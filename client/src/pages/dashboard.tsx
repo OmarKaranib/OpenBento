@@ -1,7 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, Grid2X2, Grid3X3, Maximize, LayoutGrid } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, ChevronDown, Scale } from 'lucide-react';
 
-type ViewMode = 1 | 4 | 9 | 16;
+type GridDensity = 2 | 4 | 6 | 9 | 12 | 16;
+
+interface GridOption {
+  value: GridDensity;
+  label: string;
+  cols: number;
+  rows: number;
+}
+
+const GRID_OPTIONS: GridOption[] = [
+  { value: 2, label: '2 Slots (1x2)', cols: 2, rows: 1 },
+  { value: 4, label: '4 Slots (2x2)', cols: 2, rows: 2 },
+  { value: 6, label: '6 Slots (2x3)', cols: 3, rows: 2 },
+  { value: 9, label: '9 Slots (3x3)', cols: 3, rows: 3 },
+  { value: 12, label: '12 Slots (3x4)', cols: 4, rows: 3 },
+  { value: 16, label: '16 Slots (4x4)', cols: 4, rows: 4 },
+];
 
 interface Slot {
   id: number;
@@ -14,38 +30,11 @@ interface Slot {
   embedBlocked: boolean;
 }
 
-interface YTPlayer {
-  mute: () => void;
-  unMute: () => void;
-  destroy: () => void;
-}
-
-declare global {
-  interface Window {
-    YT: {
-      Player: new (elementId: string, options: {
-        videoId: string;
-        playerVars: {
-          autoplay: number;
-          controls: number;
-          modestbranding: number;
-          rel: number;
-        };
-        events: {
-          onReady: (event: { target: { mute: () => void; unMute: () => void } }) => void;
-        };
-      }) => YTPlayer;
-    };
-    onYouTubeIframeAPIReady: () => void;
-  }
-}
-
 const MasterControlDashboard = () => {
   const [slots, setSlots] = useState<Slot[]>(() => {
     const saved = localStorage.getItem('controlDashboard');
     if (saved) {
       const parsed = JSON.parse(saved);
-      // Migrate old 12-slot layouts to 16 slots
       if (parsed.length < 16) {
         const additional = Array(16 - parsed.length).fill(null).map((_, i) => ({
           id: parsed.length + i,
@@ -74,59 +63,26 @@ const MasterControlDashboard = () => {
   });
   
   const [masterMute, setMasterMute] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    const saved = localStorage.getItem('controlDashboardViewMode');
-    return saved ? (parseInt(saved) as ViewMode) : 16;
+  const [gridDensity, setGridDensity] = useState<GridDensity>(() => {
+    const saved = localStorage.getItem('controlDashboardGridDensity');
+    return saved ? (parseInt(saved) as GridDensity) : 16;
   });
+  const [showGridDropdown, setShowGridDropdown] = useState(false);
+  const [showLegalPopup, setShowLegalPopup] = useState(false);
   const [inputIndex, setInputIndex] = useState<number | null>(null);
   const [inputValue, setInputValue] = useState('');
-  const playerRefs = useRef<Record<number, YTPlayer | null>>({});
   const iframeLoadTimers = useRef<Record<number, NodeJS.Timeout | null>>({});
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const tag = document.createElement('script');
-    tag.src = 'https://www.youtube.com/iframe_api';
-    const firstScriptTag = document.getElementsByTagName('script')[0];
-    firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-
-    window.onYouTubeIframeAPIReady = () => {
-      console.log('YouTube API Ready');
-    };
-  }, []);
-
-  useEffect(() => {
-    slots.forEach(slot => {
-      if (slot.isActive && slot.isYouTube && slot.videoId && !playerRefs.current[slot.id]) {
-        const videoId = slot.videoId;
-        setTimeout(() => {
-          if (window.YT && window.YT.Player && videoId) {
-            try {
-              playerRefs.current[slot.id] = new window.YT.Player(`youtube-player-${slot.id}`, {
-                videoId: videoId,
-                playerVars: {
-                  autoplay: 1,
-                  controls: 1,
-                  modestbranding: 1,
-                  rel: 0
-                },
-                events: {
-                  onReady: (event) => {
-                    if (slot.isMuted || masterMute) {
-                      event.target.mute();
-                    } else {
-                      event.target.unMute();
-                    }
-                  }
-                }
-              });
-            } catch (error) {
-              console.error('YouTube player initialization error:', error);
-            }
-          }
-        }, 100);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowGridDropdown(false);
       }
-    });
-  }, [slots, masterMute]);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const extractYouTubeId = (url: string): string | null => {
     const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
@@ -138,17 +94,11 @@ const MasterControlDashboard = () => {
     return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0`;
   };
 
-  const getGridCols = (): string => {
-    switch (viewMode) {
-      case 1: return 'grid-cols-1';
-      case 4: return 'grid-cols-2';
-      case 9: return 'grid-cols-3';
-      case 16: return 'grid-cols-4';
-      default: return 'grid-cols-4';
-    }
+  const getCurrentGridOption = (): GridOption => {
+    return GRID_OPTIONS.find(opt => opt.value === gridDensity) || GRID_OPTIONS[5];
   };
 
-  const visibleSlots = slots.slice(0, viewMode);
+  const visibleSlots = slots.slice(0, gridDensity);
 
   const handleAddUrl = (index: number) => {
     setInputIndex(index);
@@ -182,16 +132,6 @@ const MasterControlDashboard = () => {
   };
 
   const handleRemoveSlot = (index: number) => {
-    if (playerRefs.current[index]) {
-      try {
-        playerRefs.current[index]?.destroy();
-        delete playerRefs.current[index];
-      } catch (error) {
-        console.error('Error destroying player:', error);
-      }
-    }
-
-    // Clear any embed detection timer
     if (iframeLoadTimers.current[index]) {
       clearTimeout(iframeLoadTimers.current[index]!);
       delete iframeLoadTimers.current[index];
@@ -212,51 +152,18 @@ const MasterControlDashboard = () => {
   };
 
   const toggleSlotMute = (index: number) => {
-    const slot = slots[index];
-    
-    if (slot.isYouTube && playerRefs.current[index]) {
-      try {
-        const player = playerRefs.current[index];
-        if (slot.isMuted) {
-          player?.unMute();
-        } else {
-          player?.mute();
-        }
-      } catch (error) {
-        console.error('Error toggling YouTube mute:', error);
-      }
-    }
-
     setSlots(prev => prev.map((s, i) => 
       i === index ? { ...s, isMuted: !s.isMuted } : s
     ));
   };
 
   const handleMasterMute = () => {
-    const newMuteState = !masterMute;
-    setMasterMute(newMuteState);
-
-    slots.forEach((slot, index) => {
-      if (slot.isActive && slot.isYouTube && playerRefs.current[index]) {
-        try {
-          const player = playerRefs.current[index];
-          if (newMuteState) {
-            player?.mute();
-          } else {
-            if (!slot.isMuted) {
-              player?.unMute();
-            }
-          }
-        } catch (error) {
-          console.error('Error applying master mute:', error);
-        }
-      }
-    });
+    setMasterMute(!masterMute);
   };
 
   const handleSaveLayout = () => {
     localStorage.setItem('controlDashboard', JSON.stringify(slots));
-    localStorage.setItem('controlDashboardViewMode', viewMode.toString());
+    localStorage.setItem('controlDashboardGridDensity', gridDensity.toString());
     
     const button = document.getElementById('save-button');
     if (button) {
@@ -271,21 +178,13 @@ const MasterControlDashboard = () => {
     setSlots(prev => prev.map((slot, i) => 
       i === index ? {
         ...slot,
-        error: 'This site cannot be embedded due to X-Frame-Options policy.',
+        error: 'This site restricts embedding.',
         embedBlocked: true
       } : slot
     ));
   };
 
-  const handleIframeLoad = (index: number) => {
-    // Clear any existing timer
-    if (iframeLoadTimers.current[index]) {
-      clearTimeout(iframeLoadTimers.current[index]!);
-    }
-  };
-
   const startIframeBlockDetection = (index: number) => {
-    // Set a timer - if iframe doesn't trigger meaningful interaction, assume blocked
     if (iframeLoadTimers.current[index]) {
       clearTimeout(iframeLoadTimers.current[index]!);
     }
@@ -296,24 +195,15 @@ const MasterControlDashboard = () => {
           embedBlocked: true
         } : slot
       ));
-    }, 5000); // 5 second timeout to detect blocked iframes
+    }, 5000);
   };
 
-  const cycleViewMode = () => {
-    const modes: ViewMode[] = [1, 4, 9, 16];
-    const currentIndex = modes.indexOf(viewMode);
-    const nextIndex = (currentIndex + 1) % modes.length;
-    setViewMode(modes[nextIndex]);
+  const handleGridSelect = (value: GridDensity) => {
+    setGridDensity(value);
+    setShowGridDropdown(false);
   };
 
-  const getViewModeIcon = () => {
-    switch (viewMode) {
-      case 1: return <Maximize className="w-4 h-4" />;
-      case 4: return <Grid2X2 className="w-4 h-4" />;
-      case 9: return <Grid3X3 className="w-4 h-4" />;
-      case 16: return <LayoutGrid className="w-4 h-4" />;
-    }
-  };
+  const gridOption = getCurrentGridOption();
 
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 p-4 font-mono flex flex-col">
@@ -322,49 +212,68 @@ const MasterControlDashboard = () => {
         <div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
-      <div className="relative z-10 mb-4 flex-shrink-0">
+      <div className="relative z-10 mb-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="relative">
-              <Power className="w-6 h-6 text-cyan-400 animate-pulse" data-testid="icon-power" />
+              <Power className="w-5 h-5 text-cyan-400 animate-pulse" data-testid="icon-power" />
               <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-50"></div>
             </div>
-            <h1 className="text-2xl font-bold tracking-wider bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent" data-testid="text-title">
+            <h1 className="text-xl font-bold tracking-wider bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent" data-testid="text-title">
               MASTER CONTROL
             </h1>
           </div>
           
-          <div className="flex gap-2">
-            <button
-              onClick={cycleViewMode}
-              className="px-4 py-2 bg-purple-700 hover:bg-purple-600 rounded-lg font-semibold flex items-center gap-2 transition-all duration-300 transform hover:scale-105 shadow-lg shadow-purple-900/50 text-sm"
-              data-testid="button-view-mode"
-              title={`View ${viewMode} slot${viewMode > 1 ? 's' : ''}`}
-            >
-              {getViewModeIcon()}
-              {viewMode}
-            </button>
+          <div className="flex gap-2 items-center">
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setShowGridDropdown(!showGridDropdown)}
+                className="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 rounded-lg font-semibold flex items-center gap-2 transition-all duration-300 shadow-lg shadow-purple-900/50 text-xs"
+                data-testid="button-grid-density"
+              >
+                Grid Density
+                <ChevronDown className={`w-3 h-3 transition-transform ${showGridDropdown ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {showGridDropdown && (
+                <div className="absolute top-full mt-1 right-0 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 min-w-[160px]" data-testid="dropdown-grid-options">
+                  {GRID_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleGridSelect(option.value)}
+                      className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-700 transition-colors first:rounded-t-lg last:rounded-b-lg flex items-center justify-between ${
+                        gridDensity === option.value ? 'bg-purple-600/50 text-cyan-400' : 'text-slate-300'
+                      }`}
+                      data-testid={`grid-option-${option.value}`}
+                    >
+                      {option.label}
+                      {gridDensity === option.value && <span className="text-cyan-400">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             
             <button
               onClick={handleMasterMute}
-              className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all duration-300 transform hover:scale-105 text-sm ${
+              className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-all duration-300 transform hover:scale-105 text-xs ${
                 masterMute 
                   ? 'bg-red-600 hover:bg-red-500 shadow-lg shadow-red-900/50' 
                   : 'bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-900/50'
               }`}
               data-testid="button-master-mute"
             >
-              {masterMute ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              {masterMute ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
               {masterMute ? 'MUTED' : 'LIVE'}
             </button>
             
             <button
               id="save-button"
               onClick={handleSaveLayout}
-              className="px-4 py-2 bg-cyan-700 hover:bg-cyan-600 rounded-lg font-semibold flex items-center gap-2 transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-sm"
+              className="px-3 py-1.5 bg-cyan-700 hover:bg-cyan-600 rounded-lg font-semibold flex items-center gap-1.5 transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-xs"
               data-testid="button-save-layout"
             >
-              <Save className="w-4 h-4" />
+              <Save className="w-3.5 h-3.5" />
               SAVE
             </button>
           </div>
@@ -373,34 +282,39 @@ const MasterControlDashboard = () => {
         <div className="h-0.5 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full"></div>
       </div>
 
-      <div className={`relative z-10 grid ${getGridCols()} gap-2 flex-1 min-h-0`}>
+      <div 
+        className="relative z-10 flex-1 min-h-0 grid gap-1.5"
+        style={{
+          gridTemplateColumns: `repeat(${gridOption.cols}, minmax(0, 1fr))`,
+          gridTemplateRows: `repeat(auto-fit, minmax(0, 1fr))`
+        }}
+      >
         {visibleSlots.map((slot, index) => (
           <div
             key={slot.id}
             className="relative bg-slate-900/50 backdrop-blur-sm rounded-lg border border-slate-700/50 overflow-hidden group hover:border-cyan-500/50 transition-all duration-300 shadow-xl"
             data-testid={`slot-container-${index}`}
           >
-            <div className="absolute top-1 left-1 z-20 bg-slate-800/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold text-cyan-400 border border-cyan-500/30" data-testid={`text-slot-number-${index}`}>
+            <div className="absolute top-1 left-1 z-20 bg-slate-800/90 backdrop-blur-sm px-1.5 py-0.5 rounded text-[9px] font-bold text-cyan-400 border border-cyan-500/30" data-testid={`text-slot-number-${index}`}>
               {index + 1}
             </div>
 
             {slot.isActive && (
-              <div className="absolute top-1 right-1 z-20 flex gap-1">
+              <div className="absolute top-1 right-1 z-20 flex gap-0.5">
                 {(slot.embedBlocked || !slot.isYouTube) && slot.url && (
                   <a
                     href={slot.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`p-1 rounded transition-all duration-300 backdrop-blur-sm flex items-center gap-1 ${
+                    className={`p-1 rounded transition-all duration-300 backdrop-blur-sm ${
                       slot.embedBlocked 
                         ? 'bg-orange-600/90 hover:bg-orange-500' 
                         : 'bg-blue-600/90 hover:bg-blue-500'
                     }`}
-                    title={slot.embedBlocked ? 'Launch External (embed blocked)' : 'Open in new tab'}
+                    title={slot.embedBlocked ? 'Open in New Window' : 'Open in new tab'}
                     data-testid={`button-link-${index}`}
                   >
                     <ExternalLink className="w-3 h-3" />
-                    {slot.embedBlocked && <span className="text-[8px] font-bold">LAUNCH</span>}
                   </a>
                 )}
                 <button
@@ -431,23 +345,20 @@ const MasterControlDashboard = () => {
               {!slot.isActive && inputIndex !== index && (
                 <button
                   onClick={() => handleAddUrl(index)}
-                  className="flex flex-col items-center gap-1 p-2 hover:bg-slate-800/50 rounded-lg transition-all duration-300 group/btn"
+                  className="flex flex-col items-center gap-0.5 p-1 hover:bg-slate-800/50 rounded-lg transition-all duration-300 group/btn"
                   data-testid={`button-add-source-${index}`}
                 >
-                  <div className="relative">
-                    <Plus className="w-8 h-8 text-cyan-400 group-hover/btn:scale-110 transition-transform" />
-                    <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-0 group-hover/btn:opacity-50 transition-opacity"></div>
-                  </div>
-                  <span className="text-xs text-slate-400 group-hover/btn:text-cyan-400 transition-colors">
+                  <Plus className="w-6 h-6 text-cyan-400 group-hover/btn:scale-110 transition-transform" />
+                  <span className="text-[10px] text-slate-400 group-hover/btn:text-cyan-400 transition-colors">
                     ADD
                   </span>
                 </button>
               )}
 
               {inputIndex === index && (
-                <div className="absolute inset-0 flex items-center justify-center p-3 bg-slate-900/95 backdrop-blur-sm z-30">
+                <div className="absolute inset-0 flex items-center justify-center p-2 bg-slate-900/95 backdrop-blur-sm z-30">
                   <div className="w-full max-w-xs">
-                    <label className="block text-xs font-semibold mb-1 text-cyan-400">
+                    <label className="block text-[10px] font-semibold mb-1 text-cyan-400">
                       ENTER URL
                     </label>
                     <input
@@ -461,18 +372,18 @@ const MasterControlDashboard = () => {
                         }
                       }}
                       placeholder="https://youtube.com/watch?v=..."
-                      className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded focus:border-cyan-500 focus:outline-none transition-colors text-xs"
+                      className="w-full px-2 py-1 bg-slate-800 border border-slate-700 rounded focus:border-cyan-500 focus:outline-none transition-colors text-[10px]"
                       autoFocus
                       data-testid={`input-url-${index}`}
                     />
-                    <div className="flex gap-1 mt-2">
+                    <div className="flex gap-1 mt-1.5">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
                           handleSubmitUrl(index);
                         }}
-                        className="flex-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-500 rounded font-semibold transition-colors text-xs"
+                        className="flex-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-500 rounded font-semibold transition-colors text-[10px]"
                         data-testid={`button-load-${index}`}
                       >
                         LOAD
@@ -484,7 +395,7 @@ const MasterControlDashboard = () => {
                           setInputIndex(null);
                           setInputValue('');
                         }}
-                        className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded font-semibold transition-colors text-xs"
+                        className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded font-semibold transition-colors text-[10px]"
                         data-testid={`button-cancel-${index}`}
                       >
                         CANCEL
@@ -513,25 +424,22 @@ const MasterControlDashboard = () => {
                         allow="autoplay; encrypted-media"
                         sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
                         onError={() => handleIframeError(index)}
-                        onLoad={() => {
-                          handleIframeLoad(index);
-                          startIframeBlockDetection(index);
-                        }}
+                        onLoad={() => startIframeBlockDetection(index)}
                       />
                       {slot.embedBlocked && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
+                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90 backdrop-blur-sm">
                           <div className="text-center p-2">
-                            <AlertCircle className="w-6 h-6 text-orange-400 mx-auto mb-1" />
-                            <p className="text-[10px] text-slate-300 mb-2">Embed blocked</p>
+                            <AlertCircle className="w-5 h-5 text-orange-400 mx-auto mb-1" />
+                            <p className="text-[9px] text-slate-300 mb-2">This site restricts embedding.</p>
                             <a
                               href={slot.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 rounded font-semibold transition-colors text-xs flex items-center gap-1 mx-auto"
-                              data-testid={`button-launch-external-${index}`}
+                              className="px-2 py-1 bg-orange-600 hover:bg-orange-500 rounded font-semibold transition-colors text-[10px] inline-flex items-center gap-1"
+                              data-testid={`button-open-new-window-${index}`}
                             >
                               <ExternalLink className="w-3 h-3" />
-                              LAUNCH EXTERNAL
+                              Open in New Window
                             </a>
                           </div>
                         </div>
@@ -542,26 +450,26 @@ const MasterControlDashboard = () => {
               )}
 
               {slot.error && (
-                <div className="absolute inset-0 flex items-center justify-center p-3 bg-slate-900/95 backdrop-blur-sm">
+                <div className="absolute inset-0 flex items-center justify-center p-2 bg-slate-900/95 backdrop-blur-sm">
                   <div className="max-w-xs text-center">
-                    <AlertCircle className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                    <p className="text-xs text-slate-300 mb-2" data-testid={`text-error-${index}`}>{slot.error}</p>
+                    <AlertCircle className="w-6 h-6 text-yellow-400 mx-auto mb-1" />
+                    <p className="text-[10px] text-slate-300 mb-2" data-testid={`text-error-${index}`}>{slot.error}</p>
                     <div className="flex gap-1 justify-center">
                       {slot.url && (
                         <a
                           href={slot.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded font-semibold transition-colors text-xs flex items-center gap-1"
+                          className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded font-semibold transition-colors text-[10px] flex items-center gap-1"
                           data-testid={`button-open-link-${index}`}
                         >
                           <ExternalLink className="w-3 h-3" />
-                          OPEN
+                          Open in New Window
                         </a>
                       )}
                       <button
                         onClick={() => handleRemoveSlot(index)}
-                        className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded font-semibold transition-colors text-xs"
+                        className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded font-semibold transition-colors text-[10px]"
                         data-testid={`button-clear-slot-${index}`}
                       >
                         CLEAR
@@ -579,9 +487,50 @@ const MasterControlDashboard = () => {
         ))}
       </div>
 
-      <div className="relative z-10 mt-2 text-center text-[10px] text-slate-500 flex-shrink-0" data-testid="text-status">
-        <p>OPERATIONAL | View: {viewMode} | Active: {slots.filter(s => s.isActive).length}/16</p>
+      <div className="relative z-10 mt-2 flex-shrink-0 flex items-center justify-between text-[9px] text-slate-500 border-t border-slate-800 pt-2">
+        <p data-testid="text-footer-copyright">© 2026 Master Control. Independent tool for content aggregation.</p>
+        <div className="flex items-center gap-3">
+          <span data-testid="text-status">Active: {slots.filter(s => s.isActive).length}/16</span>
+          <button
+            onClick={() => setShowLegalPopup(true)}
+            className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-300 transition-colors flex items-center gap-1"
+            data-testid="button-legal"
+          >
+            <Scale className="w-3 h-3" />
+            Legal
+          </button>
+        </div>
       </div>
+
+      {showLegalPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" data-testid="modal-legal">
+          <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-md mx-4 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-cyan-400 flex items-center gap-2">
+                <Scale className="w-5 h-5" />
+                Legal Disclaimer
+              </h2>
+              <button
+                onClick={() => setShowLegalPopup(false)}
+                className="p-1 hover:bg-slate-800 rounded transition-colors"
+                data-testid="button-close-legal"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-300 leading-relaxed" data-testid="text-legal-content">
+              This application is a productivity tool for aggregating public web content. It is not affiliated with or endorsed by the third-party services displayed. Users are responsible for complying with the Terms of Service of all embedded sites.
+            </p>
+            <button
+              onClick={() => setShowLegalPopup(false)}
+              className="mt-4 w-full py-2 bg-cyan-700 hover:bg-cyan-600 rounded-lg font-semibold text-sm transition-colors"
+              data-testid="button-acknowledge-legal"
+            >
+              I Understand
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
