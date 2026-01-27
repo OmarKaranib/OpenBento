@@ -32,13 +32,13 @@ A 16-slot Mission Control Dashboard for monitoring multiple video sources and st
 - `tailwind.config.ts` - Tailwind configuration with scan animation
 
 ## Recent Changes
-- Added body overflow: hidden for single-screen enforcement
-- Implemented CORS proxy for non-YouTube URLs via corsproxy.io
+- Fixed grid layout: height: calc(100vh - 64px) for proper screen fill
+- Fixed row heights: grid-template-rows: repeat(4, 1fr) forces 4 equal rows at 25% each
 - Updated z-index to 9999 for dropdown and Add Source modal
 - Individual Play/Pause and Mute buttons on every slot using YouTube IFrame API
 
 ## Technical Implementation Details
-- Grid Layout: `grid-template-rows: repeat(auto-fill, minmax(0, 1fr))` with `height: 100vh; overflow: hidden`
+- Grid Layout: `height: calc(100vh - 64px)` with `grid-template-rows: repeat(4, 1fr)`
 - Z-Index: Dropdown and Add Source modal use `z-[9999]` to always stay on top
 - YouTube Auto-Converter: `extractYouTubeId()` function detects standard YouTube URLs and converts to `/embed/` format
 - CORS Proxy: `getCorsProxyUrl()` wraps non-YouTube URLs with `https://corsproxy.io/?{encodedUrl}`
