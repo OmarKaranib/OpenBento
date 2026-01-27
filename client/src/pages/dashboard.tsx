@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, ChevronDown, Scale } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, ChevronDown, Scale, Pause, Play } from 'lucide-react';
 
 type GridDensity = 2 | 4 | 6 | 9 | 12 | 16;
 
@@ -24,6 +24,7 @@ interface Slot {
   url: string;
   isActive: boolean;
   isMuted: boolean;
+  isPaused: boolean;
   error: string | null;
   isYouTube: boolean;
   videoId: string | null;
@@ -41,20 +42,30 @@ const MasterControlDashboard = () => {
           url: '',
           isActive: false,
           isMuted: true,
+          isPaused: false,
           error: null,
           isYouTube: false,
           videoId: null,
           embedBlocked: false
         }));
-        return [...parsed.map((s: Slot) => ({ ...s, embedBlocked: s.embedBlocked ?? false })), ...additional];
+        return [...parsed.map((s: Slot) => ({ 
+          ...s, 
+          embedBlocked: s.embedBlocked ?? false,
+          isPaused: s.isPaused ?? false 
+        })), ...additional];
       }
-      return parsed.map((s: Slot) => ({ ...s, embedBlocked: s.embedBlocked ?? false }));
+      return parsed.map((s: Slot) => ({ 
+        ...s, 
+        embedBlocked: s.embedBlocked ?? false,
+        isPaused: s.isPaused ?? false 
+      }));
     }
     return Array(16).fill(null).map((_, i) => ({
       id: i,
       url: '',
       isActive: false,
       isMuted: true,
+      isPaused: false,
       error: null,
       isYouTube: false,
       videoId: null,
@@ -72,6 +83,7 @@ const MasterControlDashboard = () => {
   const [inputIndex, setInputIndex] = useState<number | null>(null);
   const [inputValue, setInputValue] = useState('');
   const iframeLoadTimers = useRef<Record<number, NodeJS.Timeout | null>>({});
+  const iframeRefs = useRef<Record<number, HTMLIFrameElement | null>>({});
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -91,8 +103,20 @@ const MasterControlDashboard = () => {
   };
 
   const getYouTubeEmbedUrl = (videoId: string): string => {
-    return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0`;
+    return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
   };
+
+  const sendYouTubeCommand = useCallback((index: number, command: string, value?: number | boolean) => {
+    const iframe = iframeRefs.current[index];
+    if (iframe && iframe.contentWindow) {
+      const message = {
+        event: 'command',
+        func: command,
+        args: value !== undefined ? [value] : []
+      };
+      iframe.contentWindow.postMessage(JSON.stringify(message), '*');
+    }
+  }, []);
 
   const getCurrentGridOption = (): GridOption => {
     return GRID_OPTIONS.find(opt => opt.value === gridDensity) || GRID_OPTIONS[5];
@@ -123,7 +147,9 @@ const MasterControlDashboard = () => {
         isYouTube: !!youtubeId,
         videoId: youtubeId,
         error: null,
-        embedBlocked: false
+        embedBlocked: false,
+        isPaused: false,
+        isMuted: true
       } : slot
     ));
 
@@ -136,6 +162,7 @@ const MasterControlDashboard = () => {
       clearTimeout(iframeLoadTimers.current[index]!);
       delete iframeLoadTimers.current[index];
     }
+    delete iframeRefs.current[index];
 
     setSlots(prev => prev.map((slot, i) => 
       i === index ? {
@@ -143,6 +170,7 @@ const MasterControlDashboard = () => {
         url: '',
         isActive: false,
         isMuted: true,
+        isPaused: false,
         error: null,
         isYouTube: false,
         videoId: null,
@@ -152,13 +180,44 @@ const MasterControlDashboard = () => {
   };
 
   const toggleSlotMute = (index: number) => {
+    const slot = slots[index];
+    const newMuted = !slot.isMuted;
+    
+    if (slot.isYouTube) {
+      sendYouTubeCommand(index, newMuted ? 'mute' : 'unMute');
+    }
+    
     setSlots(prev => prev.map((s, i) => 
-      i === index ? { ...s, isMuted: !s.isMuted } : s
+      i === index ? { ...s, isMuted: newMuted } : s
+    ));
+  };
+
+  const toggleSlotPause = (index: number) => {
+    const slot = slots[index];
+    const newPaused = !slot.isPaused;
+    
+    if (slot.isYouTube) {
+      sendYouTubeCommand(index, newPaused ? 'pauseVideo' : 'playVideo');
+    }
+    
+    setSlots(prev => prev.map((s, i) => 
+      i === index ? { ...s, isPaused: newPaused } : s
     ));
   };
 
   const handleMasterMute = () => {
-    setMasterMute(!masterMute);
+    const newMasterMute = !masterMute;
+    setMasterMute(newMasterMute);
+    
+    slots.forEach((slot, index) => {
+      if (slot.isActive && slot.isYouTube) {
+        sendYouTubeCommand(index, newMasterMute ? 'mute' : 'unMute');
+      }
+    });
+    
+    setSlots(prev => prev.map(s => 
+      s.isActive ? { ...s, isMuted: newMasterMute } : s
+    ));
   };
 
   const handleSaveLayout = () => {
@@ -207,17 +266,17 @@ const MasterControlDashboard = () => {
 
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 p-4 font-mono flex flex-col">
-      <div className="fixed inset-0 opacity-30 pointer-events-none">
+      <div className="fixed inset-0 opacity-30 pointer-events-none z-0">
         <div className="absolute top-20 left-20 w-96 h-96 bg-cyan-500 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
-      <div className="relative z-10 mb-3 flex-shrink-0">
+      <div className="relative z-30 mb-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <div className="relative">
               <Power className="w-5 h-5 text-cyan-400 animate-pulse" data-testid="icon-power" />
-              <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-50"></div>
+              <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-50 pointer-events-none"></div>
             </div>
             <h1 className="text-xl font-bold tracking-wider bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent" data-testid="text-title">
               MASTER CONTROL
@@ -301,22 +360,21 @@ const MasterControlDashboard = () => {
 
             {slot.isActive && (
               <div className="absolute top-1 right-1 z-20 flex gap-0.5">
-                {(slot.embedBlocked || !slot.isYouTube) && slot.url && (
-                  <a
-                    href={slot.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                {slot.isYouTube && (
+                  <button
+                    onClick={() => toggleSlotPause(index)}
                     className={`p-1 rounded transition-all duration-300 backdrop-blur-sm ${
-                      slot.embedBlocked 
-                        ? 'bg-orange-600/90 hover:bg-orange-500' 
+                      slot.isPaused 
+                        ? 'bg-yellow-600/90 hover:bg-yellow-500' 
                         : 'bg-blue-600/90 hover:bg-blue-500'
                     }`}
-                    title={slot.embedBlocked ? 'Open in New Window' : 'Open in new tab'}
-                    data-testid={`button-link-${index}`}
+                    title={slot.isPaused ? 'Play' : 'Pause'}
+                    data-testid={`button-pause-${index}`}
                   >
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+                    {slot.isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                  </button>
                 )}
+                
                 <button
                   onClick={() => toggleSlotMute(index)}
                   className={`p-1 rounded transition-all duration-300 backdrop-blur-sm ${
@@ -329,6 +387,19 @@ const MasterControlDashboard = () => {
                 >
                   {slot.isMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
                 </button>
+                
+                {!slot.isYouTube && slot.url && (
+                  <a
+                    href={slot.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1 rounded transition-all duration-300 backdrop-blur-sm bg-blue-600/90 hover:bg-blue-500"
+                    title="Open in new tab"
+                    data-testid={`button-link-${index}`}
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
                 
                 <button
                   onClick={() => handleRemoveSlot(index)}
@@ -409,6 +480,7 @@ const MasterControlDashboard = () => {
                 <div className="w-full h-full relative">
                   {slot.isYouTube && slot.videoId ? (
                     <iframe
+                      ref={(el) => { iframeRefs.current[index] = el; }}
                       src={getYouTubeEmbedUrl(slot.videoId)}
                       className="w-full h-full"
                       title={`YouTube - Slot ${index + 1}`}
@@ -427,19 +499,22 @@ const MasterControlDashboard = () => {
                         onLoad={() => startIframeBlockDetection(index)}
                       />
                       {slot.embedBlocked && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90 backdrop-blur-sm">
-                          <div className="text-center p-2">
-                            <AlertCircle className="w-5 h-5 text-orange-400 mx-auto mb-1" />
-                            <p className="text-[9px] text-slate-300 mb-2">This site restricts embedding.</p>
+                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm">
+                          <div className="text-center p-4 max-w-xs">
+                            <AlertCircle className="w-8 h-8 text-orange-400 mx-auto mb-2" />
+                            <p className="text-sm font-semibold text-slate-200 mb-1">Embedding Restricted</p>
+                            <p className="text-[10px] text-slate-400 mb-3">
+                              Sites like Twitter, Discord, and others require their official embed codes. Standard iframes are blocked for security.
+                            </p>
                             <a
                               href={slot.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="px-2 py-1 bg-orange-600 hover:bg-orange-500 rounded font-semibold transition-colors text-[10px] inline-flex items-center gap-1"
-                              data-testid={`button-open-new-window-${index}`}
+                              className="px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg font-semibold transition-colors text-sm inline-flex items-center gap-2"
+                              data-testid={`button-open-widget-${index}`}
                             >
-                              <ExternalLink className="w-3 h-3" />
-                              Open in New Window
+                              <ExternalLink className="w-4 h-4" />
+                              Open in Official Widget Mode
                             </a>
                           </div>
                         </div>
