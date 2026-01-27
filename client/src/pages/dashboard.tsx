@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, Grid2X2, Grid3X3, Maximize, LayoutGrid } from 'lucide-react';
+
+type ViewMode = 1 | 4 | 9 | 16;
 
 interface Slot {
   id: number;
@@ -9,6 +11,7 @@ interface Slot {
   error: string | null;
   isYouTube: boolean;
   videoId: string | null;
+  embedBlocked: boolean;
 }
 
 interface YTPlayer {
@@ -40,21 +43,45 @@ declare global {
 const MasterControlDashboard = () => {
   const [slots, setSlots] = useState<Slot[]>(() => {
     const saved = localStorage.getItem('controlDashboard');
-    return saved ? JSON.parse(saved) : Array(12).fill(null).map((_, i) => ({
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Migrate old 12-slot layouts to 16 slots
+      if (parsed.length < 16) {
+        const additional = Array(16 - parsed.length).fill(null).map((_, i) => ({
+          id: parsed.length + i,
+          url: '',
+          isActive: false,
+          isMuted: true,
+          error: null,
+          isYouTube: false,
+          videoId: null,
+          embedBlocked: false
+        }));
+        return [...parsed.map((s: Slot) => ({ ...s, embedBlocked: s.embedBlocked ?? false })), ...additional];
+      }
+      return parsed.map((s: Slot) => ({ ...s, embedBlocked: s.embedBlocked ?? false }));
+    }
+    return Array(16).fill(null).map((_, i) => ({
       id: i,
       url: '',
       isActive: false,
       isMuted: true,
       error: null,
       isYouTube: false,
-      videoId: null
+      videoId: null,
+      embedBlocked: false
     }));
   });
   
   const [masterMute, setMasterMute] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const saved = localStorage.getItem('controlDashboardViewMode');
+    return saved ? (parseInt(saved) as ViewMode) : 16;
+  });
   const [inputIndex, setInputIndex] = useState<number | null>(null);
   const [inputValue, setInputValue] = useState('');
   const playerRefs = useRef<Record<number, YTPlayer | null>>({});
+  const iframeLoadTimers = useRef<Record<number, NodeJS.Timeout | null>>({});
 
   useEffect(() => {
     const tag = document.createElement('script');
@@ -107,6 +134,22 @@ const MasterControlDashboard = () => {
     return (match && match[7].length === 11) ? match[7] : null;
   };
 
+  const getYouTubeEmbedUrl = (videoId: string): string => {
+    return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0`;
+  };
+
+  const getGridCols = (): string => {
+    switch (viewMode) {
+      case 1: return 'grid-cols-1';
+      case 4: return 'grid-cols-2';
+      case 9: return 'grid-cols-3';
+      case 16: return 'grid-cols-4';
+      default: return 'grid-cols-4';
+    }
+  };
+
+  const visibleSlots = slots.slice(0, viewMode);
+
   const handleAddUrl = (index: number) => {
     setInputIndex(index);
     setInputValue(slots[index].url || '');
@@ -129,7 +172,8 @@ const MasterControlDashboard = () => {
         isActive: true,
         isYouTube: !!youtubeId,
         videoId: youtubeId,
-        error: null
+        error: null,
+        embedBlocked: false
       } : slot
     ));
 
@@ -147,6 +191,12 @@ const MasterControlDashboard = () => {
       }
     }
 
+    // Clear any embed detection timer
+    if (iframeLoadTimers.current[index]) {
+      clearTimeout(iframeLoadTimers.current[index]!);
+      delete iframeLoadTimers.current[index];
+    }
+
     setSlots(prev => prev.map((slot, i) => 
       i === index ? {
         ...slot,
@@ -155,7 +205,8 @@ const MasterControlDashboard = () => {
         isMuted: true,
         error: null,
         isYouTube: false,
-        videoId: null
+        videoId: null,
+        embedBlocked: false
       } : slot
     ));
   };
@@ -205,6 +256,7 @@ const MasterControlDashboard = () => {
 
   const handleSaveLayout = () => {
     localStorage.setItem('controlDashboard', JSON.stringify(slots));
+    localStorage.setItem('controlDashboardViewMode', viewMode.toString());
     
     const button = document.getElementById('save-button');
     if (button) {
@@ -219,9 +271,48 @@ const MasterControlDashboard = () => {
     setSlots(prev => prev.map((slot, i) => 
       i === index ? {
         ...slot,
-        error: 'This site cannot be embedded due to X-Frame-Options policy. Try a different URL or use a proxy service.'
+        error: 'This site cannot be embedded due to X-Frame-Options policy.',
+        embedBlocked: true
       } : slot
     ));
+  };
+
+  const handleIframeLoad = (index: number) => {
+    // Clear any existing timer
+    if (iframeLoadTimers.current[index]) {
+      clearTimeout(iframeLoadTimers.current[index]!);
+    }
+  };
+
+  const startIframeBlockDetection = (index: number) => {
+    // Set a timer - if iframe doesn't trigger meaningful interaction, assume blocked
+    if (iframeLoadTimers.current[index]) {
+      clearTimeout(iframeLoadTimers.current[index]!);
+    }
+    iframeLoadTimers.current[index] = setTimeout(() => {
+      setSlots(prev => prev.map((slot, i) => 
+        i === index && slot.isActive && !slot.isYouTube && !slot.embedBlocked ? {
+          ...slot,
+          embedBlocked: true
+        } : slot
+      ));
+    }, 5000); // 5 second timeout to detect blocked iframes
+  };
+
+  const cycleViewMode = () => {
+    const modes: ViewMode[] = [1, 4, 9, 16];
+    const currentIndex = modes.indexOf(viewMode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    setViewMode(modes[nextIndex]);
+  };
+
+  const getViewModeIcon = () => {
+    switch (viewMode) {
+      case 1: return <Maximize className="w-4 h-4" />;
+      case 4: return <Grid2X2 className="w-4 h-4" />;
+      case 9: return <Grid3X3 className="w-4 h-4" />;
+      case 16: return <LayoutGrid className="w-4 h-4" />;
+    }
   };
 
   return (
@@ -244,6 +335,16 @@ const MasterControlDashboard = () => {
           </div>
           
           <div className="flex gap-2">
+            <button
+              onClick={cycleViewMode}
+              className="px-4 py-2 bg-purple-700 hover:bg-purple-600 rounded-lg font-semibold flex items-center gap-2 transition-all duration-300 transform hover:scale-105 shadow-lg shadow-purple-900/50 text-sm"
+              data-testid="button-view-mode"
+              title={`View ${viewMode} slot${viewMode > 1 ? 's' : ''}`}
+            >
+              {getViewModeIcon()}
+              {viewMode}
+            </button>
+            
             <button
               onClick={handleMasterMute}
               className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all duration-300 transform hover:scale-105 text-sm ${
@@ -272,8 +373,8 @@ const MasterControlDashboard = () => {
         <div className="h-0.5 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full"></div>
       </div>
 
-      <div className="relative z-10 grid grid-cols-4 gap-2 flex-1 min-h-0">
-        {slots.map((slot, index) => (
+      <div className={`relative z-10 grid ${getGridCols()} gap-2 flex-1 min-h-0`}>
+        {visibleSlots.map((slot, index) => (
           <div
             key={slot.id}
             className="relative bg-slate-900/50 backdrop-blur-sm rounded-lg border border-slate-700/50 overflow-hidden group hover:border-cyan-500/50 transition-all duration-300 shadow-xl"
@@ -285,16 +386,21 @@ const MasterControlDashboard = () => {
 
             {slot.isActive && (
               <div className="absolute top-1 right-1 z-20 flex gap-1">
-                {!slot.isYouTube && slot.url && (
+                {(slot.embedBlocked || !slot.isYouTube) && slot.url && (
                   <a
                     href={slot.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-1 bg-blue-600/90 hover:bg-blue-500 rounded transition-all duration-300 backdrop-blur-sm"
-                    title="Open in new tab"
+                    className={`p-1 rounded transition-all duration-300 backdrop-blur-sm flex items-center gap-1 ${
+                      slot.embedBlocked 
+                        ? 'bg-orange-600/90 hover:bg-orange-500' 
+                        : 'bg-blue-600/90 hover:bg-blue-500'
+                    }`}
+                    title={slot.embedBlocked ? 'Launch External (embed blocked)' : 'Open in new tab'}
                     data-testid={`button-link-${index}`}
                   >
                     <ExternalLink className="w-3 h-3" />
+                    {slot.embedBlocked && <span className="text-[8px] font-bold">LAUNCH</span>}
                   </a>
                 )}
                 <button
@@ -389,18 +495,48 @@ const MasterControlDashboard = () => {
               )}
 
               {slot.isActive && !slot.error && (
-                <div className="w-full h-full">
-                  {slot.isYouTube ? (
-                    <div id={`youtube-player-${slot.id}`} className="w-full h-full"></div>
-                  ) : (
+                <div className="w-full h-full relative">
+                  {slot.isYouTube && slot.videoId ? (
                     <iframe
-                      src={slot.url}
+                      src={getYouTubeEmbedUrl(slot.videoId)}
                       className="w-full h-full"
-                      title={`Slot ${index + 1}`}
-                      allow="autoplay; encrypted-media"
-                      sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                      onError={() => handleIframeError(index)}
+                      title={`YouTube - Slot ${index + 1}`}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
                     />
+                  ) : (
+                    <>
+                      <iframe
+                        src={slot.url}
+                        className="w-full h-full"
+                        title={`Slot ${index + 1}`}
+                        allow="autoplay; encrypted-media"
+                        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                        onError={() => handleIframeError(index)}
+                        onLoad={() => {
+                          handleIframeLoad(index);
+                          startIframeBlockDetection(index);
+                        }}
+                      />
+                      {slot.embedBlocked && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
+                          <div className="text-center p-2">
+                            <AlertCircle className="w-6 h-6 text-orange-400 mx-auto mb-1" />
+                            <p className="text-[10px] text-slate-300 mb-2">Embed blocked</p>
+                            <a
+                              href={slot.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 rounded font-semibold transition-colors text-xs flex items-center gap-1 mx-auto"
+                              data-testid={`button-launch-external-${index}`}
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              LAUNCH EXTERNAL
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -444,7 +580,7 @@ const MasterControlDashboard = () => {
       </div>
 
       <div className="relative z-10 mt-2 text-center text-[10px] text-slate-500 flex-shrink-0" data-testid="text-status">
-        <p>OPERATIONAL | Active: {slots.filter(s => s.isActive).length}/12</p>
+        <p>OPERATIONAL | View: {viewMode} | Active: {slots.filter(s => s.isActive).length}/16</p>
       </div>
     </div>
   );
