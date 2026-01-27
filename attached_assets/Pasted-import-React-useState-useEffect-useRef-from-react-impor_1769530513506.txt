@@ -1,0 +1,418 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X } from 'lucide-react';
+
+const MasterControlDashboard = () => {
+  const [slots, setSlots] = useState(() => {
+    const saved = localStorage.getItem('controlDashboard');
+    return saved ? JSON.parse(saved) : Array(12).fill(null).map((_, i) => ({
+      id: i,
+      url: '',
+      isActive: false,
+      isMuted: true,
+      error: null,
+      isYouTube: false,
+      videoId: null
+    }));
+  });
+  
+  const [masterMute, setMasterMute] = useState(true);
+  const [inputIndex, setInputIndex] = useState(null);
+  const [inputValue, setInputValue] = useState('');
+  const playerRefs = useRef({});
+
+  // Load YouTube IFrame API
+  useEffect(() => {
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    window.onYouTubeIframeAPIReady = () => {
+      console.log('YouTube API Ready');
+    };
+  }, []);
+
+  // Initialize YouTube players when slots change
+  useEffect(() => {
+    slots.forEach(slot => {
+      if (slot.isActive && slot.isYouTube && slot.videoId && !playerRefs.current[slot.id]) {
+        setTimeout(() => {
+          if (window.YT && window.YT.Player) {
+            try {
+              playerRefs.current[slot.id] = new window.YT.Player(`youtube-player-${slot.id}`, {
+                videoId: slot.videoId,
+                playerVars: {
+                  autoplay: 1,
+                  controls: 1,
+                  modestbranding: 1,
+                  rel: 0
+                },
+                events: {
+                  onReady: (event) => {
+                    if (slot.isMuted || masterMute) {
+                      event.target.mute();
+                    } else {
+                      event.target.unMute();
+                    }
+                  }
+                }
+              });
+            } catch (error) {
+              console.error('YouTube player initialization error:', error);
+            }
+          }
+        }, 100);
+      }
+    });
+  }, [slots, masterMute]);
+
+  const extractYouTubeId = (url) => {
+    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[7].length === 11) ? match[7] : null;
+  };
+
+  const handleAddUrl = (index) => {
+    setInputIndex(index);
+    setInputValue(slots[index].url || '');
+  };
+
+  const handleSubmitUrl = (index) => {
+    if (!inputValue.trim()) return;
+
+    let url = inputValue.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+
+    const youtubeId = extractYouTubeId(url);
+    
+    setSlots(prev => prev.map((slot, i) => 
+      i === index ? {
+        ...slot,
+        url,
+        isActive: true,
+        isYouTube: !!youtubeId,
+        videoId: youtubeId,
+        error: null
+      } : slot
+    ));
+
+    setInputIndex(null);
+    setInputValue('');
+  };
+
+  const handleRemoveSlot = (index) => {
+    if (playerRefs.current[index]) {
+      try {
+        playerRefs.current[index].destroy();
+        delete playerRefs.current[index];
+      } catch (error) {
+        console.error('Error destroying player:', error);
+      }
+    }
+
+    setSlots(prev => prev.map((slot, i) => 
+      i === index ? {
+        ...slot,
+        url: '',
+        isActive: false,
+        isMuted: true,
+        error: null,
+        isYouTube: false,
+        videoId: null
+      } : slot
+    ));
+  };
+
+  const toggleSlotMute = (index) => {
+    const slot = slots[index];
+    
+    if (slot.isYouTube && playerRefs.current[index]) {
+      try {
+        const player = playerRefs.current[index];
+        if (slot.isMuted) {
+          player.unMute();
+        } else {
+          player.mute();
+        }
+      } catch (error) {
+        console.error('Error toggling YouTube mute:', error);
+      }
+    }
+
+    setSlots(prev => prev.map((s, i) => 
+      i === index ? { ...s, isMuted: !s.isMuted } : s
+    ));
+  };
+
+  const handleMasterMute = () => {
+    const newMuteState = !masterMute;
+    setMasterMute(newMuteState);
+
+    slots.forEach((slot, index) => {
+      if (slot.isActive && slot.isYouTube && playerRefs.current[index]) {
+        try {
+          const player = playerRefs.current[index];
+          if (newMuteState) {
+            player.mute();
+          } else {
+            if (!slot.isMuted) {
+              player.unMute();
+            }
+          }
+        } catch (error) {
+          console.error('Error applying master mute:', error);
+        }
+      }
+    });
+  };
+
+  const handleSaveLayout = () => {
+    localStorage.setItem('controlDashboard', JSON.stringify(slots));
+    
+    // Visual feedback
+    const button = document.getElementById('save-button');
+    button.classList.add('scale-95', 'bg-cyan-600');
+    setTimeout(() => {
+      button.classList.remove('scale-95', 'bg-cyan-600');
+    }, 200);
+  };
+
+  const handleIframeError = (index) => {
+    setSlots(prev => prev.map((slot, i) => 
+      i === index ? {
+        ...slot,
+        error: 'This site cannot be embedded due to X-Frame-Options policy. Try a different URL or use a proxy service.'
+      } : slot
+    ));
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 p-6 font-mono">
+      {/* Ambient background effects */}
+      <div className="fixed inset-0 opacity-30 pointer-events-none">
+        <div className="absolute top-20 left-20 w-96 h-96 bg-cyan-500 rounded-full blur-[120px] animate-pulse"></div>
+        <div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+      </div>
+
+      {/* Header */}
+      <div className="relative z-10 mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Power className="w-8 h-8 text-cyan-400 animate-pulse" />
+              <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-50"></div>
+            </div>
+            <h1 className="text-4xl font-bold tracking-wider bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+              MASTER CONTROL
+            </h1>
+          </div>
+          
+          <div className="flex gap-3">
+            <button
+              onClick={handleMasterMute}
+              className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-all duration-300 transform hover:scale-105 ${
+                masterMute 
+                  ? 'bg-red-600 hover:bg-red-500 shadow-lg shadow-red-900/50' 
+                  : 'bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-900/50'
+              }`}
+            >
+              {masterMute ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              {masterMute ? 'MUTED' : 'LIVE'}
+            </button>
+            
+            <button
+              id="save-button"
+              onClick={handleSaveLayout}
+              className="px-6 py-3 bg-cyan-700 hover:bg-cyan-600 rounded-lg font-semibold flex items-center gap-2 transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50"
+            >
+              <Save className="w-5 h-5" />
+              SAVE LAYOUT
+            </button>
+          </div>
+        </div>
+        
+        <div className="h-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full"></div>
+      </div>
+
+      {/* Control Grid */}
+      <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {slots.map((slot, index) => (
+          <div
+            key={slot.id}
+            className="relative aspect-video bg-slate-900/50 backdrop-blur-sm rounded-lg border-2 border-slate-700/50 overflow-hidden group hover:border-cyan-500/50 transition-all duration-300 shadow-xl"
+          >
+            {/* Slot number indicator */}
+            <div className="absolute top-3 left-3 z-20 bg-slate-800/90 backdrop-blur-sm px-3 py-1 rounded-md text-xs font-bold text-cyan-400 border border-cyan-500/30">
+              SLOT {index + 1}
+            </div>
+
+            {/* Mute/Remove controls */}
+            {slot.isActive && (
+              <div className="absolute top-3 right-3 z-20 flex gap-2">
+                <button
+                  onClick={() => toggleSlotMute(index)}
+                  className={`p-2 rounded-md transition-all duration-300 backdrop-blur-sm ${
+                    slot.isMuted 
+                      ? 'bg-red-600/90 hover:bg-red-500' 
+                      : 'bg-emerald-600/90 hover:bg-emerald-500'
+                  }`}
+                  title={slot.isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {slot.isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                </button>
+                
+                <button
+                  onClick={() => handleRemoveSlot(index)}
+                  className="p-2 bg-slate-800/90 hover:bg-slate-700 rounded-md transition-all duration-300 backdrop-blur-sm"
+                  title="Remove"
+                >
+                  <X className="w-4 h-4 text-red-400" />
+                </button>
+              </div>
+            )}
+
+            {/* Content Area */}
+            <div className="w-full h-full flex items-center justify-center">
+              {!slot.isActive && inputIndex !== index && (
+                <button
+                  onClick={() => handleAddUrl(index)}
+                  className="flex flex-col items-center gap-3 p-8 hover:bg-slate-800/50 rounded-lg transition-all duration-300 group/btn"
+                >
+                  <div className="relative">
+                    <Plus className="w-12 h-12 text-cyan-400 group-hover/btn:scale-110 transition-transform" />
+                    <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-0 group-hover/btn:opacity-50 transition-opacity"></div>
+                  </div>
+                  <span className="text-sm text-slate-400 group-hover/btn:text-cyan-400 transition-colors">
+                    ADD SOURCE
+                  </span>
+                </button>
+              )}
+
+              {inputIndex === index && (
+                <div className="absolute inset-0 flex items-center justify-center p-6 bg-slate-900/95 backdrop-blur-sm z-30">
+                  <div className="w-full max-w-md">
+                    <label className="block text-sm font-semibold mb-2 text-cyan-400">
+                      ENTER URL
+                    </label>
+                    <input
+                      type="text"
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSubmitUrl(index)}
+                      placeholder="https://youtube.com/watch?v=..."
+                      className="w-full px-4 py-3 bg-slate-800 border-2 border-slate-700 rounded-lg focus:border-cyan-500 focus:outline-none transition-colors text-sm"
+                      autoFocus
+                    />
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        onClick={() => handleSubmitUrl(index)}
+                        className="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-semibold transition-colors"
+                      >
+                        LOAD
+                      </button>
+                      <button
+                        onClick={() => {
+                          setInputIndex(null);
+                          setInputValue('');
+                        }}
+                        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-semibold transition-colors"
+                      >
+                        CANCEL
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {slot.isActive && !slot.error && (
+                <div className="w-full h-full">
+                  {slot.isYouTube ? (
+                    <div id={`youtube-player-${slot.id}`} className="w-full h-full"></div>
+                  ) : (
+                    <iframe
+                      src={slot.url}
+                      className="w-full h-full"
+                      title={`Slot ${index + 1}`}
+                      allow="autoplay; encrypted-media"
+                      sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                      onError={() => handleIframeError(index)}
+                    />
+                  )}
+                </div>
+              )}
+
+              {slot.error && (
+                <div className="absolute inset-0 flex items-center justify-center p-6 bg-slate-900/95 backdrop-blur-sm">
+                  <div className="max-w-md text-center">
+                    <AlertCircle className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+                    <p className="text-sm text-slate-300 mb-4">{slot.error}</p>
+                    <button
+                      onClick={() => handleRemoveSlot(index)}
+                      className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-semibold transition-colors"
+                    >
+                      CLEAR SLOT
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Scan line effect */}
+            <div className="absolute inset-0 pointer-events-none opacity-10">
+              <div className="w-full h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-scan"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer info */}
+      <div className="relative z-10 mt-8 text-center text-xs text-slate-500">
+        <p>System Status: OPERATIONAL | Slots Active: {slots.filter(s => s.isActive).length}/12</p>
+      </div>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+        
+        body {
+          font-family: 'Share Tech Mono', monospace;
+        }
+
+        @keyframes scan {
+          0% {
+            transform: translateY(-100%);
+          }
+          100% {
+            transform: translateY(100vh);
+          }
+        }
+
+        .animate-scan {
+          animation: scan 3s linear infinite;
+        }
+
+        /* Hide scrollbars but keep functionality */
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: rgba(15, 23, 42, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: rgba(34, 211, 238, 0.3);
+          border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(34, 211, 238, 0.5);
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default MasterControlDashboard;
