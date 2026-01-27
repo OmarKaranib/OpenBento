@@ -348,8 +348,9 @@ const MasterControlDashboard = () => {
       <div 
         className="relative z-10 grid gap-1.5 overflow-hidden"
         style={{
-          height: 'calc(100vh - 64px)',
-          gridTemplateColumns: `repeat(${gridOption.cols}, minmax(0, 1fr))`,
+          height: 'calc(100vh - 80px)',
+          width: '100%',
+          gridTemplateColumns: `repeat(${gridOption.cols}, 1fr)`,
           gridTemplateRows: `repeat(4, 1fr)`
         }}
       >
