@@ -11,6 +11,12 @@ interface Slot {
   videoId: string | null;
 }
 
+interface YTPlayer {
+  mute: () => void;
+  unMute: () => void;
+  destroy: () => void;
+}
+
 declare global {
   interface Window {
     YT: {
@@ -25,11 +31,7 @@ declare global {
         events: {
           onReady: (event: { target: { mute: () => void; unMute: () => void } }) => void;
         };
-      }) => {
-        mute: () => void;
-        unMute: () => void;
-        destroy: () => void;
-      };
+      }) => YTPlayer;
     };
     onYouTubeIframeAPIReady: () => void;
   }
@@ -52,7 +54,7 @@ const MasterControlDashboard = () => {
   const [masterMute, setMasterMute] = useState(true);
   const [inputIndex, setInputIndex] = useState<number | null>(null);
   const [inputValue, setInputValue] = useState('');
-  const playerRefs = useRef<Record<number, ReturnType<typeof window.YT.Player> | null>>({});
+  const playerRefs = useRef<Record<number, YTPlayer | null>>({});
 
   useEffect(() => {
     const tag = document.createElement('script');
@@ -68,11 +70,12 @@ const MasterControlDashboard = () => {
   useEffect(() => {
     slots.forEach(slot => {
       if (slot.isActive && slot.isYouTube && slot.videoId && !playerRefs.current[slot.id]) {
+        const videoId = slot.videoId;
         setTimeout(() => {
-          if (window.YT && window.YT.Player) {
+          if (window.YT && window.YT.Player && videoId) {
             try {
               playerRefs.current[slot.id] = new window.YT.Player(`youtube-player-${slot.id}`, {
-                videoId: slot.videoId,
+                videoId: videoId,
                 playerVars: {
                   autoplay: 1,
                   controls: 1,
