@@ -36,3 +36,9 @@ A 16-slot Mission Control Dashboard for monitoring multiple video sources and st
 - Improved embed blocked fallback: "Embedding Restricted" with explanation about Twitter/Discord
 - Added "Open in Official Widget Mode" button for blocked sites
 - YouTube URLs auto-convert to embed format with enablejsapi=1 parameter
+
+## Technical Implementation Details
+- Grid Layout: `grid-template-rows: repeat(auto-fill, minmax(0, 1fr))` with `height: 100vh; overflow: hidden`
+- Z-Index: Dropdown and Add Source modal use `z-[100]` to prevent being blocked by slots
+- YouTube Auto-Converter: `extractYouTubeId()` function detects standard YouTube URLs and converts to `/embed/` format
+- Independent Controls: Each slot has Mute and Pause buttons using YouTube IFrame API postMessage
