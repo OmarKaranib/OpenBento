@@ -69,6 +69,13 @@ const customCollisionDetection: CollisionDetection = (args) => {
   
   if (!collisions.length) return collisions;
   
+  const activeData = args.active?.data?.current;
+  const isFromSidebar = activeData?.type === 'channel' || activeData?.type === 'block';
+  
+  if (isFromSidebar) {
+    return collisions;
+  }
+  
   const filteredCollisions = collisions.filter((collision) => {
     const { data } = collision;
     if (!data?.droppableContainer?.rect?.current) return false;
