@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, ChevronDown, Scale, Pause, Play, GripVertical } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, ChevronDown, Scale, Pause, Play, GripVertical, Edit3, Lock } from 'lucide-react';
 import { 
   DndContext, 
   DragEndEvent, 
@@ -9,8 +9,10 @@ import {
   useSensor, 
   useSensors, 
   PointerSensor,
-  closestCenter,
-  UniqueIdentifier
+  rectIntersection,
+  UniqueIdentifier,
+  CollisionDetection,
+  Collision
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -59,9 +61,38 @@ interface SortableSlotProps {
   children: React.ReactNode;
   isDraggingThis: boolean;
   gridCols: number;
+  isEditMode: boolean;
 }
 
-function SortableSlot({ slot, index, children, isDraggingThis, gridCols }: SortableSlotProps) {
+const customCollisionDetection: CollisionDetection = (args) => {
+  const collisions = rectIntersection(args);
+  
+  if (!collisions.length) return collisions;
+  
+  const filteredCollisions = collisions.filter((collision) => {
+    const { data } = collision;
+    if (!data?.droppableContainer?.rect?.current) return false;
+    
+    const activeRect = args.collisionRect;
+    const targetRect = data.droppableContainer.rect.current;
+    
+    const intersectionWidth = Math.max(0, 
+      Math.min(activeRect.right, targetRect.right) - Math.max(activeRect.left, targetRect.left)
+    );
+    const intersectionHeight = Math.max(0,
+      Math.min(activeRect.bottom, targetRect.bottom) - Math.max(activeRect.top, targetRect.top)
+    );
+    const intersectionArea = intersectionWidth * intersectionHeight;
+    const targetArea = targetRect.width * targetRect.height;
+    const overlapRatio = targetArea > 0 ? intersectionArea / targetArea : 0;
+    
+    return overlapRatio >= 0.5;
+  });
+  
+  return filteredCollisions.length > 0 ? filteredCollisions : [];
+};
+
+function SortableSlot({ slot, index, children, isDraggingThis, gridCols, isEditMode }: SortableSlotProps) {
   const {
     attributes,
     listeners,
@@ -72,7 +103,8 @@ function SortableSlot({ slot, index, children, isDraggingThis, gridCols }: Sorta
     isOver
   } = useSortable({ 
     id: `slot-${index}`,
-    data: { type: 'slot', slot, index }
+    data: { type: 'slot', slot, index },
+    disabled: !isEditMode
   });
 
   const style: React.CSSProperties = {
@@ -89,32 +121,29 @@ function SortableSlot({ slot, index, children, isDraggingThis, gridCols }: Sorta
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className={`dashboard-slot relative bg-slate-900/50 backdrop-blur-sm border group transition-all duration-300 shadow-xl ${
-        isDragging 
-          ? 'scale-105 shadow-2xl shadow-cyan-500/30 border-cyan-400 z-50' 
-          : isOver 
-            ? 'border-cyan-400/70 ring-2 ring-cyan-400/50'
-            : 'border-slate-700/50 hover:border-cyan-500/50'
-      }`}
+      className="relative"
       data-testid={`slot-container-${index}`}
     >
       <div 
-        {...listeners}
-        className={`absolute top-[0.8rem] left-[4rem] z-30 p-[0.4rem] bg-slate-800/90 backdrop-blur-sm slot-button cursor-grab active:cursor-grabbing border border-slate-600/50 hover:border-cyan-500/50 hover:bg-slate-700/90 transition-all duration-200 ${
-          isDragging ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'
-        }`}
-        title="Drag to reorder"
-        data-testid={`drag-handle-${index}`}
+        className={`dashboard-slot h-full w-full relative bg-slate-900/50 backdrop-blur-sm border group transition-all duration-300 shadow-xl ${
+          isDragging 
+            ? 'scale-105 shadow-2xl shadow-cyan-500/30 border-cyan-400 z-50' 
+            : isOver 
+              ? 'border-cyan-400/70 ring-2 ring-cyan-400/50'
+              : isEditMode
+                ? 'border-purple-500/70 ring-1 ring-purple-400/30'
+                : 'border-slate-700/50 hover:border-cyan-500/50'
+        } ${isEditMode && !isDragging ? 'animate-jiggle' : ''}`}
       >
-        <GripVertical className="w-[1.2rem] h-[1.2rem] text-slate-400" />
+        {isEditMode && (
+          <div 
+            {...listeners}
+            className="absolute inset-0 cursor-grab active:cursor-grabbing z-40 bg-transparent"
+            data-testid={`drag-overlay-${index}`}
+          />
+        )}
+        {children}
       </div>
-      {!slot.isActive && (
-        <div 
-          {...listeners}
-          className="absolute inset-0 cursor-grab active:cursor-grabbing z-10"
-        />
-      )}
-      {children}
     </div>
   );
 }
@@ -123,11 +152,13 @@ const MasterControlDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 15,
+        tolerance: 5,
       },
     })
   );
@@ -513,7 +544,7 @@ const MasterControlDashboard = () => {
   return (
     <DndContext 
       sensors={sensors} 
-      collisionDetection={closestCenter}
+      collisionDetection={customCollisionDetection}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
@@ -543,6 +574,19 @@ const MasterControlDashboard = () => {
           </div>
           
           <div className="flex gap-[0.8rem] items-center">
+            <button
+              onClick={() => setIsEditMode(!isEditMode)}
+              className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
+                isEditMode 
+                  ? 'bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-900/50 ring-2 ring-purple-400' 
+                  : 'bg-slate-700 hover:bg-slate-600 shadow-lg shadow-slate-900/50'
+              }`}
+              data-testid="button-edit-layout"
+            >
+              {isEditMode ? <Lock className="w-[1.4rem] h-[1.4rem]" /> : <Edit3 className="w-[1.4rem] h-[1.4rem]" />}
+              {isEditMode ? 'LOCK' : 'EDIT LAYOUT'}
+            </button>
+            
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowGridDropdown(!showGridDropdown)}
@@ -615,6 +659,7 @@ const MasterControlDashboard = () => {
               index={index}
               isDraggingThis={activeId === `slot-${index}`}
               gridCols={gridOption.cols}
+              isEditMode={isEditMode}
             >
               <div className="absolute top-[0.8rem] left-[0.8rem] z-20 bg-slate-800/90 backdrop-blur-sm px-[0.6rem] py-[0.3rem] slot-button text-[0.9rem] font-bold text-cyan-400 border border-cyan-500/30" data-testid={`text-slot-number-${index}`}>
                 {index + 1}
