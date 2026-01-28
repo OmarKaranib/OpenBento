@@ -103,8 +103,7 @@ function SortableSlot({ slot, index, children, isDraggingThis, gridCols, isEditM
     isOver
   } = useSortable({ 
     id: `slot-${index}`,
-    data: { type: 'slot', slot, index },
-    disabled: !isEditMode
+    data: { type: 'slot', slot, index }
   });
 
   const style: React.CSSProperties = {
@@ -116,11 +115,16 @@ function SortableSlot({ slot, index, children, isDraggingThis, gridCols, isEditM
     gridRow: slot.spanRows > 1 ? `span ${slot.spanRows}` : undefined,
   };
 
+  const filteredAttributes = {
+    ...attributes,
+    'aria-disabled': undefined
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
+      {...filteredAttributes}
       className="relative"
       data-testid={`slot-container-${index}`}
     >

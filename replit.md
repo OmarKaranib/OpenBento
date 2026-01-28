@@ -17,25 +17,38 @@ A 16-slot Mission Control Dashboard for monitoring multiple video sources and st
 - Dark theme with cyan/purple accent colors
 - Animated scan line effect
 
+## Edit Layout Mode (Interaction Lock)
+- **Edit Layout button** in header toggles between locked and edit modes
+- **Locked mode (default)**: Click inside slots to play videos or type URLs
+- **Edit mode**: Slots jiggle (iOS-style animation) and become draggable
+- Purple border indicates edit mode is active
+- Internal clicks disabled in edit mode to prevent accidental interactions
+
 ## Widget Sidebar with Drag-and-Drop
 - Slide-out sidebar from left side when clicking ADD button
 - **Tabbed Interface**: Content tab (channels/search) and Layout tab (widget sizes)
 - Search bar to filter channels (Content tab)
 - Trending Channels section with 10 preset live streams
 - **Layout Blocks section** with draggable widget size templates:
-  - Single (1x1): Standard single slot
-  - Wide (2x1): Spans 2 columns, 1 row
-  - Large (2x2): Spans 2 columns, 2 rows
+  - Standard (2x2): Spans 2 columns, 2 rows
+  - Wide (2x4): Spans 4 columns, 2 rows
+  - Large (4x4): Spans 4 columns, 4 rows
 - Drag-and-drop integration using @dnd-kit/core and @dnd-kit/sortable
 - Click channel to add to first available empty slot
 - Vertical compaction algorithm reflows active slots when grid density changes
+
+## Precision Dragging
+- Custom collision detection with 50%+ overlap threshold
+- Requires significant overlap before slots push out of the way
+- Prevents accidental jumping during drag operations
+- Increased activation distance (15px) for drag initiation
 
 ## Live Reordering (iOS Home Screen Style)
 - **rectSortingStrategy** for iOS-like "running away" behavior
 - Slots shift smoothly to make room during drag operations
 - Active slot scales to 1.05x with cyan drop shadow while dragging
 - Other slots animate with 0.3s ease transition when reordering
-- Empty slots can be dragged to reorder
+- Jiggle animation applied to visible slot wrapper (doesn't conflict with dnd-kit transforms)
 
 ## CSS Grid Spanning
 - Slots have spanCols and spanRows properties (default 1x1)
@@ -55,15 +68,15 @@ A 16-slot Mission Control Dashboard for monitoring multiple video sources and st
 - `client/src/components/widget-sidebar.tsx` - Tabbed sidebar with channels and layout blocks
 - `client/src/App.tsx` - App router
 - `client/src/index.css` - Theme colors (slate/cyan/purple), CSS variables
-- `tailwind.config.ts` - Tailwind configuration with scan animation
+- `tailwind.config.ts` - Tailwind configuration with jiggle animation
 
 ## Recent Changes
-- Added tabbed interface to sidebar (Content/Layout tabs)
-- Implemented CSS grid spanning for multi-slot widgets
-- Integrated rectSortingStrategy for iOS-like live reordering
-- Added visual feedback: 1.05x scale with shadow during drag, 0.3s ease transitions
-- Maintained 1fr grid units for full-screen persistence
-- Layout blocks now show visual previews of their grid configuration
+- Added Edit Layout toggle button with lock/unlock logic
+- Implemented iOS-like jiggle animation for edit mode
+- Created custom collision detection with 50%+ overlap threshold
+- Updated Layout tab with 2x2, 2x4, 4x4 templates
+- Moved jiggle animation to inner wrapper to avoid dnd-kit transform conflicts
+- Increased activation distance for precision dragging
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px
