@@ -265,42 +265,42 @@ const MasterControlDashboard = () => {
   const gridOption = getCurrentGridOption();
 
   return (
-    <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 p-4 font-mono flex flex-col">
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 p-[1.6rem] font-mono flex flex-col">
       <div className="fixed inset-0 opacity-30 pointer-events-none z-0">
-        <div className="absolute top-20 left-20 w-96 h-96 bg-cyan-500 rounded-full blur-[120px] animate-pulse"></div>
-        <div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-[8rem] left-[8rem] w-[38rem] h-[38rem] bg-cyan-500 rounded-full blur-[120px] animate-pulse"></div>
+        <div className="absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
-      <div className="relative z-30 mb-3 flex-shrink-0">
-        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-          <div className="flex items-center gap-3">
+      <div className="relative z-30 mb-[1rem] flex-shrink-0" style={{ height: 'var(--header-height)' }}>
+        <div className="flex items-center justify-between mb-[0.8rem] flex-wrap gap-[0.8rem]">
+          <div className="flex items-center gap-[1.2rem]">
             <div className="relative">
-              <Power className="w-5 h-5 text-cyan-400 animate-pulse" data-testid="icon-power" />
+              <Power className="w-[2rem] h-[2rem] text-cyan-400 animate-pulse" data-testid="icon-power" />
               <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-50 pointer-events-none"></div>
             </div>
-            <h1 className="text-xl font-bold tracking-wider bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent" data-testid="text-title">
+            <h1 className="text-[2rem] font-bold tracking-wider bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent" data-testid="text-title">
               MASTER CONTROL
             </h1>
           </div>
           
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-[0.8rem] items-center">
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowGridDropdown(!showGridDropdown)}
-                className="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 rounded-lg font-semibold flex items-center gap-2 transition-all duration-300 shadow-lg shadow-purple-900/50 text-xs"
+                className="px-[1.2rem] py-[0.6rem] bg-purple-700 hover:bg-purple-600 slot-button font-semibold flex items-center gap-[0.8rem] transition-all duration-300 shadow-lg shadow-purple-900/50 text-[1.2rem]"
                 data-testid="button-grid-density"
               >
                 Grid Density
-                <ChevronDown className={`w-3 h-3 transition-transform ${showGridDropdown ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-[1.2rem] h-[1.2rem] transition-transform ${showGridDropdown ? 'rotate-180' : ''}`} />
               </button>
               
               {showGridDropdown && (
-                <div className="absolute top-full mt-1 right-0 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 min-w-[160px]" data-testid="dropdown-grid-options">
+                <div className="absolute top-full mt-[0.4rem] right-0 bg-slate-800 border border-slate-600 shadow-xl z-50 min-w-[16rem]" style={{ borderRadius: 'var(--inner-radius)' }} data-testid="dropdown-grid-options">
                   {GRID_OPTIONS.map((option) => (
                     <button
                       key={option.value}
                       onClick={() => handleGridSelect(option.value)}
-                      className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-700 transition-colors first:rounded-t-lg last:rounded-b-lg flex items-center justify-between ${
+                      className={`w-full px-[1.2rem] py-[0.8rem] text-left text-[1.2rem] hover:bg-slate-700 transition-colors first:rounded-t-[var(--inner-radius)] last:rounded-b-[var(--inner-radius)] flex items-center justify-between ${
                         gridDensity === option.value ? 'bg-purple-600/50 text-cyan-400' : 'text-slate-300'
                       }`}
                       data-testid={`grid-option-${option.value}`}
@@ -315,55 +315,55 @@ const MasterControlDashboard = () => {
             
             <button
               onClick={handleMasterMute}
-              className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-all duration-300 transform hover:scale-105 text-xs ${
+              className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
                 masterMute 
                   ? 'bg-red-600 hover:bg-red-500 shadow-lg shadow-red-900/50' 
                   : 'bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-900/50'
               }`}
               data-testid="button-master-mute"
             >
-              {masterMute ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+              {masterMute ? <VolumeX className="w-[1.4rem] h-[1.4rem]" /> : <Volume2 className="w-[1.4rem] h-[1.4rem]" />}
               {masterMute ? 'MUTED' : 'LIVE'}
             </button>
             
             <button
               id="save-button"
               onClick={handleSaveLayout}
-              className="px-3 py-1.5 bg-cyan-700 hover:bg-cyan-600 rounded-lg font-semibold flex items-center gap-1.5 transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-xs"
+              className="px-[1.2rem] py-[0.6rem] bg-cyan-700 hover:bg-cyan-600 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-[1.2rem]"
               data-testid="button-save-layout"
             >
-              <Save className="w-3.5 h-3.5" />
+              <Save className="w-[1.4rem] h-[1.4rem]" />
               SAVE
             </button>
           </div>
         </div>
         
-        <div className="h-0.5 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full"></div>
+        <div className="h-[0.2rem] bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full"></div>
       </div>
 
       <div 
-        className="relative z-10 flex-1 min-h-0 grid gap-1.5"
+        className="dashboard-grid relative z-10"
         style={{
-          gridTemplateColumns: `repeat(${gridOption.cols}, minmax(0, 1fr))`,
-          gridTemplateRows: `repeat(auto-fit, minmax(0, 1fr))`
-        }}
+          '--grid-cols': `repeat(${gridOption.cols}, 1fr)`,
+          '--grid-rows': `repeat(${gridOption.rows}, 1fr)`
+        } as React.CSSProperties}
       >
         {visibleSlots.map((slot, index) => (
           <div
             key={slot.id}
-            className="relative bg-slate-900/50 backdrop-blur-sm rounded-lg border border-slate-700/50 overflow-hidden group hover:border-cyan-500/50 transition-all duration-300 shadow-xl"
+            className="dashboard-slot relative bg-slate-900/50 backdrop-blur-sm border border-slate-700/50 group hover:border-cyan-500/50 transition-all duration-300 shadow-xl"
             data-testid={`slot-container-${index}`}
           >
-            <div className="absolute top-1 left-1 z-20 bg-slate-800/90 backdrop-blur-sm px-1.5 py-0.5 rounded text-[9px] font-bold text-cyan-400 border border-cyan-500/30" data-testid={`text-slot-number-${index}`}>
+            <div className="absolute top-[0.8rem] left-[0.8rem] z-20 bg-slate-800/90 backdrop-blur-sm px-[0.6rem] py-[0.3rem] slot-button text-[0.9rem] font-bold text-cyan-400 border border-cyan-500/30" data-testid={`text-slot-number-${index}`}>
               {index + 1}
             </div>
 
             {slot.isActive && (
-              <div className="absolute top-1 right-1 z-20 flex gap-0.5">
+              <div className="absolute top-[0.8rem] right-[0.8rem] z-20 flex gap-[0.4rem]">
                 {slot.isYouTube && (
                   <button
                     onClick={() => toggleSlotPause(index)}
-                    className={`p-1 rounded transition-all duration-300 backdrop-blur-sm ${
+                    className={`p-[0.6rem] slot-button transition-all duration-300 backdrop-blur-sm ${
                       slot.isPaused 
                         ? 'bg-yellow-600/90 hover:bg-yellow-500' 
                         : 'bg-blue-600/90 hover:bg-blue-500'
@@ -371,13 +371,13 @@ const MasterControlDashboard = () => {
                     title={slot.isPaused ? 'Play' : 'Pause'}
                     data-testid={`button-pause-${index}`}
                   >
-                    {slot.isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                    {slot.isPaused ? <Play className="w-[1.2rem] h-[1.2rem]" /> : <Pause className="w-[1.2rem] h-[1.2rem]" />}
                   </button>
                 )}
                 
                 <button
                   onClick={() => toggleSlotMute(index)}
-                  className={`p-1 rounded transition-all duration-300 backdrop-blur-sm ${
+                  className={`p-[0.6rem] slot-button transition-all duration-300 backdrop-blur-sm ${
                     slot.isMuted 
                       ? 'bg-red-600/90 hover:bg-red-500' 
                       : 'bg-emerald-600/90 hover:bg-emerald-500'
@@ -385,7 +385,7 @@ const MasterControlDashboard = () => {
                   title={slot.isMuted ? 'Unmute' : 'Mute'}
                   data-testid={`button-mute-${index}`}
                 >
-                  {slot.isMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                  {slot.isMuted ? <VolumeX className="w-[1.2rem] h-[1.2rem]" /> : <Volume2 className="w-[1.2rem] h-[1.2rem]" />}
                 </button>
                 
                 {!slot.isYouTube && slot.url && (
@@ -393,21 +393,21 @@ const MasterControlDashboard = () => {
                     href={slot.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-1 rounded transition-all duration-300 backdrop-blur-sm bg-blue-600/90 hover:bg-blue-500"
+                    className="p-[0.6rem] slot-button transition-all duration-300 backdrop-blur-sm bg-blue-600/90 hover:bg-blue-500"
                     title="Open in new tab"
                     data-testid={`button-link-${index}`}
                   >
-                    <ExternalLink className="w-3 h-3" />
+                    <ExternalLink className="w-[1.2rem] h-[1.2rem]" />
                   </a>
                 )}
                 
                 <button
                   onClick={() => handleRemoveSlot(index)}
-                  className="p-1 bg-slate-800/90 hover:bg-slate-700 rounded transition-all duration-300 backdrop-blur-sm"
+                  className="p-[0.6rem] bg-slate-800/90 hover:bg-slate-700 slot-button transition-all duration-300 backdrop-blur-sm"
                   title="Remove"
                   data-testid={`button-remove-${index}`}
                 >
-                  <X className="w-3 h-3 text-red-400" />
+                  <X className="w-[1.2rem] h-[1.2rem] text-red-400" />
                 </button>
               </div>
             )}
@@ -416,20 +416,20 @@ const MasterControlDashboard = () => {
               {!slot.isActive && inputIndex !== index && (
                 <button
                   onClick={() => handleAddUrl(index)}
-                  className="flex flex-col items-center gap-0.5 p-1 hover:bg-slate-800/50 rounded-lg transition-all duration-300 group/btn"
+                  className="flex flex-col items-center gap-[0.4rem] p-[0.8rem] hover:bg-slate-800/50 slot-inner-element transition-all duration-300 group/btn"
                   data-testid={`button-add-source-${index}`}
                 >
-                  <Plus className="w-6 h-6 text-cyan-400 group-hover/btn:scale-110 transition-transform" />
-                  <span className="text-[10px] text-slate-400 group-hover/btn:text-cyan-400 transition-colors">
+                  <Plus className="w-[2.4rem] h-[2.4rem] text-cyan-400 group-hover/btn:scale-110 transition-transform" />
+                  <span className="text-[1rem] text-slate-400 group-hover/btn:text-cyan-400 transition-colors">
                     ADD
                   </span>
                 </button>
               )}
 
               {inputIndex === index && (
-                <div className="absolute inset-0 flex items-center justify-center p-2 bg-slate-900/95 backdrop-blur-sm z-30">
-                  <div className="w-full max-w-xs">
-                    <label className="block text-[10px] font-semibold mb-1 text-cyan-400">
+                <div className="absolute inset-0 flex items-center justify-center p-[1.6rem] bg-slate-900/95 backdrop-blur-sm z-30 slot-inner-element">
+                  <div className="w-full max-w-[28rem]">
+                    <label className="block text-[1rem] font-semibold mb-[0.6rem] text-cyan-400">
                       ENTER URL
                     </label>
                     <input
@@ -443,18 +443,18 @@ const MasterControlDashboard = () => {
                         }
                       }}
                       placeholder="https://youtube.com/watch?v=..."
-                      className="w-full px-2 py-1 bg-slate-800 border border-slate-700 rounded focus:border-cyan-500 focus:outline-none transition-colors text-[10px]"
+                      className="w-full px-[1rem] py-[0.6rem] bg-slate-800 border border-slate-700 slot-button focus:border-cyan-500 focus:outline-none transition-colors text-[1.2rem]"
                       autoFocus
                       data-testid={`input-url-${index}`}
                     />
-                    <div className="flex gap-1 mt-1.5">
+                    <div className="flex gap-[0.6rem] mt-[1rem]">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
                           handleSubmitUrl(index);
                         }}
-                        className="flex-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-500 rounded font-semibold transition-colors text-[10px]"
+                        className="flex-1 px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold transition-colors text-[1.1rem]"
                         data-testid={`button-load-${index}`}
                       >
                         LOAD
@@ -466,7 +466,7 @@ const MasterControlDashboard = () => {
                           setInputIndex(null);
                           setInputValue('');
                         }}
-                        className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded font-semibold transition-colors text-[10px]"
+                        className="px-[1.2rem] py-[0.6rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold transition-colors text-[1.1rem]"
                         data-testid={`button-cancel-${index}`}
                       >
                         CANCEL
@@ -500,20 +500,20 @@ const MasterControlDashboard = () => {
                       />
                       {slot.embedBlocked && (
                         <div className="absolute inset-0 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm">
-                          <div className="text-center p-4 max-w-xs">
-                            <AlertCircle className="w-8 h-8 text-orange-400 mx-auto mb-2" />
-                            <p className="text-sm font-semibold text-slate-200 mb-1">Embedding Restricted</p>
-                            <p className="text-[10px] text-slate-400 mb-3">
+                          <div className="text-center p-[2rem] max-w-[28rem]">
+                            <AlertCircle className="w-[3.2rem] h-[3.2rem] text-orange-400 mx-auto mb-[1rem]" />
+                            <p className="text-[1.4rem] font-semibold text-slate-200 mb-[0.6rem]">Embedding Restricted</p>
+                            <p className="text-[1.1rem] text-slate-400 mb-[1.5rem]">
                               Sites like Twitter, Discord, and others require their official embed codes. Standard iframes are blocked for security.
                             </p>
                             <a
                               href={slot.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg font-semibold transition-colors text-sm inline-flex items-center gap-2"
+                              className="px-[1.6rem] py-[1rem] bg-orange-600 hover:bg-orange-500 slot-button font-semibold transition-colors text-[1.3rem] inline-flex items-center gap-[0.8rem]"
                               data-testid={`button-open-widget-${index}`}
                             >
-                              <ExternalLink className="w-4 h-4" />
+                              <ExternalLink className="w-[1.6rem] h-[1.6rem]" />
                               Open in Official Widget Mode
                             </a>
                           </div>
@@ -525,26 +525,26 @@ const MasterControlDashboard = () => {
               )}
 
               {slot.error && (
-                <div className="absolute inset-0 flex items-center justify-center p-2 bg-slate-900/95 backdrop-blur-sm">
-                  <div className="max-w-xs text-center">
-                    <AlertCircle className="w-6 h-6 text-yellow-400 mx-auto mb-1" />
-                    <p className="text-[10px] text-slate-300 mb-2" data-testid={`text-error-${index}`}>{slot.error}</p>
-                    <div className="flex gap-1 justify-center">
+                <div className="absolute inset-0 flex items-center justify-center p-[1.6rem] bg-slate-900/95 backdrop-blur-sm">
+                  <div className="max-w-[28rem] text-center">
+                    <AlertCircle className="w-[2.4rem] h-[2.4rem] text-yellow-400 mx-auto mb-[0.6rem]" />
+                    <p className="text-[1.1rem] text-slate-300 mb-[1rem]" data-testid={`text-error-${index}`}>{slot.error}</p>
+                    <div className="flex gap-[0.6rem] justify-center">
                       {slot.url && (
                         <a
                           href={slot.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded font-semibold transition-colors text-[10px] flex items-center gap-1"
+                          className="px-[1rem] py-[0.6rem] bg-blue-600 hover:bg-blue-500 slot-button font-semibold transition-colors text-[1.1rem] flex items-center gap-[0.4rem]"
                           data-testid={`button-open-link-${index}`}
                         >
-                          <ExternalLink className="w-3 h-3" />
+                          <ExternalLink className="w-[1.2rem] h-[1.2rem]" />
                           Open in New Window
                         </a>
                       )}
                       <button
                         onClick={() => handleRemoveSlot(index)}
-                        className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded font-semibold transition-colors text-[10px]"
+                        className="px-[1rem] py-[0.6rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold transition-colors text-[1.1rem]"
                         data-testid={`button-clear-slot-${index}`}
                       >
                         CLEAR
@@ -562,16 +562,16 @@ const MasterControlDashboard = () => {
         ))}
       </div>
 
-      <div className="relative z-10 mt-2 flex-shrink-0 flex items-center justify-between text-[9px] text-slate-500 border-t border-slate-800 pt-2">
+      <div className="relative z-10 mt-[0.8rem] flex-shrink-0 flex items-center justify-between text-[1rem] text-slate-500 border-t border-slate-800 pt-[0.8rem]" style={{ height: 'var(--footer-height)' }}>
         <p data-testid="text-footer-copyright">© 2026 Master Control. Independent tool for content aggregation.</p>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-[1.2rem]">
           <span data-testid="text-status">Active: {slots.filter(s => s.isActive).length}/16</span>
           <button
             onClick={() => setShowLegalPopup(true)}
-            className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-300 transition-colors flex items-center gap-1"
+            className="px-[0.8rem] py-[0.4rem] bg-slate-800 hover:bg-slate-700 slot-button text-slate-400 hover:text-slate-300 transition-colors flex items-center gap-[0.4rem]"
             data-testid="button-legal"
           >
-            <Scale className="w-3 h-3" />
+            <Scale className="w-[1.2rem] h-[1.2rem]" />
             Legal
           </button>
         </div>
@@ -579,26 +579,26 @@ const MasterControlDashboard = () => {
 
       {showLegalPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" data-testid="modal-legal">
-          <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-md mx-4 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-cyan-400 flex items-center gap-2">
-                <Scale className="w-5 h-5" />
+          <div className="bg-slate-900 border border-slate-700 p-[2.4rem] max-w-[44rem] mx-[1.6rem] shadow-2xl" style={{ borderRadius: 'var(--outer-radius)' }}>
+            <div className="flex items-center justify-between mb-[1.6rem]">
+              <h2 className="text-[1.8rem] font-bold text-cyan-400 flex items-center gap-[0.8rem]">
+                <Scale className="w-[2rem] h-[2rem]" />
                 Legal Disclaimer
               </h2>
               <button
                 onClick={() => setShowLegalPopup(false)}
-                className="p-1 hover:bg-slate-800 rounded transition-colors"
+                className="p-[0.6rem] hover:bg-slate-800 slot-button transition-colors"
                 data-testid="button-close-legal"
               >
-                <X className="w-5 h-5 text-slate-400" />
+                <X className="w-[2rem] h-[2rem] text-slate-400" />
               </button>
             </div>
-            <p className="text-sm text-slate-300 leading-relaxed" data-testid="text-legal-content">
+            <p className="text-[1.4rem] text-slate-300 leading-relaxed" data-testid="text-legal-content">
               This application is a productivity tool for aggregating public web content. It is not affiliated with or endorsed by the third-party services displayed. Users are responsible for complying with the Terms of Service of all embedded sites.
             </p>
             <button
               onClick={() => setShowLegalPopup(false)}
-              className="mt-4 w-full py-2 bg-cyan-700 hover:bg-cyan-600 rounded-lg font-semibold text-sm transition-colors"
+              className="mt-[1.6rem] w-full py-[1rem] bg-cyan-700 hover:bg-cyan-600 slot-button font-semibold text-[1.4rem] transition-colors"
               data-testid="button-acknowledge-legal"
             >
               I Understand

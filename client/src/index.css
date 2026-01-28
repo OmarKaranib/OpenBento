@@ -2,8 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Global Scaling: 1rem = 10px for easier calculations */
+html {
+  font-size: 62.5%;
+}
+
+/* Restore readable body font size */
+body {
+  font-size: 1.6rem;
+}
+
 /* LIGHT MODE */
 :root {
+  /* Squircle Geometry - Concentric Radius System */
+  --outer-radius: 2rem;
+  --inner-radius: calc(var(--outer-radius) - 0.8rem);
+  --button-radius: calc(var(--outer-radius) - 1rem);
+  
+  /* Dashboard Slot Variables */
+  --slot-gap: 0.8rem;
+  --slot-padding: 1rem;
+  --header-height: 6rem;
+  --footer-height: 4rem;
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
 
@@ -324,5 +344,48 @@
   .border.active-elevate-2:not(.no-active-interaction-elevate)::after,
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
+  }
+}
+
+/* Dashboard Responsive Grid System - Apple HIG Standard */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: var(--grid-cols);
+  grid-template-rows: var(--grid-rows);
+  gap: var(--slot-gap);
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+/* Slot styling with squircle geometry */
+.dashboard-slot {
+  border-radius: var(--outer-radius);
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Inner elements use concentric radius */
+.slot-button {
+  border-radius: var(--button-radius);
+}
+
+.slot-inner-element {
+  border-radius: var(--inner-radius);
+}
+
+/* Mobile breakpoint: 768px and below - force 2 columns */
+@media (max-width: 768px) {
+  .dashboard-grid {
+    --grid-cols: repeat(2, 1fr) !important;
+    grid-template-rows: repeat(auto-fit, minmax(0, 1fr));
+  }
+  
+  :root {
+    --outer-radius: 1.6rem;
+    --inner-radius: calc(var(--outer-radius) - 0.6rem);
+    --button-radius: calc(var(--outer-radius) - 0.8rem);
+    --slot-gap: 0.6rem;
   }
 }

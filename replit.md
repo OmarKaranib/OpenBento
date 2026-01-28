@@ -36,3 +36,15 @@ A 16-slot Mission Control Dashboard for monitoring multiple video sources and st
 - Improved embed blocked fallback: "Embedding Restricted" with explanation about Twitter/Discord
 - Added "Open in Official Widget Mode" button for blocked sites
 - YouTube URLs auto-convert to embed format with enablejsapi=1 parameter
+
+## Responsive Widget Scaling (Apple HIG Standard)
+- Global scaling: html { font-size: 62.5% } makes 1rem = 10px
+- All dimensions defined in rem units for consistent scaling
+- CSS Variables for concentric geometry (Squircle Rule):
+  - --outer-radius: 2rem (slot borders)
+  - --inner-radius: calc(--outer-radius - 0.8rem) (inner elements)
+  - --button-radius: calc(--outer-radius - 1rem) (buttons)
+- Breakpoints:
+  - Desktop (>768px): 4-column grid
+  - Mobile (<=768px): 2-column grid with smaller radii
+- CSS classes: dashboard-grid, dashboard-slot, slot-button, slot-inner-element
