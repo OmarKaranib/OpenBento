@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, ChevronDown, Scale, Pause, Play } from 'lucide-react';
+import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, useDroppable } from '@dnd-kit/core';
+import { WidgetSidebar, TrendingChannel, LAYOUT_BLOCKS, LayoutBlock } from '@/components/widget-sidebar';
 
 type GridDensity = 2 | 4 | 6 | 9 | 12 | 16;
 
@@ -31,7 +33,37 @@ interface Slot {
   embedBlocked: boolean;
 }
 
+interface DroppableSlotProps {
+  id: string;
+  children: React.ReactNode;
+  className?: string;
+}
+
+function DroppableSlot({ id, children, className }: DroppableSlotProps) {
+  const { isOver, setNodeRef } = useDroppable({ id });
+  
+  return (
+    <div
+      ref={setNodeRef}
+      className={`${className} ${isOver ? 'ring-2 ring-cyan-400 ring-opacity-70' : ''}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 const MasterControlDashboard = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
+  
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+  
   const [slots, setSlots] = useState<Slot[]>(() => {
     const saved = localStorage.getItem('controlDashboard');
     if (saved) {
@@ -164,19 +196,22 @@ const MasterControlDashboard = () => {
     }
     delete iframeRefs.current[index];
 
-    setSlots(prev => prev.map((slot, i) => 
-      i === index ? {
-        ...slot,
-        url: '',
-        isActive: false,
-        isMuted: true,
-        isPaused: false,
-        error: null,
-        isYouTube: false,
-        videoId: null,
-        embedBlocked: false
-      } : slot
-    ));
+    setSlots(prev => {
+      const updated = prev.map((slot, i) => 
+        i === index ? {
+          ...slot,
+          url: '',
+          isActive: false,
+          isMuted: true,
+          isPaused: false,
+          error: null,
+          isYouTube: false,
+          videoId: null,
+          embedBlocked: false
+        } : slot
+      );
+      return compactSlots(updated, gridDensity);
+    });
   };
 
   const toggleSlotMute = (index: number) => {
@@ -257,16 +292,117 @@ const MasterControlDashboard = () => {
     }, 5000);
   };
 
+  const compactSlots = useCallback((slotsToCompact: Slot[], targetDensity: GridDensity): Slot[] => {
+    const activeSlots = slotsToCompact.filter(s => s.isActive);
+    const inactiveSlots = slotsToCompact.filter(s => !s.isActive);
+    
+    const reordered: Slot[] = [];
+    for (let i = 0; i < 16; i++) {
+      if (i < activeSlots.length) {
+        reordered.push({ ...activeSlots[i], id: i });
+      } else {
+        const inactiveIndex = i - activeSlots.length;
+        if (inactiveIndex < inactiveSlots.length) {
+          reordered.push({ ...inactiveSlots[inactiveIndex], id: i });
+        } else {
+          reordered.push({
+            id: i,
+            url: '',
+            isActive: false,
+            isMuted: true,
+            isPaused: false,
+            error: null,
+            isYouTube: false,
+            videoId: null,
+            embedBlocked: false
+          });
+        }
+      }
+    }
+    return reordered;
+  }, []);
+
   const handleGridSelect = (value: GridDensity) => {
+    setSlots(prev => compactSlots(prev, value));
     setGridDensity(value);
     setShowGridDropdown(false);
+  };
+
+  const addChannelToSlot = useCallback((channel: TrendingChannel, slotIndex: number) => {
+    const extractVideoId = (url: string): string | null => {
+      const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+      const match = url.match(regExp);
+      return (match && match[7].length === 11) ? match[7] : null;
+    };
+    
+    const videoId = extractVideoId(channel.url);
+    
+    setSlots(prev => prev.map((slot, i) => 
+      i === slotIndex ? {
+        ...slot,
+        url: channel.url,
+        isActive: true,
+        isYouTube: true,
+        videoId: videoId,
+        error: null,
+        embedBlocked: false,
+        isPaused: false,
+        isMuted: true
+      } : slot
+    ));
+  }, []);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (!over) return;
+    
+    const slotMatch = over.id.toString().match(/^slot-(\d+)$/);
+    if (!slotMatch) return;
+    
+    const slotIndex = parseInt(slotMatch[1], 10);
+    const activeData = active.data.current;
+    
+    if (activeData?.type === 'channel') {
+      const channel = activeData.channel as TrendingChannel;
+      addChannelToSlot(channel, slotIndex);
+      setSidebarOpen(false);
+    } else if (activeData?.type === 'block') {
+      const block = activeData.block as LayoutBlock;
+      const newDensity = (block.cols * block.rows) as GridDensity;
+      if ([2, 4, 6, 9, 12, 16].includes(newDensity)) {
+        setSlots(prev => compactSlots(prev, newDensity));
+        setGridDensity(newDensity);
+      }
+      setSidebarOpen(false);
+    }
+  }, [addChannelToSlot, compactSlots]);
+
+  const handleChannelClick = useCallback((channel: TrendingChannel) => {
+    const firstEmptyIndex = slots.findIndex(s => !s.isActive);
+    if (firstEmptyIndex !== -1) {
+      addChannelToSlot(channel, firstEmptyIndex);
+      setSidebarOpen(false);
+    }
+  }, [slots, addChannelToSlot]);
+
+  const handleOpenSidebar = (index: number) => {
+    setActiveSlotIndex(index);
+    setSidebarOpen(true);
   };
 
   const gridOption = getCurrentGridOption();
 
   return (
-    <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 p-[1.6rem] font-mono flex flex-col">
-      <div className="fixed inset-0 opacity-30 pointer-events-none z-0">
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <div className={`h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 font-mono flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} style={{ padding: '1.6rem' }}>
+        <WidgetSidebar 
+          isOpen={sidebarOpen} 
+          onClose={() => setSidebarOpen(false)}
+          onChannelClick={handleChannelClick}
+        />
+        
+        <div className="fixed inset-0 opacity-30 pointer-events-none z-0">
         <div className="absolute top-[8rem] left-[8rem] w-[38rem] h-[38rem] bg-cyan-500 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
@@ -349,12 +485,12 @@ const MasterControlDashboard = () => {
         } as React.CSSProperties}
       >
         {visibleSlots.map((slot, index) => (
-          <div
+          <DroppableSlot
             key={slot.id}
+            id={`slot-${index}`}
             className="dashboard-slot relative bg-slate-900/50 backdrop-blur-sm border border-slate-700/50 group hover:border-cyan-500/50 transition-all duration-300 shadow-xl"
-            data-testid={`slot-container-${index}`}
           >
-            <div className="absolute top-[0.8rem] left-[0.8rem] z-20 bg-slate-800/90 backdrop-blur-sm px-[0.6rem] py-[0.3rem] slot-button text-[0.9rem] font-bold text-cyan-400 border border-cyan-500/30" data-testid={`text-slot-number-${index}`}>
+            <div className="absolute top-[0.8rem] left-[0.8rem] z-20 bg-slate-800/90 backdrop-blur-sm px-[0.6rem] py-[0.3rem] slot-button text-[0.9rem] font-bold text-cyan-400 border border-cyan-500/30" data-testid={`text-slot-number-${index}`} data-slot-testid={`slot-container-${index}`}>
               {index + 1}
             </div>
 
@@ -414,16 +550,25 @@ const MasterControlDashboard = () => {
 
             <div className="w-full h-full flex items-center justify-center">
               {!slot.isActive && inputIndex !== index && (
-                <button
-                  onClick={() => handleAddUrl(index)}
-                  className="flex flex-col items-center gap-[0.4rem] p-[0.8rem] hover:bg-slate-800/50 slot-inner-element transition-all duration-300 group/btn"
-                  data-testid={`button-add-source-${index}`}
-                >
-                  <Plus className="w-[2.4rem] h-[2.4rem] text-cyan-400 group-hover/btn:scale-110 transition-transform" />
-                  <span className="text-[1rem] text-slate-400 group-hover/btn:text-cyan-400 transition-colors">
-                    ADD
-                  </span>
-                </button>
+                <div className="flex flex-col items-center gap-[0.8rem]">
+                  <button
+                    onClick={() => handleOpenSidebar(index)}
+                    className="flex flex-col items-center gap-[0.4rem] p-[0.8rem] hover:bg-slate-800/50 slot-inner-element transition-all duration-300 group/btn"
+                    data-testid={`button-add-source-${index}`}
+                  >
+                    <Plus className="w-[2.4rem] h-[2.4rem] text-cyan-400 group-hover/btn:scale-110 transition-transform" />
+                    <span className="text-[1rem] text-slate-400 group-hover/btn:text-cyan-400 transition-colors">
+                      ADD
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => handleAddUrl(index)}
+                    className="text-[0.9rem] text-slate-500 hover:text-cyan-400 transition-colors"
+                    data-testid={`button-custom-url-${index}`}
+                  >
+                    or enter URL
+                  </button>
+                </div>
               )}
 
               {inputIndex === index && (
@@ -558,7 +703,7 @@ const MasterControlDashboard = () => {
             <div className="absolute inset-0 pointer-events-none opacity-10">
               <div className="w-full h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-scan"></div>
             </div>
-          </div>
+          </DroppableSlot>
         ))}
       </div>
 
@@ -606,7 +751,8 @@ const MasterControlDashboard = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </DndContext>
   );
 };
 

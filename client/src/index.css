@@ -389,3 +389,12 @@ body {
     --slot-gap: 0.6rem;
   }
 }
+
+/* Sidebar responsive styles */
+@media (max-width: 768px) {
+  [data-testid="widget-sidebar"] {
+    width: 100vw !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+  }
+}

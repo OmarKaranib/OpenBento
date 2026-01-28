@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { X, Search, Tv, Grid2X2, LayoutGrid, Grip, ExternalLink } from 'lucide-react';
+import { X, Search, Tv, Grid2X2, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -7,7 +7,7 @@ export interface TrendingChannel {
   id: string;
   name: string;
   url: string;
-  icon: string;
+  iconType: 'news' | 'science' | 'music' | 'finance';
   category: string;
 }
 
@@ -20,26 +20,41 @@ export interface LayoutBlock {
 }
 
 const TRENDING_CHANNELS: TrendingChannel[] = [
-  { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/embed/9Auq9mYxFEE?autoplay=1&mute=1', icon: '📺', category: 'News' },
-  { id: 'abc-news', name: 'ABC News', url: 'https://www.youtube.com/embed/vOTiJkg1voo?autoplay=1&mute=1', icon: '📺', category: 'News' },
-  { id: 'cnn', name: 'CNN', url: 'https://www.youtube.com/embed/KOY4Ka-GBus?autoplay=1&mute=1', icon: '📺', category: 'News' },
-  { id: 'bbc-news', name: 'BBC News', url: 'https://www.youtube.com/embed/dp8PhLsUcFE?autoplay=1&mute=1', icon: '📺', category: 'News' },
-  { id: 'al-jazeera', name: 'Al Jazeera', url: 'https://www.youtube.com/embed/F-POY4Q0QSI?autoplay=1&mute=1', icon: '📺', category: 'News' },
-  { id: 'france24', name: 'France 24', url: 'https://www.youtube.com/embed/LrXSfA4SoFE?autoplay=1&mute=1', icon: '📺', category: 'News' },
-  { id: 'dw-news', name: 'DW News', url: 'https://www.youtube.com/embed/V6YMvlmxvG8?autoplay=1&mute=1', icon: '📺', category: 'News' },
-  { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/21X5lGlDOfg?autoplay=1&mute=1', icon: '🚀', category: 'Science' },
-  { id: 'lofi-radio', name: 'Lofi Radio', url: 'https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&mute=1', icon: '🎵', category: 'Music' },
-  { id: 'bloomberg', name: 'Bloomberg', url: 'https://www.youtube.com/embed/Ga3maNZ0x0w?autoplay=1&mute=1', icon: '📈', category: 'Finance' },
+  { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/embed/9Auq9mYxFEE?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'abc-news', name: 'ABC News', url: 'https://www.youtube.com/embed/vOTiJkg1voo?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'cnn', name: 'CNN', url: 'https://www.youtube.com/embed/KOY4Ka-GBus?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'bbc-news', name: 'BBC News', url: 'https://www.youtube.com/embed/dp8PhLsUcFE?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'al-jazeera', name: 'Al Jazeera', url: 'https://www.youtube.com/embed/F-POY4Q0QSI?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'france24', name: 'France 24', url: 'https://www.youtube.com/embed/LrXSfA4SoFE?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'dw-news', name: 'DW News', url: 'https://www.youtube.com/embed/V6YMvlmxvG8?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/21X5lGlDOfg?autoplay=1&mute=1', iconType: 'science', category: 'Science' },
+  { id: 'lofi-radio', name: 'Lofi Radio', url: 'https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&mute=1', iconType: 'music', category: 'Music' },
+  { id: 'bloomberg', name: 'Bloomberg', url: 'https://www.youtube.com/embed/Ga3maNZ0x0w?autoplay=1&mute=1', iconType: 'finance', category: 'Finance' },
 ];
 
 export const LAYOUT_BLOCKS: LayoutBlock[] = [
-  { id: 'block-2x2', name: 'Small (2x2)', cols: 2, rows: 2, icon: 'small' },
-  { id: 'block-2x4', name: 'Medium (2x4)', cols: 2, rows: 4, icon: 'medium' },
-  { id: 'block-4x4', name: 'Large (4x4)', cols: 4, rows: 4, icon: 'large' },
+  { id: 'block-2x2', name: '4 Slots (2x2)', cols: 2, rows: 2, icon: 'small' },
+  { id: 'block-3x3', name: '9 Slots (3x3)', cols: 3, rows: 3, icon: 'medium' },
+  { id: 'block-4x4', name: '16 Slots (4x4)', cols: 4, rows: 4, icon: 'large' },
 ];
 
 interface DraggableChannelProps {
   channel: TrendingChannel;
+}
+
+function getChannelIcon(iconType: TrendingChannel['iconType']) {
+  switch (iconType) {
+    case 'news':
+      return <Newspaper className="w-[1.6rem] h-[1.6rem] text-cyan-400" />;
+    case 'science':
+      return <Rocket className="w-[1.6rem] h-[1.6rem] text-purple-400" />;
+    case 'music':
+      return <Music className="w-[1.6rem] h-[1.6rem] text-pink-400" />;
+    case 'finance':
+      return <TrendingUp className="w-[1.6rem] h-[1.6rem] text-emerald-400" />;
+    default:
+      return <Tv className="w-[1.6rem] h-[1.6rem] text-slate-400" />;
+  }
 }
 
 function DraggableChannel({ channel }: DraggableChannelProps) {
@@ -63,8 +78,8 @@ function DraggableChannel({ channel }: DraggableChannelProps) {
       className="flex items-center gap-[1rem] p-[1rem] bg-slate-800/50 hover:bg-slate-700/50 slot-button cursor-grab active:cursor-grabbing transition-all duration-200 border border-slate-700/50 hover:border-cyan-500/50"
       data-testid={`draggable-channel-${channel.id}`}
     >
-      <div className="w-[3.2rem] h-[3.2rem] rounded-lg bg-slate-700 flex items-center justify-center text-[1.6rem]">
-        {channel.icon}
+      <div className="w-[3.2rem] h-[3.2rem] rounded-lg bg-slate-700 flex items-center justify-center">
+        {getChannelIcon(channel.iconType)}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-[1.2rem] font-semibold text-slate-200 truncate">{channel.name}</p>
