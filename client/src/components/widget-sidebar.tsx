@@ -158,9 +158,21 @@ interface WidgetSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onChannelClick?: (channel: TrendingChannel) => void;
+  urlValue?: string;
+  onUrlChange?: (value: string) => void;
+  onUrlSubmit?: (url: string) => void;
+  activeSlotIndex?: number | null;
 }
 
-export function WidgetSidebar({ isOpen, onClose, onChannelClick }: WidgetSidebarProps) {
+export function WidgetSidebar({ 
+  isOpen, 
+  onClose, 
+  onChannelClick,
+  urlValue = '',
+  onUrlChange,
+  onUrlSubmit,
+  activeSlotIndex
+}: WidgetSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<SidebarTab>('content');
 
@@ -236,6 +248,36 @@ export function WidgetSidebar({ isOpen, onClose, onChannelClick }: WidgetSidebar
               Layout
             </button>
           </div>
+          
+          <div className="mt-[1.2rem]">
+            <label className="block text-[1rem] font-semibold mb-[0.4rem] text-cyan-400">
+              {activeSlotIndex !== null && activeSlotIndex !== undefined ? `ADD TO SLOT ${activeSlotIndex + 1}` : 'ENTER URL'}
+            </label>
+            <div className="flex gap-[0.6rem]">
+              <input
+                type="text"
+                value={urlValue}
+                onChange={(e) => onUrlChange?.(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && urlValue.trim()) {
+                    e.preventDefault();
+                    onUrlSubmit?.(urlValue);
+                  }
+                }}
+                placeholder="https://youtube.com/watch?v=..."
+                className="flex-1 px-[1rem] py-[0.8rem] bg-slate-800 border border-slate-700 slot-button focus:border-cyan-500 focus:outline-none transition-colors text-[1.2rem]"
+                data-testid="input-url-sidebar"
+              />
+              <button
+                onClick={() => urlValue.trim() && onUrlSubmit?.(urlValue)}
+                disabled={!urlValue.trim()}
+                className="px-[1.2rem] py-[0.8rem] bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 disabled:cursor-not-allowed slot-button font-semibold transition-colors text-[1.1rem]"
+                data-testid="button-load-url"
+              >
+                LOAD
+              </button>
+            </div>
+          </div>
         </div>
         
         <div className="flex-1 overflow-y-auto p-[1.6rem]">
@@ -298,16 +340,16 @@ export function WidgetSidebar({ isOpen, onClose, onChannelClick }: WidgetSidebar
                 <h4 className="text-[1.2rem] font-semibold text-slate-300 mb-[0.8rem]">Spanning Guide</h4>
                 <ul className="text-[1.1rem] text-slate-400 space-y-[0.4rem]">
                   <li className="flex items-center gap-[0.6rem]">
-                    <div className="w-[0.8rem] h-[0.8rem] bg-cyan-400 rounded-sm"></div>
-                    <span>1x1: Single slot</span>
+                    <div className="w-[1.6rem] h-[1.6rem] bg-cyan-400 rounded-sm"></div>
+                    <span>2x2: Standard widget</span>
                   </li>
                   <li className="flex items-center gap-[0.6rem]">
-                    <div className="w-[1.6rem] h-[0.8rem] bg-purple-400 rounded-sm"></div>
-                    <span>2x1: Spans 2 columns</span>
+                    <div className="w-[3.2rem] h-[1.6rem] bg-purple-400 rounded-sm"></div>
+                    <span>2x4: Wide widget</span>
                   </li>
                   <li className="flex items-center gap-[0.6rem]">
-                    <div className="w-[1.6rem] h-[1.6rem] bg-pink-400 rounded-sm"></div>
-                    <span>2x2: Spans 2x2 grid area</span>
+                    <div className="w-[3.2rem] h-[3.2rem] bg-pink-400 rounded-sm"></div>
+                    <span>4x4: Large widget</span>
                   </li>
                 </ul>
               </div>

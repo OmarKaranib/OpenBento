@@ -223,8 +223,7 @@ const MasterControlDashboard = () => {
   });
   const [showGridDropdown, setShowGridDropdown] = useState(false);
   const [showLegalPopup, setShowLegalPopup] = useState(false);
-  const [inputIndex, setInputIndex] = useState<number | null>(null);
-  const [inputValue, setInputValue] = useState('');
+  const [urlInputValue, setUrlInputValue] = useState('');
   const iframeLoadTimers = useRef<Record<number, NodeJS.Timeout | null>>({});
   const iframeRefs = useRef<Record<number, HTMLIFrameElement | null>>({});
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -268,25 +267,20 @@ const MasterControlDashboard = () => {
   const visibleSlots = slots.slice(0, gridDensity);
   const slotIds = visibleSlots.map((_, index) => `slot-${index}`);
 
-  const handleAddUrl = (index: number) => {
-    setInputIndex(index);
-    setInputValue(slots[index].url || '');
-  };
+  const handleSubmitUrl = (url: string) => {
+    if (!url.trim() || activeSlotIndex === null) return;
 
-  const handleSubmitUrl = (index: number) => {
-    if (!inputValue.trim()) return;
-
-    let url = inputValue.trim();
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'https://' + url;
+    let finalUrl = url.trim();
+    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      finalUrl = 'https://' + finalUrl;
     }
 
-    const youtubeId = extractYouTubeId(url);
+    const youtubeId = extractYouTubeId(finalUrl);
     
     setSlots(prev => prev.map((slot, i) => 
-      i === index ? {
+      i === activeSlotIndex ? {
         ...slot,
-        url,
+        url: finalUrl,
         isActive: true,
         isYouTube: !!youtubeId,
         videoId: youtubeId,
@@ -297,8 +291,9 @@ const MasterControlDashboard = () => {
       } : slot
     ));
 
-    setInputIndex(null);
-    setInputValue('');
+    setUrlInputValue('');
+    setSidebarOpen(false);
+    setActiveSlotIndex(null);
   };
 
   const handleRemoveSlot = (index: number) => {
@@ -556,8 +551,16 @@ const MasterControlDashboard = () => {
       <div className={`h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 font-mono flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} style={{ padding: '1.6rem' }}>
         <WidgetSidebar 
           isOpen={sidebarOpen} 
-          onClose={() => setSidebarOpen(false)}
+          onClose={() => {
+            setSidebarOpen(false);
+            setActiveSlotIndex(null);
+            setUrlInputValue('');
+          }}
           onChannelClick={handleChannelClick}
+          urlValue={urlInputValue}
+          onUrlChange={setUrlInputValue}
+          onUrlSubmit={handleSubmitUrl}
+          activeSlotIndex={activeSlotIndex}
         />
         
         <div className="fixed inset-0 opacity-30 pointer-events-none z-0">
@@ -729,85 +732,31 @@ const MasterControlDashboard = () => {
               )}
 
               <div className="w-full h-full flex items-center justify-center">
-                {!slot.isActive && inputIndex !== index && (
-                  <div className="flex flex-col items-center gap-[0.8rem]">
-                    <button
-                      onClick={() => handleOpenSidebar(index)}
-                      className="flex flex-col items-center gap-[0.4rem] p-[0.8rem] hover:bg-slate-800/50 slot-inner-element transition-all duration-300 group/btn"
-                      data-testid={`button-add-source-${index}`}
-                    >
-                      <Plus className="w-[2.4rem] h-[2.4rem] text-cyan-400 group-hover/btn:scale-110 transition-transform" />
-                      <span className="text-[1rem] text-slate-400 group-hover/btn:text-cyan-400 transition-colors">
-                        ADD
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => handleAddUrl(index)}
-                      className="text-[0.9rem] text-slate-500 hover:text-cyan-400 transition-colors"
-                      data-testid={`button-custom-url-${index}`}
-                    >
-                      or enter URL
-                    </button>
-                  </div>
-                )}
-
-                {inputIndex === index && (
-                  <div className="absolute inset-0 flex items-center justify-center p-[1.6rem] bg-slate-900/95 backdrop-blur-sm z-30 slot-inner-element">
-                    <div className="w-full max-w-[28rem]">
-                      <label className="block text-[1rem] font-semibold mb-[0.6rem] text-cyan-400">
-                        ENTER URL
-                      </label>
-                      <input
-                        type="text"
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleSubmitUrl(index);
-                          }
-                        }}
-                        placeholder="https://youtube.com/watch?v=..."
-                        className="w-full px-[1rem] py-[0.6rem] bg-slate-800 border border-slate-700 slot-button focus:border-cyan-500 focus:outline-none transition-colors text-[1.2rem]"
-                        autoFocus
-                        data-testid={`input-url-${index}`}
-                      />
-                      <div className="flex gap-[0.6rem] mt-[1rem]">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleSubmitUrl(index);
-                          }}
-                          className="flex-1 px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold transition-colors text-[1.1rem]"
-                          data-testid={`button-load-${index}`}
-                        >
-                          LOAD
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setInputIndex(null);
-                            setInputValue('');
-                          }}
-                          className="px-[1.2rem] py-[0.6rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold transition-colors text-[1.1rem]"
-                          data-testid={`button-cancel-${index}`}
-                        >
-                          CANCEL
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                {!slot.isActive && (
+                  <button
+                    onClick={() => handleOpenSidebar(index)}
+                    className="absolute inset-0 flex items-center justify-center hover:bg-slate-800/30 transition-all duration-300 group/btn cursor-pointer"
+                    data-testid={`button-add-source-${index}`}
+                  >
+                    <Plus className="w-[4rem] h-[4rem] text-cyan-400/60 group-hover/btn:text-cyan-400 group-hover/btn:scale-110 transition-all duration-300" />
+                  </button>
                 )}
 
                 {slot.isActive && !slot.error && (
                   <div className="w-full h-full relative">
+                    {isEditMode && (
+                      <div 
+                        className="absolute inset-0 z-30 bg-transparent" 
+                        style={{ pointerEvents: 'auto' }}
+                        data-testid={`iframe-overlay-${index}`}
+                      />
+                    )}
                     {slot.isYouTube && slot.videoId ? (
                       <iframe
                         ref={(el) => { iframeRefs.current[index] = el; }}
                         src={getYouTubeEmbedUrl(slot.videoId)}
                         className="w-full h-full"
+                        style={{ pointerEvents: isEditMode ? 'none' : 'auto' }}
                         title={`YouTube - Slot ${index + 1}`}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
@@ -817,6 +766,7 @@ const MasterControlDashboard = () => {
                         <iframe
                           src={slot.url}
                           className="w-full h-full"
+                          style={{ pointerEvents: isEditMode ? 'none' : 'auto' }}
                           title={`Slot ${index + 1}`}
                           allow="autoplay; encrypted-media"
                           sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
