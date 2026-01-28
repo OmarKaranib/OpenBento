@@ -106,10 +106,6 @@ const MasterControlDashboard = () => {
     return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
   };
 
-  const getCorsProxyUrl = (url: string): string => {
-    return `https://corsproxy.io/?${encodeURIComponent(url)}`;
-  };
-
   const sendYouTubeCommand = useCallback((index: number, command: string, value?: number | boolean) => {
     const iframe = iframeRefs.current[index];
     if (iframe && iframe.contentWindow) {
@@ -299,7 +295,7 @@ const MasterControlDashboard = () => {
               </button>
               
               {showGridDropdown && (
-                <div className="absolute top-full mt-1 right-0 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-[9999] min-w-[160px]" data-testid="dropdown-grid-options">
+                <div className="absolute top-full mt-1 right-0 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 min-w-[160px]" data-testid="dropdown-grid-options">
                   {GRID_OPTIONS.map((option) => (
                     <button
                       key={option.value}
@@ -346,12 +342,10 @@ const MasterControlDashboard = () => {
       </div>
 
       <div 
-        className="relative z-10 grid gap-1.5 overflow-hidden"
+        className="relative z-10 flex-1 min-h-0 grid gap-1.5"
         style={{
-          height: 'calc(100vh - 80px)',
-          width: '100%',
-          gridTemplateColumns: `repeat(${gridOption.cols}, 1fr)`,
-          gridTemplateRows: `repeat(4, 1fr)`
+          gridTemplateColumns: `repeat(${gridOption.cols}, minmax(0, 1fr))`,
+          gridTemplateRows: `repeat(auto-fit, minmax(0, 1fr))`
         }}
       >
         {visibleSlots.map((slot, index) => (
@@ -433,7 +427,7 @@ const MasterControlDashboard = () => {
               )}
 
               {inputIndex === index && (
-                <div className="absolute inset-0 flex items-center justify-center p-2 bg-slate-900/95 backdrop-blur-sm z-[9999]">
+                <div className="absolute inset-0 flex items-center justify-center p-2 bg-slate-900/95 backdrop-blur-sm z-30">
                   <div className="w-full max-w-xs">
                     <label className="block text-[10px] font-semibold mb-1 text-cyan-400">
                       ENTER URL
@@ -496,7 +490,7 @@ const MasterControlDashboard = () => {
                   ) : (
                     <>
                       <iframe
-                        src={getCorsProxyUrl(slot.url)}
+                        src={slot.url}
                         className="w-full h-full"
                         title={`Slot ${index + 1}`}
                         allow="autoplay; encrypted-media"
@@ -584,7 +578,7 @@ const MasterControlDashboard = () => {
       </div>
 
       {showLegalPopup && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm" data-testid="modal-legal">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" data-testid="modal-legal">
           <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-md mx-4 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-cyan-400 flex items-center gap-2">
