@@ -19,13 +19,15 @@ A 16-slot Mission Control Dashboard for monitoring multiple video sources and st
 
 ## Edit Layout Mode (Interaction Lock)
 - **Edit Layout button** in header toggles between locked and edit modes
-- **Locked mode (default)**: Click inside slots to play videos or type URLs
+- **Locked mode (default)**: Click large (+) ADD button to open sidebar and add sources
 - **Edit mode**: Slots jiggle (iOS-style animation) and become draggable
 - Purple border indicates edit mode is active
+- Pointer-events: none overlay on iframes during edit mode for drag sensor compatibility
 - Internal clicks disabled in edit mode to prevent accidental interactions
 
 ## Widget Sidebar with Drag-and-Drop
-- Slide-out sidebar from left side when clicking ADD button
+- Slide-out sidebar from left side when clicking slot's (+) ADD button
+- **URL Input at top** below tabs - shows "ADD TO SLOT X" label
 - **Tabbed Interface**: Content tab (channels/search) and Layout tab (widget sizes)
 - Search bar to filter channels (Content tab)
 - Trending Channels section with 10 preset live streams
@@ -71,6 +73,10 @@ A 16-slot Mission Control Dashboard for monitoring multiple video sources and st
 - `tailwind.config.ts` - Tailwind configuration with jiggle animation
 
 ## Recent Changes
+- Slot UI overhaul: large centered (+) ADD button fills entire empty slot area
+- Relocated URL input to sidebar top below Content/Layout tabs
+- Added pointer-events: none overlay on iframes during Edit Mode
+- Updated Spanning Guide to match 2x2, 2x4, 4x4 templates
 - Added Edit Layout toggle button with lock/unlock logic
 - Implemented iOS-like jiggle animation for edit mode
 - Created custom collision detection with 50%+ overlap threshold
