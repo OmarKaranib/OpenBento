@@ -1,6 +1,24 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, ChevronDown, Scale, Pause, Play } from 'lucide-react';
-import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, useDroppable } from '@dnd-kit/core';
+import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, ChevronDown, Scale, Pause, Play, GripVertical } from 'lucide-react';
+import { 
+  DndContext, 
+  DragEndEvent, 
+  DragOverEvent,
+  DragStartEvent,
+  DragOverlay, 
+  useSensor, 
+  useSensors, 
+  PointerSensor,
+  closestCenter,
+  UniqueIdentifier
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  rectSortingStrategy,
+  arrayMove
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { WidgetSidebar, TrendingChannel, LAYOUT_BLOCKS, LayoutBlock } from '@/components/widget-sidebar';
 
 type GridDensity = 2 | 4 | 6 | 9 | 12 | 16;
@@ -31,22 +49,71 @@ interface Slot {
   isYouTube: boolean;
   videoId: string | null;
   embedBlocked: boolean;
+  spanCols: number;
+  spanRows: number;
 }
 
-interface DroppableSlotProps {
-  id: string;
+interface SortableSlotProps {
+  slot: Slot;
+  index: number;
   children: React.ReactNode;
-  className?: string;
+  isDraggingThis: boolean;
+  gridCols: number;
 }
 
-function DroppableSlot({ id, children, className }: DroppableSlotProps) {
-  const { isOver, setNodeRef } = useDroppable({ id });
-  
+function SortableSlot({ slot, index, children, isDraggingThis, gridCols }: SortableSlotProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+    isOver
+  } = useSortable({ 
+    id: `slot-${index}`,
+    data: { type: 'slot', slot, index }
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition: isDragging ? 'none' : 'transform 0.3s ease, box-shadow 0.3s ease',
+    zIndex: isDragging ? 100 : 1,
+    opacity: isDragging ? 0.8 : 1,
+    gridColumn: slot.spanCols > 1 ? `span ${Math.min(slot.spanCols, gridCols)}` : undefined,
+    gridRow: slot.spanRows > 1 ? `span ${slot.spanRows}` : undefined,
+  };
+
   return (
     <div
       ref={setNodeRef}
-      className={`${className} ${isOver ? 'ring-2 ring-cyan-400 ring-opacity-70' : ''}`}
+      style={style}
+      {...attributes}
+      className={`dashboard-slot relative bg-slate-900/50 backdrop-blur-sm border group transition-all duration-300 shadow-xl ${
+        isDragging 
+          ? 'scale-105 shadow-2xl shadow-cyan-500/30 border-cyan-400 z-50' 
+          : isOver 
+            ? 'border-cyan-400/70 ring-2 ring-cyan-400/50'
+            : 'border-slate-700/50 hover:border-cyan-500/50'
+      }`}
+      data-testid={`slot-container-${index}`}
     >
+      <div 
+        {...listeners}
+        className={`absolute top-[0.8rem] left-[4rem] z-30 p-[0.4rem] bg-slate-800/90 backdrop-blur-sm slot-button cursor-grab active:cursor-grabbing border border-slate-600/50 hover:border-cyan-500/50 hover:bg-slate-700/90 transition-all duration-200 ${
+          isDragging ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'
+        }`}
+        title="Drag to reorder"
+        data-testid={`drag-handle-${index}`}
+      >
+        <GripVertical className="w-[1.2rem] h-[1.2rem] text-slate-400" />
+      </div>
+      {!slot.isActive && (
+        <div 
+          {...listeners}
+          className="absolute inset-0 cursor-grab active:cursor-grabbing z-10"
+        />
+      )}
       {children}
     </div>
   );
@@ -55,6 +122,7 @@ function DroppableSlot({ id, children, className }: DroppableSlotProps) {
 const MasterControlDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
+  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -78,18 +146,24 @@ const MasterControlDashboard = () => {
           error: null,
           isYouTube: false,
           videoId: null,
-          embedBlocked: false
+          embedBlocked: false,
+          spanCols: 1,
+          spanRows: 1
         }));
         return [...parsed.map((s: Slot) => ({ 
           ...s, 
           embedBlocked: s.embedBlocked ?? false,
-          isPaused: s.isPaused ?? false 
+          isPaused: s.isPaused ?? false,
+          spanCols: s.spanCols ?? 1,
+          spanRows: s.spanRows ?? 1
         })), ...additional];
       }
       return parsed.map((s: Slot) => ({ 
         ...s, 
         embedBlocked: s.embedBlocked ?? false,
-        isPaused: s.isPaused ?? false 
+        isPaused: s.isPaused ?? false,
+        spanCols: s.spanCols ?? 1,
+        spanRows: s.spanRows ?? 1
       }));
     }
     return Array(16).fill(null).map((_, i) => ({
@@ -101,7 +175,9 @@ const MasterControlDashboard = () => {
       error: null,
       isYouTube: false,
       videoId: null,
-      embedBlocked: false
+      embedBlocked: false,
+      spanCols: 1,
+      spanRows: 1
     }));
   });
   
@@ -155,6 +231,7 @@ const MasterControlDashboard = () => {
   };
 
   const visibleSlots = slots.slice(0, gridDensity);
+  const slotIds = visibleSlots.map((_, index) => `slot-${index}`);
 
   const handleAddUrl = (index: number) => {
     setInputIndex(index);
@@ -207,7 +284,9 @@ const MasterControlDashboard = () => {
           error: null,
           isYouTube: false,
           videoId: null,
-          embedBlocked: false
+          embedBlocked: false,
+          spanCols: 1,
+          spanRows: 1
         } : slot
       );
       return compactSlots(updated, gridDensity);
@@ -314,7 +393,9 @@ const MasterControlDashboard = () => {
             error: null,
             isYouTube: false,
             videoId: null,
-            embedBlocked: false
+            embedBlocked: false,
+            spanCols: 1,
+            spanRows: 1
           });
         }
       }
@@ -328,7 +409,7 @@ const MasterControlDashboard = () => {
     setShowGridDropdown(false);
   };
 
-  const addChannelToSlot = useCallback((channel: TrendingChannel, slotIndex: number) => {
+  const addChannelToSlot = useCallback((channel: TrendingChannel, slotIndex: number, spanCols: number = 1, spanRows: number = 1) => {
     const extractVideoId = (url: string): string | null => {
       const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
       const match = url.match(regExp);
@@ -347,36 +428,72 @@ const MasterControlDashboard = () => {
         error: null,
         embedBlocked: false,
         isPaused: false,
-        isMuted: true
+        isMuted: true,
+        spanCols,
+        spanRows
       } : slot
     ));
   }, []);
 
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id);
+  }, []);
+
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    
+    const activeData = active.data.current;
+    
+    if (activeData?.type === 'slot') {
+      const activeIndex = activeData.index as number;
+      const overMatch = over.id.toString().match(/^slot-(\d+)$/);
+      if (!overMatch) return;
+      
+      const overIndex = parseInt(overMatch[1], 10);
+      
+      if (activeIndex !== overIndex) {
+        setSlots(prev => {
+          const newSlots = arrayMove(prev, activeIndex, overIndex);
+          return newSlots.map((slot, i) => ({ ...slot, id: i }));
+        });
+      }
+    }
+  }, []);
+
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveId(null);
     
     if (!over) return;
     
-    const slotMatch = over.id.toString().match(/^slot-(\d+)$/);
-    if (!slotMatch) return;
-    
-    const slotIndex = parseInt(slotMatch[1], 10);
     const activeData = active.data.current;
     
     if (activeData?.type === 'channel') {
+      const slotMatch = over.id.toString().match(/^slot-(\d+)$/);
+      if (!slotMatch) return;
+      
+      const slotIndex = parseInt(slotMatch[1], 10);
       const channel = activeData.channel as TrendingChannel;
       addChannelToSlot(channel, slotIndex);
       setSidebarOpen(false);
     } else if (activeData?.type === 'block') {
+      const slotMatch = over.id.toString().match(/^slot-(\d+)$/);
+      if (!slotMatch) return;
+      
+      const slotIndex = parseInt(slotMatch[1], 10);
       const block = activeData.block as LayoutBlock;
-      const newDensity = (block.cols * block.rows) as GridDensity;
-      if ([2, 4, 6, 9, 12, 16].includes(newDensity)) {
-        setSlots(prev => compactSlots(prev, newDensity));
-        setGridDensity(newDensity);
-      }
+      
+      setSlots(prev => prev.map((slot, i) => 
+        i === slotIndex ? {
+          ...slot,
+          spanCols: block.spanCols,
+          spanRows: block.spanRows
+        } : slot
+      ));
       setSidebarOpen(false);
     }
-  }, [addChannelToSlot, compactSlots]);
+  }, [addChannelToSlot]);
 
   const handleChannelClick = useCallback((channel: TrendingChannel) => {
     const firstEmptyIndex = slots.findIndex(s => !s.isActive);
@@ -394,7 +511,13 @@ const MasterControlDashboard = () => {
   const gridOption = getCurrentGridOption();
 
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+    <DndContext 
+      sensors={sensors} 
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+    >
       <div className={`h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 font-mono flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} style={{ padding: '1.6rem' }}>
         <WidgetSidebar 
           isOpen={sidebarOpen} 
@@ -477,235 +600,244 @@ const MasterControlDashboard = () => {
         <div className="h-[0.2rem] bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full"></div>
       </div>
 
-      <div 
-        className="dashboard-grid relative z-10"
-        style={{
-          '--grid-cols': `repeat(${gridOption.cols}, 1fr)`,
-          '--grid-rows': `repeat(${gridOption.rows}, 1fr)`
-        } as React.CSSProperties}
-      >
-        {visibleSlots.map((slot, index) => (
-          <DroppableSlot
-            key={slot.id}
-            id={`slot-${index}`}
-            className="dashboard-slot relative bg-slate-900/50 backdrop-blur-sm border border-slate-700/50 group hover:border-cyan-500/50 transition-all duration-300 shadow-xl"
-          >
-            <div className="absolute top-[0.8rem] left-[0.8rem] z-20 bg-slate-800/90 backdrop-blur-sm px-[0.6rem] py-[0.3rem] slot-button text-[0.9rem] font-bold text-cyan-400 border border-cyan-500/30" data-testid={`text-slot-number-${index}`} data-slot-testid={`slot-container-${index}`}>
-              {index + 1}
-            </div>
-
-            {slot.isActive && (
-              <div className="absolute top-[0.8rem] right-[0.8rem] z-20 flex gap-[0.4rem]">
-                {slot.isYouTube && (
-                  <button
-                    onClick={() => toggleSlotPause(index)}
-                    className={`p-[0.6rem] slot-button transition-all duration-300 backdrop-blur-sm ${
-                      slot.isPaused 
-                        ? 'bg-yellow-600/90 hover:bg-yellow-500' 
-                        : 'bg-blue-600/90 hover:bg-blue-500'
-                    }`}
-                    title={slot.isPaused ? 'Play' : 'Pause'}
-                    data-testid={`button-pause-${index}`}
-                  >
-                    {slot.isPaused ? <Play className="w-[1.2rem] h-[1.2rem]" /> : <Pause className="w-[1.2rem] h-[1.2rem]" />}
-                  </button>
+      <SortableContext items={slotIds} strategy={rectSortingStrategy}>
+        <div 
+          className="dashboard-grid relative z-10"
+          style={{
+            '--grid-cols': `repeat(${gridOption.cols}, 1fr)`,
+            '--grid-rows': `repeat(${gridOption.rows}, 1fr)`
+          } as React.CSSProperties}
+        >
+          {visibleSlots.map((slot, index) => (
+            <SortableSlot
+              key={`slot-${index}`}
+              slot={slot}
+              index={index}
+              isDraggingThis={activeId === `slot-${index}`}
+              gridCols={gridOption.cols}
+            >
+              <div className="absolute top-[0.8rem] left-[0.8rem] z-20 bg-slate-800/90 backdrop-blur-sm px-[0.6rem] py-[0.3rem] slot-button text-[0.9rem] font-bold text-cyan-400 border border-cyan-500/30" data-testid={`text-slot-number-${index}`}>
+                {index + 1}
+                {(slot.spanCols > 1 || slot.spanRows > 1) && (
+                  <span className="ml-[0.4rem] text-purple-400 text-[0.8rem]">
+                    {slot.spanCols}x{slot.spanRows}
+                  </span>
                 )}
-                
-                <button
-                  onClick={() => toggleSlotMute(index)}
-                  className={`p-[0.6rem] slot-button transition-all duration-300 backdrop-blur-sm ${
-                    slot.isMuted 
-                      ? 'bg-red-600/90 hover:bg-red-500' 
-                      : 'bg-emerald-600/90 hover:bg-emerald-500'
-                  }`}
-                  title={slot.isMuted ? 'Unmute' : 'Mute'}
-                  data-testid={`button-mute-${index}`}
-                >
-                  {slot.isMuted ? <VolumeX className="w-[1.2rem] h-[1.2rem]" /> : <Volume2 className="w-[1.2rem] h-[1.2rem]" />}
-                </button>
-                
-                {!slot.isYouTube && slot.url && (
-                  <a
-                    href={slot.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-[0.6rem] slot-button transition-all duration-300 backdrop-blur-sm bg-blue-600/90 hover:bg-blue-500"
-                    title="Open in new tab"
-                    data-testid={`button-link-${index}`}
-                  >
-                    <ExternalLink className="w-[1.2rem] h-[1.2rem]" />
-                  </a>
-                )}
-                
-                <button
-                  onClick={() => handleRemoveSlot(index)}
-                  className="p-[0.6rem] bg-slate-800/90 hover:bg-slate-700 slot-button transition-all duration-300 backdrop-blur-sm"
-                  title="Remove"
-                  data-testid={`button-remove-${index}`}
-                >
-                  <X className="w-[1.2rem] h-[1.2rem] text-red-400" />
-                </button>
               </div>
-            )}
 
-            <div className="w-full h-full flex items-center justify-center">
-              {!slot.isActive && inputIndex !== index && (
-                <div className="flex flex-col items-center gap-[0.8rem]">
-                  <button
-                    onClick={() => handleOpenSidebar(index)}
-                    className="flex flex-col items-center gap-[0.4rem] p-[0.8rem] hover:bg-slate-800/50 slot-inner-element transition-all duration-300 group/btn"
-                    data-testid={`button-add-source-${index}`}
-                  >
-                    <Plus className="w-[2.4rem] h-[2.4rem] text-cyan-400 group-hover/btn:scale-110 transition-transform" />
-                    <span className="text-[1rem] text-slate-400 group-hover/btn:text-cyan-400 transition-colors">
-                      ADD
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => handleAddUrl(index)}
-                    className="text-[0.9rem] text-slate-500 hover:text-cyan-400 transition-colors"
-                    data-testid={`button-custom-url-${index}`}
-                  >
-                    or enter URL
-                  </button>
-                </div>
-              )}
-
-              {inputIndex === index && (
-                <div className="absolute inset-0 flex items-center justify-center p-[1.6rem] bg-slate-900/95 backdrop-blur-sm z-30 slot-inner-element">
-                  <div className="w-full max-w-[28rem]">
-                    <label className="block text-[1rem] font-semibold mb-[0.6rem] text-cyan-400">
-                      ENTER URL
-                    </label>
-                    <input
-                      type="text"
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSubmitUrl(index);
-                        }
-                      }}
-                      placeholder="https://youtube.com/watch?v=..."
-                      className="w-full px-[1rem] py-[0.6rem] bg-slate-800 border border-slate-700 slot-button focus:border-cyan-500 focus:outline-none transition-colors text-[1.2rem]"
-                      autoFocus
-                      data-testid={`input-url-${index}`}
-                    />
-                    <div className="flex gap-[0.6rem] mt-[1rem]">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleSubmitUrl(index);
-                        }}
-                        className="flex-1 px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold transition-colors text-[1.1rem]"
-                        data-testid={`button-load-${index}`}
-                      >
-                        LOAD
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setInputIndex(null);
-                          setInputValue('');
-                        }}
-                        className="px-[1.2rem] py-[0.6rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold transition-colors text-[1.1rem]"
-                        data-testid={`button-cancel-${index}`}
-                      >
-                        CANCEL
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {slot.isActive && !slot.error && (
-                <div className="w-full h-full relative">
-                  {slot.isYouTube && slot.videoId ? (
-                    <iframe
-                      ref={(el) => { iframeRefs.current[index] = el; }}
-                      src={getYouTubeEmbedUrl(slot.videoId)}
-                      className="w-full h-full"
-                      title={`YouTube - Slot ${index + 1}`}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  ) : (
-                    <>
-                      <iframe
-                        src={slot.url}
-                        className="w-full h-full"
-                        title={`Slot ${index + 1}`}
-                        allow="autoplay; encrypted-media"
-                        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                        onError={() => handleIframeError(index)}
-                        onLoad={() => startIframeBlockDetection(index)}
-                      />
-                      {slot.embedBlocked && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm">
-                          <div className="text-center p-[2rem] max-w-[28rem]">
-                            <AlertCircle className="w-[3.2rem] h-[3.2rem] text-orange-400 mx-auto mb-[1rem]" />
-                            <p className="text-[1.4rem] font-semibold text-slate-200 mb-[0.6rem]">Embedding Restricted</p>
-                            <p className="text-[1.1rem] text-slate-400 mb-[1.5rem]">
-                              Sites like Twitter, Discord, and others require their official embed codes. Standard iframes are blocked for security.
-                            </p>
-                            <a
-                              href={slot.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-[1.6rem] py-[1rem] bg-orange-600 hover:bg-orange-500 slot-button font-semibold transition-colors text-[1.3rem] inline-flex items-center gap-[0.8rem]"
-                              data-testid={`button-open-widget-${index}`}
-                            >
-                              <ExternalLink className="w-[1.6rem] h-[1.6rem]" />
-                              Open in Official Widget Mode
-                            </a>
-                          </div>
-                        </div>
-                      )}
-                    </>
+              {slot.isActive && (
+                <div className="absolute top-[0.8rem] right-[0.8rem] z-20 flex gap-[0.4rem]">
+                  {slot.isYouTube && (
+                    <button
+                      onClick={() => toggleSlotPause(index)}
+                      className={`p-[0.6rem] slot-button transition-all duration-300 backdrop-blur-sm ${
+                        slot.isPaused 
+                          ? 'bg-yellow-600/90 hover:bg-yellow-500' 
+                          : 'bg-blue-600/90 hover:bg-blue-500'
+                      }`}
+                      title={slot.isPaused ? 'Play' : 'Pause'}
+                      data-testid={`button-pause-${index}`}
+                    >
+                      {slot.isPaused ? <Play className="w-[1.2rem] h-[1.2rem]" /> : <Pause className="w-[1.2rem] h-[1.2rem]" />}
+                    </button>
                   )}
+                  
+                  <button
+                    onClick={() => toggleSlotMute(index)}
+                    className={`p-[0.6rem] slot-button transition-all duration-300 backdrop-blur-sm ${
+                      slot.isMuted 
+                        ? 'bg-red-600/90 hover:bg-red-500' 
+                        : 'bg-emerald-600/90 hover:bg-emerald-500'
+                    }`}
+                    title={slot.isMuted ? 'Unmute' : 'Mute'}
+                    data-testid={`button-mute-${index}`}
+                  >
+                    {slot.isMuted ? <VolumeX className="w-[1.2rem] h-[1.2rem]" /> : <Volume2 className="w-[1.2rem] h-[1.2rem]" />}
+                  </button>
+                  
+                  {!slot.isYouTube && slot.url && (
+                    <a
+                      href={slot.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-[0.6rem] slot-button transition-all duration-300 backdrop-blur-sm bg-blue-600/90 hover:bg-blue-500"
+                      title="Open in new tab"
+                      data-testid={`button-link-${index}`}
+                    >
+                      <ExternalLink className="w-[1.2rem] h-[1.2rem]" />
+                    </a>
+                  )}
+                  
+                  <button
+                    onClick={() => handleRemoveSlot(index)}
+                    className="p-[0.6rem] bg-slate-800/90 hover:bg-slate-700 slot-button transition-all duration-300 backdrop-blur-sm"
+                    title="Remove"
+                    data-testid={`button-remove-${index}`}
+                  >
+                    <X className="w-[1.2rem] h-[1.2rem] text-red-400" />
+                  </button>
                 </div>
               )}
 
-              {slot.error && (
-                <div className="absolute inset-0 flex items-center justify-center p-[1.6rem] bg-slate-900/95 backdrop-blur-sm">
-                  <div className="max-w-[28rem] text-center">
-                    <AlertCircle className="w-[2.4rem] h-[2.4rem] text-yellow-400 mx-auto mb-[0.6rem]" />
-                    <p className="text-[1.1rem] text-slate-300 mb-[1rem]" data-testid={`text-error-${index}`}>{slot.error}</p>
-                    <div className="flex gap-[0.6rem] justify-center">
-                      {slot.url && (
-                        <a
-                          href={slot.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-[1rem] py-[0.6rem] bg-blue-600 hover:bg-blue-500 slot-button font-semibold transition-colors text-[1.1rem] flex items-center gap-[0.4rem]"
-                          data-testid={`button-open-link-${index}`}
+              <div className="w-full h-full flex items-center justify-center">
+                {!slot.isActive && inputIndex !== index && (
+                  <div className="flex flex-col items-center gap-[0.8rem]">
+                    <button
+                      onClick={() => handleOpenSidebar(index)}
+                      className="flex flex-col items-center gap-[0.4rem] p-[0.8rem] hover:bg-slate-800/50 slot-inner-element transition-all duration-300 group/btn"
+                      data-testid={`button-add-source-${index}`}
+                    >
+                      <Plus className="w-[2.4rem] h-[2.4rem] text-cyan-400 group-hover/btn:scale-110 transition-transform" />
+                      <span className="text-[1rem] text-slate-400 group-hover/btn:text-cyan-400 transition-colors">
+                        ADD
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => handleAddUrl(index)}
+                      className="text-[0.9rem] text-slate-500 hover:text-cyan-400 transition-colors"
+                      data-testid={`button-custom-url-${index}`}
+                    >
+                      or enter URL
+                    </button>
+                  </div>
+                )}
+
+                {inputIndex === index && (
+                  <div className="absolute inset-0 flex items-center justify-center p-[1.6rem] bg-slate-900/95 backdrop-blur-sm z-30 slot-inner-element">
+                    <div className="w-full max-w-[28rem]">
+                      <label className="block text-[1rem] font-semibold mb-[0.6rem] text-cyan-400">
+                        ENTER URL
+                      </label>
+                      <input
+                        type="text"
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSubmitUrl(index);
+                          }
+                        }}
+                        placeholder="https://youtube.com/watch?v=..."
+                        className="w-full px-[1rem] py-[0.6rem] bg-slate-800 border border-slate-700 slot-button focus:border-cyan-500 focus:outline-none transition-colors text-[1.2rem]"
+                        autoFocus
+                        data-testid={`input-url-${index}`}
+                      />
+                      <div className="flex gap-[0.6rem] mt-[1rem]">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleSubmitUrl(index);
+                          }}
+                          className="flex-1 px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold transition-colors text-[1.1rem]"
+                          data-testid={`button-load-${index}`}
                         >
-                          <ExternalLink className="w-[1.2rem] h-[1.2rem]" />
-                          Open in New Window
-                        </a>
-                      )}
-                      <button
-                        onClick={() => handleRemoveSlot(index)}
-                        className="px-[1rem] py-[0.6rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold transition-colors text-[1.1rem]"
-                        data-testid={`button-clear-slot-${index}`}
-                      >
-                        CLEAR
-                      </button>
+                          LOAD
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setInputIndex(null);
+                            setInputValue('');
+                          }}
+                          className="px-[1.2rem] py-[0.6rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold transition-colors text-[1.1rem]"
+                          data-testid={`button-cancel-${index}`}
+                        >
+                          CANCEL
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
 
-            <div className="absolute inset-0 pointer-events-none opacity-10">
-              <div className="w-full h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-scan"></div>
-            </div>
-          </DroppableSlot>
-        ))}
-      </div>
+                {slot.isActive && !slot.error && (
+                  <div className="w-full h-full relative">
+                    {slot.isYouTube && slot.videoId ? (
+                      <iframe
+                        ref={(el) => { iframeRefs.current[index] = el; }}
+                        src={getYouTubeEmbedUrl(slot.videoId)}
+                        className="w-full h-full"
+                        title={`YouTube - Slot ${index + 1}`}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    ) : (
+                      <>
+                        <iframe
+                          src={slot.url}
+                          className="w-full h-full"
+                          title={`Slot ${index + 1}`}
+                          allow="autoplay; encrypted-media"
+                          sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                          onError={() => handleIframeError(index)}
+                          onLoad={() => startIframeBlockDetection(index)}
+                        />
+                        {slot.embedBlocked && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm">
+                            <div className="text-center p-[2rem] max-w-[28rem]">
+                              <AlertCircle className="w-[3.2rem] h-[3.2rem] text-orange-400 mx-auto mb-[1rem]" />
+                              <p className="text-[1.4rem] font-semibold text-slate-200 mb-[0.6rem]">Embedding Restricted</p>
+                              <p className="text-[1.1rem] text-slate-400 mb-[1.5rem]">
+                                Sites like Twitter, Discord, and others require their official embed codes. Standard iframes are blocked for security.
+                              </p>
+                              <a
+                                href={slot.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-[1.6rem] py-[1rem] bg-orange-600 hover:bg-orange-500 slot-button font-semibold transition-colors text-[1.3rem] inline-flex items-center gap-[0.8rem]"
+                                data-testid={`button-open-widget-${index}`}
+                              >
+                                <ExternalLink className="w-[1.6rem] h-[1.6rem]" />
+                                Open in Official Widget Mode
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {slot.error && (
+                  <div className="absolute inset-0 flex items-center justify-center p-[1.6rem] bg-slate-900/95 backdrop-blur-sm">
+                    <div className="max-w-[28rem] text-center">
+                      <AlertCircle className="w-[2.4rem] h-[2.4rem] text-yellow-400 mx-auto mb-[0.6rem]" />
+                      <p className="text-[1.1rem] text-slate-300 mb-[1rem]" data-testid={`text-error-${index}`}>{slot.error}</p>
+                      <div className="flex gap-[0.6rem] justify-center">
+                        {slot.url && (
+                          <a
+                            href={slot.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-[1rem] py-[0.6rem] bg-blue-600 hover:bg-blue-500 slot-button font-semibold transition-colors text-[1.1rem] flex items-center gap-[0.4rem]"
+                            data-testid={`button-open-link-${index}`}
+                          >
+                            <ExternalLink className="w-[1.2rem] h-[1.2rem]" />
+                            Open in New Window
+                          </a>
+                        )}
+                        <button
+                          onClick={() => handleRemoveSlot(index)}
+                          className="px-[1rem] py-[0.6rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold transition-colors text-[1.1rem]"
+                          data-testid={`button-clear-slot-${index}`}
+                        >
+                          CLEAR
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="absolute inset-0 pointer-events-none opacity-10">
+                <div className="w-full h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-scan"></div>
+              </div>
+            </SortableSlot>
+          ))}
+        </div>
+      </SortableContext>
 
       <div className="relative z-10 mt-[0.8rem] flex-shrink-0 flex items-center justify-between text-[1rem] text-slate-500 border-t border-slate-800 pt-[0.8rem]" style={{ height: 'var(--footer-height)' }}>
         <p data-testid="text-footer-copyright">© 2026 Master Control. Independent tool for content aggregation.</p>

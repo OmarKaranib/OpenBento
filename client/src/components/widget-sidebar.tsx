@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { X, Search, Tv, Grid2X2, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp } from 'lucide-react';
+import { X, Search, Tv, Grid2X2, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -16,6 +16,8 @@ export interface LayoutBlock {
   name: string;
   cols: number;
   rows: number;
+  spanCols: number;
+  spanRows: number;
   icon: 'small' | 'medium' | 'large';
 }
 
@@ -33,10 +35,12 @@ const TRENDING_CHANNELS: TrendingChannel[] = [
 ];
 
 export const LAYOUT_BLOCKS: LayoutBlock[] = [
-  { id: 'block-2x2', name: '4 Slots (2x2)', cols: 2, rows: 2, icon: 'small' },
-  { id: 'block-3x3', name: '9 Slots (3x3)', cols: 3, rows: 3, icon: 'medium' },
-  { id: 'block-4x4', name: '16 Slots (4x4)', cols: 4, rows: 4, icon: 'large' },
+  { id: 'block-1x1', name: 'Single (1x1)', cols: 1, rows: 1, spanCols: 1, spanRows: 1, icon: 'small' },
+  { id: 'block-2x1', name: 'Wide (2x1)', cols: 2, rows: 1, spanCols: 2, spanRows: 1, icon: 'medium' },
+  { id: 'block-2x2', name: 'Large (2x2)', cols: 2, rows: 2, spanCols: 2, spanRows: 2, icon: 'large' },
 ];
+
+type SidebarTab = 'content' | 'layout';
 
 interface DraggableChannelProps {
   channel: TrendingChannel;
@@ -106,15 +110,32 @@ function DraggableBlock({ block }: DraggableBlockProps) {
     cursor: isDragging ? 'grabbing' : 'grab',
   };
 
-  const getBlockIcon = () => {
-    switch (block.icon) {
-      case 'small':
-        return <Grid2X2 className="w-[2.4rem] h-[2.4rem] text-cyan-400" />;
-      case 'medium':
-        return <LayoutGrid className="w-[2.4rem] h-[2.4rem] text-purple-400" />;
-      case 'large':
-        return <LayoutGrid className="w-[2.8rem] h-[2.8rem] text-pink-400" />;
+  const getBlockPreview = () => {
+    const gridCells = [];
+    for (let r = 0; r < block.rows; r++) {
+      for (let c = 0; c < block.cols; c++) {
+        gridCells.push(
+          <div 
+            key={`${r}-${c}`} 
+            className="bg-gradient-to-br from-cyan-500/40 to-purple-500/40 border border-cyan-400/50"
+            style={{ borderRadius: '0.3rem' }}
+          />
+        );
+      }
     }
+    return (
+      <div 
+        className="grid gap-[0.3rem]"
+        style={{ 
+          gridTemplateColumns: `repeat(${block.cols}, 1fr)`,
+          gridTemplateRows: `repeat(${block.rows}, 1fr)`,
+          width: `${block.cols * 2}rem`,
+          height: `${block.rows * 2}rem`
+        }}
+      >
+        {gridCells}
+      </div>
+    );
   };
 
   return (
@@ -123,11 +144,12 @@ function DraggableBlock({ block }: DraggableBlockProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className="flex flex-col items-center gap-[0.6rem] p-[1.2rem] bg-slate-800/50 hover:bg-slate-700/50 slot-button cursor-grab active:cursor-grabbing transition-all duration-200 border border-slate-700/50 hover:border-purple-500/50"
+      className="flex flex-col items-center gap-[0.8rem] p-[1.2rem] bg-slate-800/50 hover:bg-slate-700/50 slot-button cursor-grab active:cursor-grabbing transition-all duration-200 border border-slate-700/50 hover:border-purple-500/50"
       data-testid={`draggable-block-${block.id}`}
     >
-      {getBlockIcon()}
+      {getBlockPreview()}
       <span className="text-[1.1rem] font-medium text-slate-300">{block.name}</span>
+      <span className="text-[0.9rem] text-slate-500">span {block.spanCols}x{block.spanRows}</span>
     </div>
   );
 }
@@ -140,6 +162,7 @@ interface WidgetSidebarProps {
 
 export function WidgetSidebar({ isOpen, onClose, onChannelClick }: WidgetSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<SidebarTab>('content');
 
   const filteredChannels = useMemo(() => {
     if (!searchQuery.trim()) return TRENDING_CHANNELS;
@@ -187,61 +210,116 @@ export function WidgetSidebar({ isOpen, onClose, onChannelClick }: WidgetSidebar
             </button>
           </div>
           
-          <div className="relative">
-            <Search className="absolute left-[1rem] top-1/2 -translate-y-1/2 w-[1.6rem] h-[1.6rem] text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search channels..."
-              className="w-full pl-[3.6rem] pr-[1rem] py-[0.8rem] bg-slate-800 border border-slate-700 slot-button focus:border-cyan-500 focus:outline-none transition-colors text-[1.2rem]"
-              data-testid="input-search-channels"
-            />
+          <div className="flex gap-[0.4rem] bg-slate-800 p-[0.4rem] rounded-lg">
+            <button
+              onClick={() => setActiveTab('content')}
+              className={`flex-1 flex items-center justify-center gap-[0.6rem] py-[0.8rem] px-[1.2rem] rounded-md text-[1.2rem] font-medium transition-all duration-200 ${
+                activeTab === 'content'
+                  ? 'bg-cyan-600 text-white shadow-lg'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+              }`}
+              data-testid="tab-content"
+            >
+              <Layers className="w-[1.4rem] h-[1.4rem]" />
+              Content
+            </button>
+            <button
+              onClick={() => setActiveTab('layout')}
+              className={`flex-1 flex items-center justify-center gap-[0.6rem] py-[0.8rem] px-[1.2rem] rounded-md text-[1.2rem] font-medium transition-all duration-200 ${
+                activeTab === 'layout'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+              }`}
+              data-testid="tab-layout"
+            >
+              <Layout className="w-[1.4rem] h-[1.4rem]" />
+              Layout
+            </button>
           </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-[1.6rem] space-y-[2rem]">
-          <div>
-            <h3 className="text-[1.4rem] font-semibold text-cyan-400 mb-[1rem] flex items-center gap-[0.6rem]">
-              <Tv className="w-[1.6rem] h-[1.6rem]" />
-              Trending Channels
-            </h3>
-            <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
-              Drag a channel to the grid or click to add
-            </p>
-            <div className="space-y-[0.8rem]">
-              {filteredChannels.map((channel) => (
-                <div key={channel.id} onClick={() => onChannelClick?.(channel)}>
-                  <DraggableChannel channel={channel} />
-                </div>
-              ))}
-              {filteredChannels.length === 0 && (
-                <p className="text-[1.2rem] text-slate-500 text-center py-[2rem]">
-                  No channels found
+        <div className="flex-1 overflow-y-auto p-[1.6rem]">
+          {activeTab === 'content' && (
+            <div className="space-y-[1.6rem]">
+              <div className="relative">
+                <Search className="absolute left-[1rem] top-1/2 -translate-y-1/2 w-[1.6rem] h-[1.6rem] text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search channels..."
+                  className="w-full pl-[3.6rem] pr-[1rem] py-[0.8rem] bg-slate-800 border border-slate-700 slot-button focus:border-cyan-500 focus:outline-none transition-colors text-[1.2rem]"
+                  data-testid="input-search-channels"
+                />
+              </div>
+              
+              <div>
+                <h3 className="text-[1.4rem] font-semibold text-cyan-400 mb-[1rem] flex items-center gap-[0.6rem]">
+                  <Tv className="w-[1.6rem] h-[1.6rem]" />
+                  Trending Channels
+                </h3>
+                <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
+                  Drag a channel to the grid or click to add
                 </p>
-              )}
+                <div className="space-y-[0.8rem]">
+                  {filteredChannels.map((channel) => (
+                    <div key={channel.id} onClick={() => onChannelClick?.(channel)}>
+                      <DraggableChannel channel={channel} />
+                    </div>
+                  ))}
+                  {filteredChannels.length === 0 && (
+                    <p className="text-[1.2rem] text-slate-500 text-center py-[2rem]">
+                      No channels found
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
           
-          <div>
-            <h3 className="text-[1.4rem] font-semibold text-purple-400 mb-[1rem] flex items-center gap-[0.6rem]">
-              <LayoutGrid className="w-[1.6rem] h-[1.6rem]" />
-              Layout Blocks
-            </h3>
-            <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
-              Drag to add layout presets
-            </p>
-            <div className="grid grid-cols-3 gap-[0.8rem]">
-              {LAYOUT_BLOCKS.map((block) => (
-                <DraggableBlock key={block.id} block={block} />
-              ))}
+          {activeTab === 'layout' && (
+            <div className="space-y-[1.6rem]">
+              <div>
+                <h3 className="text-[1.4rem] font-semibold text-purple-400 mb-[1rem] flex items-center gap-[0.6rem]">
+                  <LayoutGrid className="w-[1.6rem] h-[1.6rem]" />
+                  Widget Sizes
+                </h3>
+                <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
+                  Drag to add spanning widgets
+                </p>
+                <div className="grid grid-cols-1 gap-[1rem]">
+                  {LAYOUT_BLOCKS.map((block) => (
+                    <DraggableBlock key={block.id} block={block} />
+                  ))}
+                </div>
+              </div>
+              
+              <div className="bg-slate-800/50 p-[1.2rem] rounded-lg border border-slate-700/50">
+                <h4 className="text-[1.2rem] font-semibold text-slate-300 mb-[0.8rem]">Spanning Guide</h4>
+                <ul className="text-[1.1rem] text-slate-400 space-y-[0.4rem]">
+                  <li className="flex items-center gap-[0.6rem]">
+                    <div className="w-[0.8rem] h-[0.8rem] bg-cyan-400 rounded-sm"></div>
+                    <span>1x1: Single slot</span>
+                  </li>
+                  <li className="flex items-center gap-[0.6rem]">
+                    <div className="w-[1.6rem] h-[0.8rem] bg-purple-400 rounded-sm"></div>
+                    <span>2x1: Spans 2 columns</span>
+                  </li>
+                  <li className="flex items-center gap-[0.6rem]">
+                    <div className="w-[1.6rem] h-[1.6rem] bg-pink-400 rounded-sm"></div>
+                    <span>2x2: Spans 2x2 grid area</span>
+                  </li>
+                </ul>
+              </div>
             </div>
-          </div>
+          )}
         </div>
         
         <div className="p-[1.6rem] border-t border-slate-700 flex-shrink-0">
           <p className="text-[1rem] text-slate-500 text-center">
-            Drag items to the grid to add them
+            {activeTab === 'content' 
+              ? 'Drag channels to slots or click to add' 
+              : 'Drag layout blocks to resize widgets'}
           </p>
         </div>
       </div>
