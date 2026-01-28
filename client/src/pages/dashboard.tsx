@@ -149,7 +149,8 @@ function SortableSlot({ slot, index, children, isDraggingThis, gridCols, isEditM
         {isEditMode && (
           <div 
             {...listeners}
-            className="absolute inset-0 cursor-grab active:cursor-grabbing z-40 bg-transparent"
+            className="absolute inset-0 cursor-grab active:cursor-grabbing z-50 bg-transparent"
+            style={{ pointerEvents: 'auto' }}
             data-testid={`drag-overlay-${index}`}
           />
         )}
