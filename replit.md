@@ -66,13 +66,25 @@ A 16-slot Mission Control Dashboard for monitoring multiple video sources and st
 - YouTube IFrame API for video control (postMessage)
 
 ## Project Structure
-- `client/src/pages/dashboard.tsx` - Main dashboard with DndContext and SortableContext
-- `client/src/components/widget-sidebar.tsx` - Tabbed sidebar with channels and layout blocks
-- `client/src/App.tsx` - App router
+- `client/src/App.tsx` - DndContext and SortableContext wrapper, lifted state management (slots, gridDensity, isEditMode)
+- `client/src/pages/dashboard.tsx` - Dashboard UI component, receives state as props, SortableSlot with z-9999 ghost handle
+- `client/src/components/widget-sidebar.tsx` - Tabbed sidebar with draggable channels and layout blocks
 - `client/src/index.css` - Theme colors (slate/cyan/purple), CSS variables
 - `tailwind.config.ts` - Tailwind configuration with jiggle animation
 
+## Architecture (DndContext Unified)
+- **DndContext in App.tsx**: Wraps both WidgetSidebar and dashboard grid as shared parent
+- **State lifted to App.tsx**: slots[], gridDensity, isEditMode, sidebarOpen, activeId
+- **Props-based dashboard**: Receives slots, setSlots, gridDensity, setGridDensity, isEditMode, setIsEditMode, handleOpenSidebar
+- **Drag data types**: 'channel' (from sidebar channels), 'block' (from layout blocks), 'slot' (grid reordering)
+- **Ghost handle overlay**: z-index 9999 for reliable drag capture in Edit Mode
+- **Custom collision detection**: Standard rectIntersection for sidebar items, 50% overlap threshold for slot-to-slot reordering
+
 ## Recent Changes
+- **Architecture refactor**: Moved DndContext and SortableContext to App.tsx
+- **State lifting**: Slots, gridDensity, isEditMode lifted to App level
+- **Ghost handle z-index**: Updated to 9999 for reliable drag capture
+- **Click-to-add fix**: DraggableChannel onClick prop closes sidebar after adding channel
 - Slot UI overhaul: large centered (+) ADD button fills entire empty slot area
 - Relocated URL input to sidebar top below Content/Layout tabs
 - Added pointer-events: none overlay on iframes during Edit Mode

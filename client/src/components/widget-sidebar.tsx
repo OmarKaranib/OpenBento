@@ -44,6 +44,7 @@ type SidebarTab = 'content' | 'layout';
 
 interface DraggableChannelProps {
   channel: TrendingChannel;
+  onClick?: () => void;
 }
 
 function getChannelIcon(iconType: TrendingChannel['iconType']) {
@@ -61,7 +62,7 @@ function getChannelIcon(iconType: TrendingChannel['iconType']) {
   }
 }
 
-function DraggableChannel({ channel }: DraggableChannelProps) {
+function DraggableChannel({ channel, onClick }: DraggableChannelProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `channel-${channel.id}`,
     data: { type: 'channel', channel }
@@ -73,12 +74,19 @@ function DraggableChannel({ channel }: DraggableChannelProps) {
     cursor: isDragging ? 'grabbing' : 'grab',
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (!isDragging && onClick) {
+      onClick();
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
+      onClick={handleClick}
       className="flex items-center gap-[1rem] p-[1rem] bg-slate-800/50 hover:bg-slate-700/50 slot-button cursor-grab active:cursor-grabbing transition-all duration-200 border border-slate-700/50 hover:border-cyan-500/50"
       data-testid={`draggable-channel-${channel.id}`}
     >
@@ -190,9 +198,10 @@ export function WidgetSidebar({
     <>
       <div
         className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300 ${
-          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
+        onMouseDown={(e) => e.stopPropagation()}
         data-testid="sidebar-overlay"
       />
       
@@ -305,9 +314,11 @@ export function WidgetSidebar({
                 </p>
                 <div className="space-y-[0.8rem]">
                   {filteredChannels.map((channel) => (
-                    <div key={channel.id} onClick={() => onChannelClick?.(channel)}>
-                      <DraggableChannel channel={channel} />
-                    </div>
+                    <DraggableChannel 
+                      key={channel.id} 
+                      channel={channel} 
+                      onClick={() => onChannelClick?.(channel)}
+                    />
                   ))}
                   {filteredChannels.length === 0 && (
                     <p className="text-[1.2rem] text-slate-500 text-center py-[2rem]">
