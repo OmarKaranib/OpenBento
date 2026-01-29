@@ -81,6 +81,9 @@ A 16-slot Mission Control Dashboard for monitoring multiple video sources and st
 - **Physics**: collisionDetection={closestCenter}, rectSortingStrategy in SortableContext
 
 ## Recent Changes
+- **DragOverlay ghost preview**: Visual ghost preview when dragging slots, channels, or layout blocks
+- **Reset slot button**: Red X button in Edit Mode to reset slot spanning to 1x1
+- **Grid auto-flow dense**: Added grid-auto-flow: dense to prevent overlap bugs
 - **Architecture refactor**: Moved DndContext and SortableContext to App.tsx
 - **State lifting**: Slots, gridDensity, isEditMode lifted to App level
 - **Ghost handle z-index**: Updated to 9999 for reliable drag capture
