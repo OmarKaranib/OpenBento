@@ -81,6 +81,9 @@ A 16-slot Mission Control Dashboard for monitoring multiple video sources and st
 - **Physics**: collisionDetection={closestCenter}, rectSortingStrategy in SortableContext
 
 ## Recent Changes
+- **TV-style playback**: Iframes have pointer-events: none, hiding YouTube controls; custom Mute/Pause/Refresh buttons are the only way to control video
+- **Refresh button**: Cyan refresh icon in slot control bar restarts the stream by re-rendering the iframe
+- **Updated Trending Channels**: ABC News, Sky News, Bloomberg with confirmed embeddable live streams
 - **DragOverlay ghost preview**: Visual ghost preview when dragging slots, channels, or layout blocks
 - **Reset slot button**: Red X button in Edit Mode to reset slot spanning to 1x1
 - **Grid auto-flow dense**: Added grid-auto-flow: dense to prevent overlap bugs
