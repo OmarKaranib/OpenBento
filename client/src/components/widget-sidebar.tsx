@@ -36,7 +36,7 @@ const TRENDING_CHANNELS: TrendingChannel[] = [
 
 export const LAYOUT_BLOCKS: LayoutBlock[] = [
   { id: 'block-2x2', name: 'Standard (2x2)', cols: 2, rows: 2, spanCols: 2, spanRows: 2, icon: 'small' },
-  { id: 'block-2x4', name: 'Wide (2x4)', cols: 4, rows: 2, spanCols: 4, spanRows: 2, icon: 'medium' },
+  { id: 'block-2x4', name: 'Wide (2x4)', cols: 4, rows: 2, spanCols: 2, spanRows: 4, icon: 'medium' },
   { id: 'block-4x4', name: 'Large (4x4)', cols: 4, rows: 4, spanCols: 4, spanRows: 4, icon: 'large' },
 ];
 

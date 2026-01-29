@@ -15,9 +15,8 @@ import {
   useSensor, 
   useSensors, 
   PointerSensor,
-  rectIntersection,
   UniqueIdentifier,
-  CollisionDetection
+  closestCenter
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -41,57 +40,22 @@ interface Slot {
   spanRows: number;
 }
 
-const customCollisionDetection: CollisionDetection = (args) => {
-  const collisions = rectIntersection(args);
-  
-  if (!collisions.length) return collisions;
-  
-  const activeData = args.active?.data?.current;
-  const isFromSidebar = activeData?.type === 'channel' || activeData?.type === 'block';
-  
-  if (isFromSidebar) {
-    return collisions;
-  }
-  
-  const filteredCollisions = collisions.filter((collision) => {
-    const { data } = collision;
-    if (!data?.droppableContainer?.rect?.current) return false;
-    
-    const activeRect = args.collisionRect;
-    const targetRect = data.droppableContainer.rect.current;
-    
-    const intersectionWidth = Math.max(0, 
-      Math.min(activeRect.right, targetRect.right) - Math.max(activeRect.left, targetRect.left)
-    );
-    const intersectionHeight = Math.max(0,
-      Math.min(activeRect.bottom, targetRect.bottom) - Math.max(activeRect.top, targetRect.top)
-    );
-    const intersectionArea = intersectionWidth * intersectionHeight;
-    const targetArea = targetRect.width * targetRect.height;
-    const overlapRatio = targetArea > 0 ? intersectionArea / targetArea : 0;
-    
-    return overlapRatio >= 0.5;
-  });
-  
-  return filteredCollisions.length > 0 ? filteredCollisions : [];
-};
-
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [urlInputValue, setUrlInputValue] = useState('');
-  
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 15,
+        distance: 5, // CHANGE: Reduced from 15 to 5 for snappier movement
         tolerance: 5,
       },
     })
   );
-  
+
   const [slots, setSlots] = useState<Slot[]>(() => {
     const saved = localStorage.getItem('controlDashboard');
     if (saved) {
@@ -140,7 +104,7 @@ function App() {
       spanRows: 1
     }));
   });
-  
+
   const [gridDensity, setGridDensity] = useState<GridDensity>(() => {
     const saved = localStorage.getItem('controlDashboardGridDensity');
     return saved ? (parseInt(saved) as GridDensity) : 16;
@@ -153,14 +117,8 @@ function App() {
   };
 
   const addChannelToSlot = useCallback((channel: TrendingChannel, slotIndex: number, spanCols = 1, spanRows = 1) => {
-    const extractVideoId = (url: string): string | null => {
-      const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
-      const match = url.match(regExp);
-      return (match && match[7].length === 11) ? match[7] : null;
-    };
-    
-    const videoId = extractVideoId(channel.url);
-    
+    const videoId = extractYouTubeId(channel.url);
+
     setSlots(prev => prev.map((slot, i) => 
       i === slotIndex ? {
         ...slot,
@@ -187,7 +145,7 @@ function App() {
     }
 
     const youtubeId = extractYouTubeId(finalUrl);
-    
+
     setSlots(prev => prev.map((slot, i) => 
       i === activeSlotIndex ? {
         ...slot,
@@ -214,16 +172,16 @@ function App() {
   const handleDragOver = useCallback((event: DragOverEvent) => {
     const { active, over } = event;
     if (!over) return;
-    
+
     const activeData = active.data.current;
-    
+
     if (activeData?.type === 'slot') {
       const activeIndex = activeData.index as number;
       const overMatch = over.id.toString().match(/^slot-(\d+)$/);
       if (!overMatch) return;
-      
+
       const overIndex = parseInt(overMatch[1], 10);
-      
+
       if (activeIndex !== overIndex) {
         setSlots(prev => {
           const newSlots = arrayMove(prev, activeIndex, overIndex);
@@ -236,15 +194,15 @@ function App() {
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
-    
+
     if (!over) return;
-    
+
     const activeData = active.data.current;
-    
+
     if (activeData?.type === 'channel') {
       const slotMatch = over.id.toString().match(/^slot-(\d+)$/);
       if (!slotMatch) return;
-      
+
       const slotIndex = parseInt(slotMatch[1], 10);
       const channel = activeData.channel as TrendingChannel;
       addChannelToSlot(channel, slotIndex);
@@ -252,10 +210,10 @@ function App() {
     } else if (activeData?.type === 'block') {
       const slotMatch = over.id.toString().match(/^slot-(\d+)$/);
       if (!slotMatch) return;
-      
+
       const slotIndex = parseInt(slotMatch[1], 10);
       const block = activeData.block as LayoutBlock;
-      
+
       setSlots(prev => prev.map((slot, i) => 
         i === slotIndex ? {
           ...slot,
@@ -286,9 +244,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        {/* DndContext wrapping EVERYTHING ensures the sidebar can talk to the grid */}
         <DndContext 
           sensors={sensors} 
-          collisionDetection={customCollisionDetection}
+          collisionDetection={closestCenter} // CHANGE: Added closestCenter for better stability
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}

@@ -32,9 +32,9 @@ A 16-slot Mission Control Dashboard for monitoring multiple video sources and st
 - Search bar to filter channels (Content tab)
 - Trending Channels section with 10 preset live streams
 - **Layout Blocks section** with draggable widget size templates:
-  - Standard (2x2): Spans 2 columns, 2 rows
-  - Wide (2x4): Spans 4 columns, 2 rows
-  - Large (4x4): Spans 4 columns, 4 rows
+  - Standard (2x2): spanCols: 2, spanRows: 2
+  - Wide (2x4): spanCols: 2, spanRows: 4
+  - Large (4x4): spanCols: 4, spanRows: 4
 - Drag-and-drop integration using @dnd-kit/core and @dnd-kit/sortable
 - Click channel to add to first available empty slot
 - Vertical compaction algorithm reflows active slots when grid density changes
@@ -78,7 +78,7 @@ A 16-slot Mission Control Dashboard for monitoring multiple video sources and st
 - **Props-based dashboard**: Receives slots, setSlots, gridDensity, setGridDensity, isEditMode, setIsEditMode, handleOpenSidebar
 - **Drag data types**: 'channel' (from sidebar channels), 'block' (from layout blocks), 'slot' (grid reordering)
 - **Ghost handle overlay**: z-index 9999 for reliable drag capture in Edit Mode
-- **Custom collision detection**: Standard rectIntersection for sidebar items, 50% overlap threshold for slot-to-slot reordering
+- **Physics**: collisionDetection={closestCenter}, rectSortingStrategy in SortableContext
 
 ## Recent Changes
 - **Architecture refactor**: Moved DndContext and SortableContext to App.tsx
