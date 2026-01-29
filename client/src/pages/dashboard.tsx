@@ -54,6 +54,9 @@ const MasterControlDashboard = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const gridRows = 4;
+  const minCellHeight = 120;
+
   useEffect(() => {
     if (!resizing) return;
 
@@ -62,7 +65,7 @@ const MasterControlDashboard = ({
 
       const gridRect = gridRef.current.getBoundingClientRect();
       const cellWidth = gridRect.width / gridCols;
-      const cellHeight = gridRect.height / 4;
+      const cellHeight = Math.max(minCellHeight, gridRect.height / gridRows);
 
       const deltaX = e.clientX - resizing.startX;
       const deltaY = e.clientY - resizing.startY;
@@ -71,7 +74,7 @@ const MasterControlDashboard = ({
       const rowChange = Math.round(deltaY / cellHeight);
 
       const newCols = Math.max(1, Math.min(gridCols, resizing.startCols + colChange));
-      const newRows = Math.max(1, Math.min(4, resizing.startRows + rowChange));
+      const newRows = Math.max(1, Math.min(gridRows, resizing.startRows + rowChange));
 
       setWidgets(prev => prev.map(w => 
         w.id === resizing.widgetId ? { ...w, spanCols: newCols, spanRows: newRows } : w

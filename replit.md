@@ -1,117 +1,105 @@
 # Master Control Dashboard
 
 ## Overview
-A 16-slot Mission Control Dashboard for monitoring multiple video sources and streams. Features YouTube integration with IFrame API controls, flexible grid density dropdown, master mute controls, smart fallback for blocked embeds, legal footer/disclosure, and localStorage persistence.
+A magnetic bento-style Mission Control Dashboard for monitoring multiple video sources and streams. Features a dynamic widget system with drag-to-resize functionality, YouTube/Twitch integration, flexible grid columns, master mute controls, and localStorage persistence.
 
 ## Features
-- 16 video/stream monitoring slots with CSS grid spanning support
-- Grid Density dropdown: 2 (1x2), 4 (2x2), 6 (2x3), 9 (3x3), 12 (3x4), 16 (4x4) slots
-- Single-screen enforcement: All slots visible without scrolling using grid-template-rows with 1fr units
-- YouTube video integration via embed URLs (auto-converts standard links)
-- Twitch stream support: Auto-detects twitch.tv URLs and generates embed with proper parent domain
-- YouTube IFrame API controls: individual Mute, Pause, and Refresh buttons per slot
-- Master mute control for all slots
-- Add/remove video sources dynamically
-- Smart fallback: "Open in Official Widget Mode" button for sites that block iframes
-- Legal footer with copyright and Legal button for disclaimer popup
-- Save layout to localStorage (includes grid density preference and slot spans)
-- Dark theme with cyan/purple accent colors
-- Animated scan line effect
+- **Dynamic Widget System**: Unlimited widgets (no fixed slots) with add/remove functionality
+- **Widget Types**: Video, Note, Spacer, Image - each with unique functionality
+- **Magnetic Grid Layout**: CSS grid with `grid-auto-flow: dense` for automatic packing
+- **Drag-to-Resize (OpenBento style)**: Bottom-right resize handles in Edit Mode
+- **YouTube/Twitch Integration**: Auto-detects URLs and generates proper embeds
+- **TV-style Playback Controls**: Mute, Pause, Refresh buttons per widget
+- **Master Mute**: Control all video audio simultaneously
+- **Column Density Dropdown**: 2-6 column options
+- **localStorage Persistence**: Saves widgets and grid settings
+- **Dark Sci-Fi Theme**: Cyan/purple accent colors with animated glow effects
 
-## Edit Layout Mode (Interaction Lock)
-- **Edit Layout button** in header toggles between locked and edit modes
-- **Locked mode (default)**: Click large (+) ADD button to open sidebar and add sources
-- **Edit mode**: Slots jiggle (iOS-style animation) and become draggable
-- Purple border indicates edit mode is active
-- Pointer-events: none overlay on iframes during edit mode for drag sensor compatibility
-- Internal clicks disabled in edit mode to prevent accidental interactions
+## Widget Types
+1. **Video Widget**: YouTube, Twitch, or any embeddable URL
+   - Mute/Unmute, Pause/Play, Refresh controls
+   - Auto-detection of YouTube video IDs and Twitch channels
+2. **Note Widget**: Editable text area for notes
+   - Yellow accent color
+   - Content persisted with layout
+3. **Spacer Widget**: Empty placeholder for layout spacing
+   - Slate color
+4. **Image Widget**: Display images (placeholder for now)
+   - Purple accent color
 
-## Widget Sidebar with Drag-and-Drop
-- Slide-out sidebar from left side when clicking slot's (+) ADD button
-- **URL Input at top** below tabs - shows "ADD TO SLOT X" label
-- **Tabbed Interface**: Content tab (channels/search) and Layout tab (widget sizes)
-- Search bar to filter channels (Content tab)
-- Trending Channels section with 10 preset live streams
-- **Layout Blocks section** with draggable widget size templates:
-  - Standard (2x2): spanCols: 2, spanRows: 2
-  - Wide (2x4): spanCols: 2, spanRows: 4
-  - Large (4x4): spanCols: 4, spanRows: 4
-- Drag-and-drop integration using @dnd-kit/core and @dnd-kit/sortable
-- Click channel to add to first available empty slot
-- Vertical compaction algorithm reflows active slots when grid density changes
+## Edit Layout Mode
+- **Edit Layout button** toggles between locked and edit modes
+- **Locked mode (default)**: Widgets display content normally
+- **Edit mode**:
+  - Widgets jiggle (iOS-style animation)
+  - Resize handles appear on bottom-right corner
+  - Delete buttons appear on top-right
+  - "Add Widget" button appears at end of grid
+  - Pointer-events blocked on iframes for resize interaction
 
-## Precision Dragging
-- Custom collision detection with 50%+ overlap threshold
-- Requires significant overlap before slots push out of the way
-- Prevents accidental jumping during drag operations
-- Increased activation distance (15px) for drag initiation
+## Drag-to-Resize (OpenBento Style)
+- Resize handle on bottom-right of every widget in Edit Mode
+- Dragging the handle updates spanCols and spanRows in real-time
+- Mouse tracking calculates cell changes based on grid dimensions
+- Widgets snap to grid cell sizes (1-6 columns, 1-4 rows)
 
-## Live Reordering (iOS Home Screen Style)
-- **rectSortingStrategy** for iOS-like "running away" behavior
-- Slots shift smoothly to make room during drag operations
-- Active slot scales to 1.05x with cyan drop shadow while dragging
-- Other slots animate with 0.3s ease transition when reordering
-- Jiggle animation applied to visible slot wrapper (doesn't conflict with dnd-kit transforms)
-
-## CSS Grid Spanning
-- Slots have spanCols and spanRows properties (default 1x1)
-- Layout blocks set span values when dropped on slots
-- Uses grid-column: span X and grid-row: span Y
-- Grid maintains 1fr units for full-screen persistence
+## Widget Sidebar
+- Slide-out sidebar from left side
+- **Tabbed Interface**: Widgets tab and Streams tab
+- **Widgets Tab**: Draggable widget templates with size presets
+  - Video (1x1, 2x2)
+  - Note (1x1, 2x1)
+  - Spacer (1x1)
+  - Image (1x1, 2x2)
+- **Streams Tab**: Preset live stream channels
+  - Lofi Girl, NASA Live, CNA News, DW News, France 24, Al Jazeera
+  - Search/filter functionality
+- **URL Input**: Add video widgets by URL (YouTube/Twitch auto-detected)
 
 ## Tech Stack
 - React with TypeScript
 - Tailwind CSS for styling
-- @dnd-kit/core, @dnd-kit/sortable, @dnd-kit/utilities for drag-and-drop
+- @dnd-kit/core for drag-and-drop
 - localStorage for persistence
 - YouTube IFrame API for video control (postMessage)
 
 ## Project Structure
-- `client/src/App.tsx` - DndContext and SortableContext wrapper, lifted state management (slots, gridDensity, isEditMode)
-- `client/src/pages/dashboard.tsx` - Dashboard UI component, receives state as props, SortableSlot with z-9999 ghost handle
-- `client/src/components/widget-sidebar.tsx` - Tabbed sidebar with draggable channels and layout blocks
-- `client/src/index.css` - Theme colors (slate/cyan/purple), CSS variables
-- `tailwind.config.ts` - Tailwind configuration with jiggle animation
+- `client/src/App.tsx` - DndContext wrapper, Widget state management, URL extraction
+- `client/src/pages/dashboard.tsx` - Dashboard UI, widget rendering, resize logic
+- `client/src/components/widget-sidebar.tsx` - Sidebar with widget templates and streams
+- `client/src/index.css` - Theme colors, CSS variables, jiggle animation
 
-## Architecture (DndContext Unified)
-- **DndContext in App.tsx**: Wraps both WidgetSidebar and dashboard grid as shared parent
-- **State lifted to App.tsx**: slots[], gridDensity, isEditMode, sidebarOpen, activeId
-- **Props-based dashboard**: Receives slots, setSlots, gridDensity, setGridDensity, isEditMode, setIsEditMode, handleOpenSidebar
-- **Drag data types**: 'channel' (from sidebar channels), 'block' (from layout blocks), 'slot' (grid reordering)
-- **Ghost handle overlay**: z-index 9999 for reliable drag capture in Edit Mode
-- **Physics**: collisionDetection={closestCenter}, rectSortingStrategy in SortableContext
+## Architecture
+- **Widget Interface**: id, type, spanCols, spanRows, plus type-specific fields
+- **Dynamic List**: widgets[] array with add/remove operations
+- **State in App.tsx**: widgets, gridCols, isEditMode, sidebarOpen
+- **Magnetic Grid**: grid-auto-flow: dense ensures widgets pack efficiently
+- **Resize State**: Tracks widgetId, startX/Y, startCols/Rows during resize
+- **DndContext**: Handles channel and widget-template drag types
+
+## CSS Grid Configuration
+```css
+display: grid;
+grid-template-columns: repeat(${gridCols}, 1fr);
+grid-auto-rows: 1fr;
+grid-auto-flow: dense;
+gap: 1rem;
+```
 
 ## Recent Changes
-- **Twitch support**: Added Twitch embed integration with auto-detection of twitch.tv URLs
-- **Reliable Trending Content**: Lofi Girl, NASA Live, CNA News, DW News verified high-uptime streams
-- **TV-style playback**: Iframes have pointer-events: none, hiding YouTube controls; custom Mute/Pause/Refresh buttons are the only way to control video
-- **Refresh button**: Cyan refresh icon in slot control bar restarts the stream by re-rendering the iframe
-- **DragOverlay ghost preview**: Visual ghost preview when dragging slots, channels, or layout blocks
-- **Reset slot button**: Red X button in Edit Mode to reset slot spanning to 1x1
-- **Grid auto-flow dense**: Added grid-auto-flow: dense to prevent overlap bugs
-- **Architecture refactor**: Moved DndContext and SortableContext to App.tsx
-- **State lifting**: Slots, gridDensity, isEditMode lifted to App level
-- **Ghost handle z-index**: Updated to 9999 for reliable drag capture
-- **Click-to-add fix**: DraggableChannel onClick prop closes sidebar after adding channel
-- Slot UI overhaul: large centered (+) ADD button fills entire empty slot area
-- Relocated URL input to sidebar top below Content/Layout tabs
-- Added pointer-events: none overlay on iframes during Edit Mode
-- Updated Spanning Guide to match 2x2, 2x4, 4x4 templates
-- Added Edit Layout toggle button with lock/unlock logic
-- Implemented iOS-like jiggle animation for edit mode
-- Created custom collision detection with 50%+ overlap threshold
-- Updated Layout tab with 2x2, 2x4, 4x4 templates
-- Moved jiggle animation to inner wrapper to avoid dnd-kit transform conflicts
-- Increased activation distance for precision dragging
+- **Architecture Rebuild**: Switched from fixed 16-slot array to dynamic widgets list
+- **OpenBento Resize**: Added drag-to-resize handles with mouse tracking
+- **Widget Types**: Added Note, Spacer, Image widget types
+- **Magnetic Layout**: Implemented grid-auto-flow: dense
+- **Column Selector**: Replaced grid density with simple column count (2-6)
+- **Widget Templates**: New sidebar tab with draggable widget type templates
+- **Twitch Support**: Auto-detection of twitch.tv URLs
+- **Reliable Streams**: Lofi Girl, NASA Live, CNA News, DW News, France 24, Al Jazeera
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px
 - All dimensions defined in rem units for consistent scaling
-- CSS Variables for concentric geometry (Squircle Rule):
-  - --outer-radius: 2rem (slot borders)
+- CSS Variables for concentric geometry:
+  - --outer-radius: 2rem (widget borders)
   - --inner-radius: calc(--outer-radius - 0.8rem) (inner elements)
   - --button-radius: calc(--outer-radius - 1rem) (buttons)
-- Breakpoints:
-  - Desktop (>768px): 4-column grid, sidebar pushes content
-  - Mobile (<=768px): 2-column grid, sidebar covers full screen
-- CSS classes: dashboard-grid, dashboard-slot, slot-button, slot-inner-element

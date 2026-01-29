@@ -39,9 +39,8 @@ export interface Widget {
   imageUrl?: string;
 }
 
-let widgetIdCounter = 0;
 function generateWidgetId(): string {
-  return `widget-${Date.now()}-${++widgetIdCounter}`;
+  return `widget-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
 function App() {
