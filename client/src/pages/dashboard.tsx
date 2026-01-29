@@ -43,9 +43,10 @@ interface SortableSlotProps {
   isDraggingThis: boolean;
   gridCols: number;
   isEditMode: boolean;
+  onResetSlot?: (index: number) => void;
 }
 
-function SortableSlot({ slot, index, children, isDraggingThis, gridCols, isEditMode }: SortableSlotProps) {
+function SortableSlot({ slot, index, children, isDraggingThis, gridCols, isEditMode, onResetSlot }: SortableSlotProps) {
   const {
     attributes,
     listeners,
@@ -73,6 +74,11 @@ function SortableSlot({ slot, index, children, isDraggingThis, gridCols, isEditM
     'aria-disabled': undefined
   };
 
+  const handleResetClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onResetSlot?.(index);
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -88,12 +94,30 @@ function SortableSlot({ slot, index, children, isDraggingThis, gridCols, isEditM
           style={{ 
             position: 'absolute', 
             inset: 0,
-            zIndex: 9999,
+            zIndex: 9998,
             pointerEvents: 'auto',
             cursor: 'grab'
           }}
           data-testid={`drag-overlay-${index}`}
         />
+      )}
+      {/* Reset Slot Button - only in Edit Mode when slot has spanning */}
+      {isEditMode && (slot.spanCols > 1 || slot.spanRows > 1) && (
+        <button
+          onClick={handleResetClick}
+          style={{
+            position: 'absolute',
+            top: '0.8rem',
+            right: '0.8rem',
+            zIndex: 10000,
+            pointerEvents: 'auto'
+          }}
+          className="p-[0.5rem] bg-red-600/90 hover:bg-red-500 rounded-md transition-all duration-200 shadow-lg"
+          title="Reset slot size to 1x1"
+          data-testid={`button-reset-slot-${index}`}
+        >
+          <X className="w-[1.2rem] h-[1.2rem] text-white" />
+        </button>
       )}
       <div 
         className={`dashboard-slot h-full w-full relative bg-slate-900/50 backdrop-blur-sm border group transition-all duration-300 shadow-xl ${
@@ -141,6 +165,12 @@ const MasterControlDashboard = ({
   const iframeLoadTimers = useRef<Record<number, NodeJS.Timeout | null>>({});
   const iframeRefs = useRef<Record<number, HTMLIFrameElement | null>>({});
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleResetSlot = (index: number) => {
+    setSlots(prev => prev.map((slot, i) => 
+      i === index ? { ...slot, spanCols: 1, spanRows: 1 } : slot
+    ));
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -389,6 +419,7 @@ const MasterControlDashboard = ({
             isDraggingThis={activeId === `slot-${index}`}
             gridCols={gridOption.cols}
             isEditMode={isEditMode}
+            onResetSlot={handleResetSlot}
           >
             <div className="absolute top-[0.8rem] left-[0.8rem] z-20 bg-slate-800/90 backdrop-blur-sm px-[0.6rem] py-[0.3rem] slot-button text-[0.9rem] font-bold text-cyan-400 border border-cyan-500/30" data-testid={`text-slot-number-${index}`}>
               {index + 1}

@@ -352,6 +352,7 @@ body {
   display: grid;
   grid-template-columns: var(--grid-cols);
   grid-template-rows: var(--grid-rows);
+  grid-auto-flow: dense;
   gap: var(--slot-gap);
   flex: 1;
   min-height: 0;
