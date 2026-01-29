@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { Widget, WidgetType } from '@/App';
 
@@ -14,6 +14,8 @@ interface MasterControlDashboardProps {
   activeId: UniqueIdentifier | null;
   handleOpenSidebar: (widgetId?: string) => void;
   addWidget: (type: WidgetType, w?: number, h?: number, extraData?: Partial<Widget>) => string;
+  isFullscreen: boolean;
+  setIsFullscreen: Dispatch<SetStateAction<boolean>>;
 }
 
 interface ResizeState {
@@ -32,15 +34,17 @@ const MasterControlDashboard = ({
   sidebarOpen,
   activeId,
   handleOpenSidebar,
-  addWidget
+  addWidget,
+  isFullscreen,
+  setIsFullscreen
 }: MasterControlDashboardProps) => {
   const [masterMute, setMasterMute] = useState(true);
   const [resizing, setResizing] = useState<ResizeState | null>(null);
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const gridRows = 6;
-  const minCellHeight = 100;
+  const gridRows = 20;
+  const minCellHeight = 80;
 
   useEffect(() => {
     if (!resizing) return;
@@ -305,6 +309,14 @@ const MasterControlDashboard = ({
       <div className="relative z-30 mb-[1rem] flex-shrink-0" style={{ height: 'var(--header-height)' }}>
         <div className="flex items-center justify-between mb-[0.8rem] flex-wrap gap-[0.8rem]">
           <div className="flex items-center gap-[1.2rem]">
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="p-[0.6rem] bg-slate-800/80 hover:bg-slate-700 slot-button transition-all duration-300 border border-slate-600/50 hover:border-cyan-500/50"
+              title={isFullscreen ? 'Show Sidebar' : 'Hide Sidebar'}
+              data-testid="button-toggle-fullscreen"
+            >
+              {isFullscreen ? <PanelLeftOpen className="w-[1.6rem] h-[1.6rem] text-cyan-400" /> : <PanelLeftClose className="w-[1.6rem] h-[1.6rem] text-slate-400" />}
+            </button>
             <div className="relative">
               <Power className="w-[2rem] h-[2rem] text-cyan-400 animate-pulse" data-testid="icon-power" />
               <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-50 pointer-events-none"></div>
@@ -362,16 +374,18 @@ const MasterControlDashboard = ({
         <div className="h-[0.2rem] bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full"></div>
       </div>
 
-      <div 
-        ref={gridRef}
-        className="relative z-10 flex-1 grid gap-[1rem]"
-        style={{
-          gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-          gridAutoRows: '1fr',
-          gridAutoFlow: 'dense'
-        }}
-        data-testid="widget-grid"
-      >
+      <div className="canvas-container rounded-[2rem] p-[1rem]" data-testid="canvas-container">
+        <div 
+          ref={gridRef}
+          className="relative z-10 grid gap-[1rem]"
+          style={{
+            gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+            gridAutoRows: `minmax(${minCellHeight}px, 1fr)`,
+            gridAutoFlow: 'dense',
+            minHeight: `${gridRows * minCellHeight}px`
+          }}
+          data-testid="widget-grid"
+        >
         {widgets.map((widget) => (
           <div
             key={widget.id}
@@ -516,6 +530,7 @@ const MasterControlDashboard = ({
             </button>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

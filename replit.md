@@ -38,6 +38,10 @@ gap: 1rem;
 
 ## Features
 - **12-Column Grid**: OpenBento standard magnetic layout with dense packing
+- **Blueprint Background**: Professional dashed grid pattern visible behind widgets
+- **Fullscreen Mode**: Toggle sidebar visibility with PanelLeftClose/PanelLeftOpen button
+- **20-Row Canvas**: Large "infinite canvas" feel with minimum 1600px height
+- **Glassmorphism Widgets**: backdrop-filter: blur(10px) with semi-transparent borders
 - **Dynamic Widget System**: Unlimited widgets with add/remove functionality
 - **Widget Types**: Video, Note, Spacer, Image - each with unique functionality
 - **Drag-to-Resize**: Bottom-right resize handles in Edit Mode update w and h
@@ -128,6 +132,10 @@ gap: 1rem;
 - **Widget Edit Button**: Settings gear button on widgets in Edit Mode opens sidebar
 - **Native File Upload**: "Upload from Computer" button for Image widgets
 - **Verified Streams**: NASA Live, Lofi Girl, Sky News with direct YouTube embed URLs
+- **Blueprint Background**: CSS-based dashed grid pattern using repeating-linear-gradient
+- **Fullscreen Toggle**: PanelLeftClose icon button in header to hide sidebar
+- **20-Row Canvas**: gridRows = 20, minCellHeight = 80px for large canvas feel
+- **Glassmorphism**: .dashboard-slot has backdrop-blur, semi-transparent bg, thin cyan border
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px

@@ -53,6 +53,7 @@ function App() {
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [urlInputValue, setUrlInputValue] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const activeWidgetIdRef = useRef<string | null>(null);
 
@@ -287,10 +288,12 @@ function App() {
                   setWidgets={setWidgets}
                   isEditMode={isEditMode}
                   setIsEditMode={setIsEditMode}
-                  sidebarOpen={sidebarOpen}
+                  sidebarOpen={sidebarOpen && !isFullscreen}
                   activeId={activeId}
                   handleOpenSidebar={handleOpenSidebar}
                   addWidget={addWidget}
+                  isFullscreen={isFullscreen}
+                  setIsFullscreen={setIsFullscreen}
                 />
               )}
             </Route>
