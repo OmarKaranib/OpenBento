@@ -185,14 +185,57 @@ function App() {
   }, [addVideoWidget, addWidget]);
 
   const handleChannelClick = useCallback((channel: TrendingChannel) => {
-    addVideoWidget(channel, 1, 1);
+    const videoId = extractYouTubeId(channel.url);
+    const twitchChannel = extractTwitchChannel(channel.url);
+
+    if (activeWidgetId) {
+      setWidgets(prev => prev.map(w => 
+        w.id === activeWidgetId ? {
+          ...w,
+          type: 'video',
+          url: channel.url,
+          isYouTube: !!videoId,
+          videoId,
+          isTwitch: !!twitchChannel,
+          twitchChannel,
+          error: null,
+          embedBlocked: false,
+          isPaused: false,
+          isMuted: true
+        } : w
+      ));
+    } else {
+      addVideoWidget(channel, 1, 1);
+    }
     setSidebarOpen(false);
-  }, [addVideoWidget]);
+    setActiveWidgetId(null);
+  }, [activeWidgetId, addVideoWidget]);
 
   const handleOpenSidebar = useCallback((widgetId?: string) => {
     setActiveWidgetId(widgetId || null);
     setSidebarOpen(true);
   }, []);
+
+  const handleImageUpload = useCallback((imageUrl: string) => {
+    if (activeWidgetId) {
+      setWidgets(prev => prev.map(w => 
+        w.id === activeWidgetId ? {
+          ...w,
+          type: 'image',
+          imageUrl,
+          url: undefined,
+          isYouTube: false,
+          videoId: null,
+          isTwitch: false,
+          twitchChannel: null
+        } : w
+      ));
+    } else {
+      addWidget('image', 1, 1, { imageUrl });
+    }
+    setSidebarOpen(false);
+    setActiveWidgetId(null);
+  }, [activeWidgetId, addWidget]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -215,6 +258,7 @@ function App() {
             onUrlChange={setUrlInputValue}
             onUrlSubmit={handleSubmitUrl}
             activeWidgetId={activeWidgetId}
+            onImageUpload={handleImageUpload}
           />
           <Switch>
             <Route path="/">

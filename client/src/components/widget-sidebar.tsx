@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video } from 'lucide-react';
+import { useState, useMemo, useRef } from 'react';
+import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { WidgetType } from '@/App';
@@ -23,12 +23,9 @@ export interface WidgetTemplate {
 }
 
 const TRENDING_CHANNELS: TrendingChannel[] = [
-  { id: 'lofi-girl', name: 'Lofi Girl', url: 'https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&mute=1', iconType: 'music', category: 'Music' },
-  { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/21X5lGlDOfg?autoplay=1&mute=1', iconType: 'science', category: 'Science' },
-  { id: 'cna-news', name: 'CNA News', url: 'https://www.youtube.com/embed/XWq5kBlakJo?autoplay=1&mute=1', iconType: 'news', category: 'News' },
-  { id: 'dw-news', name: 'DW News', url: 'https://www.youtube.com/embed/qWw8S7_j6Sg?autoplay=1&mute=1', iconType: 'news', category: 'News' },
-  { id: 'france24', name: 'France 24', url: 'https://www.youtube.com/embed/LrXSfA4SoFE?autoplay=1&mute=1', iconType: 'news', category: 'News' },
-  { id: 'al-jazeera', name: 'Al Jazeera', url: 'https://www.youtube.com/embed/F-POY4Q0QSI?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/21X5lGlDOfg', iconType: 'science', category: 'Science' },
+  { id: 'lofi-girl', name: 'Lofi Girl', url: 'https://www.youtube.com/embed/jfKfPfyJRdk', iconType: 'music', category: 'Music' },
+  { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/embed/9Auqna63EFE', iconType: 'news', category: 'News' },
 ];
 
 export const WIDGET_TEMPLATES: WidgetTemplate[] = [
@@ -179,6 +176,7 @@ interface WidgetSidebarProps {
   onUrlChange?: (value: string) => void;
   onUrlSubmit?: (url: string) => void;
   activeWidgetId?: string | null;
+  onImageUpload?: (imageUrl: string) => void;
 }
 
 export function WidgetSidebar({ 
@@ -188,10 +186,23 @@ export function WidgetSidebar({
   urlValue = '',
   onUrlChange,
   onUrlSubmit,
-  activeWidgetId
+  activeWidgetId,
+  onImageUpload
 }: WidgetSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<SidebarTab>('widgets');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      const imageUrl = URL.createObjectURL(file);
+      onImageUpload?.(imageUrl);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const filteredChannels = useMemo(() => {
     if (!searchQuery.trim()) return TRENDING_CHANNELS;
@@ -319,6 +330,32 @@ export function WidgetSidebar({
                 </div>
               </div>
               
+              <div className="bg-purple-900/30 p-[1.2rem] rounded-lg border border-purple-500/50">
+                <h4 className="text-[1.2rem] font-semibold text-purple-300 mb-[0.8rem] flex items-center gap-[0.6rem]">
+                  <ImageIcon className="w-[1.4rem] h-[1.4rem]" />
+                  Upload Image
+                </h4>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  data-testid="input-file-upload"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-[0.8rem] px-[1.2rem] py-[1rem] bg-purple-600 hover:bg-purple-500 slot-button font-semibold transition-colors text-[1.2rem]"
+                  data-testid="button-upload-image"
+                >
+                  <Upload className="w-[1.6rem] h-[1.6rem]" />
+                  Upload from Computer
+                </button>
+                <p className="text-[1rem] text-purple-300/70 mt-[0.8rem] text-center">
+                  {activeWidgetId ? 'Replace existing image' : 'Creates a new image widget'}
+                </p>
+              </div>
+
               <div className="bg-slate-800/50 p-[1.2rem] rounded-lg border border-slate-700/50">
                 <h4 className="text-[1.2rem] font-semibold text-slate-300 mb-[0.8rem]">Widget Guide</h4>
                 <ul className="text-[1.1rem] text-slate-400 space-y-[0.4rem]">
