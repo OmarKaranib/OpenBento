@@ -12,6 +12,7 @@ import {
   DragEndEvent, 
   DragOverEvent,
   DragStartEvent,
+  DragOverlay,
   useSensor, 
   useSensors, 
   PointerSensor,
@@ -284,6 +285,31 @@ function App() {
               <Route component={NotFound} />
             </Switch>
           </SortableContext>
+          
+          {/* Ghost preview when dragging */}
+          <DragOverlay>
+            {activeId ? (
+              <div 
+                className="dashboard-slot bg-slate-900/80 backdrop-blur-sm border border-cyan-400 shadow-2xl shadow-cyan-500/40 pointer-events-none"
+                style={{
+                  width: '12rem',
+                  height: '8rem',
+                  opacity: 0.9
+                }}
+              >
+                <div className="flex items-center justify-center h-full">
+                  <span className="text-cyan-400 font-bold text-[1.2rem]">
+                    {String(activeId).startsWith('slot-') 
+                      ? `Slot ${parseInt(String(activeId).replace('slot-', '')) + 1}`
+                      : String(activeId).includes('block-')
+                        ? 'Layout Block'
+                        : 'Channel'
+                    }
+                  </span>
+                </div>
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
         <Toaster />
       </TooltipProvider>
