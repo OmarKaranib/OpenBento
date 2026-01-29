@@ -1,31 +1,66 @@
 # Master Control Dashboard
 
 ## Overview
-A magnetic bento-style Mission Control Dashboard for monitoring multiple video sources and streams. Features a dynamic widget system with drag-to-resize functionality, YouTube/Twitch integration, flexible grid columns, master mute controls, and localStorage persistence.
+A magnetic bento-style Mission Control Dashboard following OpenBento architecture standards. Features a 12-column grid layout with `grid-auto-flow: dense` for automatic gap-filling, dynamic widget system with drag-to-resize functionality, YouTube/Twitch integration with custom TV-style controls, and localStorage persistence.
+
+## OpenBento Architecture
+
+### Widget Structure
+```typescript
+interface Widget {
+  id: string;       // Unique identifier
+  type: WidgetType; // 'video' | 'note' | 'spacer' | 'image'
+  x: number;        // Grid column position (reserved for future drag positioning)
+  y: number;        // Grid row position (reserved for future drag positioning)
+  w: number;        // Width in columns (1-12)
+  h: number;        // Height in rows (1-6)
+  // Type-specific fields
+  url?: string;
+  isYouTube?: boolean;
+  videoId?: string | null;
+  isTwitch?: boolean;
+  twitchChannel?: string | null;
+  isMuted: boolean;
+  isPaused: boolean;
+  noteContent?: string;
+  imageUrl?: string;
+}
+```
+
+### 12-Column Magnetic Grid
+```css
+display: grid;
+grid-template-columns: repeat(12, 1fr);
+grid-auto-rows: 1fr;
+grid-auto-flow: dense;
+gap: 1rem;
+```
 
 ## Features
-- **Dynamic Widget System**: Unlimited widgets (no fixed slots) with add/remove functionality
+- **12-Column Grid**: OpenBento standard magnetic layout with dense packing
+- **Dynamic Widget System**: Unlimited widgets with add/remove functionality
 - **Widget Types**: Video, Note, Spacer, Image - each with unique functionality
-- **Magnetic Grid Layout**: CSS grid with `grid-auto-flow: dense` for automatic packing
-- **Drag-to-Resize (OpenBento style)**: Bottom-right resize handles in Edit Mode
+- **Drag-to-Resize**: Bottom-right resize handles in Edit Mode update w and h
 - **YouTube/Twitch Integration**: Auto-detects URLs and generates proper embeds
-- **TV-style Playback Controls**: Mute, Pause, Refresh buttons per widget
+- **TV-style Controls**: Mute, Refresh buttons per video widget (no Pause)
 - **Master Mute**: Control all video audio simultaneously
-- **Column Density Dropdown**: 2-6 column options
-- **localStorage Persistence**: Saves widgets and grid settings
-- **Dark Sci-Fi Theme**: Cyan/purple accent colors with animated glow effects
+- **Content Swapping**: Selecting a widget then adding content updates that widget
+- **localStorage Persistence**: Saves widgets with 'openBentoWidgets' key
 
 ## Widget Types
 1. **Video Widget**: YouTube, Twitch, or any embeddable URL
-   - Mute/Unmute, Pause/Play, Refresh controls
+   - Custom TV-style controls: Mute/Unmute, Refresh
+   - Delete button in Edit Mode
    - Auto-detection of YouTube video IDs and Twitch channels
+   - Twitch parent parameter: `window.location.host.split(':')[0]`
 2. **Note Widget**: Editable text area for notes
    - Yellow accent color
    - Content persisted with layout
 3. **Spacer Widget**: Empty placeholder for layout spacing
    - Slate color
-4. **Image Widget**: Display images (placeholder for now)
+4. **Image Widget**: Display images with file upload
    - Purple accent color
+   - Uses URL.createObjectURL for local file uploads
 
 ## Edit Layout Mode
 - **Edit Layout button** toggles between locked and edit modes
@@ -33,33 +68,48 @@ A magnetic bento-style Mission Control Dashboard for monitoring multiple video s
 - **Edit mode**:
   - Widgets jiggle (iOS-style animation)
   - Resize handles appear on bottom-right corner
-  - Delete buttons appear on top-right
+  - Settings and Delete buttons appear on top-right
   - "Add Widget" button appears at end of grid
-  - Pointer-events blocked on iframes for resize interaction
+  - Pointer-events: none on all iframes for drag interaction
+
+## TV Mode
+- All iframes have `pointer-events: none` so they don't block drag interactions
+- Video controls (Mute, Refresh) work via postMessage API for YouTube
+- Edit Mode overlay enables resize and content editing
 
 ## Drag-to-Resize (OpenBento Style)
 - Resize handle on bottom-right of every widget in Edit Mode
-- Dragging the handle updates spanCols and spanRows in real-time
+- Dragging the handle updates w and h values in real-time
 - Mouse tracking calculates cell changes based on grid dimensions
-- Widgets snap to grid cell sizes (1-6 columns, 1-4 rows)
+- Widgets snap to grid cell sizes (1-12 columns, 1-6 rows)
 
 ## Widget Sidebar
 - Slide-out sidebar from left side
 - **Tabbed Interface**: Widgets tab and Streams tab
 - **Widgets Tab**: Draggable widget templates with size presets
-  - Video (1x1, 2x2)
-  - Note (1x1, 2x1)
-  - Spacer (1x1)
-  - Image (1x1, 2x2)
+  - Video (3x2, 6x3)
+  - Note (3x2, 4x1)
+  - Spacer (2x1)
+  - Image (3x2, 4x3)
 - **Streams Tab**: Preset live stream channels
-  - Lofi Girl, NASA Live, CNA News, DW News, France 24, Al Jazeera
+  - NASA Live, Lofi Girl, Sky News
   - Search/filter functionality
 - **URL Input**: Add video widgets by URL (YouTube/Twitch auto-detected)
+- **Image Upload**: Native file picker using URL.createObjectURL
+
+## Content Swapping
+- Click Settings (gear) button on a widget in Edit Mode
+- Sidebar opens with that widget selected (shows "UPDATE WIDGET URL")
+- Clicking a stream or entering a URL updates that widget
+- No duplicate widgets created - existing widget content is swapped
 
 ## Tech Stack
 - React with TypeScript
 - Tailwind CSS for styling
 - @dnd-kit/core for drag-and-drop
+- @dnd-kit/sortable (available)
+- @dnd-kit/utilities for transforms
+- lucide-react for icons
 - localStorage for persistence
 - YouTube IFrame API for video control (postMessage)
 
@@ -69,35 +119,15 @@ A magnetic bento-style Mission Control Dashboard for monitoring multiple video s
 - `client/src/components/widget-sidebar.tsx` - Sidebar with widget templates and streams
 - `client/src/index.css` - Theme colors, CSS variables, jiggle animation
 
-## Architecture
-- **Widget Interface**: id, type, spanCols, spanRows, plus type-specific fields
-- **Dynamic List**: widgets[] array with add/remove operations
-- **State in App.tsx**: widgets, gridCols, isEditMode, sidebarOpen
-- **Magnetic Grid**: grid-auto-flow: dense ensures widgets pack efficiently
-- **Resize State**: Tracks widgetId, startX/Y, startCols/Rows during resize
-- **DndContext**: Handles channel and widget-template drag types
-
-## CSS Grid Configuration
-```css
-display: grid;
-grid-template-columns: repeat(${gridCols}, 1fr);
-grid-auto-rows: 1fr;
-grid-auto-flow: dense;
-gap: 1rem;
-```
-
 ## Recent Changes
-- **Content Swap Logic**: Clicking streams/entering URLs updates existing widget when selected instead of creating duplicates
-- **Widget Edit Button**: Settings gear button on widgets in Edit Mode opens sidebar for content swapping
-- **Native File Upload**: "Upload from Computer" button for Image widgets using URL.createObjectURL
+- **OpenBento Rebuild**: Complete architecture overhaul to 12-column grid
+- **New Widget Structure**: {id, type, x, y, w, h, content} format
+- **Twitch Fix**: Parent parameter uses `window.location.host.split(':')[0]`
+- **TV Mode**: `pointer-events: none` on all iframes
+- **Content Swap Logic**: Clicking streams/entering URLs updates existing widget when selected
+- **Widget Edit Button**: Settings gear button on widgets in Edit Mode opens sidebar
+- **Native File Upload**: "Upload from Computer" button for Image widgets
 - **Verified Streams**: NASA Live, Lofi Girl, Sky News with direct YouTube embed URLs
-- **Architecture Rebuild**: Switched from fixed 16-slot array to dynamic widgets list
-- **OpenBento Resize**: Added drag-to-resize handles with mouse tracking
-- **Widget Types**: Added Note, Spacer, Image widget types
-- **Magnetic Layout**: Implemented grid-auto-flow: dense
-- **Column Selector**: Replaced grid density with simple column count (2-6)
-- **Widget Templates**: New sidebar tab with draggable widget type templates
-- **Twitch Support**: Auto-detection of twitch.tv URLs
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px

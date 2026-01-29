@@ -1,34 +1,32 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, ChevronDown, Pause, Play, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { Widget, WidgetType } from '@/App';
+
+const GRID_COLS = 12;
 
 interface MasterControlDashboardProps {
   widgets: Widget[];
   setWidgets: Dispatch<SetStateAction<Widget[]>>;
-  gridCols: number;
-  setGridCols: Dispatch<SetStateAction<number>>;
   isEditMode: boolean;
   setIsEditMode: Dispatch<SetStateAction<boolean>>;
   sidebarOpen: boolean;
   activeId: UniqueIdentifier | null;
   handleOpenSidebar: (widgetId?: string) => void;
-  addWidget: (type: WidgetType, spanCols?: number, spanRows?: number, extraData?: Partial<Widget>) => string;
+  addWidget: (type: WidgetType, w?: number, h?: number, extraData?: Partial<Widget>) => string;
 }
 
 interface ResizeState {
   widgetId: string;
   startX: number;
   startY: number;
-  startCols: number;
-  startRows: number;
+  startW: number;
+  startH: number;
 }
 
 const MasterControlDashboard = ({
   widgets,
   setWidgets,
-  gridCols,
-  setGridCols,
   isEditMode,
   setIsEditMode,
   sidebarOpen,
@@ -37,25 +35,12 @@ const MasterControlDashboard = ({
   addWidget
 }: MasterControlDashboardProps) => {
   const [masterMute, setMasterMute] = useState(true);
-  const [showGridDropdown, setShowGridDropdown] = useState(false);
-  const [showLegalPopup, setShowLegalPopup] = useState(false);
   const [resizing, setResizing] = useState<ResizeState | null>(null);
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowGridDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const gridRows = 4;
-  const minCellHeight = 120;
+  const gridRows = 6;
+  const minCellHeight = 100;
 
   useEffect(() => {
     if (!resizing) return;
@@ -64,7 +49,7 @@ const MasterControlDashboard = ({
       if (!gridRef.current) return;
 
       const gridRect = gridRef.current.getBoundingClientRect();
-      const cellWidth = gridRect.width / gridCols;
+      const cellWidth = gridRect.width / GRID_COLS;
       const cellHeight = Math.max(minCellHeight, gridRect.height / gridRows);
 
       const deltaX = e.clientX - resizing.startX;
@@ -73,11 +58,11 @@ const MasterControlDashboard = ({
       const colChange = Math.round(deltaX / cellWidth);
       const rowChange = Math.round(deltaY / cellHeight);
 
-      const newCols = Math.max(1, Math.min(gridCols, resizing.startCols + colChange));
-      const newRows = Math.max(1, Math.min(gridRows, resizing.startRows + rowChange));
+      const newW = Math.max(1, Math.min(GRID_COLS, resizing.startW + colChange));
+      const newH = Math.max(1, Math.min(gridRows, resizing.startH + rowChange));
 
       setWidgets(prev => prev.map(w => 
-        w.id === resizing.widgetId ? { ...w, spanCols: newCols, spanRows: newRows } : w
+        w.id === resizing.widgetId ? { ...w, w: newW, h: newH } : w
       ));
     };
 
@@ -92,14 +77,14 @@ const MasterControlDashboard = ({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizing, gridCols, setWidgets]);
+  }, [resizing, setWidgets]);
 
   const getYouTubeEmbedUrl = (videoId: string): string => {
     return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
   };
 
   const getTwitchEmbedUrl = (channel: string): string => {
-    const parentDomain = window.location.hostname;
+    const parentDomain = window.location.host.split(':')[0];
     return `https://player.twitch.tv/?channel=${channel}&parent=${parentDomain}&autoplay=true&muted=true`;
   };
 
@@ -127,19 +112,6 @@ const MasterControlDashboard = ({
           sendYouTubeCommand(widgetId, newMuted ? 'mute' : 'unMute');
         }
         return { ...w, isMuted: newMuted };
-      }
-      return w;
-    }));
-  };
-
-  const toggleWidgetPause = (widgetId: string) => {
-    setWidgets(prev => prev.map(w => {
-      if (w.id === widgetId) {
-        const newPaused = !w.isPaused;
-        if (w.isYouTube) {
-          sendYouTubeCommand(widgetId, newPaused ? 'pauseVideo' : 'playVideo');
-        }
-        return { ...w, isPaused: newPaused };
       }
       return w;
     }));
@@ -191,8 +163,7 @@ const MasterControlDashboard = ({
   };
 
   const handleSaveLayout = () => {
-    localStorage.setItem('bentoWidgets', JSON.stringify(widgets));
-    localStorage.setItem('bentoGridCols', gridCols.toString());
+    localStorage.setItem('openBentoWidgets', JSON.stringify(widgets));
     
     const saveButton = document.getElementById('save-button');
     if (saveButton) {
@@ -203,15 +174,15 @@ const MasterControlDashboard = ({
     }
   };
 
-  const handleResizeStart = (e: React.MouseEvent, widgetId: string, currentCols: number, currentRows: number) => {
+  const handleResizeStart = (e: React.MouseEvent, widgetId: string, currentW: number, currentH: number) => {
     e.preventDefault();
     e.stopPropagation();
     setResizing({
       widgetId,
       startX: e.clientX,
       startY: e.clientY,
-      startCols: currentCols,
-      startRows: currentRows
+      startW: currentW,
+      startH: currentH
     });
   };
 
@@ -344,6 +315,9 @@ const MasterControlDashboard = ({
             <span className="text-[1rem] text-slate-400 bg-slate-800/50 px-[0.8rem] py-[0.3rem] rounded-full">
               {widgets.length} widgets
             </span>
+            <span className="text-[0.9rem] text-cyan-400/70 bg-cyan-900/30 px-[0.6rem] py-[0.2rem] rounded-full border border-cyan-500/30">
+              {GRID_COLS}-col grid
+            </span>
           </div>
           
           <div className="flex gap-[0.8rem] items-center">
@@ -359,35 +333,6 @@ const MasterControlDashboard = ({
               {isEditMode ? <Lock className="w-[1.4rem] h-[1.4rem]" /> : <Edit3 className="w-[1.4rem] h-[1.4rem]" />}
               {isEditMode ? 'LOCK' : 'EDIT LAYOUT'}
             </button>
-            
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setShowGridDropdown(!showGridDropdown)}
-                className="px-[1.2rem] py-[0.6rem] bg-purple-700 hover:bg-purple-600 slot-button font-semibold flex items-center gap-[0.8rem] transition-all duration-300 shadow-lg shadow-purple-900/50 text-[1.2rem]"
-                data-testid="button-grid-cols"
-              >
-                {gridCols} Columns
-                <ChevronDown className={`w-[1.2rem] h-[1.2rem] transition-transform ${showGridDropdown ? 'rotate-180' : ''}`} />
-              </button>
-              
-              {showGridDropdown && (
-                <div className="absolute top-full mt-[0.4rem] right-0 bg-slate-800 border border-slate-600 shadow-xl z-50 min-w-[12rem]" style={{ borderRadius: 'var(--inner-radius)' }} data-testid="dropdown-grid-options">
-                  {[2, 3, 4, 5, 6].map((cols) => (
-                    <button
-                      key={cols}
-                      onClick={() => { setGridCols(cols); setShowGridDropdown(false); }}
-                      className={`w-full px-[1.2rem] py-[0.8rem] text-left text-[1.2rem] hover:bg-slate-700 transition-colors first:rounded-t-[var(--inner-radius)] last:rounded-b-[var(--inner-radius)] flex items-center justify-between ${
-                        gridCols === cols ? 'bg-purple-600/50 text-cyan-400' : 'text-slate-300'
-                      }`}
-                      data-testid={`grid-option-${cols}`}
-                    >
-                      {cols} Columns
-                      {gridCols === cols && <span className="text-cyan-400">✓</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
             
             <button
               onClick={handleMasterMute}
@@ -421,7 +366,7 @@ const MasterControlDashboard = ({
         ref={gridRef}
         className="relative z-10 flex-1 grid gap-[1rem]"
         style={{
-          gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+          gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
           gridAutoRows: '1fr',
           gridAutoFlow: 'dense'
         }}
@@ -436,8 +381,8 @@ const MasterControlDashboard = ({
                 : 'border-slate-700/50 hover:border-cyan-500/50'
             }`}
             style={{
-              gridColumn: `span ${Math.min(widget.spanCols, gridCols)}`,
-              gridRow: `span ${widget.spanRows}`
+              gridColumn: `span ${Math.min(widget.w, GRID_COLS)}`,
+              gridRow: `span ${widget.h}`
             }}
             data-testid={`widget-${widget.id}`}
           >
@@ -451,7 +396,7 @@ const MasterControlDashboard = ({
 
             <div className="absolute top-[0.6rem] left-[0.6rem] z-20 flex items-center gap-[0.4rem]">
               <span className="bg-slate-800/90 backdrop-blur-sm px-[0.5rem] py-[0.2rem] slot-button text-[0.8rem] font-bold text-cyan-400 border border-cyan-500/30">
-                {widget.spanCols}x{widget.spanRows}
+                {widget.w}x{widget.h}
               </span>
               {widget.type !== 'video' && (
                 <span className="bg-slate-800/90 backdrop-blur-sm px-[0.5rem] py-[0.2rem] slot-button text-[0.8rem] font-medium text-purple-400 border border-purple-500/30 capitalize">
@@ -460,23 +405,8 @@ const MasterControlDashboard = ({
               )}
             </div>
 
-            {widget.type === 'video' && widget.url && (
+            {widget.type === 'video' && widget.url && !isEditMode && (
               <div className="absolute top-[0.6rem] right-[0.6rem] z-20 flex gap-[0.3rem]">
-                {(widget.isYouTube || widget.isTwitch) && (
-                  <button
-                    onClick={() => toggleWidgetPause(widget.id)}
-                    className={`p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm ${
-                      widget.isPaused 
-                        ? 'bg-yellow-600/90 hover:bg-yellow-500' 
-                        : 'bg-blue-600/90 hover:bg-blue-500'
-                    }`}
-                    title={widget.isPaused ? 'Play' : 'Pause'}
-                    data-testid={`button-pause-${widget.id}`}
-                  >
-                    {widget.isPaused ? <Play className="w-[1rem] h-[1rem]" /> : <Pause className="w-[1rem] h-[1rem]" />}
-                  </button>
-                )}
-                
                 <button
                   onClick={() => toggleWidgetMute(widget.id)}
                   className={`p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm ${
@@ -502,9 +432,16 @@ const MasterControlDashboard = ({
             )}
 
             {isEditMode && (
-              <div className="absolute top-[0.6rem] right-[0.6rem] z-40 flex gap-[0.3rem]">
+              <div 
+                className="absolute top-[0.6rem] right-[0.6rem] z-40 flex gap-[0.3rem]"
+                style={{ pointerEvents: 'auto' }}
+              >
                 <button
-                  onClick={() => handleOpenSidebar(widget.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleOpenSidebar(widget.id);
+                  }}
                   className="p-[0.5rem] bg-cyan-600/90 hover:bg-cyan-500 slot-button transition-all duration-300 backdrop-blur-sm"
                   title="Edit widget content"
                   data-testid={`button-edit-${widget.id}`}
@@ -512,7 +449,11 @@ const MasterControlDashboard = ({
                   <Settings className="w-[1rem] h-[1rem]" />
                 </button>
                 <button
-                  onClick={() => handleRemoveWidget(widget.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleRemoveWidget(widget.id);
+                  }}
                   className="p-[0.5rem] bg-red-600/90 hover:bg-red-500 slot-button transition-all duration-300 backdrop-blur-sm"
                   title="Remove widget"
                   data-testid={`button-remove-${widget.id}`}
@@ -528,7 +469,7 @@ const MasterControlDashboard = ({
 
             {isEditMode && (
               <div
-                onMouseDown={(e) => handleResizeStart(e, widget.id, widget.spanCols, widget.spanRows)}
+                onMouseDown={(e) => handleResizeStart(e, widget.id, widget.w, widget.h)}
                 className="absolute bottom-0 right-0 w-[2.4rem] h-[2.4rem] cursor-se-resize z-50 flex items-center justify-center bg-purple-600/80 hover:bg-purple-500 transition-colors"
                 style={{ 
                   borderTopLeftRadius: 'var(--inner-radius)',
@@ -547,6 +488,7 @@ const MasterControlDashboard = ({
           <button
             onClick={() => handleOpenSidebar()}
             className="dashboard-slot flex items-center justify-center bg-slate-900/30 backdrop-blur-sm border-2 border-dashed border-cyan-500/50 hover:border-cyan-400 hover:bg-slate-800/30 transition-all duration-300 cursor-pointer group min-h-[12rem]"
+            style={{ gridColumn: 'span 3' }}
             data-testid="button-add-widget"
           >
             <div className="flex flex-col items-center gap-[0.8rem] text-cyan-400/60 group-hover:text-cyan-400 transition-colors">
@@ -557,58 +499,24 @@ const MasterControlDashboard = ({
         )}
 
         {widgets.length === 0 && !isEditMode && (
-          <div className="col-span-full flex flex-col items-center justify-center h-[40vh] text-slate-400">
-            <Power className="w-[4rem] h-[4rem] mb-[1.5rem] text-cyan-400/40" />
-            <h2 className="text-[1.8rem] font-bold mb-[0.8rem]">No Widgets Yet</h2>
+          <div 
+            className="flex flex-col items-center justify-center text-slate-400 col-span-12"
+            data-testid="empty-state"
+          >
+            <Power className="w-[6rem] h-[6rem] mb-[1.5rem] text-cyan-400/30" />
+            <h3 className="text-[1.6rem] font-bold mb-[0.8rem] text-slate-300">Dashboard Empty</h3>
             <p className="text-[1.2rem] mb-[1.5rem]">Click "Edit Layout" to add widgets to your dashboard</p>
             <button
               onClick={() => setIsEditMode(true)}
-              className="px-[1.6rem] py-[0.8rem] bg-purple-600 hover:bg-purple-500 slot-button font-semibold text-[1.2rem] transition-all"
+              className="px-[2rem] py-[1rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.8rem] transition-all duration-300 text-[1.3rem]"
               data-testid="button-start-editing"
             >
-              Start Editing
+              <Edit3 className="w-[1.6rem] h-[1.6rem]" />
+              Start Building
             </button>
           </div>
         )}
       </div>
-
-      <div className="relative z-30 mt-[1rem] flex-shrink-0 pt-[1rem] border-t border-slate-700/50">
-        <div className="flex items-center justify-between text-[1rem] text-slate-500">
-          <div className="flex items-center gap-[0.6rem]">
-            <span>© 2024 Master Control Dashboard</span>
-            <span className="text-slate-600">|</span>
-            <button
-              onClick={() => setShowLegalPopup(true)}
-              className="hover:text-cyan-400 transition-colors underline"
-              data-testid="button-legal"
-            >
-              Legal
-            </button>
-          </div>
-          <div className="flex items-center gap-[0.6rem]">
-            <div className="w-[0.6rem] h-[0.6rem] rounded-full bg-emerald-400 animate-pulse"></div>
-            <span>System Online</span>
-          </div>
-        </div>
-      </div>
-
-      {showLegalPopup && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowLegalPopup(false)}>
-          <div className="bg-slate-900 border border-slate-700 p-[2rem] max-w-[48rem] mx-[1.6rem]" style={{ borderRadius: 'var(--outer-radius)' }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-[1.2rem]">
-              <h3 className="text-[1.6rem] font-bold text-cyan-400">Legal Disclaimer</h3>
-              <button onClick={() => setShowLegalPopup(false)} className="p-[0.4rem] hover:bg-slate-800 rounded-lg transition-colors">
-                <X className="w-[1.6rem] h-[1.6rem] text-slate-400" />
-              </button>
-            </div>
-            <div className="text-[1.2rem] text-slate-300 space-y-[1rem]">
-              <p>This dashboard is provided for educational and personal use only. The embedded content is sourced from third-party platforms and remains the property of their respective owners.</p>
-              <p>Some websites may restrict embedding due to their security policies. In such cases, use the "Open in new tab" feature to view the content directly.</p>
-              <p>By using this dashboard, you acknowledge that you are responsible for complying with the terms of service of any embedded content providers.</p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

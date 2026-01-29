@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -24,8 +24,10 @@ export type WidgetType = 'video' | 'note' | 'spacer' | 'image';
 export interface Widget {
   id: string;
   type: WidgetType;
-  spanCols: number;
-  spanRows: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
   url?: string;
   isYouTube?: boolean;
   videoId?: string | null;
@@ -39,6 +41,8 @@ export interface Widget {
   imageUrl?: string;
 }
 
+const GRID_COLS = 12;
+
 function generateWidgetId(): string {
   return `widget-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
@@ -50,6 +54,12 @@ function App() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [urlInputValue, setUrlInputValue] = useState('');
 
+  const activeWidgetIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    activeWidgetIdRef.current = activeWidgetId;
+  }, [activeWidgetId]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -59,7 +69,7 @@ function App() {
   );
 
   const [widgets, setWidgets] = useState<Widget[]>(() => {
-    const saved = localStorage.getItem('bentoWidgets');
+    const saved = localStorage.getItem('openBentoWidgets');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -67,19 +77,16 @@ function App() {
           ...w,
           isMuted: w.isMuted ?? true,
           isPaused: w.isPaused ?? false,
-          spanCols: w.spanCols ?? 1,
-          spanRows: w.spanRows ?? 1
+          x: w.x ?? 0,
+          y: w.y ?? 0,
+          w: w.w ?? 3,
+          h: w.h ?? 2
         }));
       } catch {
         return [];
       }
     }
     return [];
-  });
-
-  const [gridCols, setGridCols] = useState<number>(() => {
-    const saved = localStorage.getItem('bentoGridCols');
-    return saved ? parseInt(saved) : 4;
   });
 
   const extractYouTubeId = (url: string): string | null => {
@@ -94,12 +101,14 @@ function App() {
     return match ? match[1] : null;
   };
 
-  const addWidget = useCallback((type: WidgetType, spanCols = 1, spanRows = 1, extraData?: Partial<Widget>) => {
+  const addWidget = useCallback((type: WidgetType, w = 3, h = 2, extraData?: Partial<Widget>) => {
     const newWidget: Widget = {
       id: generateWidgetId(),
       type,
-      spanCols,
-      spanRows,
+      x: 0,
+      y: 0,
+      w: Math.min(w, GRID_COLS),
+      h,
       isMuted: true,
       isPaused: false,
       ...extraData
@@ -108,11 +117,11 @@ function App() {
     return newWidget.id;
   }, []);
 
-  const addVideoWidget = useCallback((channel: TrendingChannel, spanCols = 1, spanRows = 1) => {
+  const addVideoWidget = useCallback((channel: TrendingChannel, w = 3, h = 2) => {
     const videoId = extractYouTubeId(channel.url);
     const twitchChannel = extractTwitchChannel(channel.url);
 
-    addWidget('video', spanCols, spanRows, {
+    addWidget('video', w, h, {
       url: channel.url,
       isYouTube: !!videoId,
       videoId,
@@ -131,10 +140,11 @@ function App() {
 
     const youtubeId = extractYouTubeId(finalUrl);
     const twitchChannel = extractTwitchChannel(finalUrl);
+    const currentActiveWidgetId = activeWidgetIdRef.current;
 
-    if (activeWidgetId) {
+    if (currentActiveWidgetId) {
       setWidgets(prev => prev.map(w => 
-        w.id === activeWidgetId ? {
+        w.id === currentActiveWidgetId ? {
           ...w,
           type: 'video',
           url: finalUrl,
@@ -149,7 +159,7 @@ function App() {
         } : w
       ));
     } else {
-      addWidget('video', 1, 1, {
+      addWidget('video', 3, 2, {
         url: finalUrl,
         isYouTube: !!youtubeId,
         videoId: youtubeId,
@@ -160,8 +170,9 @@ function App() {
 
     setUrlInputValue('');
     setSidebarOpen(false);
+    activeWidgetIdRef.current = null;
     setActiveWidgetId(null);
-  }, [activeWidgetId, addWidget]);
+  }, [addWidget]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id);
@@ -175,11 +186,11 @@ function App() {
 
     if (activeData?.type === 'channel') {
       const channel = activeData.channel as TrendingChannel;
-      addVideoWidget(channel, 1, 1);
+      addVideoWidget(channel, 3, 2);
       setSidebarOpen(false);
     } else if (activeData?.type === 'widget-template') {
       const template = activeData.template as WidgetTemplate;
-      addWidget(template.widgetType, template.spanCols, template.spanRows);
+      addWidget(template.widgetType, template.w || 3, template.h || 2);
       setSidebarOpen(false);
     }
   }, [addVideoWidget, addWidget]);
@@ -187,10 +198,11 @@ function App() {
   const handleChannelClick = useCallback((channel: TrendingChannel) => {
     const videoId = extractYouTubeId(channel.url);
     const twitchChannel = extractTwitchChannel(channel.url);
+    const currentActiveWidgetId = activeWidgetIdRef.current;
 
-    if (activeWidgetId) {
+    if (currentActiveWidgetId) {
       setWidgets(prev => prev.map(w => 
-        w.id === activeWidgetId ? {
+        w.id === currentActiveWidgetId ? {
           ...w,
           type: 'video',
           url: channel.url,
@@ -205,21 +217,26 @@ function App() {
         } : w
       ));
     } else {
-      addVideoWidget(channel, 1, 1);
+      addVideoWidget(channel, 3, 2);
     }
     setSidebarOpen(false);
+    activeWidgetIdRef.current = null;
     setActiveWidgetId(null);
-  }, [activeWidgetId, addVideoWidget]);
+  }, [addVideoWidget]);
 
   const handleOpenSidebar = useCallback((widgetId?: string) => {
-    setActiveWidgetId(widgetId || null);
+    const id = widgetId || null;
+    activeWidgetIdRef.current = id;
+    setActiveWidgetId(id);
     setSidebarOpen(true);
   }, []);
 
   const handleImageUpload = useCallback((imageUrl: string) => {
-    if (activeWidgetId) {
+    const currentActiveWidgetId = activeWidgetIdRef.current;
+
+    if (currentActiveWidgetId) {
       setWidgets(prev => prev.map(w => 
-        w.id === activeWidgetId ? {
+        w.id === currentActiveWidgetId ? {
           ...w,
           type: 'image',
           imageUrl,
@@ -231,11 +248,12 @@ function App() {
         } : w
       ));
     } else {
-      addWidget('image', 1, 1, { imageUrl });
+      addWidget('image', 3, 2, { imageUrl });
     }
     setSidebarOpen(false);
+    activeWidgetIdRef.current = null;
     setActiveWidgetId(null);
-  }, [activeWidgetId, addWidget]);
+  }, [addWidget]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -250,6 +268,7 @@ function App() {
             isOpen={sidebarOpen} 
             onClose={() => {
               setSidebarOpen(false);
+              activeWidgetIdRef.current = null;
               setActiveWidgetId(null);
               setUrlInputValue('');
             }}
@@ -266,8 +285,6 @@ function App() {
                 <MasterControlDashboard 
                   widgets={widgets}
                   setWidgets={setWidgets}
-                  gridCols={gridCols}
-                  setGridCols={setGridCols}
                   isEditMode={isEditMode}
                   setIsEditMode={setIsEditMode}
                   sidebarOpen={sidebarOpen}

@@ -16,8 +16,8 @@ export interface WidgetTemplate {
   id: string;
   name: string;
   widgetType: WidgetType;
-  spanCols: number;
-  spanRows: number;
+  w: number;
+  h: number;
   icon: 'video' | 'note' | 'spacer' | 'image';
   color: string;
 }
@@ -29,13 +29,13 @@ const TRENDING_CHANNELS: TrendingChannel[] = [
 ];
 
 export const WIDGET_TEMPLATES: WidgetTemplate[] = [
-  { id: 'template-video-1x1', name: 'Video (1x1)', widgetType: 'video', spanCols: 1, spanRows: 1, icon: 'video', color: 'cyan' },
-  { id: 'template-video-2x2', name: 'Video (2x2)', widgetType: 'video', spanCols: 2, spanRows: 2, icon: 'video', color: 'cyan' },
-  { id: 'template-note-1x1', name: 'Note (1x1)', widgetType: 'note', spanCols: 1, spanRows: 1, icon: 'note', color: 'yellow' },
-  { id: 'template-note-2x1', name: 'Note (2x1)', widgetType: 'note', spanCols: 2, spanRows: 1, icon: 'note', color: 'yellow' },
-  { id: 'template-spacer-1x1', name: 'Spacer (1x1)', widgetType: 'spacer', spanCols: 1, spanRows: 1, icon: 'spacer', color: 'slate' },
-  { id: 'template-image-1x1', name: 'Image (1x1)', widgetType: 'image', spanCols: 1, spanRows: 1, icon: 'image', color: 'purple' },
-  { id: 'template-image-2x2', name: 'Image (2x2)', widgetType: 'image', spanCols: 2, spanRows: 2, icon: 'image', color: 'purple' },
+  { id: 'template-video-3x2', name: 'Video (3x2)', widgetType: 'video', w: 3, h: 2, icon: 'video', color: 'cyan' },
+  { id: 'template-video-6x3', name: 'Video (6x3)', widgetType: 'video', w: 6, h: 3, icon: 'video', color: 'cyan' },
+  { id: 'template-note-3x2', name: 'Note (3x2)', widgetType: 'note', w: 3, h: 2, icon: 'note', color: 'yellow' },
+  { id: 'template-note-4x1', name: 'Note (4x1)', widgetType: 'note', w: 4, h: 1, icon: 'note', color: 'yellow' },
+  { id: 'template-spacer-2x1', name: 'Spacer (2x1)', widgetType: 'spacer', w: 2, h: 1, icon: 'spacer', color: 'slate' },
+  { id: 'template-image-3x2', name: 'Image (3x2)', widgetType: 'image', w: 3, h: 2, icon: 'image', color: 'purple' },
+  { id: 'template-image-4x3', name: 'Image (4x3)', widgetType: 'image', w: 4, h: 3, icon: 'image', color: 'purple' },
 ];
 
 type SidebarTab = 'content' | 'widgets';
@@ -160,7 +160,7 @@ function DraggableTemplate({ template, onClick }: DraggableTemplateProps) {
       <div className="flex-1 min-w-0">
         <p className="text-[1.2rem] font-semibold text-slate-200 truncate">{template.name}</p>
         <p className="text-[1rem] text-slate-400">
-          {template.spanCols}x{template.spanRows} • {template.widgetType}
+          {template.w}x{template.h} cols/rows
         </p>
       </div>
       <Grip className="w-[1.6rem] h-[1.6rem] text-slate-500" />
@@ -318,7 +318,7 @@ export function WidgetSidebar({
                   Widget Types
                 </h3>
                 <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
-                  Drag or click to add widgets
+                  Drag or click to add widgets (12-column grid)
                 </p>
                 <div className="space-y-[0.8rem]">
                   {WIDGET_TEMPLATES.map((template) => (
@@ -357,23 +357,27 @@ export function WidgetSidebar({
               </div>
 
               <div className="bg-slate-800/50 p-[1.2rem] rounded-lg border border-slate-700/50">
-                <h4 className="text-[1.2rem] font-semibold text-slate-300 mb-[0.8rem]">Widget Guide</h4>
+                <h4 className="text-[1.2rem] font-semibold text-slate-300 mb-[0.8rem]">OpenBento Grid</h4>
                 <ul className="text-[1.1rem] text-slate-400 space-y-[0.4rem]">
                   <li className="flex items-center gap-[0.6rem]">
+                    <span className="text-cyan-400">12</span>
+                    <span>column magnetic grid</span>
+                  </li>
+                  <li className="flex items-center gap-[0.6rem]">
                     <Video className="w-[1.4rem] h-[1.4rem] text-cyan-400" />
-                    <span>Video: YouTube, Twitch, or any embed</span>
+                    <span>Video: Mute, Refresh, Delete</span>
                   </li>
                   <li className="flex items-center gap-[0.6rem]">
                     <FileText className="w-[1.4rem] h-[1.4rem] text-yellow-400" />
-                    <span>Note: Editable text notes</span>
-                  </li>
-                  <li className="flex items-center gap-[0.6rem]">
-                    <Square className="w-[1.4rem] h-[1.4rem] text-slate-400" />
-                    <span>Spacer: Empty space for layout</span>
+                    <span>Note: Editable text</span>
                   </li>
                   <li className="flex items-center gap-[0.6rem]">
                     <ImageIcon className="w-[1.4rem] h-[1.4rem] text-purple-400" />
-                    <span>Image: Display images</span>
+                    <span>Photo: File upload</span>
+                  </li>
+                  <li className="flex items-center gap-[0.6rem]">
+                    <Square className="w-[1.4rem] h-[1.4rem] text-slate-400" />
+                    <span>Spacer: Layout block</span>
                   </li>
                 </ul>
               </div>
@@ -424,7 +428,7 @@ export function WidgetSidebar({
         <div className="p-[1.6rem] border-t border-slate-700 flex-shrink-0">
           <p className="text-[1rem] text-slate-500 text-center">
             {activeTab === 'widgets' 
-              ? 'Drag widgets to add them • Resize in Edit Mode' 
+              ? 'Drag widgets to add • Resize in Edit Mode' 
               : 'Click or drag streams to add'}
           </p>
         </div>
