@@ -22,16 +22,14 @@ export interface LayoutBlock {
 }
 
 const TRENDING_CHANNELS: TrendingChannel[] = [
-  { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/embed/9Auq9mYxFEE?autoplay=1&mute=1', iconType: 'news', category: 'News' },
-  { id: 'abc-news', name: 'ABC News', url: 'https://www.youtube.com/embed/vOTiJkg1voo?autoplay=1&mute=1', iconType: 'news', category: 'News' },
-  { id: 'cnn', name: 'CNN', url: 'https://www.youtube.com/embed/KOY4Ka-GBus?autoplay=1&mute=1', iconType: 'news', category: 'News' },
-  { id: 'bbc-news', name: 'BBC News', url: 'https://www.youtube.com/embed/dp8PhLsUcFE?autoplay=1&mute=1', iconType: 'news', category: 'News' },
-  { id: 'al-jazeera', name: 'Al Jazeera', url: 'https://www.youtube.com/embed/F-POY4Q0QSI?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'abc-news', name: 'ABC News', url: 'https://www.youtube.com/embed/w_Ma8oQLmSM?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/embed/9Auqna63EFE?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'bloomberg', name: 'Bloomberg', url: 'https://www.youtube.com/embed/dp8PhLsUcFE?autoplay=1&mute=1', iconType: 'finance', category: 'Finance' },
   { id: 'france24', name: 'France 24', url: 'https://www.youtube.com/embed/LrXSfA4SoFE?autoplay=1&mute=1', iconType: 'news', category: 'News' },
   { id: 'dw-news', name: 'DW News', url: 'https://www.youtube.com/embed/V6YMvlmxvG8?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'al-jazeera', name: 'Al Jazeera', url: 'https://www.youtube.com/embed/F-POY4Q0QSI?autoplay=1&mute=1', iconType: 'news', category: 'News' },
   { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/21X5lGlDOfg?autoplay=1&mute=1', iconType: 'science', category: 'Science' },
   { id: 'lofi-radio', name: 'Lofi Radio', url: 'https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&mute=1', iconType: 'music', category: 'Music' },
-  { id: 'bloomberg', name: 'Bloomberg', url: 'https://www.youtube.com/embed/Ga3maNZ0x0w?autoplay=1&mute=1', iconType: 'finance', category: 'Finance' },
 ];
 
 export const LAYOUT_BLOCKS: LayoutBlock[] = [

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, ChevronDown, Scale, Pause, Play, Edit3, Lock } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, ChevronDown, Scale, Pause, Play, Edit3, Lock, RefreshCw } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -282,6 +282,24 @@ const MasterControlDashboard = ({
     }));
   };
 
+  const handleRefreshSlot = (index: number) => {
+    setSlots(prev => prev.map((slot, i) => {
+      if (i === index && slot.isActive) {
+        return { ...slot, isActive: false };
+      }
+      return slot;
+    }));
+    
+    setTimeout(() => {
+      setSlots(prev => prev.map((slot, i) => {
+        if (i === index) {
+          return { ...slot, isActive: true };
+        }
+        return slot;
+      }));
+    }, 100);
+  };
+
   const handleMasterMute = () => {
     const newMute = !masterMute;
     setMasterMute(newMute);
@@ -460,6 +478,15 @@ const MasterControlDashboard = ({
                   {slot.isMuted ? <VolumeX className="w-[1.2rem] h-[1.2rem]" /> : <Volume2 className="w-[1.2rem] h-[1.2rem]" />}
                 </button>
                 
+                <button
+                  onClick={() => handleRefreshSlot(index)}
+                  className="p-[0.6rem] slot-button transition-all duration-300 backdrop-blur-sm bg-cyan-600/90 hover:bg-cyan-500"
+                  title="Refresh stream"
+                  data-testid={`button-refresh-${index}`}
+                >
+                  <RefreshCw className="w-[1.2rem] h-[1.2rem]" />
+                </button>
+                
                 {!slot.isYouTube && slot.url && (
                   <a
                     href={slot.url}
@@ -509,7 +536,7 @@ const MasterControlDashboard = ({
                       ref={(el) => { iframeRefs.current[index] = el; }}
                       src={getYouTubeEmbedUrl(slot.videoId)}
                       className="w-full h-full"
-                      style={{ pointerEvents: isEditMode ? 'none' : 'auto' }}
+                      style={{ pointerEvents: 'none' }}
                       title={`YouTube - Slot ${index + 1}`}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
@@ -519,7 +546,7 @@ const MasterControlDashboard = ({
                       <iframe
                         src={slot.url}
                         className="w-full h-full"
-                        style={{ pointerEvents: isEditMode ? 'none' : 'auto' }}
+                        style={{ pointerEvents: 'none' }}
                         title={`Slot ${index + 1}`}
                         allow="autoplay; encrypted-media"
                         sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
