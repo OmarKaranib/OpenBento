@@ -81,6 +81,20 @@ function SortableSlot({ slot, index, children, isDraggingThis, gridCols, isEditM
       className="relative"
       data-testid={`slot-container-${index}`}
     >
+      {/* IFRAME SHIELD: Direct child of useSortable ref, position absolute inset-0 */}
+      {isEditMode && (
+        <div 
+          {...listeners}
+          style={{ 
+            position: 'absolute', 
+            inset: 0,
+            zIndex: 9999,
+            pointerEvents: 'auto',
+            cursor: 'grab'
+          }}
+          data-testid={`drag-overlay-${index}`}
+        />
+      )}
       <div 
         className={`dashboard-slot h-full w-full relative bg-slate-900/50 backdrop-blur-sm border group transition-all duration-300 shadow-xl ${
           isDragging 
@@ -92,22 +106,6 @@ function SortableSlot({ slot, index, children, isDraggingThis, gridCols, isEditM
                 : 'border-slate-700/50 hover:border-cyan-500/50'
         } ${isEditMode && !isDragging ? 'animate-jiggle' : ''}`}
       >
-        {isEditMode && (
-          <div 
-            {...listeners}
-            style={{ 
-              position: 'absolute', 
-              top: 0, 
-              left: 0, 
-              width: '100%', 
-              height: '100%', 
-              zIndex: 9999,
-              pointerEvents: 'auto',
-              cursor: 'grab'
-            }}
-            data-testid={`drag-overlay-${index}`}
-          />
-        )}
         {children}
       </div>
     </div>

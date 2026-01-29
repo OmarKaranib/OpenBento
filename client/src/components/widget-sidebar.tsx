@@ -152,7 +152,7 @@ function DraggableBlock({ block }: DraggableBlockProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className="flex flex-col items-center gap-[0.8rem] p-[1.2rem] bg-slate-800/50 hover:bg-slate-700/50 slot-button cursor-grab active:cursor-grabbing transition-all duration-200 border border-slate-700/50 hover:border-purple-500/50"
+      className="flex flex-col items-center gap-[0.8rem] p-[1.2rem] bg-slate-800/70 hover:bg-slate-700/70 slot-button cursor-grab active:cursor-grabbing transition-all duration-200 border-2 border-purple-500/70 hover:border-purple-400 shadow-lg shadow-purple-900/30"
       data-testid={`draggable-block-${block.id}`}
     >
       {getBlockPreview()}
@@ -206,7 +206,7 @@ export function WidgetSidebar({
       />
       
       <div
-        className={`fixed top-0 left-0 h-full bg-slate-900 border-r border-slate-700 z-50 transition-transform duration-300 ease-out flex flex-col ${
+        className={`fixed top-0 left-0 h-full bg-slate-900 border-r border-slate-700 z-50 transition-transform duration-300 ease-out flex flex-col overflow-visible ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ 
@@ -289,7 +289,7 @@ export function WidgetSidebar({
           </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-[1.6rem]">
+        <div className="flex-1 overflow-visible p-[1.6rem]">
           {activeTab === 'content' && (
             <div className="space-y-[1.6rem]">
               <div className="relative">
