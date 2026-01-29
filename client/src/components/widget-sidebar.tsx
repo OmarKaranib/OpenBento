@@ -22,14 +22,12 @@ export interface LayoutBlock {
 }
 
 const TRENDING_CHANNELS: TrendingChannel[] = [
-  { id: 'abc-news', name: 'ABC News', url: 'https://www.youtube.com/embed/w_Ma8oQLmSM?autoplay=1&mute=1', iconType: 'news', category: 'News' },
-  { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/embed/9Auqna63EFE?autoplay=1&mute=1', iconType: 'news', category: 'News' },
-  { id: 'bloomberg', name: 'Bloomberg', url: 'https://www.youtube.com/embed/dp8PhLsUcFE?autoplay=1&mute=1', iconType: 'finance', category: 'Finance' },
-  { id: 'france24', name: 'France 24', url: 'https://www.youtube.com/embed/LrXSfA4SoFE?autoplay=1&mute=1', iconType: 'news', category: 'News' },
-  { id: 'dw-news', name: 'DW News', url: 'https://www.youtube.com/embed/V6YMvlmxvG8?autoplay=1&mute=1', iconType: 'news', category: 'News' },
-  { id: 'al-jazeera', name: 'Al Jazeera', url: 'https://www.youtube.com/embed/F-POY4Q0QSI?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'lofi-girl', name: 'Lofi Girl', url: 'https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&mute=1', iconType: 'music', category: 'Music' },
   { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/21X5lGlDOfg?autoplay=1&mute=1', iconType: 'science', category: 'Science' },
-  { id: 'lofi-radio', name: 'Lofi Radio', url: 'https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&mute=1', iconType: 'music', category: 'Music' },
+  { id: 'cna-news', name: 'CNA News', url: 'https://www.youtube.com/embed/XWq5kBlakJo?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'dw-news', name: 'DW News', url: 'https://www.youtube.com/embed/qWw8S7_j6Sg?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'france24', name: 'France 24', url: 'https://www.youtube.com/embed/LrXSfA4SoFE?autoplay=1&mute=1', iconType: 'news', category: 'News' },
+  { id: 'al-jazeera', name: 'Al Jazeera', url: 'https://www.youtube.com/embed/F-POY4Q0QSI?autoplay=1&mute=1', iconType: 'news', category: 'News' },
 ];
 
 export const LAYOUT_BLOCKS: LayoutBlock[] = [

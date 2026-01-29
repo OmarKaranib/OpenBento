@@ -36,6 +36,8 @@ interface Slot {
   error: string | null;
   isYouTube: boolean;
   videoId: string | null;
+  isTwitch: boolean;
+  twitchChannel: string | null;
   embedBlocked: boolean;
   spanCols: number;
   spanRows: number;
@@ -70,6 +72,8 @@ function App() {
           error: null,
           isYouTube: false,
           videoId: null,
+          isTwitch: false,
+          twitchChannel: null,
           embedBlocked: false,
           spanCols: 1,
           spanRows: 1
@@ -79,7 +83,9 @@ function App() {
           embedBlocked: s.embedBlocked ?? false,
           isPaused: s.isPaused ?? false,
           spanCols: s.spanCols ?? 1,
-          spanRows: s.spanRows ?? 1
+          spanRows: s.spanRows ?? 1,
+          isTwitch: s.isTwitch ?? false,
+          twitchChannel: s.twitchChannel ?? null
         })), ...additional];
       }
       return parsed.map((s: Slot) => ({ 
@@ -87,7 +93,9 @@ function App() {
         embedBlocked: s.embedBlocked ?? false,
         isPaused: s.isPaused ?? false,
         spanCols: s.spanCols ?? 1,
-        spanRows: s.spanRows ?? 1
+        spanRows: s.spanRows ?? 1,
+        isTwitch: s.isTwitch ?? false,
+        twitchChannel: s.twitchChannel ?? null
       }));
     }
     return Array(16).fill(null).map((_, i) => ({
@@ -99,6 +107,8 @@ function App() {
       error: null,
       isYouTube: false,
       videoId: null,
+      isTwitch: false,
+      twitchChannel: null,
       embedBlocked: false,
       spanCols: 1,
       spanRows: 1
@@ -116,16 +126,30 @@ function App() {
     return (match && match[7].length === 11) ? match[7] : null;
   };
 
+  const extractTwitchChannel = (url: string): string | null => {
+    const twitchRegex = /(?:twitch\.tv\/)([a-zA-Z0-9_]+)/;
+    const match = url.match(twitchRegex);
+    return match ? match[1] : null;
+  };
+
+  const getTwitchEmbedUrl = (channel: string): string => {
+    const parentDomain = window.location.hostname;
+    return `https://player.twitch.tv/?channel=${channel}&parent=${parentDomain}&autoplay=true&muted=true`;
+  };
+
   const addChannelToSlot = useCallback((channel: TrendingChannel, slotIndex: number, spanCols = 1, spanRows = 1) => {
     const videoId = extractYouTubeId(channel.url);
+    const twitchChannel = extractTwitchChannel(channel.url);
 
     setSlots(prev => prev.map((slot, i) => 
       i === slotIndex ? {
         ...slot,
         url: channel.url,
         isActive: true,
-        isYouTube: true,
+        isYouTube: !!videoId,
         videoId: videoId,
+        isTwitch: !!twitchChannel,
+        twitchChannel: twitchChannel,
         error: null,
         embedBlocked: false,
         isPaused: false,
@@ -145,6 +169,7 @@ function App() {
     }
 
     const youtubeId = extractYouTubeId(finalUrl);
+    const twitchChannel = extractTwitchChannel(finalUrl);
 
     setSlots(prev => prev.map((slot, i) => 
       i === activeSlotIndex ? {
@@ -153,6 +178,8 @@ function App() {
         isActive: true,
         isYouTube: !!youtubeId,
         videoId: youtubeId,
+        isTwitch: !!twitchChannel,
+        twitchChannel: twitchChannel,
         error: null,
         embedBlocked: false,
         isPaused: false,

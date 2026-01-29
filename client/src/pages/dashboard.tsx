@@ -31,6 +31,8 @@ export interface Slot {
   error: string | null;
   isYouTube: boolean;
   videoId: string | null;
+  isTwitch: boolean;
+  twitchChannel: string | null;
   embedBlocked: boolean;
   spanCols: number;
   spanRows: number;
@@ -184,6 +186,11 @@ const MasterControlDashboard = ({
 
   const getYouTubeEmbedUrl = (videoId: string): string => {
     return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
+  };
+
+  const getTwitchEmbedUrl = (channel: string): string => {
+    const parentDomain = window.location.hostname;
+    return `https://player.twitch.tv/?channel=${channel}&parent=${parentDomain}&autoplay=true&muted=true`;
   };
 
   const sendYouTubeCommand = useCallback((index: number, command: string, value?: number | boolean) => {
@@ -450,7 +457,7 @@ const MasterControlDashboard = ({
 
             {slot.isActive && (
               <div className="absolute top-[0.8rem] right-[0.8rem] z-20 flex gap-[0.4rem]">
-                {slot.isYouTube && (
+                {(slot.isYouTube || slot.isTwitch) && (
                   <button
                     onClick={() => toggleSlotPause(index)}
                     className={`p-[0.6rem] slot-button transition-all duration-300 backdrop-blur-sm ${
@@ -487,7 +494,7 @@ const MasterControlDashboard = ({
                   <RefreshCw className="w-[1.2rem] h-[1.2rem]" />
                 </button>
                 
-                {!slot.isYouTube && slot.url && (
+                {!slot.isYouTube && !slot.isTwitch && slot.url && (
                   <a
                     href={slot.url}
                     target="_blank"
@@ -539,6 +546,16 @@ const MasterControlDashboard = ({
                       style={{ pointerEvents: 'none' }}
                       title={`YouTube - Slot ${index + 1}`}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : slot.isTwitch && slot.twitchChannel ? (
+                    <iframe
+                      ref={(el) => { iframeRefs.current[index] = el; }}
+                      src={getTwitchEmbedUrl(slot.twitchChannel)}
+                      className="w-full h-full"
+                      style={{ pointerEvents: 'none' }}
+                      title={`Twitch - Slot ${index + 1}`}
+                      allow="autoplay; encrypted-media"
                       allowFullScreen
                     />
                   ) : (
