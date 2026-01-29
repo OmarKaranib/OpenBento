@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, ChevronDown, Pause, Play, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Save, Power, AlertCircle, X, ExternalLink, ChevronDown, Pause, Play, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { Widget, WidgetType } from '@/App';
 
@@ -502,14 +502,24 @@ const MasterControlDashboard = ({
             )}
 
             {isEditMode && (
-              <button
-                onClick={() => handleRemoveWidget(widget.id)}
-                className="absolute top-[0.6rem] right-[0.6rem] z-40 p-[0.5rem] bg-red-600/90 hover:bg-red-500 slot-button transition-all duration-300 backdrop-blur-sm"
-                title="Remove widget"
-                data-testid={`button-remove-${widget.id}`}
-              >
-                <Trash2 className="w-[1rem] h-[1rem]" />
-              </button>
+              <div className="absolute top-[0.6rem] right-[0.6rem] z-40 flex gap-[0.3rem]">
+                <button
+                  onClick={() => handleOpenSidebar(widget.id)}
+                  className="p-[0.5rem] bg-cyan-600/90 hover:bg-cyan-500 slot-button transition-all duration-300 backdrop-blur-sm"
+                  title="Edit widget content"
+                  data-testid={`button-edit-${widget.id}`}
+                >
+                  <Settings className="w-[1rem] h-[1rem]" />
+                </button>
+                <button
+                  onClick={() => handleRemoveWidget(widget.id)}
+                  className="p-[0.5rem] bg-red-600/90 hover:bg-red-500 slot-button transition-all duration-300 backdrop-blur-sm"
+                  title="Remove widget"
+                  data-testid={`button-remove-${widget.id}`}
+                >
+                  <Trash2 className="w-[1rem] h-[1rem]" />
+                </button>
+              </div>
             )}
 
             <div className="w-full h-full">

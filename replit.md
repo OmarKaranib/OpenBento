@@ -87,6 +87,10 @@ gap: 1rem;
 ```
 
 ## Recent Changes
+- **Content Swap Logic**: Clicking streams/entering URLs updates existing widget when selected instead of creating duplicates
+- **Widget Edit Button**: Settings gear button on widgets in Edit Mode opens sidebar for content swapping
+- **Native File Upload**: "Upload from Computer" button for Image widgets using URL.createObjectURL
+- **Verified Streams**: NASA Live, Lofi Girl, Sky News with direct YouTube embed URLs
 - **Architecture Rebuild**: Switched from fixed 16-slot array to dynamic widgets list
 - **OpenBento Resize**: Added drag-to-resize handles with mouse tracking
 - **Widget Types**: Added Note, Spacer, Image widget types
@@ -94,7 +98,6 @@ gap: 1rem;
 - **Column Selector**: Replaced grid density with simple column count (2-6)
 - **Widget Templates**: New sidebar tab with draggable widget type templates
 - **Twitch Support**: Auto-detection of twitch.tv URLs
-- **Reliable Streams**: Lofi Girl, NASA Live, CNA News, DW News, France 24, Al Jazeera
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px
