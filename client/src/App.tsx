@@ -6,11 +6,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import MasterControlDashboard from "@/pages/dashboard";
-import { WidgetSidebar, TrendingChannel, LayoutBlock } from '@/components/widget-sidebar';
+import { WidgetSidebar, TrendingChannel, WidgetTemplate } from '@/components/widget-sidebar';
 import { 
   DndContext, 
   DragEndEvent, 
-  DragOverEvent,
   DragStartEvent,
   DragOverlay,
   useSensor, 
@@ -19,33 +18,35 @@ import {
   UniqueIdentifier,
   closestCenter
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  rectSortingStrategy,
-  arrayMove
-} from '@dnd-kit/sortable';
 
-type GridDensity = 2 | 4 | 6 | 9 | 12 | 16;
+export type WidgetType = 'video' | 'note' | 'spacer' | 'image';
 
-interface Slot {
-  id: number;
-  url: string;
-  isActive: boolean;
-  isMuted: boolean;
-  isPaused: boolean;
-  error: string | null;
-  isYouTube: boolean;
-  videoId: string | null;
-  isTwitch: boolean;
-  twitchChannel: string | null;
-  embedBlocked: boolean;
+export interface Widget {
+  id: string;
+  type: WidgetType;
   spanCols: number;
   spanRows: number;
+  url?: string;
+  isYouTube?: boolean;
+  videoId?: string | null;
+  isTwitch?: boolean;
+  twitchChannel?: string | null;
+  isMuted: boolean;
+  isPaused: boolean;
+  error?: string | null;
+  embedBlocked?: boolean;
+  noteContent?: string;
+  imageUrl?: string;
+}
+
+let widgetIdCounter = 0;
+function generateWidgetId(): string {
+  return `widget-${Date.now()}-${++widgetIdCounter}`;
 }
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
+  const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [urlInputValue, setUrlInputValue] = useState('');
@@ -58,66 +59,28 @@ function App() {
     })
   );
 
-  const [slots, setSlots] = useState<Slot[]>(() => {
-    const saved = localStorage.getItem('controlDashboard');
+  const [widgets, setWidgets] = useState<Widget[]>(() => {
+    const saved = localStorage.getItem('bentoWidgets');
     if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed.length < 16) {
-        const additional = Array(16 - parsed.length).fill(null).map((_, i) => ({
-          id: parsed.length + i,
-          url: '',
-          isActive: false,
-          isMuted: true,
-          isPaused: false,
-          error: null,
-          isYouTube: false,
-          videoId: null,
-          isTwitch: false,
-          twitchChannel: null,
-          embedBlocked: false,
-          spanCols: 1,
-          spanRows: 1
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((w: Widget) => ({
+          ...w,
+          isMuted: w.isMuted ?? true,
+          isPaused: w.isPaused ?? false,
+          spanCols: w.spanCols ?? 1,
+          spanRows: w.spanRows ?? 1
         }));
-        return [...parsed.map((s: Slot) => ({ 
-          ...s, 
-          embedBlocked: s.embedBlocked ?? false,
-          isPaused: s.isPaused ?? false,
-          spanCols: s.spanCols ?? 1,
-          spanRows: s.spanRows ?? 1,
-          isTwitch: s.isTwitch ?? false,
-          twitchChannel: s.twitchChannel ?? null
-        })), ...additional];
+      } catch {
+        return [];
       }
-      return parsed.map((s: Slot) => ({ 
-        ...s, 
-        embedBlocked: s.embedBlocked ?? false,
-        isPaused: s.isPaused ?? false,
-        spanCols: s.spanCols ?? 1,
-        spanRows: s.spanRows ?? 1,
-        isTwitch: s.isTwitch ?? false,
-        twitchChannel: s.twitchChannel ?? null
-      }));
     }
-    return Array(16).fill(null).map((_, i) => ({
-      id: i,
-      url: '',
-      isActive: false,
-      isMuted: true,
-      isPaused: false,
-      error: null,
-      isYouTube: false,
-      videoId: null,
-      isTwitch: false,
-      twitchChannel: null,
-      embedBlocked: false,
-      spanCols: 1,
-      spanRows: 1
-    }));
+    return [];
   });
 
-  const [gridDensity, setGridDensity] = useState<GridDensity>(() => {
-    const saved = localStorage.getItem('controlDashboardGridDensity');
-    return saved ? (parseInt(saved) as GridDensity) : 16;
+  const [gridCols, setGridCols] = useState<number>(() => {
+    const saved = localStorage.getItem('bentoGridCols');
+    return saved ? parseInt(saved) : 4;
   });
 
   const extractYouTubeId = (url: string): string | null => {
@@ -132,36 +95,35 @@ function App() {
     return match ? match[1] : null;
   };
 
-  const getTwitchEmbedUrl = (channel: string): string => {
-    const parentDomain = window.location.hostname;
-    return `https://player.twitch.tv/?channel=${channel}&parent=${parentDomain}&autoplay=true&muted=true`;
-  };
+  const addWidget = useCallback((type: WidgetType, spanCols = 1, spanRows = 1, extraData?: Partial<Widget>) => {
+    const newWidget: Widget = {
+      id: generateWidgetId(),
+      type,
+      spanCols,
+      spanRows,
+      isMuted: true,
+      isPaused: false,
+      ...extraData
+    };
+    setWidgets(prev => [...prev, newWidget]);
+    return newWidget.id;
+  }, []);
 
-  const addChannelToSlot = useCallback((channel: TrendingChannel, slotIndex: number, spanCols = 1, spanRows = 1) => {
+  const addVideoWidget = useCallback((channel: TrendingChannel, spanCols = 1, spanRows = 1) => {
     const videoId = extractYouTubeId(channel.url);
     const twitchChannel = extractTwitchChannel(channel.url);
 
-    setSlots(prev => prev.map((slot, i) => 
-      i === slotIndex ? {
-        ...slot,
-        url: channel.url,
-        isActive: true,
-        isYouTube: !!videoId,
-        videoId: videoId,
-        isTwitch: !!twitchChannel,
-        twitchChannel: twitchChannel,
-        error: null,
-        embedBlocked: false,
-        isPaused: false,
-        isMuted: true,
-        spanCols,
-        spanRows
-      } : slot
-    ));
-  }, []);
+    addWidget('video', spanCols, spanRows, {
+      url: channel.url,
+      isYouTube: !!videoId,
+      videoId,
+      isTwitch: !!twitchChannel,
+      twitchChannel
+    });
+  }, [addWidget]);
 
   const handleSubmitUrl = useCallback((url: string) => {
-    if (!url.trim() || activeSlotIndex === null) return;
+    if (!url.trim()) return;
 
     let finalUrl = url.trim();
     if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
@@ -171,149 +133,110 @@ function App() {
     const youtubeId = extractYouTubeId(finalUrl);
     const twitchChannel = extractTwitchChannel(finalUrl);
 
-    setSlots(prev => prev.map((slot, i) => 
-      i === activeSlotIndex ? {
-        ...slot,
+    if (activeWidgetId) {
+      setWidgets(prev => prev.map(w => 
+        w.id === activeWidgetId ? {
+          ...w,
+          type: 'video',
+          url: finalUrl,
+          isYouTube: !!youtubeId,
+          videoId: youtubeId,
+          isTwitch: !!twitchChannel,
+          twitchChannel,
+          error: null,
+          embedBlocked: false,
+          isPaused: false,
+          isMuted: true
+        } : w
+      ));
+    } else {
+      addWidget('video', 1, 1, {
         url: finalUrl,
-        isActive: true,
         isYouTube: !!youtubeId,
         videoId: youtubeId,
         isTwitch: !!twitchChannel,
-        twitchChannel: twitchChannel,
-        error: null,
-        embedBlocked: false,
-        isPaused: false,
-        isMuted: true
-      } : slot
-    ));
+        twitchChannel
+      });
+    }
 
     setUrlInputValue('');
     setSidebarOpen(false);
-    setActiveSlotIndex(null);
-  }, [activeSlotIndex]);
+    setActiveWidgetId(null);
+  }, [activeWidgetId, addWidget]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id);
   }, []);
 
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeData = active.data.current;
-
-    if (activeData?.type === 'slot') {
-      const activeIndex = activeData.index as number;
-      const overMatch = over.id.toString().match(/^slot-(\d+)$/);
-      if (!overMatch) return;
-
-      const overIndex = parseInt(overMatch[1], 10);
-
-      if (activeIndex !== overIndex) {
-        setSlots(prev => {
-          const newSlots = arrayMove(prev, activeIndex, overIndex);
-          return newSlots.map((slot, i) => ({ ...slot, id: i }));
-        });
-      }
-    }
-  }, []);
-
   const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
+    const { active } = event;
     setActiveId(null);
-
-    if (!over) return;
 
     const activeData = active.data.current;
 
     if (activeData?.type === 'channel') {
-      const slotMatch = over.id.toString().match(/^slot-(\d+)$/);
-      if (!slotMatch) return;
-
-      const slotIndex = parseInt(slotMatch[1], 10);
       const channel = activeData.channel as TrendingChannel;
-      addChannelToSlot(channel, slotIndex);
+      addVideoWidget(channel, 1, 1);
       setSidebarOpen(false);
-    } else if (activeData?.type === 'block') {
-      const slotMatch = over.id.toString().match(/^slot-(\d+)$/);
-      if (!slotMatch) return;
-
-      const slotIndex = parseInt(slotMatch[1], 10);
-      const block = activeData.block as LayoutBlock;
-
-      setSlots(prev => prev.map((slot, i) => 
-        i === slotIndex ? {
-          ...slot,
-          spanCols: block.spanCols,
-          spanRows: block.spanRows
-        } : slot
-      ));
+    } else if (activeData?.type === 'widget-template') {
+      const template = activeData.template as WidgetTemplate;
+      addWidget(template.widgetType, template.spanCols, template.spanRows);
       setSidebarOpen(false);
     }
-  }, [addChannelToSlot]);
+  }, [addVideoWidget, addWidget]);
 
   const handleChannelClick = useCallback((channel: TrendingChannel) => {
-    const firstEmptyIndex = slots.findIndex(s => !s.isActive);
-    if (firstEmptyIndex !== -1) {
-      addChannelToSlot(channel, firstEmptyIndex);
-      setSidebarOpen(false);
-    }
-  }, [slots, addChannelToSlot]);
+    addVideoWidget(channel, 1, 1);
+    setSidebarOpen(false);
+  }, [addVideoWidget]);
 
-  const handleOpenSidebar = useCallback((index: number) => {
-    setActiveSlotIndex(index);
+  const handleOpenSidebar = useCallback((widgetId?: string) => {
+    setActiveWidgetId(widgetId || null);
     setSidebarOpen(true);
   }, []);
-
-  const visibleSlots = slots.slice(0, gridDensity);
-  const slotIds = visibleSlots.map((_, index) => `slot-${index}`);
 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        {/* DndContext wrapping EVERYTHING ensures the sidebar can talk to the grid */}
         <DndContext 
           sensors={sensors} 
-          collisionDetection={closestCenter} // CHANGE: Added closestCenter for better stability
+          collisionDetection={closestCenter}
           onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-          <SortableContext items={slotIds} strategy={rectSortingStrategy}>
-            <WidgetSidebar 
-              isOpen={sidebarOpen} 
-              onClose={() => {
-                setSidebarOpen(false);
-                setActiveSlotIndex(null);
-                setUrlInputValue('');
-              }}
-              onChannelClick={handleChannelClick}
-              urlValue={urlInputValue}
-              onUrlChange={setUrlInputValue}
-              onUrlSubmit={handleSubmitUrl}
-              activeSlotIndex={activeSlotIndex}
-            />
-            <Switch>
-              <Route path="/">
-                {() => (
-                  <MasterControlDashboard 
-                    slots={slots}
-                    setSlots={setSlots}
-                    gridDensity={gridDensity}
-                    setGridDensity={setGridDensity}
-                    isEditMode={isEditMode}
-                    setIsEditMode={setIsEditMode}
-                    sidebarOpen={sidebarOpen}
-                    activeId={activeId}
-                    handleOpenSidebar={handleOpenSidebar}
-                  />
-                )}
-              </Route>
-              <Route component={NotFound} />
-            </Switch>
-          </SortableContext>
+          <WidgetSidebar 
+            isOpen={sidebarOpen} 
+            onClose={() => {
+              setSidebarOpen(false);
+              setActiveWidgetId(null);
+              setUrlInputValue('');
+            }}
+            onChannelClick={handleChannelClick}
+            urlValue={urlInputValue}
+            onUrlChange={setUrlInputValue}
+            onUrlSubmit={handleSubmitUrl}
+            activeWidgetId={activeWidgetId}
+          />
+          <Switch>
+            <Route path="/">
+              {() => (
+                <MasterControlDashboard 
+                  widgets={widgets}
+                  setWidgets={setWidgets}
+                  gridCols={gridCols}
+                  setGridCols={setGridCols}
+                  isEditMode={isEditMode}
+                  setIsEditMode={setIsEditMode}
+                  sidebarOpen={sidebarOpen}
+                  activeId={activeId}
+                  handleOpenSidebar={handleOpenSidebar}
+                  addWidget={addWidget}
+                />
+              )}
+            </Route>
+            <Route component={NotFound} />
+          </Switch>
           
-          {/* Ghost preview when dragging */}
           <DragOverlay>
             {activeId ? (
               <div 
@@ -326,11 +249,11 @@ function App() {
               >
                 <div className="flex items-center justify-center h-full">
                   <span className="text-cyan-400 font-bold text-[1.2rem]">
-                    {String(activeId).startsWith('slot-') 
-                      ? `Slot ${parseInt(String(activeId).replace('slot-', '')) + 1}`
-                      : String(activeId).includes('block-')
-                        ? 'Layout Block'
-                        : 'Channel'
+                    {String(activeId).includes('channel-') 
+                      ? 'Channel'
+                      : String(activeId).includes('template-')
+                        ? 'Widget'
+                        : 'Widget'
                     }
                   </span>
                 </div>

@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
-import { X, Search, Tv, Grid2X2, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout } from 'lucide-react';
+import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { WidgetType } from '@/App';
 
 export interface TrendingChannel {
   id: string;
@@ -11,14 +12,14 @@ export interface TrendingChannel {
   category: string;
 }
 
-export interface LayoutBlock {
+export interface WidgetTemplate {
   id: string;
   name: string;
-  cols: number;
-  rows: number;
+  widgetType: WidgetType;
   spanCols: number;
   spanRows: number;
-  icon: 'small' | 'medium' | 'large';
+  icon: 'video' | 'note' | 'spacer' | 'image';
+  color: string;
 }
 
 const TRENDING_CHANNELS: TrendingChannel[] = [
@@ -30,13 +31,17 @@ const TRENDING_CHANNELS: TrendingChannel[] = [
   { id: 'al-jazeera', name: 'Al Jazeera', url: 'https://www.youtube.com/embed/F-POY4Q0QSI?autoplay=1&mute=1', iconType: 'news', category: 'News' },
 ];
 
-export const LAYOUT_BLOCKS: LayoutBlock[] = [
-  { id: 'block-2x2', name: 'Standard (2x2)', cols: 2, rows: 2, spanCols: 2, spanRows: 2, icon: 'small' },
-  { id: 'block-2x4', name: 'Wide (2x4)', cols: 4, rows: 2, spanCols: 2, spanRows: 4, icon: 'medium' },
-  { id: 'block-4x4', name: 'Large (4x4)', cols: 4, rows: 4, spanCols: 4, spanRows: 4, icon: 'large' },
+export const WIDGET_TEMPLATES: WidgetTemplate[] = [
+  { id: 'template-video-1x1', name: 'Video (1x1)', widgetType: 'video', spanCols: 1, spanRows: 1, icon: 'video', color: 'cyan' },
+  { id: 'template-video-2x2', name: 'Video (2x2)', widgetType: 'video', spanCols: 2, spanRows: 2, icon: 'video', color: 'cyan' },
+  { id: 'template-note-1x1', name: 'Note (1x1)', widgetType: 'note', spanCols: 1, spanRows: 1, icon: 'note', color: 'yellow' },
+  { id: 'template-note-2x1', name: 'Note (2x1)', widgetType: 'note', spanCols: 2, spanRows: 1, icon: 'note', color: 'yellow' },
+  { id: 'template-spacer-1x1', name: 'Spacer (1x1)', widgetType: 'spacer', spanCols: 1, spanRows: 1, icon: 'spacer', color: 'slate' },
+  { id: 'template-image-1x1', name: 'Image (1x1)', widgetType: 'image', spanCols: 1, spanRows: 1, icon: 'image', color: 'purple' },
+  { id: 'template-image-2x2', name: 'Image (2x2)', widgetType: 'image', spanCols: 2, spanRows: 2, icon: 'image', color: 'purple' },
 ];
 
-type SidebarTab = 'content' | 'layout';
+type SidebarTab = 'content' | 'widgets';
 
 interface DraggableChannelProps {
   channel: TrendingChannel;
@@ -55,6 +60,22 @@ function getChannelIcon(iconType: TrendingChannel['iconType']) {
       return <TrendingUp className="w-[1.6rem] h-[1.6rem] text-emerald-400" />;
     default:
       return <Tv className="w-[1.6rem] h-[1.6rem] text-slate-400" />;
+  }
+}
+
+function getTemplateIcon(icon: WidgetTemplate['icon'], color: string) {
+  const colorClass = `text-${color}-400`;
+  switch (icon) {
+    case 'video':
+      return <Video className={`w-[1.8rem] h-[1.8rem] ${colorClass}`} />;
+    case 'note':
+      return <FileText className={`w-[1.8rem] h-[1.8rem] ${colorClass}`} />;
+    case 'spacer':
+      return <Square className={`w-[1.8rem] h-[1.8rem] ${colorClass}`} />;
+    case 'image':
+      return <ImageIcon className={`w-[1.8rem] h-[1.8rem] ${colorClass}`} />;
+    default:
+      return <Square className={`w-[1.8rem] h-[1.8rem] ${colorClass}`} />;
   }
 }
 
@@ -98,14 +119,15 @@ function DraggableChannel({ channel, onClick }: DraggableChannelProps) {
   );
 }
 
-interface DraggableBlockProps {
-  block: LayoutBlock;
+interface DraggableTemplateProps {
+  template: WidgetTemplate;
+  onClick?: () => void;
 }
 
-function DraggableBlock({ block }: DraggableBlockProps) {
+function DraggableTemplate({ template, onClick }: DraggableTemplateProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `block-${block.id}`,
-    data: { type: 'block', block }
+    id: `template-${template.id}`,
+    data: { type: 'widget-template', template }
   });
 
   const style = {
@@ -114,33 +136,16 @@ function DraggableBlock({ block }: DraggableBlockProps) {
     cursor: isDragging ? 'grabbing' : 'grab',
   };
 
-  const getBlockPreview = () => {
-    const gridCells = [];
-    for (let r = 0; r < block.rows; r++) {
-      for (let c = 0; c < block.cols; c++) {
-        gridCells.push(
-          <div 
-            key={`${r}-${c}`} 
-            className="bg-gradient-to-br from-cyan-500/40 to-purple-500/40 border border-cyan-400/50"
-            style={{ borderRadius: '0.3rem' }}
-          />
-        );
-      }
+  const handleClick = (e: React.MouseEvent) => {
+    if (!isDragging && onClick) {
+      onClick();
     }
-    return (
-      <div 
-        className="grid gap-[0.3rem]"
-        style={{ 
-          gridTemplateColumns: `repeat(${block.cols}, 1fr)`,
-          gridTemplateRows: `repeat(${block.rows}, 1fr)`,
-          width: `${block.cols * 2}rem`,
-          height: `${block.rows * 2}rem`
-        }}
-      >
-        {gridCells}
-      </div>
-    );
   };
+
+  const colorBorder = template.color === 'cyan' ? 'border-cyan-500/50 hover:border-cyan-400' 
+    : template.color === 'yellow' ? 'border-yellow-500/50 hover:border-yellow-400'
+    : template.color === 'purple' ? 'border-purple-500/50 hover:border-purple-400'
+    : 'border-slate-500/50 hover:border-slate-400';
 
   return (
     <div
@@ -148,12 +153,20 @@ function DraggableBlock({ block }: DraggableBlockProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className="flex flex-col items-center gap-[0.8rem] p-[1.2rem] bg-slate-800/70 hover:bg-slate-700/70 slot-button cursor-grab active:cursor-grabbing transition-all duration-200 border-2 border-purple-500/70 hover:border-purple-400 shadow-lg shadow-purple-900/30"
-      data-testid={`draggable-block-${block.id}`}
+      onClick={handleClick}
+      className={`flex items-center gap-[1rem] p-[1rem] bg-slate-800/50 hover:bg-slate-700/50 slot-button cursor-grab active:cursor-grabbing transition-all duration-200 border ${colorBorder}`}
+      data-testid={`draggable-template-${template.id}`}
     >
-      {getBlockPreview()}
-      <span className="text-[1.1rem] font-medium text-slate-300">{block.name}</span>
-      <span className="text-[0.9rem] text-slate-500">span {block.spanCols}x{block.spanRows}</span>
+      <div className="w-[3.2rem] h-[3.2rem] rounded-lg bg-slate-700 flex items-center justify-center">
+        {getTemplateIcon(template.icon, template.color)}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[1.2rem] font-semibold text-slate-200 truncate">{template.name}</p>
+        <p className="text-[1rem] text-slate-400">
+          {template.spanCols}x{template.spanRows} • {template.widgetType}
+        </p>
+      </div>
+      <Grip className="w-[1.6rem] h-[1.6rem] text-slate-500" />
     </div>
   );
 }
@@ -165,7 +178,7 @@ interface WidgetSidebarProps {
   urlValue?: string;
   onUrlChange?: (value: string) => void;
   onUrlSubmit?: (url: string) => void;
-  activeSlotIndex?: number | null;
+  activeWidgetId?: string | null;
 }
 
 export function WidgetSidebar({ 
@@ -175,10 +188,10 @@ export function WidgetSidebar({
   urlValue = '',
   onUrlChange,
   onUrlSubmit,
-  activeSlotIndex
+  activeWidgetId
 }: WidgetSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<SidebarTab>('content');
+  const [activeTab, setActiveTab] = useState<SidebarTab>('widgets');
 
   const filteredChannels = useMemo(() => {
     if (!searchQuery.trim()) return TRENDING_CHANNELS;
@@ -215,7 +228,7 @@ export function WidgetSidebar({
         <div className="p-[1.6rem] border-b border-slate-700 flex-shrink-0">
           <div className="flex items-center justify-between mb-[1.2rem]">
             <h2 className="text-[1.8rem] font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent flex items-center gap-[0.8rem]">
-              <Tv className="w-[2rem] h-[2rem] text-cyan-400" />
+              <LayoutGrid className="w-[2rem] h-[2rem] text-cyan-400" />
               Widget Library
             </h2>
             <button
@@ -229,6 +242,18 @@ export function WidgetSidebar({
           
           <div className="flex gap-[0.4rem] bg-slate-800 p-[0.4rem] rounded-lg">
             <button
+              onClick={() => setActiveTab('widgets')}
+              className={`flex-1 flex items-center justify-center gap-[0.6rem] py-[0.8rem] px-[1.2rem] rounded-md text-[1.2rem] font-medium transition-all duration-200 ${
+                activeTab === 'widgets'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+              }`}
+              data-testid="tab-widgets"
+            >
+              <Layout className="w-[1.4rem] h-[1.4rem]" />
+              Widgets
+            </button>
+            <button
               onClick={() => setActiveTab('content')}
               className={`flex-1 flex items-center justify-center gap-[0.6rem] py-[0.8rem] px-[1.2rem] rounded-md text-[1.2rem] font-medium transition-all duration-200 ${
                 activeTab === 'content'
@@ -238,25 +263,13 @@ export function WidgetSidebar({
               data-testid="tab-content"
             >
               <Layers className="w-[1.4rem] h-[1.4rem]" />
-              Content
-            </button>
-            <button
-              onClick={() => setActiveTab('layout')}
-              className={`flex-1 flex items-center justify-center gap-[0.6rem] py-[0.8rem] px-[1.2rem] rounded-md text-[1.2rem] font-medium transition-all duration-200 ${
-                activeTab === 'layout'
-                  ? 'bg-purple-600 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
-              }`}
-              data-testid="tab-layout"
-            >
-              <Layout className="w-[1.4rem] h-[1.4rem]" />
-              Layout
+              Streams
             </button>
           </div>
           
           <div className="mt-[1.2rem]">
             <label className="block text-[1rem] font-semibold mb-[0.4rem] text-cyan-400">
-              {activeSlotIndex !== null && activeSlotIndex !== undefined ? `ADD TO SLOT ${activeSlotIndex + 1}` : 'ENTER URL'}
+              {activeWidgetId ? 'UPDATE WIDGET URL' : 'ADD VIDEO BY URL'}
             </label>
             <div className="flex gap-[0.6rem]">
               <input
@@ -279,13 +292,57 @@ export function WidgetSidebar({
                 className="px-[1.2rem] py-[0.8rem] bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 disabled:cursor-not-allowed slot-button font-semibold transition-colors text-[1.1rem]"
                 data-testid="button-load-url"
               >
-                LOAD
+                ADD
               </button>
             </div>
           </div>
         </div>
         
-        <div className="flex-1 overflow-visible p-[1.6rem]">
+        <div className="flex-1 overflow-y-auto p-[1.6rem]">
+          {activeTab === 'widgets' && (
+            <div className="space-y-[1.6rem]">
+              <div>
+                <h3 className="text-[1.4rem] font-semibold text-purple-400 mb-[1rem] flex items-center gap-[0.6rem]">
+                  <LayoutGrid className="w-[1.6rem] h-[1.6rem]" />
+                  Widget Types
+                </h3>
+                <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
+                  Drag or click to add widgets
+                </p>
+                <div className="space-y-[0.8rem]">
+                  {WIDGET_TEMPLATES.map((template) => (
+                    <DraggableTemplate 
+                      key={template.id} 
+                      template={template}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              <div className="bg-slate-800/50 p-[1.2rem] rounded-lg border border-slate-700/50">
+                <h4 className="text-[1.2rem] font-semibold text-slate-300 mb-[0.8rem]">Widget Guide</h4>
+                <ul className="text-[1.1rem] text-slate-400 space-y-[0.4rem]">
+                  <li className="flex items-center gap-[0.6rem]">
+                    <Video className="w-[1.4rem] h-[1.4rem] text-cyan-400" />
+                    <span>Video: YouTube, Twitch, or any embed</span>
+                  </li>
+                  <li className="flex items-center gap-[0.6rem]">
+                    <FileText className="w-[1.4rem] h-[1.4rem] text-yellow-400" />
+                    <span>Note: Editable text notes</span>
+                  </li>
+                  <li className="flex items-center gap-[0.6rem]">
+                    <Square className="w-[1.4rem] h-[1.4rem] text-slate-400" />
+                    <span>Spacer: Empty space for layout</span>
+                  </li>
+                  <li className="flex items-center gap-[0.6rem]">
+                    <ImageIcon className="w-[1.4rem] h-[1.4rem] text-purple-400" />
+                    <span>Image: Display images</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
+          
           {activeTab === 'content' && (
             <div className="space-y-[1.6rem]">
               <div className="relative">
@@ -294,7 +351,7 @@ export function WidgetSidebar({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search channels..."
+                  placeholder="Search streams..."
                   className="w-full pl-[3.6rem] pr-[1rem] py-[0.8rem] bg-slate-800 border border-slate-700 slot-button focus:border-cyan-500 focus:outline-none transition-colors text-[1.2rem]"
                   data-testid="input-search-channels"
                 />
@@ -303,10 +360,10 @@ export function WidgetSidebar({
               <div>
                 <h3 className="text-[1.4rem] font-semibold text-cyan-400 mb-[1rem] flex items-center gap-[0.6rem]">
                   <Tv className="w-[1.6rem] h-[1.6rem]" />
-                  Trending Channels
+                  Trending Streams
                 </h3>
                 <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
-                  Drag a channel to the grid or click to add
+                  Drag or click to add live streams
                 </p>
                 <div className="space-y-[0.8rem]">
                   {filteredChannels.map((channel) => (
@@ -318,47 +375,10 @@ export function WidgetSidebar({
                   ))}
                   {filteredChannels.length === 0 && (
                     <p className="text-[1.2rem] text-slate-500 text-center py-[2rem]">
-                      No channels found
+                      No streams found
                     </p>
                   )}
                 </div>
-              </div>
-            </div>
-          )}
-          
-          {activeTab === 'layout' && (
-            <div className="space-y-[1.6rem]">
-              <div>
-                <h3 className="text-[1.4rem] font-semibold text-purple-400 mb-[1rem] flex items-center gap-[0.6rem]">
-                  <LayoutGrid className="w-[1.6rem] h-[1.6rem]" />
-                  Widget Sizes
-                </h3>
-                <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
-                  Drag to add spanning widgets
-                </p>
-                <div className="grid grid-cols-1 gap-[1rem]">
-                  {LAYOUT_BLOCKS.map((block) => (
-                    <DraggableBlock key={block.id} block={block} />
-                  ))}
-                </div>
-              </div>
-              
-              <div className="bg-slate-800/50 p-[1.2rem] rounded-lg border border-slate-700/50">
-                <h4 className="text-[1.2rem] font-semibold text-slate-300 mb-[0.8rem]">Spanning Guide</h4>
-                <ul className="text-[1.1rem] text-slate-400 space-y-[0.4rem]">
-                  <li className="flex items-center gap-[0.6rem]">
-                    <div className="w-[1.6rem] h-[1.6rem] bg-cyan-400 rounded-sm"></div>
-                    <span>2x2: Standard widget</span>
-                  </li>
-                  <li className="flex items-center gap-[0.6rem]">
-                    <div className="w-[3.2rem] h-[1.6rem] bg-purple-400 rounded-sm"></div>
-                    <span>2x4: Wide widget</span>
-                  </li>
-                  <li className="flex items-center gap-[0.6rem]">
-                    <div className="w-[3.2rem] h-[3.2rem] bg-pink-400 rounded-sm"></div>
-                    <span>4x4: Large widget</span>
-                  </li>
-                </ul>
               </div>
             </div>
           )}
@@ -366,9 +386,9 @@ export function WidgetSidebar({
         
         <div className="p-[1.6rem] border-t border-slate-700 flex-shrink-0">
           <p className="text-[1rem] text-slate-500 text-center">
-            {activeTab === 'content' 
-              ? 'Drag channels to slots or click to add' 
-              : 'Drag layout blocks to resize widgets'}
+            {activeTab === 'widgets' 
+              ? 'Drag widgets to add them • Resize in Edit Mode' 
+              : 'Click or drag streams to add'}
           </p>
         </div>
       </div>
