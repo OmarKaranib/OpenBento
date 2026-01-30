@@ -169,8 +169,13 @@ gap: 1rem;
 - **Add Block Button**: Renamed from "+ Block" to "Add Block"
 - **Refresh All Button**: New header button to re-render all active iframes
 - **Edit Mode Overlay z-index**: Increased to 9999 to prevent iframe interference during drag
-- **Hover-Triggered Fullscreen**: Header slides up and reveals on top 10px hover
+- **Hover-Triggered Fullscreen**: Header slides up and reveals on top 15px hover zone at center
 - **Canvas Expansion**: Grid fills full screen when header is hidden in fullscreen mode
+- **SortableWidget Component**: Uses useSortable hook with drag listeners on GripVertical handle only
+- **Drag Reordering**: arrayMove in handleDragEnd for persistent widget reordering
+- **GripVertical Drag Handle**: Top-left corner with cyan background, cursor-grab, touch-none class
+- **Opacity-Based Exit Button**: Exit Fullscreen button uses opacity-0 → group-hover:opacity-100
+- **High Z-Index Controls**: Grip handle and resize handle use z-index: 10000 above overlay
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px
