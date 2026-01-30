@@ -169,6 +169,31 @@ const MasterControlDashboard = ({
     }, 100);
   };
 
+  const handleRefreshAllWidgets = () => {
+    const videoWidgets = widgets.filter(w => w.type === 'video' && w.url);
+    if (videoWidgets.length === 0) return;
+
+    setWidgets(prev => prev.map(w => {
+      if (w.type === 'video' && w.url) {
+        return { ...w, url: '' };
+      }
+      return w;
+    }));
+
+    setTimeout(() => {
+      setWidgets(prev => prev.map(w => {
+        if (w.type === 'video') {
+          if (w.isYouTube && w.videoId) {
+            return { ...w, url: `https://www.youtube.com/watch?v=${w.videoId}` };
+          } else if (w.isTwitch && w.twitchChannel) {
+            return { ...w, url: `https://www.twitch.tv/${w.twitchChannel}` };
+          }
+        }
+        return w;
+      }));
+    }, 100);
+  };
+
   const handleMasterMute = () => {
     const newMute = !masterMute;
     setMasterMute(newMute);
@@ -354,7 +379,16 @@ const MasterControlDashboard = ({
               data-testid="button-add-block"
             >
               <Plus className="w-[1.4rem] h-[1.4rem]" />
-              + Block
+              Add Block
+            </button>
+            
+            <button
+              onClick={handleRefreshAllWidgets}
+              className="px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-[1.2rem]"
+              data-testid="button-refresh-all"
+            >
+              <RefreshCw className="w-[1.4rem] h-[1.4rem]" />
+              Refresh All
             </button>
             
             <button
@@ -440,8 +474,8 @@ const MasterControlDashboard = ({
           >
             {isEditMode && (
               <div 
-                className="absolute inset-0 z-30 bg-transparent cursor-move"
-                style={{ pointerEvents: 'auto' }}
+                className="absolute inset-0 bg-transparent cursor-move"
+                style={{ pointerEvents: 'auto', zIndex: 9999 }}
                 data-testid={`widget-overlay-${widget.id}`}
               />
             )}
@@ -568,7 +602,7 @@ const MasterControlDashboard = ({
           >
             <Power className="w-[6rem] h-[6rem] mb-[1.5rem] text-cyan-400/30" />
             <h3 className="text-[1.6rem] font-bold mb-[0.8rem] text-slate-300">Dashboard Empty</h3>
-            <p className="text-[1.2rem] mb-[1.5rem]">Click "+ Block" to add blocks to your dashboard</p>
+            <p className="text-[1.2rem] mb-[1.5rem]">Click "Add Block" to add blocks to your dashboard</p>
             <button
               onClick={() => setIsEditMode(true)}
               className="px-[2rem] py-[1rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.8rem] transition-all duration-300 text-[1.3rem]"
