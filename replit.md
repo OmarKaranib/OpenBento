@@ -10,8 +10,8 @@ A magnetic bento-style Mission Control Dashboard following OpenBento architectur
 interface Widget {
   id: string;       // Unique identifier
   type: WidgetType; // 'video' | 'note' | 'spacer' | 'image'
-  x: number;        // Grid column position (reserved for future drag positioning)
-  y: number;        // Grid row position (reserved for future drag positioning)
+  x: number;        // Grid column position (0-11)
+  y: number;        // Grid row position (0-5)
   w: number;        // Width in columns (1-12)
   h: number;        // Height in rows (1-6)
   // Type-specific fields
@@ -84,9 +84,12 @@ gap: 1rem;
   - Pointer-events: none on all iframes for drag interaction
 
 ## Fullscreen Mode
-- **Fullscreen button**: Maximize2/Minimize2 icon toggles fullscreen state
+- **Fullscreen button**: Maximize2 icon toggles fullscreen state
+- **Exit Fullscreen X Button**: X icon appears at top center when entering fullscreen
+  - Click X to dismiss button (stays in fullscreen for immersive mode)
+  - Hover 50px zone at top center to reveal X button again
+  - Click revealed button to exit fullscreen
 - **Hover-triggered header**: Header slides up (translateY: -100%) when fullscreen is active
-- **Top 10px hover zone**: Mouse entering top 10px of screen reveals the header
 - **Edge-to-edge layout**: Canvas expands to full screen height, padding removed
 - **All controls preserved**: Add Block, Refresh All, Edit Layout, Mute, Save buttons remain accessible
 
@@ -176,6 +179,11 @@ gap: 1rem;
 - **GripVertical Drag Handle**: Top-left corner with cyan background, cursor-grab, touch-none class
 - **Opacity-Based Exit Button**: Exit Fullscreen button uses opacity-0 → group-hover:opacity-100
 - **High Z-Index Controls**: Grip handle and resize handle use z-index: 10000 above overlay
+- **X Icon Exit Button**: Exit Fullscreen button now uses X icon, dismissible with click, revealed on hover
+- **Widget Position Finding**: addWidget() uses findAvailablePosition() to auto-place widgets without overlap
+- **No-Overlap Drop Rule**: handleDragEnd uses findNearestAvailable() spiral search for collision-free drops
+- **Grid Position Styling**: Widgets use explicit gridColumn/gridRow based on x/y coordinates
+- **useSortable Data**: SortableWidget includes { type: 'sortable-widget', widget } for drag identification
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px

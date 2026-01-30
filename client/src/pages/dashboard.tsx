@@ -35,8 +35,8 @@ const SortableWidget = ({ widget, isEditMode, children }: SortableWidgetProps) =
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    gridColumn: `span ${Math.min(widget.w, GRID_COLS)}`,
-    gridRow: `span ${widget.h}`
+    gridColumn: `${widget.x + 1} / span ${Math.min(widget.w, GRID_COLS - widget.x)}`,
+    gridRow: `${widget.y + 1} / span ${Math.min(widget.h, GRID_ROWS - widget.y)}`
   };
 
   return (
@@ -457,47 +457,37 @@ const MasterControlDashboard = ({
         <div className="absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
-      {/* Exit Fullscreen Button - visible initially when entering fullscreen, dismissible with X */}
+      {/* Exit Fullscreen X Button - visible initially, click to dismiss, hover to reveal, click revealed to exit */}
       {isFullscreen && !headerVisible && !exitButtonDismissed && (
         <div 
-          className="fixed top-[1rem] left-1/2 -translate-x-1/2 z-[10001] flex items-center gap-[0.3rem]"
+          className="fixed top-[1rem] left-1/2 -translate-x-1/2 z-[10001]"
           data-testid="exit-fullscreen-container"
         >
           <button
-            onClick={() => setIsFullscreen(false)}
-            className="px-[1.2rem] py-[0.5rem] bg-slate-800/90 hover:bg-slate-700 backdrop-blur-md slot-button flex items-center gap-[0.5rem] text-[1rem] text-slate-300 hover:text-white shadow-lg border border-slate-600/50 transition-all duration-200"
-            title="Exit Fullscreen"
+            onClick={() => setExitButtonDismissed(true)}
+            className="p-[0.8rem] bg-slate-800/90 hover:bg-red-600 backdrop-blur-md slot-button text-slate-300 hover:text-white shadow-lg border border-slate-600/50 transition-all duration-200"
+            title="Hide (hover top to reveal)"
             data-testid="button-exit-fullscreen-floating"
           >
-            <Minimize2 className="w-[1.2rem] h-[1.2rem]" />
-            <span>Exit Fullscreen</span>
-          </button>
-          <button
-            onClick={() => setExitButtonDismissed(true)}
-            className="p-[0.5rem] bg-slate-800/90 hover:bg-red-600 backdrop-blur-md slot-button text-slate-400 hover:text-white shadow-lg border border-slate-600/50 transition-all duration-200"
-            title="Dismiss button"
-            data-testid="button-dismiss-exit"
-          >
-            <X className="w-[1rem] h-[1rem]" />
+            <X className="w-[1.4rem] h-[1.4rem]" />
           </button>
         </div>
       )}
 
-      {/* 15px hover zone at top-center - only active when exit button is dismissed */}
+      {/* 15px hover zone at top-center - reveals exit button when hovering */}
       {isFullscreen && !headerVisible && exitButtonDismissed && (
         <div 
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-[20rem] h-[15px] z-[10001] group"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-[20rem] h-[50px] z-[10001] group"
           onMouseEnter={() => setExitButtonDismissed(false)}
           data-testid="hover-zone-top"
         >
           <button
             onClick={() => setIsFullscreen(false)}
-            className="absolute top-[0.5rem] left-1/2 -translate-x-1/2 px-[1.2rem] py-[0.5rem] bg-slate-800/90 hover:bg-slate-700 backdrop-blur-md slot-button flex items-center gap-[0.5rem] text-[1rem] text-slate-300 hover:text-white shadow-lg border border-slate-600/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+            className="absolute top-[1rem] left-1/2 -translate-x-1/2 p-[0.8rem] bg-slate-800/90 hover:bg-red-600 backdrop-blur-md slot-button text-slate-300 hover:text-white shadow-lg border border-slate-600/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
             title="Exit Fullscreen"
             data-testid="button-exit-fullscreen-hover"
           >
-            <Minimize2 className="w-[1.2rem] h-[1.2rem]" />
-            <span>Exit Fullscreen</span>
+            <X className="w-[1.4rem] h-[1.4rem]" />
           </button>
         </div>
       )}
