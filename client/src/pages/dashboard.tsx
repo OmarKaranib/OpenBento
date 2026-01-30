@@ -49,23 +49,23 @@ const SortableWidget = ({ widget, isEditMode, children }: SortableWidgetProps) =
           : 'border-slate-700/50 hover:border-cyan-500/50'
       } ${isDragging ? 'z-50' : ''}`}
       data-testid={`widget-${widget.id}`}
-      {...attributes}
     >
+      {/* Overlay blocks iframe interactions in Edit Mode but not buttons */}
       {isEditMode && (
         <div 
           className="absolute inset-0 bg-transparent"
-          style={{ pointerEvents: 'none', zIndex: 9998 }}
+          style={{ pointerEvents: 'none', zIndex: 10 }}
           data-testid={`widget-overlay-${widget.id}`}
         />
       )}
 
       {isEditMode && (
-        <div className="absolute top-[0.6rem] left-[0.6rem] z-[10000] flex items-center gap-[0.4rem]">
+        <div className="absolute top-[0.6rem] left-[0.6rem] z-[10000] flex items-center gap-[0.4rem]" style={{ pointerEvents: 'auto' }}>
           <div 
             className="p-[0.4rem] bg-cyan-600/90 hover:bg-cyan-500 slot-button cursor-grab active:cursor-grabbing transition-colors touch-none"
             title="Drag to move"
-            style={{ pointerEvents: 'auto' }}
             data-testid={`grip-handle-${widget.id}`}
+            {...attributes}
             {...listeners}
           >
             <GripVertical className="w-[1.2rem] h-[1.2rem] text-white" />
@@ -183,6 +183,21 @@ const MasterControlDashboard = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreen]);
 
+  // Fullscreenchange event listener to sync state when browser exits fullscreen
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        // Browser exited fullscreen (via ESC or other means)
+        setIsFullscreen(false);
+        setHeaderVisible(true);
+        setExitButtonDismissed(false);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [setIsFullscreen]);
+
   // YouTube Live ID Watchdog - Auto-refresh YouTube embeds every 60 seconds to recover from errors
   useEffect(() => {
     const WATCHDOG_INTERVAL = 60000; // 60 seconds
@@ -279,10 +294,6 @@ const MasterControlDashboard = ({
     return `https://player.kick.com/${channel}?muted=true&autoplay=true&parent=${parentDomain}`;
   };
 
-  const getTrovoEmbedUrl = (channel: string): string => {
-    const origin = window.location.origin;
-    return `https://player.trovo.live?streamername=${channel}&autoplay=1&origin=${encodeURIComponent(origin)}`;
-  };
 
   const sendYouTubeCommand = useCallback((widgetId: string, command: string, value?: number | boolean) => {
     const iframe = iframeRefs.current[widgetId];
@@ -467,27 +478,6 @@ const MasterControlDashboard = ({
               allow="autoplay; encrypted-media"
               allowFullScreen
             />
-          );
-        } else if (widget.isTrovo && widget.trovoChannel) {
-          return (
-            <div className="w-full h-full relative">
-              <iframe
-                ref={(el) => { iframeRefs.current[widget.id] = el; }}
-                src={getTrovoEmbedUrl(widget.trovoChannel)}
-                className="w-full h-full"
-                style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
-                title={`Trovo - ${widget.id}`}
-                allow="autoplay; encrypted-media"
-                allowFullScreen
-              />
-              <div 
-                className="absolute bottom-0 left-0 right-0 bg-amber-900/90 text-amber-200 text-[0.9rem] px-[0.8rem] py-[0.4rem] flex items-center gap-2 backdrop-blur-sm"
-                style={{ pointerEvents: 'none' }}
-              >
-                <span className="font-semibold">Developer Note:</span>
-                <span>Email developer@trovo.live to whitelist your domain for interactive embeds</span>
-              </div>
-            </div>
           );
         } else if (widget.url) {
           return (
@@ -774,7 +764,7 @@ const MasterControlDashboard = ({
         >
         {widgets.map((widget) => (
           <SortableWidget key={widget.id} widget={widget} isEditMode={isEditMode}>
-            {widget.type === 'video' && (widget.url || widget.videoId || widget.twitchChannel || widget.kickChannel || widget.trovoChannel) && !isEditMode && (
+            {widget.type === 'video' && (widget.url || widget.videoId || widget.twitchChannel || widget.kickChannel) && !isEditMode && (
               <>
                 {/* Seek Mode "Done" button - always visible when seek mode is active */}
                 {seekModeWidgets.has(widget.id) && (

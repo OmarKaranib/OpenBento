@@ -37,8 +37,6 @@ export interface Widget {
   twitchChannel?: string | null;
   isKick?: boolean;
   kickChannel?: string | null;
-  isTrovo?: boolean;
-  trovoChannel?: string | null;
   isMuted: boolean;
   isPaused: boolean;
   error?: string | null;
@@ -124,11 +122,6 @@ function App() {
     return match ? match[1] : null;
   };
 
-  const extractTrovoChannel = (url: string): string | null => {
-    const trovoRegex = /(?:trovo\.live\/)([a-zA-Z0-9_]+)/;
-    const match = url.match(trovoRegex);
-    return match ? match[1] : null;
-  };
 
   // Find first available position for a new widget
   const findAvailablePosition = useCallback((w: number, h: number, currentWidgets: Widget[]): { x: number; y: number } => {
@@ -186,7 +179,6 @@ function App() {
     const videoId = extractYouTubeId(channel.url);
     const twitchChannel = extractTwitchChannel(channel.url);
     const kickChannel = extractKickChannel(channel.url);
-    const trovoChannel = extractTrovoChannel(channel.url);
 
     addWidget('video', w, h, {
       url: channel.url,
@@ -196,8 +188,6 @@ function App() {
       twitchChannel,
       isKick: !!kickChannel,
       kickChannel,
-      isTrovo: !!trovoChannel,
-      trovoChannel,
       lastRefresh: Date.now()
     });
   }, [addWidget]);
@@ -213,7 +203,6 @@ function App() {
     const youtubeId = extractYouTubeId(finalUrl);
     const twitchChannel = extractTwitchChannel(finalUrl);
     const kickChannel = extractKickChannel(finalUrl);
-    const trovoChannel = extractTrovoChannel(finalUrl);
     const currentActiveWidgetId = activeWidgetIdRef.current;
 
     if (currentActiveWidgetId) {
@@ -228,8 +217,6 @@ function App() {
           twitchChannel,
           isKick: !!kickChannel,
           kickChannel,
-          isTrovo: !!trovoChannel,
-          trovoChannel,
           error: null,
           embedBlocked: false,
           isPaused: false,
@@ -246,8 +233,6 @@ function App() {
         twitchChannel,
         isKick: !!kickChannel,
         kickChannel,
-        isTrovo: !!trovoChannel,
-        trovoChannel,
         lastRefresh: Date.now()
       });
     }
