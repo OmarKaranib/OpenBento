@@ -4,6 +4,7 @@ import { UniqueIdentifier } from '@dnd-kit/core';
 import { Widget, WidgetType } from '@/App';
 
 const GRID_COLS = 12;
+const GRID_ROWS = 6;
 
 interface MasterControlDashboardProps {
   widgets: Widget[];
@@ -44,7 +45,6 @@ const MasterControlDashboard = ({
   const gridRef = useRef<HTMLDivElement>(null);
 
   const minCellHeight = 80;
-  const maxRows = 10;
 
   useEffect(() => {
     if (!resizing) return;
@@ -54,7 +54,7 @@ const MasterControlDashboard = ({
 
       const gridRect = gridRef.current.getBoundingClientRect();
       const cellWidth = gridRect.width / GRID_COLS;
-      const cellHeight = Math.max(minCellHeight, gridRect.height / maxRows);
+      const cellHeight = Math.max(minCellHeight, gridRect.height / GRID_ROWS);
 
       const deltaX = e.clientX - resizing.startX;
       const deltaY = e.clientY - resizing.startY;
@@ -63,7 +63,7 @@ const MasterControlDashboard = ({
       const rowChange = Math.round(deltaY / cellHeight);
 
       const newW = Math.max(1, Math.min(GRID_COLS, resizing.startW + colChange));
-      const newH = Math.max(1, Math.min(maxRows, resizing.startH + rowChange));
+      const newH = Math.max(1, Math.min(GRID_ROWS, resizing.startH + rowChange));
 
       setWidgets(prev => prev.map(w => 
         w.id === resizing.widgetId ? { ...w, w: newW, h: newH } : w
@@ -374,13 +374,28 @@ const MasterControlDashboard = ({
         <div className="h-[0.2rem] bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full"></div>
       </div>
 
-      <div className="canvas-container rounded-[2rem] p-[1rem]" data-testid="canvas-container">
+      <div 
+        className="canvas-container rounded-[2rem] p-[1rem]" 
+        data-testid="canvas-container"
+      >
+        <div 
+          className="absolute inset-[1rem] grid gap-[1rem] pointer-events-none z-0"
+          style={{
+            gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+            gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`
+          }}
+          data-testid="ghost-grid"
+        >
+          {Array.from({ length: GRID_COLS * GRID_ROWS }).map((_, i) => (
+            <div key={i} className="ghost-cell" />
+          ))}
+        </div>
         <div 
           ref={gridRef}
           className="relative z-10 grid gap-[1rem] h-full"
           style={{
             gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-            gridTemplateRows: `repeat(auto-fill, minmax(${minCellHeight}px, 1fr))`,
+            gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`,
             gridAutoFlow: 'dense'
           }}
           data-testid="widget-grid"

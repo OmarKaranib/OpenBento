@@ -27,20 +27,25 @@ interface Widget {
 }
 ```
 
-### 12-Column Magnetic Grid
+### 12-Column Magnetic Grid (6 Rows Fit-to-Screen)
 ```css
 display: grid;
 grid-template-columns: repeat(12, 1fr);
-grid-auto-rows: 1fr;
+grid-template-rows: repeat(6, 1fr);
 grid-auto-flow: dense;
 gap: 1rem;
 ```
 
+### Ghost Placeholder Layer
+- 72 background "ghost" cells (12×6) with dashed cyan borders
+- border-radius: 1.2rem matching OpenBento style
+- Widgets snap 1:1 to these placeholder cells
+
 ## Features
 - **12-Column Grid**: OpenBento standard magnetic layout with dense packing
-- **Blueprint Background**: Subtle cyan grid lines aligned with 12-column system (opacity 0.04)
-- **Fullscreen Mode**: Toggle sidebar visibility with PanelLeftClose/PanelLeftOpen button
-- **Fit-to-Screen**: Fixed viewport height with overflow hidden - no scrolling
+- **Ghost Placeholder Layer**: 72 dashed-border ghost cells (12×6) as visible background
+- **Fullscreen Mode**: Toggle sidebar with width:0 transition and grid expands to 100vw
+- **Fit-to-Screen**: Exactly 6 rows fit viewport height with overflow hidden - no scrolling
 - **Glassmorphism Widgets**: backdrop-filter: blur(10px) with semi-transparent borders
 - **Dynamic Widget System**: Unlimited widgets with add/remove functionality
 - **Widget Types**: Video, Note, Spacer, Image - each with unique functionality

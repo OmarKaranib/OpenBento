@@ -226,11 +226,10 @@ export function WidgetSidebar({
       />
       
       <div
-        className={`fixed top-0 left-0 h-full bg-slate-900 border-r border-slate-700 z-50 transition-transform duration-300 ease-out flex flex-col overflow-visible ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className="fixed top-0 left-0 h-full bg-slate-900 border-r border-slate-700 z-50 flex flex-col overflow-hidden"
         style={{ 
-          width: 'min(32rem, 100vw)',
+          width: isOpen ? 'min(32rem, 100vw)' : '0',
+          display: isOpen ? 'flex' : 'none',
           borderTopRightRadius: 'var(--outer-radius)',
           borderBottomRightRadius: 'var(--outer-radius)'
         }}
