@@ -379,7 +379,7 @@ const MasterControlDashboard = ({
       )}
 
       <div 
-        className={`z-30 mb-[1rem] flex-shrink-0 transition-all duration-300 ${
+        className={`z-30 mb-[1rem] flex-shrink-0 ${
           isFullscreen 
             ? 'fixed top-0 left-0 right-0 bg-slate-950/95 backdrop-blur-md px-[1.6rem] py-[0.8rem] shadow-lg border-b border-slate-800/50' 
             : 'relative'
@@ -387,6 +387,7 @@ const MasterControlDashboard = ({
         style={{ 
           height: isFullscreen ? 'auto' : 'var(--header-height)',
           transform: isFullscreen && !headerVisible ? 'translateY(-100%)' : 'translateY(0)',
+          transition: 'transform 0.3s ease-in-out',
           zIndex: 10001
         }}
         onMouseLeave={() => isFullscreen && setHeaderVisible(false)}
@@ -547,7 +548,7 @@ const MasterControlDashboard = ({
               </div>
             )}
 
-            {widget.type === 'video' && widget.url && !isEditMode && (
+            {widget.type === 'video' && (widget.url || widget.videoId || widget.twitchChannel) && !isEditMode && (
               <div className="absolute top-[0.6rem] right-[0.6rem] z-20 flex gap-[0.3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <button
                   onClick={() => toggleWidgetMute(widget.id)}
