@@ -51,15 +51,16 @@ gap: 1rem;
 - **Widget Types**: Video, Note, Spacer, Image - each with unique functionality
 - **Drag-to-Resize**: Bottom-right resize handles in Edit Mode update w and h
 - **YouTube/Twitch Integration**: Auto-detects URLs and generates proper embeds
-- **TV-style Controls**: Mute, Refresh buttons per video widget (no Pause)
+- **TV-style Controls**: Mute, Pause, Refresh, Delete buttons per video widget (hover-only)
 - **Master Mute**: Control all video audio simultaneously
+- **Hover-Only Controls**: Video controls hidden by default, appear on widget hover
 - **Content Swapping**: Selecting a widget then adding content updates that widget
 - **localStorage Persistence**: Saves widgets with 'openBentoWidgets' key
 
 ## Widget Types
 1. **Video Widget**: YouTube, Twitch, or any embeddable URL
-   - Custom TV-style controls: Mute/Unmute, Refresh
-   - Delete button in Edit Mode
+   - Custom TV-style controls: Mute/Unmute, Pause/Play, Refresh, Delete
+   - Controls appear on hover (opacity-0 → opacity-100 transition)
    - Auto-detection of YouTube video IDs and Twitch channels
    - Twitch parent parameter: `window.location.host.split(':')[0]`
 2. **Note Widget**: Editable text area for notes
@@ -73,13 +74,19 @@ gap: 1rem;
 
 ## Edit Layout Mode
 - **Edit Layout button** toggles between locked and edit modes
-- **Locked mode (default)**: Widgets display content normally
+- **Locked mode (default)**: Widgets display content normally, size labels hidden
 - **Edit mode**:
   - Widgets jiggle (iOS-style animation)
+  - Size labels (e.g., "3x2") visible in top-left corner
   - Resize handles appear on bottom-right corner
   - Settings and Delete buttons appear on top-right
-  - "Add Widget" button appears at end of grid
   - Pointer-events: none on all iframes for drag interaction
+
+## Header Controls
+- **"+ Block" button**: Always visible in header, opens sidebar to Streams tab
+- **"EDIT LAYOUT / LOCK" button**: Toggles edit mode
+- **"MUTED" button**: Master mute for all video widgets
+- **"SAVE" button**: Manual save to localStorage
 
 ## TV Mode
 - All iframes have `pointer-events: none` so they don't block drag interactions
@@ -92,15 +99,16 @@ gap: 1rem;
 - Mouse tracking calculates cell changes based on grid dimensions
 - Widgets snap to grid cell sizes (1-12 columns, 1-6 rows)
 
-## Widget Sidebar
+## Widget Sidebar ("Block Library")
 - Slide-out sidebar from left side
-- **Tabbed Interface**: Widgets tab and Streams tab
-- **Widgets Tab**: Draggable widget templates with size presets
-  - Video (3x2, 6x3)
-  - Note (3x2, 4x1)
+- **Tabbed Interface**: Library tab and Streams tab
+- **Library Tab**: 4 unique block templates (one of each type)
+  - Video (3x2)
+  - Note (3x2)
   - Spacer (2x1)
-  - Image (3x2, 4x3)
-- **Streams Tab**: Preset live stream channels
+  - Photo (3x2)
+  - Templates are draggable OR clickable to add
+- **Streams Tab**: Preset live stream channels (default when opened)
   - NASA Live, Lofi Girl, Sky News
   - Search/filter functionality
 - **URL Input**: Add video widgets by URL (YouTube/Twitch auto-detected)
@@ -142,6 +150,13 @@ gap: 1rem;
 - **Fit-to-Screen Layout**: overflow: hidden on canvas, h-full grid - no scrolling
 - **Dimmed Grid Lines**: Blueprint lines at 0.04 opacity for subtle ruler appearance
 - **Glassmorphism**: .dashboard-slot has backdrop-blur, semi-transparent bg, thin cyan border
+- **Precision Dragging**: Uses rectIntersection collision detection for top-left border snapping
+- **+ Block Button**: Renamed from "Add Widget", moved to header, always visible
+- **Hover-Only Video Controls**: opacity-0 group-hover:opacity-100 on video control buttons
+- **Pause Button**: Added pause/play functionality to video widget controls
+- **Size Label Edit Mode**: Labels (e.g., "3x2") only visible in Edit Layout mode
+- **Template Click**: Clicking sidebar templates directly adds widget and closes sidebar
+- **Simplified Library**: 4 unique templates (Video, Note, Spacer, Photo) without size duplicates
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px
