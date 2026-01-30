@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2 } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2 } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { Widget, WidgetType } from '@/App';
 
@@ -378,6 +378,19 @@ const MasterControlDashboard = ({
         />
       )}
 
+      {/* Visible Exit Fullscreen button - backup for hover trigger */}
+      {isFullscreen && !headerVisible && (
+        <button
+          onClick={() => setIsFullscreen(false)}
+          className="fixed top-[1rem] left-1/2 -translate-x-1/2 z-[10001] px-[1.2rem] py-[0.5rem] bg-slate-800/90 hover:bg-slate-700 backdrop-blur-md slot-button flex items-center gap-[0.5rem] text-[1rem] text-slate-300 hover:text-white transition-all duration-200 shadow-lg border border-slate-600/50"
+          title="Exit Fullscreen"
+          data-testid="button-exit-fullscreen-floating"
+        >
+          <X className="w-[1.2rem] h-[1.2rem]" />
+          <span>Exit Fullscreen</span>
+        </button>
+      )}
+
       <div 
         className={`z-30 mb-[1rem] flex-shrink-0 ${
           isFullscreen 
@@ -643,7 +656,7 @@ const MasterControlDashboard = ({
                 title="Drag to resize"
                 data-testid={`resize-handle-${widget.id}`}
               >
-                <GripVertical className="w-[1.2rem] h-[1.2rem] text-white rotate-[-45deg]" />
+                <MoveDiagonal2 className="w-[1.4rem] h-[1.4rem] text-white" />
               </div>
             )}
           </div>

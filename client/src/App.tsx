@@ -18,6 +18,7 @@ import {
   UniqueIdentifier,
   rectIntersection
 } from '@dnd-kit/core';
+import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 
 export type WidgetType = 'video' | 'note' | 'spacer' | 'image';
 
@@ -70,7 +71,7 @@ function App() {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 3,
+        distance: 5,
       },
     })
   );
@@ -282,42 +283,44 @@ function App() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <WidgetSidebar 
-            isOpen={sidebarOpen} 
-            onClose={() => {
-              setSidebarOpen(false);
-              activeWidgetIdRef.current = null;
-              setActiveWidgetId(null);
-              setUrlInputValue('');
-            }}
-            onChannelClick={handleChannelClick}
-            onTemplateClick={handleTemplateClick}
-            urlValue={urlInputValue}
-            onUrlChange={setUrlInputValue}
-            onUrlSubmit={handleSubmitUrl}
-            activeWidgetId={activeWidgetId}
-            onImageUpload={handleImageUpload}
-          />
-          <Switch>
-            <Route path="/">
-              {() => (
-                <MasterControlDashboard 
-                  widgets={widgets}
-                  setWidgets={setWidgets}
-                  isEditMode={isEditMode}
-                  setIsEditMode={setIsEditMode}
-                  sidebarOpen={sidebarOpen && !isFullscreen}
-                  activeId={activeId}
-                  handleOpenSidebar={handleOpenSidebar}
-                  handleOpenSidebarToContent={handleOpenSidebarToContent}
-                  addWidget={addWidget}
-                  isFullscreen={isFullscreen}
-                  setIsFullscreen={setIsFullscreen}
-                />
-              )}
-            </Route>
-            <Route component={NotFound} />
-          </Switch>
+          <SortableContext items={widgets.map(w => w.id)} strategy={rectSortingStrategy}>
+            <WidgetSidebar 
+              isOpen={sidebarOpen} 
+              onClose={() => {
+                setSidebarOpen(false);
+                activeWidgetIdRef.current = null;
+                setActiveWidgetId(null);
+                setUrlInputValue('');
+              }}
+              onChannelClick={handleChannelClick}
+              onTemplateClick={handleTemplateClick}
+              urlValue={urlInputValue}
+              onUrlChange={setUrlInputValue}
+              onUrlSubmit={handleSubmitUrl}
+              activeWidgetId={activeWidgetId}
+              onImageUpload={handleImageUpload}
+            />
+            <Switch>
+              <Route path="/">
+                {() => (
+                  <MasterControlDashboard 
+                    widgets={widgets}
+                    setWidgets={setWidgets}
+                    isEditMode={isEditMode}
+                    setIsEditMode={setIsEditMode}
+                    sidebarOpen={sidebarOpen && !isFullscreen}
+                    activeId={activeId}
+                    handleOpenSidebar={handleOpenSidebar}
+                    handleOpenSidebarToContent={handleOpenSidebarToContent}
+                    addWidget={addWidget}
+                    isFullscreen={isFullscreen}
+                    setIsFullscreen={setIsFullscreen}
+                  />
+                )}
+              </Route>
+              <Route component={NotFound} />
+            </Switch>
+          </SortableContext>
           
           <DragOverlay>
             {activeId ? (
