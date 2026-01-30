@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import MasterControlDashboard from "@/pages/dashboard";
-import { WidgetSidebar, TrendingChannel, WidgetTemplate } from '@/components/widget-sidebar';
+import { WidgetSidebar, TrendingChannel, WidgetTemplate, WIDGET_TEMPLATES } from '@/components/widget-sidebar';
 import { 
   DndContext, 
   DragEndEvent, 
@@ -16,7 +16,7 @@ import {
   useSensors, 
   PointerSensor,
   UniqueIdentifier,
-  closestCenter
+  rectIntersection
 } from '@dnd-kit/core';
 
 export type WidgetType = 'video' | 'note' | 'spacer' | 'image';
@@ -238,6 +238,17 @@ function App() {
     setSidebarOpen(true);
   }, []);
 
+  const handleOpenSidebarToContent = useCallback(() => {
+    activeWidgetIdRef.current = null;
+    setActiveWidgetId(null);
+    setSidebarOpen(true);
+  }, []);
+
+  const handleTemplateClick = useCallback((template: WidgetTemplate) => {
+    addWidget(template.widgetType, template.w || 3, template.h || 2);
+    setSidebarOpen(false);
+  }, [addWidget]);
+
   const handleImageUpload = useCallback((imageUrl: string) => {
     const currentActiveWidgetId = activeWidgetIdRef.current;
 
@@ -267,7 +278,7 @@ function App() {
       <TooltipProvider>
         <DndContext 
           sensors={sensors} 
-          collisionDetection={closestCenter}
+          collisionDetection={rectIntersection}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
@@ -280,6 +291,7 @@ function App() {
               setUrlInputValue('');
             }}
             onChannelClick={handleChannelClick}
+            onTemplateClick={handleTemplateClick}
             urlValue={urlInputValue}
             onUrlChange={setUrlInputValue}
             onUrlSubmit={handleSubmitUrl}
@@ -297,6 +309,7 @@ function App() {
                   sidebarOpen={sidebarOpen && !isFullscreen}
                   activeId={activeId}
                   handleOpenSidebar={handleOpenSidebar}
+                  handleOpenSidebarToContent={handleOpenSidebarToContent}
                   addWidget={addWidget}
                   isFullscreen={isFullscreen}
                   setIsFullscreen={setIsFullscreen}

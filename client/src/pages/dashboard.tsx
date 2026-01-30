@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { Widget, WidgetType } from '@/App';
 
@@ -14,6 +14,7 @@ interface MasterControlDashboardProps {
   sidebarOpen: boolean;
   activeId: UniqueIdentifier | null;
   handleOpenSidebar: (widgetId?: string) => void;
+  handleOpenSidebarToContent: () => void;
   addWidget: (type: WidgetType, w?: number, h?: number, extraData?: Partial<Widget>) => string;
   isFullscreen: boolean;
   setIsFullscreen: Dispatch<SetStateAction<boolean>>;
@@ -35,6 +36,7 @@ const MasterControlDashboard = ({
   sidebarOpen,
   activeId,
   handleOpenSidebar,
+  handleOpenSidebarToContent,
   addWidget,
   isFullscreen,
   setIsFullscreen
@@ -116,6 +118,19 @@ const MasterControlDashboard = ({
           sendYouTubeCommand(widgetId, newMuted ? 'mute' : 'unMute');
         }
         return { ...w, isMuted: newMuted };
+      }
+      return w;
+    }));
+  };
+
+  const toggleWidgetPause = (widgetId: string) => {
+    setWidgets(prev => prev.map(w => {
+      if (w.id === widgetId) {
+        const newPaused = !w.isPaused;
+        if (w.isYouTube) {
+          sendYouTubeCommand(widgetId, newPaused ? 'pauseVideo' : 'playVideo');
+        }
+        return { ...w, isPaused: newPaused };
       }
       return w;
     }));
@@ -334,6 +349,15 @@ const MasterControlDashboard = ({
           
           <div className="flex gap-[0.8rem] items-center">
             <button
+              onClick={handleOpenSidebarToContent}
+              className="px-[1.2rem] py-[0.6rem] bg-emerald-600 hover:bg-emerald-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-emerald-900/50 text-[1.2rem]"
+              data-testid="button-add-block"
+            >
+              <Plus className="w-[1.4rem] h-[1.4rem]" />
+              + Block
+            </button>
+            
+            <button
               onClick={() => setIsEditMode(!isEditMode)}
               className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
                 isEditMode 
@@ -422,19 +446,21 @@ const MasterControlDashboard = ({
               />
             )}
 
-            <div className="absolute top-[0.6rem] left-[0.6rem] z-20 flex items-center gap-[0.4rem]">
-              <span className="bg-slate-800/90 backdrop-blur-sm px-[0.5rem] py-[0.2rem] slot-button text-[0.8rem] font-bold text-cyan-400 border border-cyan-500/30">
-                {widget.w}x{widget.h}
-              </span>
-              {widget.type !== 'video' && (
-                <span className="bg-slate-800/90 backdrop-blur-sm px-[0.5rem] py-[0.2rem] slot-button text-[0.8rem] font-medium text-purple-400 border border-purple-500/30 capitalize">
-                  {widget.type}
+            {isEditMode && (
+              <div className="absolute top-[0.6rem] left-[0.6rem] z-20 flex items-center gap-[0.4rem]">
+                <span className="bg-slate-800/90 backdrop-blur-sm px-[0.5rem] py-[0.2rem] slot-button text-[0.8rem] font-bold text-cyan-400 border border-cyan-500/30">
+                  {widget.w}x{widget.h}
                 </span>
-              )}
-            </div>
+                {widget.type !== 'video' && (
+                  <span className="bg-slate-800/90 backdrop-blur-sm px-[0.5rem] py-[0.2rem] slot-button text-[0.8rem] font-medium text-purple-400 border border-purple-500/30 capitalize">
+                    {widget.type}
+                  </span>
+                )}
+              </div>
+            )}
 
             {widget.type === 'video' && widget.url && !isEditMode && (
-              <div className="absolute top-[0.6rem] right-[0.6rem] z-20 flex gap-[0.3rem]">
+              <div className="absolute top-[0.6rem] right-[0.6rem] z-20 flex gap-[0.3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <button
                   onClick={() => toggleWidgetMute(widget.id)}
                   className={`p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm ${
@@ -449,12 +475,34 @@ const MasterControlDashboard = ({
                 </button>
                 
                 <button
+                  onClick={() => toggleWidgetPause(widget.id)}
+                  className={`p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm ${
+                    widget.isPaused 
+                      ? 'bg-yellow-600/90 hover:bg-yellow-500' 
+                      : 'bg-blue-600/90 hover:bg-blue-500'
+                  }`}
+                  title={widget.isPaused ? 'Play' : 'Pause'}
+                  data-testid={`button-pause-${widget.id}`}
+                >
+                  {widget.isPaused ? <Play className="w-[1rem] h-[1rem]" /> : <Pause className="w-[1rem] h-[1rem]" />}
+                </button>
+                
+                <button
                   onClick={() => handleRefreshWidget(widget.id)}
                   className="p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm bg-cyan-600/90 hover:bg-cyan-500"
                   title="Refresh stream"
                   data-testid={`button-refresh-${widget.id}`}
                 >
                   <RefreshCw className="w-[1rem] h-[1rem]" />
+                </button>
+                
+                <button
+                  onClick={() => handleRemoveWidget(widget.id)}
+                  className="p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm bg-red-600/90 hover:bg-red-500"
+                  title="Delete widget"
+                  data-testid={`button-delete-${widget.id}`}
+                >
+                  <Trash2 className="w-[1rem] h-[1rem]" />
                 </button>
               </div>
             )}
@@ -512,19 +560,6 @@ const MasterControlDashboard = ({
           </div>
         ))}
 
-        {isEditMode && (
-          <button
-            onClick={() => handleOpenSidebar()}
-            className="dashboard-slot flex items-center justify-center bg-slate-900/30 backdrop-blur-sm border-2 border-dashed border-cyan-500/50 hover:border-cyan-400 hover:bg-slate-800/30 transition-all duration-300 cursor-pointer group min-h-[12rem]"
-            style={{ gridColumn: 'span 3' }}
-            data-testid="button-add-widget"
-          >
-            <div className="flex flex-col items-center gap-[0.8rem] text-cyan-400/60 group-hover:text-cyan-400 transition-colors">
-              <Plus className="w-[3rem] h-[3rem]" />
-              <span className="text-[1.2rem] font-semibold">Add Widget</span>
-            </div>
-          </button>
-        )}
 
         {widgets.length === 0 && !isEditMode && (
           <div 
@@ -533,7 +568,7 @@ const MasterControlDashboard = ({
           >
             <Power className="w-[6rem] h-[6rem] mb-[1.5rem] text-cyan-400/30" />
             <h3 className="text-[1.6rem] font-bold mb-[0.8rem] text-slate-300">Dashboard Empty</h3>
-            <p className="text-[1.2rem] mb-[1.5rem]">Click "Edit Layout" to add widgets to your dashboard</p>
+            <p className="text-[1.2rem] mb-[1.5rem]">Click "+ Block" to add blocks to your dashboard</p>
             <button
               onClick={() => setIsEditMode(true)}
               className="px-[2rem] py-[1rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.8rem] transition-all duration-300 text-[1.3rem]"

@@ -29,16 +29,13 @@ const TRENDING_CHANNELS: TrendingChannel[] = [
 ];
 
 export const WIDGET_TEMPLATES: WidgetTemplate[] = [
-  { id: 'template-video-3x2', name: 'Video (3x2)', widgetType: 'video', w: 3, h: 2, icon: 'video', color: 'cyan' },
-  { id: 'template-video-6x3', name: 'Video (6x3)', widgetType: 'video', w: 6, h: 3, icon: 'video', color: 'cyan' },
-  { id: 'template-note-3x2', name: 'Note (3x2)', widgetType: 'note', w: 3, h: 2, icon: 'note', color: 'yellow' },
-  { id: 'template-note-4x1', name: 'Note (4x1)', widgetType: 'note', w: 4, h: 1, icon: 'note', color: 'yellow' },
-  { id: 'template-spacer-2x1', name: 'Spacer (2x1)', widgetType: 'spacer', w: 2, h: 1, icon: 'spacer', color: 'slate' },
-  { id: 'template-image-3x2', name: 'Image (3x2)', widgetType: 'image', w: 3, h: 2, icon: 'image', color: 'purple' },
-  { id: 'template-image-4x3', name: 'Image (4x3)', widgetType: 'image', w: 4, h: 3, icon: 'image', color: 'purple' },
+  { id: 'template-video', name: 'Video', widgetType: 'video', w: 3, h: 2, icon: 'video', color: 'cyan' },
+  { id: 'template-note', name: 'Note', widgetType: 'note', w: 3, h: 2, icon: 'note', color: 'yellow' },
+  { id: 'template-spacer', name: 'Spacer', widgetType: 'spacer', w: 2, h: 1, icon: 'spacer', color: 'slate' },
+  { id: 'template-image', name: 'Photo', widgetType: 'image', w: 3, h: 2, icon: 'image', color: 'purple' },
 ];
 
-type SidebarTab = 'content' | 'widgets';
+type SidebarTab = 'content' | 'library';
 
 interface DraggableChannelProps {
   channel: TrendingChannel;
@@ -160,7 +157,7 @@ function DraggableTemplate({ template, onClick }: DraggableTemplateProps) {
       <div className="flex-1 min-w-0">
         <p className="text-[1.2rem] font-semibold text-slate-200 truncate">{template.name}</p>
         <p className="text-[1rem] text-slate-400">
-          {template.w}x{template.h} cols/rows
+          Resizable block
         </p>
       </div>
       <Grip className="w-[1.6rem] h-[1.6rem] text-slate-500" />
@@ -172,6 +169,7 @@ interface WidgetSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onChannelClick?: (channel: TrendingChannel) => void;
+  onTemplateClick?: (template: WidgetTemplate) => void;
   urlValue?: string;
   onUrlChange?: (value: string) => void;
   onUrlSubmit?: (url: string) => void;
@@ -183,6 +181,7 @@ export function WidgetSidebar({
   isOpen, 
   onClose, 
   onChannelClick,
+  onTemplateClick,
   urlValue = '',
   onUrlChange,
   onUrlSubmit,
@@ -190,7 +189,7 @@ export function WidgetSidebar({
   onImageUpload
 }: WidgetSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<SidebarTab>('widgets');
+  const [activeTab, setActiveTab] = useState<SidebarTab>('content');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -239,7 +238,7 @@ export function WidgetSidebar({
           <div className="flex items-center justify-between mb-[1.2rem]">
             <h2 className="text-[1.8rem] font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent flex items-center gap-[0.8rem]">
               <LayoutGrid className="w-[2rem] h-[2rem] text-cyan-400" />
-              Widget Library
+              Block Library
             </h2>
             <button
               onClick={onClose}
@@ -252,16 +251,16 @@ export function WidgetSidebar({
           
           <div className="flex gap-[0.4rem] bg-slate-800 p-[0.4rem] rounded-lg">
             <button
-              onClick={() => setActiveTab('widgets')}
+              onClick={() => setActiveTab('library')}
               className={`flex-1 flex items-center justify-center gap-[0.6rem] py-[0.8rem] px-[1.2rem] rounded-md text-[1.2rem] font-medium transition-all duration-200 ${
-                activeTab === 'widgets'
+                activeTab === 'library'
                   ? 'bg-purple-600 text-white shadow-lg'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
               }`}
-              data-testid="tab-widgets"
+              data-testid="tab-library"
             >
               <Layout className="w-[1.4rem] h-[1.4rem]" />
-              Widgets
+              Library
             </button>
             <button
               onClick={() => setActiveTab('content')}
@@ -309,21 +308,22 @@ export function WidgetSidebar({
         </div>
         
         <div className="flex-1 overflow-y-auto p-[1.6rem]">
-          {activeTab === 'widgets' && (
+          {activeTab === 'library' && (
             <div className="space-y-[1.6rem]">
               <div>
                 <h3 className="text-[1.4rem] font-semibold text-purple-400 mb-[1rem] flex items-center gap-[0.6rem]">
                   <LayoutGrid className="w-[1.6rem] h-[1.6rem]" />
-                  Widget Types
+                  Block Types
                 </h3>
                 <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
-                  Drag or click to add widgets (12-column grid)
+                  Click to add • Resize in Edit Mode
                 </p>
                 <div className="space-y-[0.8rem]">
                   {WIDGET_TEMPLATES.map((template) => (
                     <DraggableTemplate 
                       key={template.id} 
                       template={template}
+                      onClick={() => onTemplateClick?.(template)}
                     />
                   ))}
                 </div>
@@ -426,8 +426,8 @@ export function WidgetSidebar({
         
         <div className="p-[1.6rem] border-t border-slate-700 flex-shrink-0">
           <p className="text-[1rem] text-slate-500 text-center">
-            {activeTab === 'widgets' 
-              ? 'Drag widgets to add • Resize in Edit Mode' 
+            {activeTab === 'library' 
+              ? 'Drag blocks to add • Resize in Edit Mode' 
               : 'Click or drag streams to add'}
           </p>
         </div>
