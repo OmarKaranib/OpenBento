@@ -183,6 +183,38 @@ const MasterControlDashboard = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreen]);
 
+  // YouTube Live ID Watchdog - Auto-refresh YouTube embeds every 60 seconds to recover from errors
+  useEffect(() => {
+    const WATCHDOG_INTERVAL = 60000; // 60 seconds
+    
+    const checkAndRefreshYouTubeWidgets = () => {
+      const now = Date.now();
+      
+      setWidgets(prev => prev.map(widget => {
+        // Only check YouTube widgets with video IDs
+        if (widget.type === 'video' && widget.isYouTube && widget.videoId) {
+          const lastRefresh = widget.lastRefresh || 0;
+          const timeSinceRefresh = now - lastRefresh;
+          
+          // If widget hasn't been refreshed in 60+ seconds, trigger a refresh
+          // by updating the lastRefresh timestamp (which forces iframe re-render)
+          if (timeSinceRefresh >= WATCHDOG_INTERVAL) {
+            console.log(`[YouTube Watchdog] Refreshing widget ${widget.id} (${timeSinceRefresh}ms since last refresh)`);
+            return {
+              ...widget,
+              lastRefresh: now
+            };
+          }
+        }
+        return widget;
+      }));
+    };
+
+    const intervalId = setInterval(checkAndRefreshYouTubeWidgets, WATCHDOG_INTERVAL);
+    
+    return () => clearInterval(intervalId);
+  }, [setWidgets]);
+
   // Toggle seek mode for a specific widget
   const toggleSeekMode = (widgetId: string) => {
     setSeekModeWidgets(prev => {
@@ -240,6 +272,16 @@ const MasterControlDashboard = ({
   const getTwitchEmbedUrl = (channel: string): string => {
     const parentDomain = window.location.host.split(':')[0];
     return `https://player.twitch.tv/?channel=${channel}&parent=${parentDomain}&autoplay=true&muted=true`;
+  };
+
+  const getKickEmbedUrl = (channel: string): string => {
+    const parentDomain = window.location.host.split(':')[0];
+    return `https://player.kick.com/${channel}?muted=true&autoplay=true&parent=${parentDomain}`;
+  };
+
+  const getTrovoEmbedUrl = (channel: string): string => {
+    const origin = window.location.origin;
+    return `https://player.trovo.live?streamername=${channel}&autoplay=1&origin=${encodeURIComponent(origin)}`;
   };
 
   const sendYouTubeCommand = useCallback((widgetId: string, command: string, value?: number | boolean) => {
@@ -392,6 +434,7 @@ const MasterControlDashboard = ({
         if (widget.isYouTube && widget.videoId) {
           return (
             <iframe
+              key={`youtube-${widget.id}-${widget.lastRefresh || 0}`}
               ref={(el) => { iframeRefs.current[widget.id] = el; }}
               src={getYouTubeEmbedUrl(widget.videoId)}
               className="w-full h-full"
@@ -412,6 +455,39 @@ const MasterControlDashboard = ({
               allow="autoplay; encrypted-media"
               allowFullScreen
             />
+          );
+        } else if (widget.isKick && widget.kickChannel) {
+          return (
+            <iframe
+              ref={(el) => { iframeRefs.current[widget.id] = el; }}
+              src={getKickEmbedUrl(widget.kickChannel)}
+              className="w-full h-full"
+              style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
+              title={`Kick - ${widget.id}`}
+              allow="autoplay; encrypted-media"
+              allowFullScreen
+            />
+          );
+        } else if (widget.isTrovo && widget.trovoChannel) {
+          return (
+            <div className="w-full h-full relative">
+              <iframe
+                ref={(el) => { iframeRefs.current[widget.id] = el; }}
+                src={getTrovoEmbedUrl(widget.trovoChannel)}
+                className="w-full h-full"
+                style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
+                title={`Trovo - ${widget.id}`}
+                allow="autoplay; encrypted-media"
+                allowFullScreen
+              />
+              <div 
+                className="absolute bottom-0 left-0 right-0 bg-amber-900/90 text-amber-200 text-[0.9rem] px-[0.8rem] py-[0.4rem] flex items-center gap-2 backdrop-blur-sm"
+                style={{ pointerEvents: 'none' }}
+              >
+                <span className="font-semibold">Developer Note:</span>
+                <span>Email developer@trovo.live to whitelist your domain for interactive embeds</span>
+              </div>
+            </div>
           );
         } else if (widget.url) {
           return (
@@ -698,7 +774,7 @@ const MasterControlDashboard = ({
         >
         {widgets.map((widget) => (
           <SortableWidget key={widget.id} widget={widget} isEditMode={isEditMode}>
-            {widget.type === 'video' && (widget.url || widget.videoId || widget.twitchChannel) && !isEditMode && (
+            {widget.type === 'video' && (widget.url || widget.videoId || widget.twitchChannel || widget.kickChannel || widget.trovoChannel) && !isEditMode && (
               <>
                 {/* Seek Mode "Done" button - always visible when seek mode is active */}
                 {seekModeWidgets.has(widget.id) && (

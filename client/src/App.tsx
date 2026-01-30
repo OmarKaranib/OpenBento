@@ -35,12 +35,17 @@ export interface Widget {
   videoId?: string | null;
   isTwitch?: boolean;
   twitchChannel?: string | null;
+  isKick?: boolean;
+  kickChannel?: string | null;
+  isTrovo?: boolean;
+  trovoChannel?: string | null;
   isMuted: boolean;
   isPaused: boolean;
   error?: string | null;
   embedBlocked?: boolean;
   noteContent?: string;
   imageUrl?: string;
+  lastRefresh?: number;
 }
 
 const GRID_COLS = 12;
@@ -113,6 +118,18 @@ function App() {
     return match ? match[1] : null;
   };
 
+  const extractKickChannel = (url: string): string | null => {
+    const kickRegex = /(?:kick\.com\/)([a-zA-Z0-9_-]+)/;
+    const match = url.match(kickRegex);
+    return match ? match[1] : null;
+  };
+
+  const extractTrovoChannel = (url: string): string | null => {
+    const trovoRegex = /(?:trovo\.live\/)([a-zA-Z0-9_]+)/;
+    const match = url.match(trovoRegex);
+    return match ? match[1] : null;
+  };
+
   // Find first available position for a new widget
   const findAvailablePosition = useCallback((w: number, h: number, currentWidgets: Widget[]): { x: number; y: number } => {
     const GRID_ROWS = 6;
@@ -168,13 +185,20 @@ function App() {
   const addVideoWidget = useCallback((channel: TrendingChannel, w = 3, h = 2) => {
     const videoId = extractYouTubeId(channel.url);
     const twitchChannel = extractTwitchChannel(channel.url);
+    const kickChannel = extractKickChannel(channel.url);
+    const trovoChannel = extractTrovoChannel(channel.url);
 
     addWidget('video', w, h, {
       url: channel.url,
       isYouTube: !!videoId,
       videoId,
       isTwitch: !!twitchChannel,
-      twitchChannel
+      twitchChannel,
+      isKick: !!kickChannel,
+      kickChannel,
+      isTrovo: !!trovoChannel,
+      trovoChannel,
+      lastRefresh: Date.now()
     });
   }, [addWidget]);
 
@@ -188,6 +212,8 @@ function App() {
 
     const youtubeId = extractYouTubeId(finalUrl);
     const twitchChannel = extractTwitchChannel(finalUrl);
+    const kickChannel = extractKickChannel(finalUrl);
+    const trovoChannel = extractTrovoChannel(finalUrl);
     const currentActiveWidgetId = activeWidgetIdRef.current;
 
     if (currentActiveWidgetId) {
@@ -200,10 +226,15 @@ function App() {
           videoId: youtubeId,
           isTwitch: !!twitchChannel,
           twitchChannel,
+          isKick: !!kickChannel,
+          kickChannel,
+          isTrovo: !!trovoChannel,
+          trovoChannel,
           error: null,
           embedBlocked: false,
           isPaused: false,
-          isMuted: true
+          isMuted: true,
+          lastRefresh: Date.now()
         } : w
       ));
     } else {
@@ -212,7 +243,12 @@ function App() {
         isYouTube: !!youtubeId,
         videoId: youtubeId,
         isTwitch: !!twitchChannel,
-        twitchChannel
+        twitchChannel,
+        isKick: !!kickChannel,
+        kickChannel,
+        isTrovo: !!trovoChannel,
+        trovoChannel,
+        lastRefresh: Date.now()
       });
     }
 

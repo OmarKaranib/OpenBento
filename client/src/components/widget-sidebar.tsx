@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload } from 'lucide-react';
+import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, Radio } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { WidgetType } from '@/App';
@@ -8,7 +8,7 @@ export interface TrendingChannel {
   id: string;
   name: string;
   url: string;
-  iconType: 'news' | 'science' | 'music' | 'finance';
+  iconType: 'news' | 'science' | 'music' | 'finance' | 'gaming' | 'live';
   category: string;
 }
 
@@ -26,6 +26,9 @@ const TRENDING_CHANNELS: TrendingChannel[] = [
   { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/21X5lGlDOfg', iconType: 'science', category: 'Science' },
   { id: 'lofi-girl', name: 'Lofi Girl', url: 'https://www.youtube.com/embed/jfKfPfyJRdk', iconType: 'music', category: 'Music' },
   { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/embed/9Auqna63EFE', iconType: 'news', category: 'News' },
+  { id: 'kick-xqc', name: 'xQc (Kick)', url: 'https://kick.com/xqc', iconType: 'gaming', category: 'Gaming' },
+  { id: 'kick-adin', name: 'Adin Ross (Kick)', url: 'https://kick.com/adinross', iconType: 'gaming', category: 'Gaming' },
+  { id: 'trovo-gaming', name: 'Trovo Gaming', url: 'https://trovo.live/gaming', iconType: 'live', category: 'Live' },
 ];
 
 export const WIDGET_TEMPLATES: WidgetTemplate[] = [
@@ -52,6 +55,10 @@ function getChannelIcon(iconType: TrendingChannel['iconType']) {
       return <Music className="w-[1.6rem] h-[1.6rem] text-pink-400" />;
     case 'finance':
       return <TrendingUp className="w-[1.6rem] h-[1.6rem] text-emerald-400" />;
+    case 'gaming':
+      return <Gamepad2 className="w-[1.6rem] h-[1.6rem] text-green-400" />;
+    case 'live':
+      return <Radio className="w-[1.6rem] h-[1.6rem] text-red-400" />;
     default:
       return <Tv className="w-[1.6rem] h-[1.6rem] text-slate-400" />;
   }
@@ -226,13 +233,16 @@ export function WidgetSidebar({
       />
       
       <div
-        className="fixed left-0 h-[calc(100vh-var(--header-height)-1rem)] bg-slate-900 border-r border-slate-700 z-[100] flex flex-col overflow-hidden shadow-2xl"
+        className="fixed left-0 h-[calc(100vh-var(--header-height)-1rem)] bg-slate-900 border-r border-slate-700 flex flex-col overflow-hidden shadow-2xl transition-all duration-300"
         style={{ 
           width: isOpen ? 'min(32rem, 100vw)' : '0',
-          display: isOpen ? 'flex' : 'none',
+          visibility: isOpen ? 'visible' : 'hidden',
+          opacity: isOpen ? 1 : 0,
+          zIndex: isOpen ? 100 : -1,
           top: 'calc(var(--header-height) + 1rem)',
           borderTopRightRadius: 'var(--outer-radius)',
-          borderBottomRightRadius: 'var(--outer-radius)'
+          borderBottomRightRadius: 'var(--outer-radius)',
+          pointerEvents: isOpen ? 'auto' : 'none'
         }}
         data-testid="widget-sidebar"
       >

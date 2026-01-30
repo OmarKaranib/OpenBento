@@ -201,6 +201,11 @@ gap: 1rem;
 - **Done Button**: Appears at bottom center when seek mode active, click to lock controls
 - **Fullscreen Recovery Fix**: ESC and Exit buttons now force header visible immediately
 - **exitFullscreenAndRestoreHeader()**: Helper function ensures proper menu recovery on exit
+- **Kick.com Integration**: player.kick.com embeds with parent parameter for SAMEORIGIN bypass
+- **Trovo.live Integration**: player.trovo.live embeds with developer whitelist note
+- **YouTube Live ID Watchdog**: 60-second auto-refresh cycle for error recovery
+- **Layer Management**: Sidebar uses visibility/z-index instead of display:none for 24/7 connectivity
+- **Platform Channels**: Added Kick (xQc, Adin Ross) and Trovo Gaming to trending streams
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px
