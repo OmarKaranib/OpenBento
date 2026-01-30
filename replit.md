@@ -83,7 +83,8 @@ gap: 1rem;
   - Pointer-events: none on all iframes for drag interaction
 
 ## Header Controls
-- **"+ Block" button**: Always visible in header, opens sidebar to Streams tab
+- **"Add Block" button**: Always visible in header, opens sidebar to Streams tab
+- **"Refresh All" button**: Re-renders all active iframes to clear hung streams
 - **"EDIT LAYOUT / LOCK" button**: Toggles edit mode
 - **"MUTED" button**: Master mute for all video widgets
 - **"SAVE" button**: Manual save to localStorage
@@ -157,6 +158,9 @@ gap: 1rem;
 - **Size Label Edit Mode**: Labels (e.g., "3x2") only visible in Edit Layout mode
 - **Template Click**: Clicking sidebar templates directly adds widget and closes sidebar
 - **Simplified Library**: 4 unique templates (Video, Note, Spacer, Photo) without size duplicates
+- **Add Block Button**: Renamed from "+ Block" to "Add Block"
+- **Refresh All Button**: New header button to re-render all active iframes
+- **Edit Mode Overlay z-index**: Increased to 9999 to prevent iframe interference during drag
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px
