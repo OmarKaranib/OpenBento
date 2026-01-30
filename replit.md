@@ -78,9 +78,17 @@ gap: 1rem;
 - **Edit mode**:
   - Widgets jiggle (iOS-style animation)
   - Size labels (e.g., "3x2") visible in top-left corner
-  - Resize handles appear on bottom-right corner
+  - Resize handles appear on bottom-right corner (purple, cursor-se-resize)
   - Settings and Delete buttons appear on top-right
+  - Transparent overlay (z-index: 9999) prevents iframe interference
   - Pointer-events: none on all iframes for drag interaction
+
+## Fullscreen Mode
+- **Fullscreen button**: Maximize2/Minimize2 icon toggles fullscreen state
+- **Hover-triggered header**: Header slides up (translateY: -100%) when fullscreen is active
+- **Top 10px hover zone**: Mouse entering top 10px of screen reveals the header
+- **Edge-to-edge layout**: Canvas expands to full screen height, padding removed
+- **All controls preserved**: Add Block, Refresh All, Edit Layout, Mute, Save buttons remain accessible
 
 ## Header Controls
 - **"Add Block" button**: Always visible in header, opens sidebar to Streams tab
@@ -161,6 +169,8 @@ gap: 1rem;
 - **Add Block Button**: Renamed from "+ Block" to "Add Block"
 - **Refresh All Button**: New header button to re-render all active iframes
 - **Edit Mode Overlay z-index**: Increased to 9999 to prevent iframe interference during drag
+- **Hover-Triggered Fullscreen**: Header slides up and reveals on top 10px hover
+- **Canvas Expansion**: Grid fills full screen when header is hidden in fullscreen mode
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px
