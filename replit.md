@@ -59,7 +59,10 @@ gap: 1rem;
 
 ## Widget Types
 1. **Video Widget**: YouTube, Twitch, or any embeddable URL
-   - Custom TV-style controls: Mute/Unmute, Pause/Play, Refresh, Delete
+   - Custom TV-style controls: Seek/Controls, Mute/Unmute, Pause/Play, Refresh, Delete
+   - **Seek Mode**: Sliders icon button toggles iframe pointer-events for video seeking
+     - When active: iframe has pointer-events: auto, "Done" button appears at bottom
+     - Click "Done" to lock controls back to pointer-events: none
    - Controls appear on hover (opacity-0 → opacity-100 transition)
    - Auto-detection of YouTube video IDs and Twitch channels
    - Twitch parent parameter: `window.location.host.split(':')[0]`
@@ -194,6 +197,10 @@ gap: 1rem;
 - **ESC Key Exit**: Event listener on keydown exits fullscreen when Escape pressed (does not enter)
 - **15px Hover Zone**: Reduced from 50px to 15px at top-center for revealing exit button
 - **ghostPositionRef**: Added ref-based tracking for immediate ghost position access during drag
+- **Seek Mode Feature**: New Sliders button in video controls toggles pointer-events for seeking
+- **Done Button**: Appears at bottom center when seek mode active, click to lock controls
+- **Fullscreen Recovery Fix**: ESC and Exit buttons now force header visible immediately
+- **exitFullscreenAndRestoreHeader()**: Helper function ensures proper menu recovery on exit
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px

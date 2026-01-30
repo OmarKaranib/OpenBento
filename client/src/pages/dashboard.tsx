@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2 } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -129,6 +129,7 @@ const MasterControlDashboard = ({
   const [resizing, setResizing] = useState<ResizeState | null>(null);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [exitButtonDismissed, setExitButtonDismissed] = useState(false);
+  const [seekModeWidgets, setSeekModeWidgets] = useState<Set<string>>(new Set());
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
 
   const minCellHeight = 80;
@@ -159,21 +160,41 @@ const MasterControlDashboard = ({
     return () => document.removeEventListener('mousemove', handleMouseMove);
   }, [isFullscreen, headerVisible]);
 
+  // Helper function to exit fullscreen and restore header
+  const exitFullscreenAndRestoreHeader = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+    setIsFullscreen(false);
+    setHeaderVisible(true);
+    setExitButtonDismissed(false);
+  };
+
   // ESC key to exit fullscreen (but not enter)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isFullscreen) {
         e.preventDefault();
-        if (document.fullscreenElement) {
-          document.exitFullscreen().catch(() => {});
-        }
-        setIsFullscreen(false);
+        exitFullscreenAndRestoreHeader();
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen, setIsFullscreen]);
+  }, [isFullscreen]);
+
+  // Toggle seek mode for a specific widget
+  const toggleSeekMode = (widgetId: string) => {
+    setSeekModeWidgets(prev => {
+      const next = new Set(prev);
+      if (next.has(widgetId)) {
+        next.delete(widgetId);
+      } else {
+        next.add(widgetId);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!resizing) return;
@@ -364,6 +385,8 @@ const MasterControlDashboard = ({
   };
 
   const renderWidgetContent = (widget: Widget) => {
+    const isSeekMode = seekModeWidgets.has(widget.id);
+    
     switch (widget.type) {
       case 'video':
         if (widget.isYouTube && widget.videoId) {
@@ -372,7 +395,7 @@ const MasterControlDashboard = ({
               ref={(el) => { iframeRefs.current[widget.id] = el; }}
               src={getYouTubeEmbedUrl(widget.videoId)}
               className="w-full h-full"
-              style={{ pointerEvents: 'none' }}
+              style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
               title={`YouTube - ${widget.id}`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -384,7 +407,7 @@ const MasterControlDashboard = ({
               ref={(el) => { iframeRefs.current[widget.id] = el; }}
               src={getTwitchEmbedUrl(widget.twitchChannel)}
               className="w-full h-full"
-              style={{ pointerEvents: 'none' }}
+              style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
               title={`Twitch - ${widget.id}`}
               allow="autoplay; encrypted-media"
               allowFullScreen
@@ -395,7 +418,7 @@ const MasterControlDashboard = ({
             <iframe
               src={widget.url}
               className="w-full h-full"
-              style={{ pointerEvents: 'none' }}
+              style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
               title={widget.id}
               allow="autoplay; encrypted-media"
               sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
@@ -498,12 +521,7 @@ const MasterControlDashboard = ({
           data-testid="hover-zone-top"
         >
           <button
-            onClick={() => {
-              if (document.fullscreenElement) {
-                document.exitFullscreen().catch(() => {});
-              }
-              setIsFullscreen(false);
-            }}
+            onClick={exitFullscreenAndRestoreHeader}
             className="absolute top-[1rem] left-1/2 -translate-x-1/2 p-[0.8rem] bg-slate-800/90 hover:bg-red-600 backdrop-blur-md slot-button text-slate-300 hover:text-white shadow-lg border border-slate-600/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
             title="Exit Fullscreen"
             data-testid="button-exit-fullscreen-hover"
@@ -533,10 +551,7 @@ const MasterControlDashboard = ({
             <button
               onClick={() => {
                 if (isFullscreen) {
-                  if (document.fullscreenElement) {
-                    document.exitFullscreen().catch(() => {});
-                  }
-                  setIsFullscreen(false);
+                  exitFullscreenAndRestoreHeader();
                 } else {
                   document.documentElement.requestFullscreen?.().catch(() => {});
                   setIsFullscreen(true);
@@ -684,51 +699,97 @@ const MasterControlDashboard = ({
         {widgets.map((widget) => (
           <SortableWidget key={widget.id} widget={widget} isEditMode={isEditMode}>
             {widget.type === 'video' && (widget.url || widget.videoId || widget.twitchChannel) && !isEditMode && (
-              <div className="absolute top-[0.6rem] right-[0.6rem] z-20 flex gap-[0.3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <button
-                  onClick={() => toggleWidgetMute(widget.id)}
-                  className={`p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm ${
-                    widget.isMuted 
-                      ? 'bg-red-600/90 hover:bg-red-500' 
-                      : 'bg-emerald-600/90 hover:bg-emerald-500'
-                  }`}
-                  title={widget.isMuted ? 'Unmute' : 'Mute'}
-                  data-testid={`button-mute-${widget.id}`}
-                >
-                  {widget.isMuted ? <VolumeX className="w-[1rem] h-[1rem]" /> : <Volume2 className="w-[1rem] h-[1rem]" />}
-                </button>
+              <>
+                {/* Seek Mode "Done" button - always visible when seek mode is active */}
+                {seekModeWidgets.has(widget.id) && (
+                  <div className="absolute bottom-[0.6rem] left-1/2 -translate-x-1/2 z-50" style={{ pointerEvents: 'auto' }}>
+                    <button
+                      type="button"
+                      disabled={false}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        toggleSeekMode(widget.id);
+                      }}
+                      className="px-[1.2rem] py-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm bg-purple-600/95 hover:bg-purple-500 flex items-center gap-[0.5rem] shadow-lg border border-purple-400/50 cursor-pointer"
+                      title="Lock video controls"
+                      data-testid={`button-seek-done-${widget.id}`}
+                    >
+                      <LockKeyhole className="w-[1rem] h-[1rem]" />
+                      <span className="text-[1rem] font-semibold">Done</span>
+                    </button>
+                  </div>
+                )}
                 
-                <button
-                  onClick={() => toggleWidgetPause(widget.id)}
-                  className={`p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm ${
-                    widget.isPaused 
-                      ? 'bg-yellow-600/90 hover:bg-yellow-500' 
-                      : 'bg-blue-600/90 hover:bg-blue-500'
-                  }`}
-                  title={widget.isPaused ? 'Play' : 'Pause'}
-                  data-testid={`button-pause-${widget.id}`}
+                {/* Regular hover controls - always interactive with high z-index */}
+                <div 
+                  className={`absolute top-[0.6rem] right-[0.6rem] z-50 flex gap-[0.3rem] transition-opacity duration-200 ${seekModeWidgets.has(widget.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                  style={{ pointerEvents: 'auto' }}
                 >
-                  {widget.isPaused ? <Play className="w-[1rem] h-[1rem]" /> : <Pause className="w-[1rem] h-[1rem]" />}
-                </button>
-                
-                <button
-                  onClick={() => handleRefreshWidget(widget.id)}
-                  className="p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm bg-cyan-600/90 hover:bg-cyan-500"
-                  title="Refresh stream"
-                  data-testid={`button-refresh-${widget.id}`}
-                >
-                  <RefreshCw className="w-[1rem] h-[1rem]" />
-                </button>
-                
-                <button
-                  onClick={() => handleRemoveWidget(widget.id)}
-                  className="p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm bg-red-600/90 hover:bg-red-500"
-                  title="Delete widget"
-                  data-testid={`button-delete-${widget.id}`}
-                >
-                  <Trash2 className="w-[1rem] h-[1rem]" />
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    disabled={false}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      toggleSeekMode(widget.id);
+                    }}
+                    className={`p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm cursor-pointer ${
+                      seekModeWidgets.has(widget.id)
+                        ? 'bg-purple-600/90 hover:bg-purple-500 ring-2 ring-purple-400'
+                        : 'bg-indigo-600/90 hover:bg-indigo-500'
+                    }`}
+                    title={seekModeWidgets.has(widget.id) ? 'Disable seek controls' : 'Enable seek controls (rewind/skip)'}
+                    data-testid={`button-seek-mode-${widget.id}`}
+                  >
+                    <Sliders className="w-[1rem] h-[1rem]" />
+                  </button>
+                  
+                  <button
+                    onClick={() => toggleWidgetMute(widget.id)}
+                    className={`p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm ${
+                      widget.isMuted 
+                        ? 'bg-red-600/90 hover:bg-red-500' 
+                        : 'bg-emerald-600/90 hover:bg-emerald-500'
+                    }`}
+                    title={widget.isMuted ? 'Unmute' : 'Mute'}
+                    data-testid={`button-mute-${widget.id}`}
+                  >
+                    {widget.isMuted ? <VolumeX className="w-[1rem] h-[1rem]" /> : <Volume2 className="w-[1rem] h-[1rem]" />}
+                  </button>
+                  
+                  <button
+                    onClick={() => toggleWidgetPause(widget.id)}
+                    className={`p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm ${
+                      widget.isPaused 
+                        ? 'bg-yellow-600/90 hover:bg-yellow-500' 
+                        : 'bg-blue-600/90 hover:bg-blue-500'
+                    }`}
+                    title={widget.isPaused ? 'Play' : 'Pause'}
+                    data-testid={`button-pause-${widget.id}`}
+                  >
+                    {widget.isPaused ? <Play className="w-[1rem] h-[1rem]" /> : <Pause className="w-[1rem] h-[1rem]" />}
+                  </button>
+                  
+                  <button
+                    onClick={() => handleRefreshWidget(widget.id)}
+                    className="p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm bg-cyan-600/90 hover:bg-cyan-500"
+                    title="Refresh stream"
+                    data-testid={`button-refresh-${widget.id}`}
+                  >
+                    <RefreshCw className="w-[1rem] h-[1rem]" />
+                  </button>
+                  
+                  <button
+                    onClick={() => handleRemoveWidget(widget.id)}
+                    className="p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm bg-red-600/90 hover:bg-red-500"
+                    title="Delete widget"
+                    data-testid={`button-delete-${widget.id}`}
+                  >
+                    <Trash2 className="w-[1rem] h-[1rem]" />
+                  </button>
+                </div>
+              </>
             )}
 
             {isEditMode && (
@@ -763,7 +824,12 @@ const MasterControlDashboard = ({
               </div>
             )}
 
-            <div className="w-full h-full">
+            <div 
+              className="w-full h-full"
+              style={{ 
+                pointerEvents: widget.type === 'video' && !isEditMode && !seekModeWidgets.has(widget.id) ? 'none' : 'auto'
+              }}
+            >
               {renderWidgetContent(widget)}
             </div>
 
