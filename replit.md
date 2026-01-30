@@ -38,9 +38,9 @@ gap: 1rem;
 
 ## Features
 - **12-Column Grid**: OpenBento standard magnetic layout with dense packing
-- **Blueprint Background**: Professional dashed grid pattern visible behind widgets
+- **Blueprint Background**: Subtle cyan grid lines aligned with 12-column system (opacity 0.04)
 - **Fullscreen Mode**: Toggle sidebar visibility with PanelLeftClose/PanelLeftOpen button
-- **20-Row Canvas**: Large "infinite canvas" feel with minimum 1600px height
+- **Fit-to-Screen**: Fixed viewport height with overflow hidden - no scrolling
 - **Glassmorphism Widgets**: backdrop-filter: blur(10px) with semi-transparent borders
 - **Dynamic Widget System**: Unlimited widgets with add/remove functionality
 - **Widget Types**: Video, Note, Spacer, Image - each with unique functionality
@@ -132,9 +132,10 @@ gap: 1rem;
 - **Widget Edit Button**: Settings gear button on widgets in Edit Mode opens sidebar
 - **Native File Upload**: "Upload from Computer" button for Image widgets
 - **Verified Streams**: NASA Live, Lofi Girl, Sky News with direct YouTube embed URLs
-- **Blueprint Background**: CSS-based dashed grid pattern using repeating-linear-gradient
-- **Fullscreen Toggle**: PanelLeftClose icon button in header to hide sidebar
-- **20-Row Canvas**: gridRows = 20, minCellHeight = 80px for large canvas feel
+- **Blueprint Background**: Aligned with 12-column grid using CSS variables (--grid-cols, --grid-gap)
+- **Fullscreen Toggle**: PanelLeftClose icon button closes sidebar and expands grid to 100vw
+- **Fit-to-Screen Layout**: overflow: hidden on canvas, h-full grid - no scrolling
+- **Dimmed Grid Lines**: Blueprint lines at 0.04 opacity for subtle ruler appearance
 - **Glassmorphism**: .dashboard-slot has backdrop-blur, semi-transparent bg, thin cyan border
 
 ## Responsive Widget Scaling (Apple HIG Standard)
