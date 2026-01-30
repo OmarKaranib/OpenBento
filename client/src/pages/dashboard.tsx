@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction } from 'react';
+import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
 import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2 } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
@@ -24,7 +24,11 @@ const SortableWidget = ({ widget, isEditMode, children }: SortableWidgetProps) =
     isDragging
   } = useSortable({ 
     id: widget.id,
-    disabled: !isEditMode
+    disabled: !isEditMode,
+    data: {
+      type: 'sortable-widget',
+      widget: widget
+    }
   });
 
   const style = {
@@ -94,6 +98,8 @@ interface MasterControlDashboardProps {
   addWidget: (type: WidgetType, w?: number, h?: number, extraData?: Partial<Widget>) => string;
   isFullscreen: boolean;
   setIsFullscreen: Dispatch<SetStateAction<boolean>>;
+  ghostPosition: { x: number; y: number; w: number; h: number } | null;
+  gridContainerRef: MutableRefObject<HTMLDivElement | null>;
 }
 
 interface ResizeState {
@@ -115,13 +121,15 @@ const MasterControlDashboard = ({
   handleOpenSidebarToContent,
   addWidget,
   isFullscreen,
-  setIsFullscreen
+  setIsFullscreen,
+  ghostPosition,
+  gridContainerRef
 }: MasterControlDashboardProps) => {
   const [masterMute, setMasterMute] = useState(true);
   const [resizing, setResizing] = useState<ResizeState | null>(null);
   const [headerVisible, setHeaderVisible] = useState(true);
+  const [exitButtonDismissed, setExitButtonDismissed] = useState(false);
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
-  const gridRef = useRef<HTMLDivElement>(null);
 
   const minCellHeight = 80;
 
@@ -129,8 +137,12 @@ const MasterControlDashboard = ({
   useEffect(() => {
     if (!isFullscreen) {
       setHeaderVisible(true);
+      setExitButtonDismissed(false);
       return;
     }
+
+    // Reset exit button state when entering fullscreen - it should be visible initially
+    setExitButtonDismissed(false);
 
     const handleMouseMove = (e: MouseEvent) => {
       if (e.clientY <= 10) {
@@ -151,9 +163,9 @@ const MasterControlDashboard = ({
     if (!resizing) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!gridRef.current) return;
+      if (!gridContainerRef.current) return;
 
-      const gridRect = gridRef.current.getBoundingClientRect();
+      const gridRect = gridContainerRef.current.getBoundingClientRect();
       const cellWidth = gridRect.width / GRID_COLS;
       const cellHeight = Math.max(minCellHeight, gridRect.height / GRID_ROWS);
 
@@ -445,20 +457,46 @@ const MasterControlDashboard = ({
         <div className="absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
-      {/* 15px hover zone at top-center with opacity-based Exit Fullscreen button */}
-      {isFullscreen && !headerVisible && (
+      {/* Exit Fullscreen Button - visible initially when entering fullscreen, dismissible with X */}
+      {isFullscreen && !headerVisible && !exitButtonDismissed && (
+        <div 
+          className="fixed top-[1rem] left-1/2 -translate-x-1/2 z-[10001] flex items-center gap-[0.3rem]"
+          data-testid="exit-fullscreen-container"
+        >
+          <button
+            onClick={() => setIsFullscreen(false)}
+            className="px-[1.2rem] py-[0.5rem] bg-slate-800/90 hover:bg-slate-700 backdrop-blur-md slot-button flex items-center gap-[0.5rem] text-[1rem] text-slate-300 hover:text-white shadow-lg border border-slate-600/50 transition-all duration-200"
+            title="Exit Fullscreen"
+            data-testid="button-exit-fullscreen-floating"
+          >
+            <Minimize2 className="w-[1.2rem] h-[1.2rem]" />
+            <span>Exit Fullscreen</span>
+          </button>
+          <button
+            onClick={() => setExitButtonDismissed(true)}
+            className="p-[0.5rem] bg-slate-800/90 hover:bg-red-600 backdrop-blur-md slot-button text-slate-400 hover:text-white shadow-lg border border-slate-600/50 transition-all duration-200"
+            title="Dismiss button"
+            data-testid="button-dismiss-exit"
+          >
+            <X className="w-[1rem] h-[1rem]" />
+          </button>
+        </div>
+      )}
+
+      {/* 15px hover zone at top-center - only active when exit button is dismissed */}
+      {isFullscreen && !headerVisible && exitButtonDismissed && (
         <div 
           className="fixed top-0 left-1/2 -translate-x-1/2 w-[20rem] h-[15px] z-[10001] group"
-          onMouseEnter={() => setHeaderVisible(true)}
+          onMouseEnter={() => setExitButtonDismissed(false)}
           data-testid="hover-zone-top"
         >
           <button
             onClick={() => setIsFullscreen(false)}
             className="absolute top-[0.5rem] left-1/2 -translate-x-1/2 px-[1.2rem] py-[0.5rem] bg-slate-800/90 hover:bg-slate-700 backdrop-blur-md slot-button flex items-center gap-[0.5rem] text-[1rem] text-slate-300 hover:text-white shadow-lg border border-slate-600/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
             title="Exit Fullscreen"
-            data-testid="button-exit-fullscreen-floating"
+            data-testid="button-exit-fullscreen-hover"
           >
-            <X className="w-[1.2rem] h-[1.2rem]" />
+            <Minimize2 className="w-[1.2rem] h-[1.2rem]" />
             <span>Exit Fullscreen</span>
           </button>
         </div>
@@ -589,8 +627,31 @@ const MasterControlDashboard = ({
             <div key={i} className="ghost-cell" />
           ))}
         </div>
+        
+        {/* Ghost Preview - shows during drag */}
+        {ghostPosition && (
+          <div 
+            className="absolute inset-[1rem] grid gap-[1rem] pointer-events-none z-[5]"
+            style={{
+              gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+              gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`
+            }}
+            data-testid="ghost-preview-grid"
+          >
+            <div
+              className="bg-cyan-500/30 border-2 border-dashed border-cyan-400 backdrop-blur-sm transition-all duration-100"
+              style={{
+                gridColumn: `${ghostPosition.x + 1} / span ${Math.min(ghostPosition.w, GRID_COLS - ghostPosition.x)}`,
+                gridRow: `${ghostPosition.y + 1} / span ${Math.min(ghostPosition.h, GRID_ROWS - ghostPosition.y)}`,
+                borderRadius: 'var(--outer-radius)'
+              }}
+              data-testid="ghost-preview"
+            />
+          </div>
+        )}
+        
         <div 
-          ref={gridRef}
+          ref={gridContainerRef}
           className="relative z-10 grid gap-[1rem] h-full"
           style={{
             gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,

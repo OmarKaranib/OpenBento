@@ -11,6 +11,7 @@ import {
   DndContext, 
   DragEndEvent, 
   DragStartEvent,
+  DragMoveEvent,
   DragOverlay,
   useSensor, 
   useSensors, 
@@ -55,8 +56,10 @@ function App() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [urlInputValue, setUrlInputValue] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [ghostPosition, setGhostPosition] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
   const activeWidgetIdRef = useRef<string | null>(null);
+  const gridContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     activeWidgetIdRef.current = activeWidgetId;
@@ -184,11 +187,70 @@ function App() {
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id);
+    
+    // Get the widget being dragged to determine ghost size
+    const activeData = event.active.data.current;
+    
+    if (activeData?.type === 'channel' || activeData?.type === 'widget-template') {
+      // Sidebar items use default 3x2 or template size
+      const template = activeData.template as WidgetTemplate | undefined;
+      setGhostPosition({ x: 0, y: 0, w: template?.w || 3, h: template?.h || 2 });
+    } else if (activeData?.type === 'sortable-widget') {
+      // Sortable widget being dragged - get widget from data
+      const widget = activeData.widget as Widget;
+      setGhostPosition({ x: 0, y: 0, w: widget.w, h: widget.h });
+    } else {
+      // Fallback: try to find widget by ID
+      const widget = widgets.find(w => w.id === event.active.id);
+      if (widget) {
+        setGhostPosition({ x: 0, y: 0, w: widget.w, h: widget.h });
+      } else {
+        // Default ghost size
+        setGhostPosition({ x: 0, y: 0, w: 3, h: 2 });
+      }
+    }
+  }, [widgets]);
+
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    if (!gridContainerRef.current) return;
+    
+    const gridRect = gridContainerRef.current.getBoundingClientRect();
+    
+    // Use translated rect, fallback to initial rect + delta
+    let dragX = 0;
+    let dragY = 0;
+    
+    const translated = event.active.rect.current.translated;
+    const initial = event.active.rect.current.initial;
+    
+    if (translated) {
+      dragX = translated.left;
+      dragY = translated.top;
+    } else if (initial && event.delta) {
+      dragX = initial.left + event.delta.x;
+      dragY = initial.top + event.delta.y;
+    } else {
+      return;
+    }
+    
+    // Calculate cell dimensions
+    const cellWidth = gridRect.width / GRID_COLS;
+    const cellHeight = gridRect.height / 6; // GRID_ROWS = 6
+    
+    // Calculate grid position based on the drag overlay's top-left corner
+    const relativeX = dragX - gridRect.left;
+    const relativeY = dragY - gridRect.top;
+    
+    const gridX = Math.max(0, Math.min(GRID_COLS - 1, Math.floor(relativeX / cellWidth)));
+    const gridY = Math.max(0, Math.min(5, Math.floor(relativeY / cellHeight))); // 0-5 for 6 rows
+    
+    setGhostPosition(prev => prev ? { ...prev, x: gridX, y: gridY } : null);
   }, []);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setGhostPosition(null);
 
     const activeData = active.data.current;
 
@@ -297,6 +359,7 @@ function App() {
           sensors={sensors} 
           collisionDetection={rectIntersection}
           onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={widgets.map(w => w.id)} strategy={rectSortingStrategy}>
@@ -331,6 +394,8 @@ function App() {
                     addWidget={addWidget}
                     isFullscreen={isFullscreen}
                     setIsFullscreen={setIsFullscreen}
+                    ghostPosition={ghostPosition}
+                    gridContainerRef={gridContainerRef}
                   />
                 )}
               </Route>
