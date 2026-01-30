@@ -43,8 +43,8 @@ const MasterControlDashboard = ({
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const gridRows = 20;
   const minCellHeight = 80;
+  const maxRows = 10;
 
   useEffect(() => {
     if (!resizing) return;
@@ -54,7 +54,7 @@ const MasterControlDashboard = ({
 
       const gridRect = gridRef.current.getBoundingClientRect();
       const cellWidth = gridRect.width / GRID_COLS;
-      const cellHeight = Math.max(minCellHeight, gridRect.height / gridRows);
+      const cellHeight = Math.max(minCellHeight, gridRect.height / maxRows);
 
       const deltaX = e.clientX - resizing.startX;
       const deltaY = e.clientY - resizing.startY;
@@ -63,7 +63,7 @@ const MasterControlDashboard = ({
       const rowChange = Math.round(deltaY / cellHeight);
 
       const newW = Math.max(1, Math.min(GRID_COLS, resizing.startW + colChange));
-      const newH = Math.max(1, Math.min(gridRows, resizing.startH + rowChange));
+      const newH = Math.max(1, Math.min(maxRows, resizing.startH + rowChange));
 
       setWidgets(prev => prev.map(w => 
         w.id === resizing.widgetId ? { ...w, w: newW, h: newH } : w
@@ -377,12 +377,11 @@ const MasterControlDashboard = ({
       <div className="canvas-container rounded-[2rem] p-[1rem]" data-testid="canvas-container">
         <div 
           ref={gridRef}
-          className="relative z-10 grid gap-[1rem]"
+          className="relative z-10 grid gap-[1rem] h-full"
           style={{
             gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-            gridAutoRows: `minmax(${minCellHeight}px, 1fr)`,
-            gridAutoFlow: 'dense',
-            minHeight: `${gridRows * minCellHeight}px`
+            gridTemplateRows: `repeat(auto-fill, minmax(${minCellHeight}px, 1fr))`,
+            gridAutoFlow: 'dense'
           }}
           data-testid="widget-grid"
         >

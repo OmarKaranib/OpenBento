@@ -61,6 +61,12 @@ function App() {
     activeWidgetIdRef.current = activeWidgetId;
   }, [activeWidgetId]);
 
+  useEffect(() => {
+    if (isFullscreen) {
+      setSidebarOpen(false);
+    }
+  }, [isFullscreen]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
