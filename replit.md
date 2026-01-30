@@ -84,11 +84,13 @@ gap: 1rem;
   - Pointer-events: none on all iframes for drag interaction
 
 ## Fullscreen Mode
-- **Fullscreen button**: Maximize2 icon toggles fullscreen state
+- **Fullscreen button**: Maximize2 icon toggles fullscreen state using browser Fullscreen API
+- **Browser API Integration**: Uses document.requestFullscreen() to enter and document.exitFullscreen() to exit
+- **ESC Key Support**: Pressing Escape key exits fullscreen (but does not enter it)
 - **Exit Fullscreen X Button**: X icon appears at top center when entering fullscreen
   - Click X to dismiss button (stays in fullscreen for immersive mode)
-  - Hover 50px zone at top center to reveal X button again
-  - Click revealed button to exit fullscreen
+  - Hover 15px zone at top center to reveal X button again
+  - Click revealed button to exit fullscreen using browser API
 - **Hover-triggered header**: Header slides up (translateY: -100%) when fullscreen is active
 - **Edge-to-edge layout**: Canvas expands to full screen height, padding removed
 - **All controls preserved**: Add Block, Refresh All, Edit Layout, Mute, Save buttons remain accessible
@@ -112,7 +114,9 @@ gap: 1rem;
 - Widgets snap to grid cell sizes (1-12 columns, 1-6 rows)
 
 ## Widget Sidebar ("Block Library")
-- Slide-out sidebar from left side
+- Slide-out sidebar from left side, positioned **below the header** to avoid overlap
+- **Sidebar z-index**: 100 (below header z-index: 10001)
+- **Close Button**: X button in top-right of sidebar for manual dismissal
 - **Tabbed Interface**: Library tab and Streams tab
 - **Library Tab**: 4 unique block templates (one of each type)
   - Video (3x2)
@@ -184,6 +188,12 @@ gap: 1rem;
 - **No-Overlap Drop Rule**: handleDragEnd uses findNearestAvailable() spiral search for collision-free drops
 - **Grid Position Styling**: Widgets use explicit gridColumn/gridRow based on x/y coordinates
 - **useSortable Data**: SortableWidget includes { type: 'sortable-widget', widget } for drag identification
+- **Sidebar Layout Fix**: Sidebar positioned below header using `top: calc(var(--header-height) + 1rem)` to prevent overlap
+- **Sidebar Close Button**: X button in sidebar header for manual dismissal (data-testid="button-close-sidebar")
+- **Fullscreen API Integration**: Toggle button uses document.requestFullscreen() / document.exitFullscreen()
+- **ESC Key Exit**: Event listener on keydown exits fullscreen when Escape pressed (does not enter)
+- **15px Hover Zone**: Reduced from 50px to 15px at top-center for revealing exit button
+- **ghostPositionRef**: Added ref-based tracking for immediate ghost position access during drag
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px

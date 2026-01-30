@@ -216,19 +216,21 @@ export function WidgetSidebar({
   return (
     <>
       <div
-        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-[99] transition-opacity duration-300 ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
+        style={{ top: 'var(--header-height)' }}
         onClick={onClose}
         onMouseDown={(e) => e.stopPropagation()}
         data-testid="sidebar-overlay"
       />
       
       <div
-        className="fixed top-0 left-0 h-full bg-slate-900 border-r border-slate-700 z-50 flex flex-col overflow-hidden"
+        className="fixed left-0 h-[calc(100vh-var(--header-height)-1rem)] bg-slate-900 border-r border-slate-700 z-[100] flex flex-col overflow-hidden shadow-2xl"
         style={{ 
           width: isOpen ? 'min(32rem, 100vw)' : '0',
           display: isOpen ? 'flex' : 'none',
+          top: 'calc(var(--header-height) + 1rem)',
           borderTopRightRadius: 'var(--outer-radius)',
           borderBottomRightRadius: 'var(--outer-radius)'
         }}

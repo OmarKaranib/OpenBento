@@ -133,7 +133,7 @@ const MasterControlDashboard = ({
 
   const minCellHeight = 80;
 
-  // Hover detection for fullscreen mode - show header when mouse is in top 10px
+  // Hover detection for fullscreen mode - show header when mouse is in top 15px
   useEffect(() => {
     if (!isFullscreen) {
       setHeaderVisible(true);
@@ -145,7 +145,7 @@ const MasterControlDashboard = ({
     setExitButtonDismissed(false);
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (e.clientY <= 10) {
+      if (e.clientY <= 15) {
         setHeaderVisible(true);
       } else if (e.clientY > 80 && headerVisible) {
         setHeaderVisible(false);
@@ -158,6 +158,22 @@ const MasterControlDashboard = ({
     document.addEventListener('mousemove', handleMouseMove);
     return () => document.removeEventListener('mousemove', handleMouseMove);
   }, [isFullscreen, headerVisible]);
+
+  // ESC key to exit fullscreen (but not enter)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        e.preventDefault();
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+        setIsFullscreen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen, setIsFullscreen]);
 
   useEffect(() => {
     if (!resizing) return;
@@ -477,12 +493,17 @@ const MasterControlDashboard = ({
       {/* 15px hover zone at top-center - reveals exit button when hovering */}
       {isFullscreen && !headerVisible && exitButtonDismissed && (
         <div 
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-[20rem] h-[50px] z-[10001] group"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-[20rem] h-[15px] z-[10001] group"
           onMouseEnter={() => setExitButtonDismissed(false)}
           data-testid="hover-zone-top"
         >
           <button
-            onClick={() => setIsFullscreen(false)}
+            onClick={() => {
+              if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+              }
+              setIsFullscreen(false);
+            }}
             className="absolute top-[1rem] left-1/2 -translate-x-1/2 p-[0.8rem] bg-slate-800/90 hover:bg-red-600 backdrop-blur-md slot-button text-slate-300 hover:text-white shadow-lg border border-slate-600/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
             title="Exit Fullscreen"
             data-testid="button-exit-fullscreen-hover"
@@ -510,7 +531,17 @@ const MasterControlDashboard = ({
         <div className="flex items-center justify-between mb-[0.8rem] flex-wrap gap-[0.8rem]">
           <div className="flex items-center gap-[1.2rem]">
             <button
-              onClick={() => setIsFullscreen(!isFullscreen)}
+              onClick={() => {
+                if (isFullscreen) {
+                  if (document.fullscreenElement) {
+                    document.exitFullscreen().catch(() => {});
+                  }
+                  setIsFullscreen(false);
+                } else {
+                  document.documentElement.requestFullscreen?.().catch(() => {});
+                  setIsFullscreen(true);
+                }
+              }}
               className={`p-[0.6rem] slot-button transition-all duration-300 border ${
                 isFullscreen 
                   ? 'bg-cyan-600 hover:bg-cyan-500 border-cyan-500/50' 
