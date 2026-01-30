@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2 } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { Widget, WidgetType } from '@/App';
 
@@ -43,10 +43,33 @@ const MasterControlDashboard = ({
 }: MasterControlDashboardProps) => {
   const [masterMute, setMasterMute] = useState(true);
   const [resizing, setResizing] = useState<ResizeState | null>(null);
+  const [headerVisible, setHeaderVisible] = useState(true);
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
   const gridRef = useRef<HTMLDivElement>(null);
 
   const minCellHeight = 80;
+
+  // Hover detection for fullscreen mode - show header when mouse is in top 10px
+  useEffect(() => {
+    if (!isFullscreen) {
+      setHeaderVisible(true);
+      return;
+    }
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (e.clientY <= 10) {
+        setHeaderVisible(true);
+      } else if (e.clientY > 80 && headerVisible) {
+        setHeaderVisible(false);
+      }
+    };
+
+    // Initially hide header in fullscreen mode
+    setHeaderVisible(false);
+
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => document.removeEventListener('mousemove', handleMouseMove);
+  }, [isFullscreen, headerVisible]);
 
   useEffect(() => {
     if (!resizing) return;
@@ -340,22 +363,48 @@ const MasterControlDashboard = ({
   };
 
   return (
-    <div className={`h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 font-mono flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} style={{ padding: '1.6rem' }}>
+    <div className={`h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 font-mono flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} style={{ padding: isFullscreen && !headerVisible ? '0' : '1.6rem' }}>
       <div className="fixed inset-0 opacity-30 pointer-events-none z-0">
         <div className="absolute top-[8rem] left-[8rem] w-[38rem] h-[38rem] bg-cyan-500 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
-      <div className="relative z-30 mb-[1rem] flex-shrink-0" style={{ height: 'var(--header-height)' }}>
+      {/* Hover detection zone at top of screen when in fullscreen */}
+      {isFullscreen && !headerVisible && (
+        <div 
+          className="fixed top-0 left-0 right-0 h-[10px] z-[10000]"
+          onMouseEnter={() => setHeaderVisible(true)}
+          data-testid="hover-zone-top"
+        />
+      )}
+
+      <div 
+        className={`z-30 mb-[1rem] flex-shrink-0 transition-all duration-300 ${
+          isFullscreen 
+            ? 'fixed top-0 left-0 right-0 bg-slate-950/95 backdrop-blur-md px-[1.6rem] py-[0.8rem] shadow-lg border-b border-slate-800/50' 
+            : 'relative'
+        }`}
+        style={{ 
+          height: isFullscreen ? 'auto' : 'var(--header-height)',
+          transform: isFullscreen && !headerVisible ? 'translateY(-100%)' : 'translateY(0)',
+          zIndex: 10001
+        }}
+        onMouseLeave={() => isFullscreen && setHeaderVisible(false)}
+        data-testid="header-container"
+      >
         <div className="flex items-center justify-between mb-[0.8rem] flex-wrap gap-[0.8rem]">
           <div className="flex items-center gap-[1.2rem]">
             <button
               onClick={() => setIsFullscreen(!isFullscreen)}
-              className="p-[0.6rem] bg-slate-800/80 hover:bg-slate-700 slot-button transition-all duration-300 border border-slate-600/50 hover:border-cyan-500/50"
-              title={isFullscreen ? 'Show Sidebar' : 'Hide Sidebar'}
+              className={`p-[0.6rem] slot-button transition-all duration-300 border ${
+                isFullscreen 
+                  ? 'bg-cyan-600 hover:bg-cyan-500 border-cyan-500/50' 
+                  : 'bg-slate-800/80 hover:bg-slate-700 border-slate-600/50 hover:border-cyan-500/50'
+              }`}
+              title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Mode'}
               data-testid="button-toggle-fullscreen"
             >
-              {isFullscreen ? <PanelLeftOpen className="w-[1.6rem] h-[1.6rem] text-cyan-400" /> : <PanelLeftClose className="w-[1.6rem] h-[1.6rem] text-slate-400" />}
+              {isFullscreen ? <Minimize2 className="w-[1.6rem] h-[1.6rem] text-white" /> : <Maximize2 className="w-[1.6rem] h-[1.6rem] text-slate-400" />}
             </button>
             <div className="relative">
               <Power className="w-[2rem] h-[2rem] text-cyan-400 animate-pulse" data-testid="icon-power" />
@@ -433,7 +482,12 @@ const MasterControlDashboard = ({
       </div>
 
       <div 
-        className="canvas-container rounded-[2rem] p-[1rem]" 
+        className={`canvas-container p-[1rem] transition-all duration-300 ${
+          isFullscreen && !headerVisible ? 'rounded-none h-screen' : 'rounded-[2rem]'
+        }`}
+        style={{
+          marginTop: isFullscreen && headerVisible ? '6rem' : '0'
+        }}
         data-testid="canvas-container"
       >
         <div 
