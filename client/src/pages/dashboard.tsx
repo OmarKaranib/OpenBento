@@ -1,10 +1,86 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction } from 'react';
 import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2 } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Widget, WidgetType } from '@/App';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
+
+interface SortableWidgetProps {
+  widget: Widget;
+  isEditMode: boolean;
+  children: React.ReactNode;
+}
+
+const SortableWidget = ({ widget, isEditMode, children }: SortableWidgetProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ 
+    id: widget.id,
+    disabled: !isEditMode
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    gridColumn: `span ${Math.min(widget.w, GRID_COLS)}`,
+    gridRow: `span ${widget.h}`
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`dashboard-slot relative bg-slate-900/50 backdrop-blur-sm border group transition-all duration-300 shadow-xl overflow-hidden ${
+        isEditMode
+          ? 'border-purple-500/70 ring-1 ring-purple-400/30 animate-jiggle'
+          : 'border-slate-700/50 hover:border-cyan-500/50'
+      } ${isDragging ? 'z-50' : ''}`}
+      data-testid={`widget-${widget.id}`}
+      {...attributes}
+    >
+      {isEditMode && (
+        <div 
+          className="absolute inset-0 bg-transparent"
+          style={{ pointerEvents: 'none', zIndex: 9998 }}
+          data-testid={`widget-overlay-${widget.id}`}
+        />
+      )}
+
+      {isEditMode && (
+        <div className="absolute top-[0.6rem] left-[0.6rem] z-[10000] flex items-center gap-[0.4rem]">
+          <div 
+            className="p-[0.4rem] bg-cyan-600/90 hover:bg-cyan-500 slot-button cursor-grab active:cursor-grabbing transition-colors touch-none"
+            title="Drag to move"
+            style={{ pointerEvents: 'auto' }}
+            data-testid={`grip-handle-${widget.id}`}
+            {...listeners}
+          >
+            <GripVertical className="w-[1.2rem] h-[1.2rem] text-white" />
+          </div>
+          <span className="bg-slate-800/90 backdrop-blur-sm px-[0.5rem] py-[0.2rem] slot-button text-[0.8rem] font-bold text-cyan-400 border border-cyan-500/30">
+            {widget.w}x{widget.h}
+          </span>
+          {widget.type !== 'video' && (
+            <span className="bg-slate-800/90 backdrop-blur-sm px-[0.5rem] py-[0.2rem] slot-button text-[0.8rem] font-medium text-purple-400 border border-purple-500/30 capitalize">
+              {widget.type}
+            </span>
+          )}
+        </div>
+      )}
+
+      {children}
+    </div>
+  );
+};
 
 interface MasterControlDashboardProps {
   widgets: Widget[];
@@ -369,26 +445,23 @@ const MasterControlDashboard = ({
         <div className="absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
-      {/* Hover detection zone at top of screen when in fullscreen */}
+      {/* 15px hover zone at top-center with opacity-based Exit Fullscreen button */}
       {isFullscreen && !headerVisible && (
         <div 
-          className="fixed top-0 left-0 right-0 h-[10px] z-[10000]"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-[20rem] h-[15px] z-[10001] group"
           onMouseEnter={() => setHeaderVisible(true)}
           data-testid="hover-zone-top"
-        />
-      )}
-
-      {/* Visible Exit Fullscreen button - backup for hover trigger */}
-      {isFullscreen && !headerVisible && (
-        <button
-          onClick={() => setIsFullscreen(false)}
-          className="fixed top-[1rem] left-1/2 -translate-x-1/2 z-[10001] px-[1.2rem] py-[0.5rem] bg-slate-800/90 hover:bg-slate-700 backdrop-blur-md slot-button flex items-center gap-[0.5rem] text-[1rem] text-slate-300 hover:text-white transition-all duration-200 shadow-lg border border-slate-600/50"
-          title="Exit Fullscreen"
-          data-testid="button-exit-fullscreen-floating"
         >
-          <X className="w-[1.2rem] h-[1.2rem]" />
-          <span>Exit Fullscreen</span>
-        </button>
+          <button
+            onClick={() => setIsFullscreen(false)}
+            className="absolute top-[0.5rem] left-1/2 -translate-x-1/2 px-[1.2rem] py-[0.5rem] bg-slate-800/90 hover:bg-slate-700 backdrop-blur-md slot-button flex items-center gap-[0.5rem] text-[1rem] text-slate-300 hover:text-white shadow-lg border border-slate-600/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+            title="Exit Fullscreen"
+            data-testid="button-exit-fullscreen-floating"
+          >
+            <X className="w-[1.2rem] h-[1.2rem]" />
+            <span>Exit Fullscreen</span>
+          </button>
+        </div>
       )}
 
       <div 
@@ -527,40 +600,7 @@ const MasterControlDashboard = ({
           data-testid="widget-grid"
         >
         {widgets.map((widget) => (
-          <div
-            key={widget.id}
-            className={`dashboard-slot relative bg-slate-900/50 backdrop-blur-sm border group transition-all duration-300 shadow-xl overflow-hidden ${
-              isEditMode
-                ? 'border-purple-500/70 ring-1 ring-purple-400/30 animate-jiggle'
-                : 'border-slate-700/50 hover:border-cyan-500/50'
-            }`}
-            style={{
-              gridColumn: `span ${Math.min(widget.w, GRID_COLS)}`,
-              gridRow: `span ${widget.h}`
-            }}
-            data-testid={`widget-${widget.id}`}
-          >
-            {isEditMode && (
-              <div 
-                className="absolute inset-0 bg-transparent cursor-move"
-                style={{ pointerEvents: 'auto', zIndex: 9999 }}
-                data-testid={`widget-overlay-${widget.id}`}
-              />
-            )}
-
-            {isEditMode && (
-              <div className="absolute top-[0.6rem] left-[0.6rem] z-20 flex items-center gap-[0.4rem]">
-                <span className="bg-slate-800/90 backdrop-blur-sm px-[0.5rem] py-[0.2rem] slot-button text-[0.8rem] font-bold text-cyan-400 border border-cyan-500/30">
-                  {widget.w}x{widget.h}
-                </span>
-                {widget.type !== 'video' && (
-                  <span className="bg-slate-800/90 backdrop-blur-sm px-[0.5rem] py-[0.2rem] slot-button text-[0.8rem] font-medium text-purple-400 border border-purple-500/30 capitalize">
-                    {widget.type}
-                  </span>
-                )}
-              </div>
-            )}
-
+          <SortableWidget key={widget.id} widget={widget} isEditMode={isEditMode}>
             {widget.type === 'video' && (widget.url || widget.videoId || widget.twitchChannel) && !isEditMode && (
               <div className="absolute top-[0.6rem] right-[0.6rem] z-20 flex gap-[0.3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <button
@@ -648,7 +688,7 @@ const MasterControlDashboard = ({
             {isEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget.id, widget.w, widget.h)}
-                className="absolute bottom-0 right-0 w-[2.4rem] h-[2.4rem] cursor-se-resize z-50 flex items-center justify-center bg-purple-600/80 hover:bg-purple-500 transition-colors"
+                className="absolute bottom-0 right-0 w-[2.4rem] h-[2.4rem] cursor-se-resize z-[10000] flex items-center justify-center bg-purple-600/80 hover:bg-purple-500 transition-colors"
                 style={{ 
                   borderTopLeftRadius: 'var(--inner-radius)',
                   pointerEvents: 'auto'
@@ -659,7 +699,7 @@ const MasterControlDashboard = ({
                 <MoveDiagonal2 className="w-[1.4rem] h-[1.4rem] text-white" />
               </div>
             )}
-          </div>
+          </SortableWidget>
         ))}
 
 

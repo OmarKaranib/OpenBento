@@ -18,7 +18,7 @@ import {
   UniqueIdentifier,
   rectIntersection
 } from '@dnd-kit/core';
-import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 
 export type WidgetType = 'video' | 'note' | 'spacer' | 'image';
 
@@ -187,21 +187,37 @@ function App() {
   }, []);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active } = event;
+    const { active, over } = event;
     setActiveId(null);
 
     const activeData = active.data.current;
 
+    // Handle sidebar items being dropped
     if (activeData?.type === 'channel') {
       const channel = activeData.channel as TrendingChannel;
       addVideoWidget(channel, 3, 2);
       setSidebarOpen(false);
+      return;
     } else if (activeData?.type === 'widget-template') {
       const template = activeData.template as WidgetTemplate;
       addWidget(template.widgetType, template.w || 3, template.h || 2);
       setSidebarOpen(false);
+      return;
     }
-  }, [addVideoWidget, addWidget]);
+
+    // Handle widget reordering (sortable)
+    if (over && active.id !== over.id) {
+      setWidgets((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        
+        if (oldIndex !== -1 && newIndex !== -1) {
+          return arrayMove(items, oldIndex, newIndex);
+        }
+        return items;
+      });
+    }
+  }, [addVideoWidget, addWidget, setWidgets]);
 
   const handleChannelClick = useCallback((channel: TrendingChannel) => {
     const videoId = extractYouTubeId(channel.url);
