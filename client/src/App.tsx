@@ -33,6 +33,7 @@ export interface Widget {
   url?: string;
   isYouTube?: boolean;
   videoId?: string | null;
+  youtubeChannelId?: string | null;
   isTwitch?: boolean;
   twitchChannel?: string | null;
   isKick?: boolean;
@@ -105,14 +106,27 @@ function App() {
   });
 
   const extractYouTubeId = (url: string): string | null => {
+    // Don't extract ID from channel-based live stream URLs (they use channel= parameter)
+    if (url.includes('live_stream?channel=') || url.includes('live_stream&channel=')) {
+      return null;
+    }
     const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[7].length === 11) ? match[7] : null;
   };
 
+  // Extract YouTube channel ID from permanent live stream URLs
+  const extractYouTubeChannelId = (url: string): string | null => {
+    const channelRegex = /youtube\.com\/embed\/live_stream\?channel=([a-zA-Z0-9_-]+)/;
+    const match = url.match(channelRegex);
+    return match ? match[1] : null;
+  };
+
   const extractTwitchChannel = (url: string): string | null => {
+    // Match both twitch.tv/channel and player.twitch.tv/?channel=xxx
     const twitchRegex = /(?:twitch\.tv\/)([a-zA-Z0-9_]+)/;
-    const match = url.match(twitchRegex);
+    const playerRegex = /player\.twitch\.tv\/.*[?&]channel=([a-zA-Z0-9_]+)/;
+    const match = url.match(twitchRegex) || url.match(playerRegex);
     return match ? match[1] : null;
   };
 
@@ -177,13 +191,15 @@ function App() {
 
   const addVideoWidget = useCallback((channel: TrendingChannel, w = 3, h = 2) => {
     const videoId = extractYouTubeId(channel.url);
+    const youtubeChannelId = extractYouTubeChannelId(channel.url);
     const twitchChannel = extractTwitchChannel(channel.url);
     const kickChannel = extractKickChannel(channel.url);
 
     addWidget('video', w, h, {
       url: channel.url,
-      isYouTube: !!videoId,
+      isYouTube: !!videoId || !!youtubeChannelId,
       videoId,
+      youtubeChannelId,
       isTwitch: !!twitchChannel,
       twitchChannel,
       isKick: !!kickChannel,
@@ -201,6 +217,7 @@ function App() {
     }
 
     const youtubeId = extractYouTubeId(finalUrl);
+    const youtubeChannelId = extractYouTubeChannelId(finalUrl);
     const twitchChannel = extractTwitchChannel(finalUrl);
     const kickChannel = extractKickChannel(finalUrl);
     const currentActiveWidgetId = activeWidgetIdRef.current;
@@ -211,8 +228,9 @@ function App() {
           ...w,
           type: 'video',
           url: finalUrl,
-          isYouTube: !!youtubeId,
+          isYouTube: !!youtubeId || !!youtubeChannelId,
           videoId: youtubeId,
+          youtubeChannelId,
           isTwitch: !!twitchChannel,
           twitchChannel,
           isKick: !!kickChannel,
@@ -227,8 +245,9 @@ function App() {
     } else {
       addWidget('video', 3, 2, {
         url: finalUrl,
-        isYouTube: !!youtubeId,
+        isYouTube: !!youtubeId || !!youtubeChannelId,
         videoId: youtubeId,
+        youtubeChannelId,
         isTwitch: !!twitchChannel,
         twitchChannel,
         isKick: !!kickChannel,
@@ -253,6 +272,7 @@ function App() {
     }
 
     const youtubeId = extractYouTubeId(finalUrl);
+    const youtubeChannelId = extractYouTubeChannelId(finalUrl);
     const twitchChannel = extractTwitchChannel(finalUrl);
     const kickChannel = extractKickChannel(finalUrl);
 
@@ -261,8 +281,9 @@ function App() {
         ...w,
         type: 'video',
         url: finalUrl,
-        isYouTube: !!youtubeId,
+        isYouTube: !!youtubeId || !!youtubeChannelId,
         videoId: youtubeId,
+        youtubeChannelId,
         isTwitch: !!twitchChannel,
         twitchChannel,
         isKick: !!kickChannel,

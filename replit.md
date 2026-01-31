@@ -216,6 +216,9 @@ gap: 1rem;
 - **Hover-Only Fullscreen X**: Button hidden by default (opacity-0), 40px hover zone at top center reveals it
 - **Twitch Trending Channels**: Added ESL_CSGO, RocketLeague, Gaules to sidebar with LIVE badges
 - **Add Button Works Anytime**: Add Video button inside widgets works outside Edit Mode
+- **YouTube Channel Embeds**: Uses permanent /embed/live_stream?channel=CHANNEL_ID format for news channels
+- **Twitch Player Detection**: extractTwitchChannel matches both twitch.tv and player.twitch.tv URLs
+- **Widget youtubeChannelId**: New property for channel-based live streams vs video ID-based embeds
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px

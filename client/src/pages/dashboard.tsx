@@ -288,6 +288,11 @@ const MasterControlDashboard = ({
     return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
   };
 
+  // Generate embed URL for YouTube channel-based live streams (permanent, never expires)
+  const getYouTubeChannelEmbedUrl = (channelId: string): string => {
+    return `https://www.youtube.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&modestbranding=1&rel=0`;
+  };
+
   const getTwitchEmbedUrl = (channel: string): string => {
     const parentDomain = window.location.hostname;
     return `https://player.twitch.tv/?channel=${channel}&parent=${parentDomain}&autoplay=true&muted=true`;
@@ -446,7 +451,22 @@ const MasterControlDashboard = ({
     
     switch (widget.type) {
       case 'video':
-        if (widget.isYouTube && widget.videoId) {
+        // YouTube channel-based live stream (permanent URL)
+        if (widget.isYouTube && widget.youtubeChannelId) {
+          return (
+            <iframe
+              key={`youtube-channel-${widget.id}-${widget.lastRefresh || 0}`}
+              ref={(el) => { iframeRefs.current[widget.id] = el; }}
+              src={getYouTubeChannelEmbedUrl(widget.youtubeChannelId)}
+              className="w-full h-full"
+              style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
+              title={`YouTube Live - ${widget.id}`}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          );
+        } else if (widget.isYouTube && widget.videoId) {
+          // YouTube video ID-based embed (specific video)
           return (
             <iframe
               key={`youtube-${widget.id}-${widget.lastRefresh || 0}`}
@@ -813,7 +833,7 @@ const MasterControlDashboard = ({
         >
         {widgets.map((widget) => (
           <SortableWidget key={widget.id} widget={widget} isEditMode={isEditMode}>
-            {widget.type === 'video' && (widget.url || widget.videoId || widget.twitchChannel || widget.kickChannel) && !isEditMode && (
+            {widget.type === 'video' && (widget.url || widget.videoId || widget.youtubeChannelId || widget.twitchChannel || widget.kickChannel) && !isEditMode && (
               <>
                 {/* Seek Mode "Done" button - always visible when seek mode is active */}
                 {seekModeWidgets.has(widget.id) && (
