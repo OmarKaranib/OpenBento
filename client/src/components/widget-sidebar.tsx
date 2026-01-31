@@ -32,11 +32,18 @@ export interface WidgetTemplate {
 }
 
 const TRENDING_CHANNELS: TrendingChannel[] = [
+  // YouTube 24/7 Live Streams (using permanent channel URLs)
   { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/live_stream?channel=UCLA_DiR1FfKNvjuUpBHmylQ', iconType: 'science', category: 'Science', platform: 'youtube', channelId: 'UCLA_DiR1FfKNvjuUpBHmylQ' },
   { id: 'lofi-girl', name: 'Lofi Girl', url: 'https://www.youtube.com/embed/live_stream?channel=UCSJ4gkVC6NrvII8umztf0Ow', iconType: 'music', category: 'Music', platform: 'youtube', channelId: 'UCSJ4gkVC6NrvII8umztf0Ow' },
   { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/embed/live_stream?channel=UCoMdktPbSTixAyNGwb-UYkQ', iconType: 'news', category: 'News', platform: 'youtube', channelId: 'UCoMdktPbSTixAyNGwb-UYkQ' },
-  { id: 'kick-xqc', name: 'xQc (Kick)', url: 'https://kick.com/xqc', iconType: 'gaming', category: 'Gaming', platform: 'kick', channelId: 'xqc' },
-  { id: 'kick-adin', name: 'Adin Ross (Kick)', url: 'https://kick.com/adinross', iconType: 'gaming', category: 'Gaming', platform: 'kick', channelId: 'adinross' },
+  { id: 'abc-news', name: 'ABC News', url: 'https://www.youtube.com/embed/live_stream?channel=UCBi2mrWuNuyYy4gbM6fU18Q', iconType: 'news', category: 'News', platform: 'youtube', channelId: 'UCBi2mrWuNuyYy4gbM6fU18Q' },
+  // Twitch Trending Channels
+  { id: 'twitch-esl', name: 'ESL CS:GO', url: 'https://www.twitch.tv/esl_csgo', iconType: 'gaming', category: 'Esports', platform: 'twitch', channelId: 'esl_csgo' },
+  { id: 'twitch-rocket', name: 'Rocket League', url: 'https://www.twitch.tv/rocketleague', iconType: 'gaming', category: 'Esports', platform: 'twitch', channelId: 'rocketleague' },
+  { id: 'twitch-gaules', name: 'Gaules', url: 'https://www.twitch.tv/gaules', iconType: 'gaming', category: 'Gaming', platform: 'twitch', channelId: 'gaules' },
+  // Kick Channels
+  { id: 'kick-xqc', name: 'xQc', url: 'https://kick.com/xqc', iconType: 'gaming', category: 'Gaming', platform: 'kick', channelId: 'xqc' },
+  { id: 'kick-adin', name: 'Adin Ross', url: 'https://kick.com/adinross', iconType: 'gaming', category: 'Gaming', platform: 'kick', channelId: 'adinross' },
 ];
 
 // Live status polling interval (5 minutes)
@@ -250,6 +257,9 @@ export function WidgetSidebar({
           // For YouTube channels, assume live (24/7 streams)
           if (channel.platform === 'youtube') {
             isLive = true; // NASA, Lofi Girl, Sky News are 24/7
+          } else if (channel.platform === 'twitch') {
+            // Twitch requires OAuth for live status, assume potentially live
+            isLive = true;
           } else if (channel.platform === 'kick') {
             isLive = await checkKickLiveStatus(channel.channelId);
           }

@@ -627,35 +627,19 @@ const MasterControlDashboard = ({
         <div className="absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
-      {/* Exit Fullscreen X Button - visible initially, click to exit fullscreen */}
-      {isFullscreen && !headerVisible && !exitButtonDismissed && (
+      {/* 40px hover zone at top-center - reveals exit button when hovering (only when header hidden) */}
+      {isFullscreen && (
         <div 
-          className="fixed top-[1rem] left-1/2 -translate-x-1/2 z-[10001]"
-          data-testid="exit-fullscreen-container"
-        >
-          <button
-            onClick={exitFullscreenAndRestoreHeader}
-            className="p-[0.8rem] bg-slate-800/90 hover:bg-red-600 backdrop-blur-md slot-button text-slate-300 hover:text-white shadow-lg border border-slate-600/50 transition-all duration-200"
-            title="Exit Fullscreen (click to exit, or press ESC)"
-            data-testid="button-exit-fullscreen-floating"
-          >
-            <X className="w-[1.4rem] h-[1.4rem]" />
-          </button>
-        </div>
-      )}
-
-      {/* 15px hover zone at top-center - reveals exit button when hovering */}
-      {isFullscreen && !headerVisible && exitButtonDismissed && (
-        <div 
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-[20rem] h-[15px] z-[10001] group"
-          onMouseEnter={() => setExitButtonDismissed(false)}
+          className={`fixed top-0 left-1/2 -translate-x-1/2 w-[24rem] h-[40px] z-[10001] group transition-opacity duration-200 ${
+            headerVisible ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
+          }`}
           data-testid="hover-zone-top"
         >
           <button
             onClick={exitFullscreenAndRestoreHeader}
-            className="absolute top-[1rem] left-1/2 -translate-x-1/2 p-[0.8rem] bg-slate-800/90 hover:bg-red-600 backdrop-blur-md slot-button text-slate-300 hover:text-white shadow-lg border border-slate-600/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-            title="Exit Fullscreen"
-            data-testid="button-exit-fullscreen-hover"
+            className="absolute top-[0.8rem] left-1/2 -translate-x-1/2 p-[0.8rem] bg-slate-800/90 hover:bg-red-600 backdrop-blur-md slot-button text-slate-300 hover:text-white shadow-lg border border-slate-600/50 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200"
+            title="Exit Fullscreen (or press ESC)"
+            data-testid="button-exit-fullscreen-floating"
           >
             <X className="w-[1.4rem] h-[1.4rem]" />
           </button>

@@ -213,6 +213,9 @@ gap: 1rem;
 - **Platform Labels**: Channels show platform (YouTube/Kick) in sidebar category display
 - **Twitch Parent Fix**: Uses window.location.hostname for proper Replit domain embedding
 - **YouTube Permanent URLs**: Trending channels use /embed/live_stream?channel=CHANNEL_ID format (no expiring video IDs)
+- **Hover-Only Fullscreen X**: Button hidden by default (opacity-0), 40px hover zone at top center reveals it
+- **Twitch Trending Channels**: Added ESL_CSGO, RocketLeague, Gaules to sidebar with LIVE badges
+- **Add Button Works Anytime**: Add Video button inside widgets works outside Edit Mode
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px
