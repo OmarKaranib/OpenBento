@@ -15,6 +15,7 @@ export interface TrendingChannel {
   channelId?: string;
   videoId?: string | null;
   lastUpdated?: number;
+  isLive?: boolean; // True for live streams (10-min refresh), false for normal videos (no refresh)
 }
 
 export interface LiveStatus {

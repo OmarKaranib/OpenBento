@@ -21,7 +21,7 @@ export interface LinksData {
 
 const LINKS_FILE_PATH = path.join(process.cwd(), 'server', 'data', 'links.json');
 
-const YOUTUBE_CHANNELS: Omit<LiveChannel, 'videoId' | 'lastUpdated'>[] = [
+const YOUTUBE_CHANNELS: Omit<LiveChannel, 'videoId' | 'lastUpdated' | 'isLive'>[] = [
   { id: 'nasa-live', name: 'NASA Live', channelHandle: 'NASA', platform: 'youtube', iconType: 'science', category: 'Science' },
   { id: 'lofi-girl', name: 'Lofi Girl', channelHandle: 'LofiGirl', platform: 'youtube', iconType: 'music', category: 'Music' },
   { id: 'sky-news', name: 'Sky News', channelHandle: 'skynews', platform: 'youtube', iconType: 'news', category: 'News' },

@@ -165,6 +165,45 @@ const MasterControlDashboard = ({
     return () => document.removeEventListener('mousemove', handleMouseMove);
   }, [isFullscreen, headerVisible]);
 
+  // 10-minute refresh interval for live widgets only
+  // Normal videos (isLive=false) do not get automatic refresh
+  const TEN_MINUTES_MS = 10 * 60 * 1000;
+  const liveWidgetCount = widgets.filter(w => w.type === 'video' && w.isLive === true).length;
+  
+  useEffect(() => {
+    if (liveWidgetCount === 0) {
+      return; // No live widgets, no need for refresh interval
+    }
+    
+    console.log(`[Dashboard] Starting 10-min refresh interval for ${liveWidgetCount} live widget(s)`);
+    
+    const refreshInterval = setInterval(() => {
+      const now = Date.now();
+      console.log('[Dashboard] Running 10-min live widget refresh check');
+      
+      setWidgets(prev => prev.map(w => {
+        // Only refresh live video widgets
+        if (w.type !== 'video' || w.isLive !== true) {
+          return w;
+        }
+        
+        // Check if 10 minutes have passed since last refresh
+        const timeSinceRefresh = now - (w.lastRefresh || 0);
+        if (timeSinceRefresh >= TEN_MINUTES_MS) {
+          console.log(`[Dashboard] Refreshing live widget: ${w.id}`);
+          return { ...w, lastRefresh: now };
+        }
+        
+        return w;
+      }));
+    }, TEN_MINUTES_MS);
+    
+    return () => {
+      console.log('[Dashboard] Cleaning up live widget refresh interval');
+      clearInterval(refreshInterval);
+    };
+  }, [liveWidgetCount, setWidgets]);
+
   // Helper function to exit fullscreen and restore header
   const exitFullscreenAndRestoreHeader = () => {
     if (document.fullscreenElement) {

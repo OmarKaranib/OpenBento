@@ -207,6 +207,9 @@ function App() {
     const youtubeChannelId = extractYouTubeChannelId(channel.url);
     const twitchChannel = extractTwitchChannel(channel.url);
     const kickChannel = extractKickChannel(channel.url);
+    
+    // Determine if this is a live stream - Twitch/Kick are always live, YouTube uses isLive flag
+    const isLiveStream = channel.platform === 'twitch' || channel.platform === 'kick' || channel.isLive === true;
 
     addWidget('video', w, h, {
       url: channel.url,
@@ -217,6 +220,7 @@ function App() {
       twitchChannel,
       isKick: !!kickChannel,
       kickChannel,
+      isLive: isLiveStream,
       lastRefresh: Date.now()
     });
   }, [addWidget]);
@@ -248,6 +252,7 @@ function App() {
           twitchChannel,
           isKick: !!kickChannel,
           kickChannel,
+          isLive: false, // Manual URL submissions are treated as normal videos (no auto-refresh)
           error: null,
           embedBlocked: false,
           isPaused: false,
@@ -266,6 +271,7 @@ function App() {
         twitchChannel,
         isKick: !!kickChannel,
         kickChannel,
+        isLive: false, // Manual URL submissions are treated as normal videos (no auto-refresh)
         lastRefresh: Date.now()
       });
     }
@@ -302,6 +308,7 @@ function App() {
         twitchChannel,
         isKick: !!kickChannel,
         kickChannel,
+        isLive: false, // Inline URL submissions are treated as normal videos (no auto-refresh)
         error: null,
         embedBlocked: false,
         isPaused: false,
@@ -620,7 +627,11 @@ function App() {
     const videoId = extractYouTubeId(channel.url);
     const youtubeChannelId = extractYouTubeChannelId(channel.url);
     const twitchChannel = extractTwitchChannel(channel.url);
+    const kickChannel = extractKickChannel(channel.url);
     const currentActiveWidgetId = activeWidgetIdRef.current;
+    
+    // Determine if this is a live stream - Twitch/Kick are always live, YouTube uses isLive flag
+    const isLiveStream = channel.platform === 'twitch' || channel.platform === 'kick' || channel.isLive === true;
 
     if (currentActiveWidgetId) {
       setWidgets(prev => prev.map(w => 
@@ -633,11 +644,15 @@ function App() {
           youtubeChannelId,
           isTwitch: !!twitchChannel,
           twitchChannel,
+          isKick: !!kickChannel,
+          kickChannel,
+          isLive: isLiveStream,
           error: null,
           embedBlocked: false,
           isPaused: false,
           isMuted: true,
-          isOffline: false
+          isOffline: false,
+          lastRefresh: Date.now()
         } : w
       ));
     } else {
