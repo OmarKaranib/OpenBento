@@ -381,12 +381,10 @@ const MasterControlDashboard = ({
     return `https://www.youtube.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&modestbranding=1&rel=0`;
   };
 
-  // CRITICAL FIX: Robust Twitch Parent Detection with Multiple Fallbacks
+  // CRITICAL FIX: Dynamic Twitch Parent Detection
   const getTwitchEmbedUrl = (channel: string): string => {
-    // Use multiple parent domains to cover all Replit preview states
-    const parents = [window.location.hostname, 'replit.app', 'replit.dev'];
-    const parentParams = parents.map(p => `parent=${p}`).join('&');
-    return `https://player.twitch.tv/?channel=${channel}&${parentParams}&autoplay=true&muted=true`;
+    // Use dynamic hostname detection for any Replit subdomain
+    return `https://player.twitch.tv/?channel=${channel}&parent=${window.location.hostname}&muted=true&autoplay=true`;
   };
 
   const getKickEmbedUrl = (channel: string): string => {

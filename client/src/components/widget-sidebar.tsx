@@ -32,8 +32,8 @@ export interface WidgetTemplate {
 }
 
 const TRENDING_CHANNELS: TrendingChannel[] = [
-  // YouTube 24/7 Live Streams (using permanent channel URLs)
-  { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/live_stream?channel=UCLA_DiR1FfKNvjuUpBHmylQ', iconType: 'science', category: 'Science', platform: 'youtube', channelId: 'UCLA_DiR1FfKNvjuUpBHmylQ' },
+  // YouTube 24/7 Live Streams using verified 2026 video IDs
+  { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/watch?v=21X5lGlDOfg', iconType: 'science', category: 'Science', platform: 'youtube', channelId: undefined },
   { id: 'lofi-girl', name: 'Lofi Girl', url: 'https://www.youtube.com/embed/live_stream?channel=UCSJ4gkVC6NrvII8umztf0Ow', iconType: 'music', category: 'Music', platform: 'youtube', channelId: 'UCSJ4gkVC6NrvII8umztf0Ow' },
   // News channels using verified stable video IDs (2026)
   { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/watch?v=9Auqkrry-jE', iconType: 'news', category: 'News', platform: 'youtube', channelId: undefined },
