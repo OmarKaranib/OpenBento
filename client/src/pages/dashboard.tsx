@@ -47,7 +47,7 @@ const SortableWidget = ({ widget, isEditMode, children }: SortableWidgetProps) =
         isEditMode
           ? 'border-purple-500/70 ring-1 ring-purple-400/30 animate-jiggle'
           : 'border-slate-700/50 hover:border-cyan-500/50'
-      } ${isDragging ? 'z-50' : ''}`}
+      } ${isDragging ? 'z-[9999]' : 'z-10'}`}
       data-testid={`widget-${widget.id}`}
     >
       {/* Overlay blocks iframe interactions in Edit Mode but not buttons */}
@@ -573,7 +573,7 @@ const MasterControlDashboard = ({
           return <OfflinePlaceholder widget={widget} />;
         }
 
-        // YouTube channel-based live stream (permanent URL) with fallback to video ID
+        // YouTube iframe with no-cookie domain, origin handshake, and referrerPolicy
         if (widget.isYouTube && widget.youtubeChannelId) {
           return (
             <iframe
@@ -587,13 +587,11 @@ const MasterControlDashboard = ({
               referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
               onError={() => {
-                console.log(`[Fallback] YouTube channel embed failed for ${widget.youtubeChannelId}, attempting video ID fallback...`);
-                // Fallback: If widget has a video ID, switch to video ID mode; otherwise mark offline
+                console.log(`[Fallback] YouTube channel embed failed for ${widget.youtubeChannelId}`);
                 setWidgets(prev => prev.map(w => {
                   if (w.id !== widget.id) return w;
                   if (w.videoId) {
-                    console.log(`[Fallback] Switching to video ID: ${w.videoId}`);
-                    return { ...w, youtubeChannelId: null }; // Clear channelId to trigger videoId embed
+                    return { ...w, youtubeChannelId: null };
                   }
                   return { ...w, isOffline: true };
                 }));
@@ -601,7 +599,6 @@ const MasterControlDashboard = ({
             />
           );
         } else if (widget.isYouTube && widget.videoId) {
-          // YouTube video ID-based embed (specific video)
           return (
             <iframe
               key={`youtube-${widget.id}-${widget.lastRefresh || 0}`}

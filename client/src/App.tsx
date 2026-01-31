@@ -371,10 +371,85 @@ function App() {
     const gridX = Math.max(0, Math.min(GRID_COLS - 1, Math.floor(relativeX / cellWidth)));
     const gridY = Math.max(0, Math.min(5, Math.floor(relativeY / cellHeight))); // 0-5 for 6 rows
 
-    // Update both ref and state
+    // Get the dragging widget's dimensions
+    const activeData = event.active.data.current;
+    const draggedWidgetId = event.active.id as string;
+    
+    if (activeData?.type === 'sortable-widget') {
+      const draggedWidget = widgets.find(w => w.id === draggedWidgetId);
+      if (draggedWidget) {
+        const previewW = draggedWidget.w;
+        const previewH = draggedWidget.h;
+        
+        // Clamp preview position to grid bounds
+        const clampedX = Math.max(0, Math.min(GRID_COLS - previewW, gridX));
+        const clampedY = Math.max(0, Math.min(5 - previewH + 1, gridY));
+
+        // REAL-TIME COLLISION DETECTION: Treat preview as solid block
+        // Find widgets that would collide with the preview position
+        const collidingWidgets = widgets.filter(widget => {
+          if (widget.id === draggedWidgetId) return false;
+          const widgetRight = widget.x + widget.w;
+          const widgetBottom = widget.y + widget.h;
+          const previewRight = clampedX + previewW;
+          const previewBottom = clampedY + previewH;
+          return clampedX < widgetRight && previewRight > widget.x && clampedY < widgetBottom && previewBottom > widget.y;
+        });
+
+        // Push colliding widgets in real-time
+        if (collidingWidgets.length > 0) {
+          setWidgets(currentWidgets => {
+            let updatedWidgets = [...currentWidgets];
+            const GRID_ROWS = 6;
+            
+            for (const collidingWidget of collidingWidgets) {
+              // Find next available slot for the pushed widget
+              const findSlot = (w: Widget, allWidgets: Widget[], excludeIds: string[]): { x: number; y: number } | null => {
+                for (let y = 0; y <= GRID_ROWS - w.h; y++) {
+                  for (let x = 0; x <= GRID_COLS - w.w; x++) {
+                    let collision = false;
+                    for (const other of allWidgets) {
+                      if (excludeIds.includes(other.id)) continue;
+                      // Also check against the preview position
+                      if (x < other.x + other.w && x + w.w > other.x && y < other.y + other.h && y + w.h > other.y) {
+                        collision = true;
+                        break;
+                      }
+                    }
+                    // Also check against the preview position
+                    if (!collision && x < clampedX + previewW && x + w.w > clampedX && y < clampedY + previewH && y + w.h > clampedY) {
+                      collision = true;
+                    }
+                    if (!collision) {
+                      return { x, y };
+                    }
+                  }
+                }
+                return null;
+              };
+
+              const newSlot = findSlot(collidingWidget, updatedWidgets, [collidingWidget.id, draggedWidgetId]);
+              if (newSlot) {
+                updatedWidgets = updatedWidgets.map(w =>
+                  w.id === collidingWidget.id ? { ...w, x: newSlot.x, y: newSlot.y } : w
+                );
+              }
+            }
+            return updatedWidgets;
+          });
+        }
+
+        // Update ghost position
+        ghostPositionRef.current = { x: clampedX, y: clampedY, w: previewW, h: previewH };
+        setGhostPosition(ghostPositionRef.current);
+        return;
+      }
+    }
+
+    // Update both ref and state (fallback for non-widget drags)
     ghostPositionRef.current = { ...ghostPositionRef.current, x: gridX, y: gridY };
     setGhostPosition(ghostPositionRef.current);
-  }, []);
+  }, [widgets, setWidgets]);
 
   // Helper function to check if a position is occupied by another widget
   const isPositionOccupied = useCallback((x: number, y: number, w: number, h: number, excludeWidgetId: string, currentWidgets: Widget[]): boolean => {
