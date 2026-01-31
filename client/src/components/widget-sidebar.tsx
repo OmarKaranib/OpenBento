@@ -1,8 +1,9 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, Radio } from 'lucide-react';
+import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, Radio, RefreshCw } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { WidgetType } from '@/App';
+import { useQuery } from '@tanstack/react-query';
 
 export interface TrendingChannel {
   id: string;
@@ -11,7 +12,9 @@ export interface TrendingChannel {
   iconType: 'news' | 'science' | 'music' | 'finance' | 'gaming';
   category: string;
   platform: 'youtube' | 'twitch' | 'kick';
-  channelId?: string; // For API status checks
+  channelId?: string;
+  videoId?: string | null;
+  lastUpdated?: number;
 }
 
 export interface LiveStatus {
@@ -34,30 +37,36 @@ export interface WidgetTemplate {
 // Helper to generate Pro YouTube embed URL with handshake parameters
 const getProYouTubeEmbedUrl = (videoId: string): string => {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://localhost';
-  return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&origin=${encodeURIComponent(origin)}`;
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&origin=${encodeURIComponent(origin)}&parent=${encodeURIComponent(hostname)}`;
 };
 
 // Helper to generate Pro YouTube channel live stream URL
 const getProYouTubeChannelUrl = (channelId: string): string => {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://localhost';
-  return `https://www.youtube-nocookie.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&origin=${encodeURIComponent(origin)}`;
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  return `https://www.youtube-nocookie.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&origin=${encodeURIComponent(origin)}&parent=${encodeURIComponent(hostname)}`;
 };
 
-const TRENDING_CHANNELS: TrendingChannel[] = [
-  // YouTube 24/7 Live Streams using Pro youtube-nocookie.com format with handshake
+// Fallback channels (used when API is not available)
+const FALLBACK_CHANNELS: TrendingChannel[] = [
   { id: 'nasa-live', name: 'NASA Live', url: getProYouTubeEmbedUrl('21X5lGlDOfg'), iconType: 'science', category: 'Science', platform: 'youtube', channelId: undefined },
   { id: 'lofi-girl', name: 'Lofi Girl', url: getProYouTubeChannelUrl('UCSJ4gkVC6NrvII8umztf0Ow'), iconType: 'music', category: 'Music', platform: 'youtube', channelId: 'UCSJ4gkVC6NrvII8umztf0Ow' },
-  // News channels using Pro youtube-nocookie.com format with handshake
   { id: 'sky-news', name: 'Sky News', url: getProYouTubeEmbedUrl('9Auqkrry-jE'), iconType: 'news', category: 'News', platform: 'youtube', channelId: undefined },
   { id: 'abc-news', name: 'ABC News', url: getProYouTubeEmbedUrl('I9u-j-2V_Vw'), iconType: 'news', category: 'News', platform: 'youtube', channelId: undefined },
-  // Twitch Trending Channels
   { id: 'twitch-esl', name: 'ESL CS:GO', url: 'https://www.twitch.tv/esl_csgo', iconType: 'gaming', category: 'Esports', platform: 'twitch', channelId: 'esl_csgo' },
   { id: 'twitch-rocket', name: 'Rocket League', url: 'https://www.twitch.tv/rocketleague', iconType: 'gaming', category: 'Esports', platform: 'twitch', channelId: 'rocketleague' },
   { id: 'twitch-gaules', name: 'Gaules', url: 'https://www.twitch.tv/gaules', iconType: 'gaming', category: 'Gaming', platform: 'twitch', channelId: 'gaules' },
-  // Kick Channels
   { id: 'kick-xqc', name: 'xQc', url: 'https://kick.com/xqc', iconType: 'gaming', category: 'Gaming', platform: 'kick', channelId: 'xqc' },
   { id: 'kick-adin', name: 'Adin Ross', url: 'https://kick.com/adinross', iconType: 'gaming', category: 'Gaming', platform: 'kick', channelId: 'adinross' },
 ];
+
+// API response type
+interface LinksApiResponse {
+  channels: TrendingChannel[];
+  lastRefresh: number;
+  origin: string;
+}
 
 // Live status polling interval (5 minutes)
 const LIVE_STATUS_POLL_INTERVAL = 5 * 60 * 1000;
@@ -241,10 +250,21 @@ export function WidgetSidebar({
   const [liveStatuses, setLiveStatuses] = useState<Record<string, LiveStatus>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Fetch live channels from API (self-healing video library)
+  const { data: linksData, isLoading: isLoadingLinks, refetch: refetchLinks } = useQuery<LinksApiResponse>({
+    queryKey: ['/api/links'],
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 5 * 60 * 1000, // Poll every 5 minutes
+  });
+
+  // Use API channels if available, fallback to hardcoded
+  const channels: TrendingChannel[] = linksData?.channels?.length 
+    ? linksData.channels 
+    : FALLBACK_CHANNELS;
+
   // Check live status for Kick channels
   const checkKickLiveStatus = useCallback(async (channelId: string): Promise<boolean> => {
     try {
-      // Kick API endpoint for channel info
       const response = await fetch(`https://kick.com/api/v2/channels/${channelId}`);
       if (response.ok) {
         const data = await response.json();
@@ -252,7 +272,6 @@ export function WidgetSidebar({
       }
       return false;
     } catch {
-      // Assume live if we can't check (CORS issues expected)
       return true;
     }
   }, []);
@@ -263,15 +282,13 @@ export function WidgetSidebar({
       const now = Date.now();
       const newStatuses: Record<string, LiveStatus> = {};
 
-      for (const channel of TRENDING_CHANNELS) {
+      for (const channel of channels) {
         if (channel.channelId) {
           let isLive = false;
           
-          // For YouTube channels, assume live (24/7 streams)
           if (channel.platform === 'youtube') {
-            isLive = true; // NASA, Lofi Girl, Sky News are 24/7
+            isLive = true;
           } else if (channel.platform === 'twitch') {
-            // Twitch requires OAuth for live status, assume potentially live
             isLive = true;
           } else if (channel.platform === 'kick') {
             isLive = await checkKickLiveStatus(channel.channelId);
@@ -288,13 +305,11 @@ export function WidgetSidebar({
       setLiveStatuses(newStatuses);
     };
 
-    // Initial check
     checkAllStatuses();
 
-    // Poll every 5 minutes
     const interval = setInterval(checkAllStatuses, LIVE_STATUS_POLL_INTERVAL);
     return () => clearInterval(interval);
-  }, [checkKickLiveStatus]);
+  }, [checkKickLiveStatus, channels]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -308,14 +323,14 @@ export function WidgetSidebar({
   };
 
   const filteredChannels = useMemo(() => {
-    if (!searchQuery.trim()) return TRENDING_CHANNELS;
+    if (!searchQuery.trim()) return channels;
     const query = searchQuery.toLowerCase();
-    return TRENDING_CHANNELS.filter(
-      channel => 
+    return channels.filter(
+      (channel: TrendingChannel) => 
         channel.name.toLowerCase().includes(query) ||
         channel.category.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [searchQuery, channels]);
 
   return (
     <>
@@ -507,12 +522,24 @@ export function WidgetSidebar({
               </div>
               
               <div>
-                <h3 className="text-[1.4rem] font-semibold text-cyan-400 mb-[1rem] flex items-center gap-[0.6rem]">
-                  <Tv className="w-[1.6rem] h-[1.6rem]" />
-                  Trending Streams
-                </h3>
+                <div className="flex items-center justify-between mb-[1rem]">
+                  <h3 className="text-[1.4rem] font-semibold text-cyan-400 flex items-center gap-[0.6rem]">
+                    <Tv className="w-[1.6rem] h-[1.6rem]" />
+                    Trending Streams
+                  </h3>
+                  <button
+                    onClick={() => refetchLinks()}
+                    className="p-[0.6rem] hover:bg-slate-800 slot-button transition-colors"
+                    title="Refresh stream links"
+                    data-testid="button-refresh-links"
+                  >
+                    <RefreshCw className={`w-[1.4rem] h-[1.4rem] text-cyan-400 ${isLoadingLinks ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
                 <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
-                  Drag or click to add live streams
+                  {linksData?.lastRefresh 
+                    ? `Auto-updated ${new Date(linksData.lastRefresh).toLocaleDateString()}`
+                    : 'Drag or click to add live streams'}
                 </p>
                 <div className="space-y-[0.8rem]">
                   {filteredChannels.map((channel) => (
@@ -546,4 +573,4 @@ export function WidgetSidebar({
   );
 }
 
-export { TRENDING_CHANNELS };
+export { FALLBACK_CHANNELS as TRENDING_CHANNELS };
