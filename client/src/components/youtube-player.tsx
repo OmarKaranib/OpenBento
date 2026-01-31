@@ -93,6 +93,38 @@ function YouTubePlayerInner({
   // Hardcoded origin for handshake - computed once
   const origin = useMemo(() => window.location.origin, []);
 
+  // MediaSession API for background play support
+  const setupMediaSession = useCallback(() => {
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: `Stream ${widgetId}`,
+          artist: 'Master Control Dashboard',
+          album: 'Live Streams',
+        });
+
+        navigator.mediaSession.setActionHandler('play', () => {
+          try {
+            playerRef.current?.playVideo();
+          } catch (e) {
+            console.log('[YouTube] MediaSession play error:', e);
+          }
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          try {
+            playerRef.current?.pauseVideo();
+          } catch (e) {
+            console.log('[YouTube] MediaSession pause error:', e);
+          }
+        });
+
+        console.log('[YouTube] MediaSession API configured for background play');
+      } catch (e) {
+        console.log('[YouTube] MediaSession setup error:', e);
+      }
+    }
+  }, [widgetId]);
+
   const initializePlayer = useCallback(() => {
     if (!containerRef.current || !window.YT?.Player) return;
     if (isInitializedRef.current && playerRef.current) return; // Already initialized
@@ -108,11 +140,13 @@ function YouTubePlayerInner({
     }
 
     // Standard 2026 YouTube IFrame API handshake parameters - hardcoded strings
+    // rel: 0 = no related videos, iv_load_policy: 3 = hide video annotations
     const playerVars: Record<string, string | number> = {
       autoplay: 1,
       mute: 1,
       modestbranding: 1,
       rel: 0,
+      iv_load_policy: 3,
       enablejsapi: 1,
       origin: origin,
       widget_referrer: window.location.href,
@@ -139,6 +173,9 @@ function YouTubePlayerInner({
                 iframe.referrerPolicy = 'strict-origin-when-cross-origin';
               }
             }
+            
+            // Setup MediaSession API for background play
+            setupMediaSession();
             
             // Delay player control calls to ensure API is fully ready
             setTimeout(() => {
@@ -180,7 +217,7 @@ function YouTubePlayerInner({
       console.error('[YouTube] Failed to initialize player:', e);
       onErrorRef.current?.();
     }
-  }, [playerId, stableVideoId, widgetId, origin]); // Only re-init when video/widget changes
+  }, [playerId, stableVideoId, widgetId, origin, setupMediaSession]); // Only re-init when video/widget changes
 
   // Initialize player only when videoId changes
   useEffect(() => {

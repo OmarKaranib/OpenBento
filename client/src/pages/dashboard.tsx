@@ -575,11 +575,11 @@ const MasterControlDashboard = ({
           return <OfflinePlaceholder widget={widget} />;
         }
 
-        // YouTube IFrame API with 2026 Standard handshake (no URL strings)
+        // YouTube IFrame API with MediaSession for background play, rel=0, iv_load_policy=3
         if (widget.isYouTube && (widget.videoId || widget.youtubeChannelId)) {
           return (
             <YouTubePlayer
-              key={`youtube-api-${widget.id}-${widget.lastRefresh || 0}`}
+              key={`youtube-${widget.id}-${widget.lastRefresh || 0}`}
               widgetId={widget.id}
               videoId={widget.videoId}
               channelId={widget.youtubeChannelId}
@@ -587,10 +587,10 @@ const MasterControlDashboard = ({
               isPaused={widget.isPaused}
               isSeekMode={isSeekMode}
               onReady={() => {
-                console.log(`[YouTube API] Player ready: ${widget.id}`);
+                console.log(`[YouTube] Player ready: ${widget.id}`);
               }}
               onError={() => {
-                console.log(`[YouTube API] Error for widget: ${widget.id}`);
+                console.log(`[YouTube] Error for widget: ${widget.id}`);
                 setWidgets(prev => prev.map(w => 
                   w.id === widget.id ? { ...w, isOffline: true } : w
                 ));
