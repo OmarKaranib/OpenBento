@@ -372,13 +372,14 @@ const MasterControlDashboard = ({
     };
   }, [resizing, setWidgets]);
 
+  // Privacy-enhanced YouTube embed using no-cookie domain
   const getYouTubeEmbedUrl = (videoId: string): string => {
-    return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
+    return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
   };
 
   // Generate embed URL for YouTube channel-based live streams (permanent, never expires)
   const getYouTubeChannelEmbedUrl = (channelId: string): string => {
-    return `https://www.youtube.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
+    return `https://www.youtube-nocookie.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
   };
 
   // CRITICAL FIX: Dynamic Twitch Parent Detection
