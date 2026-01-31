@@ -102,6 +102,7 @@ interface MasterControlDashboardProps {
   setIsFullscreen: Dispatch<SetStateAction<boolean>>;
   ghostPosition: { x: number; y: number; w: number; h: number } | null;
   gridContainerRef: MutableRefObject<HTMLDivElement | null>;
+  isGridFull: boolean;
 }
 
 interface ResizeState {
@@ -126,7 +127,8 @@ const MasterControlDashboard = ({
   isFullscreen,
   setIsFullscreen,
   ghostPosition,
-  gridContainerRef
+  gridContainerRef,
+  isGridFull
 }: MasterControlDashboardProps) => {
   const [masterMute, setMasterMute] = useState(true);
   const [resizing, setResizing] = useState<ResizeState | null>(null);
@@ -903,6 +905,9 @@ const MasterControlDashboard = ({
               {GRID_COLS}-col grid
             </span>
             
+          </div>
+
+          <div className="flex gap-[0.8rem] items-center">
             {/* Clear All - Hold to Clear (2 seconds) - Only visible in Edit Mode */}
             {isEditMode && (
               <button
@@ -954,16 +959,20 @@ const MasterControlDashboard = ({
                 <span className="relative z-10">{clearHoldProgress > 0 ? 'Hold...' : 'Clear All'}</span>
               </button>
             )}
-          </div>
 
-          <div className="flex gap-[0.8rem] items-center">
             <button
               onClick={handleOpenSidebarToContent}
-              className="px-[1.2rem] py-[0.6rem] bg-emerald-600 hover:bg-emerald-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-emerald-900/50 text-[1.2rem]"
+              disabled={isGridFull}
+              className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform shadow-lg text-[1.2rem] ${
+                isGridFull 
+                  ? 'bg-slate-600 cursor-not-allowed opacity-60 shadow-slate-900/50' 
+                  : 'bg-emerald-600 hover:bg-emerald-500 hover:scale-105 shadow-emerald-900/50'
+              }`}
+              title={isGridFull ? 'Grid Full - No space available' : 'Add a new block'}
               data-testid="button-add-block"
             >
               <Plus className="w-[1.4rem] h-[1.4rem]" />
-              Add Block
+              {isGridFull ? 'Grid Full' : 'Add Block'}
             </button>
 
             <button
@@ -1096,9 +1105,9 @@ const MasterControlDashboard = ({
                   </div>
                 )}
 
-                {/* Regular hover controls - circular 20px buttons with Life-Box theme */}
+                {/* Regular hover controls - circular 40px buttons with Life-Box theme */}
                 <div 
-                  className={`absolute top-[0.6rem] right-[0.6rem] z-50 flex gap-[0.6rem] transition-opacity duration-200 ${seekModeWidgets.has(widget.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                  className={`absolute top-[0.6rem] right-[0.6rem] z-50 flex gap-[0.8rem] transition-opacity duration-200 ${seekModeWidgets.has(widget.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                   style={{ pointerEvents: 'auto' }}
                 >
                   <button
@@ -1109,7 +1118,7 @@ const MasterControlDashboard = ({
                       e.preventDefault();
                       toggleSeekMode(widget.id);
                     }}
-                    className={`w-[2rem] h-[2rem] rounded-full transition-all duration-300 backdrop-blur-sm cursor-pointer flex items-center justify-center shadow-md border border-white/20 ${
+                    className={`w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm cursor-pointer flex items-center justify-center shadow-lg border border-white/30 ${
                       seekModeWidgets.has(widget.id)
                         ? 'bg-purple-600/90 hover:bg-purple-500 ring-2 ring-purple-400'
                         : 'bg-indigo-600/90 hover:bg-indigo-500'
@@ -1117,12 +1126,12 @@ const MasterControlDashboard = ({
                     title={seekModeWidgets.has(widget.id) ? 'Disable seek controls' : 'Enable seek controls (rewind/skip)'}
                     data-testid={`button-seek-mode-${widget.id}`}
                   >
-                    <Sliders className="w-[1rem] h-[1rem]" />
+                    <Sliders className="w-[2rem] h-[2rem]" />
                   </button>
 
                   <button
                     onClick={() => toggleWidgetMute(widget.id)}
-                    className={`w-[2rem] h-[2rem] rounded-full transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-md border border-white/20 ${
+                    className={`w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30 ${
                       widget.isMuted 
                         ? 'bg-red-600/90 hover:bg-red-500' 
                         : 'bg-emerald-600/90 hover:bg-emerald-500'
@@ -1130,12 +1139,12 @@ const MasterControlDashboard = ({
                     title={widget.isMuted ? 'Unmute' : 'Mute'}
                     data-testid={`button-mute-${widget.id}`}
                   >
-                    {widget.isMuted ? <VolumeX className="w-[1rem] h-[1rem]" /> : <Volume2 className="w-[1rem] h-[1rem]" />}
+                    {widget.isMuted ? <VolumeX className="w-[2rem] h-[2rem]" /> : <Volume2 className="w-[2rem] h-[2rem]" />}
                   </button>
 
                   <button
                     onClick={() => toggleWidgetPause(widget.id)}
-                    className={`w-[2rem] h-[2rem] rounded-full transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-md border border-white/20 ${
+                    className={`w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30 ${
                       widget.isPaused 
                         ? 'bg-yellow-600/90 hover:bg-yellow-500' 
                         : 'bg-blue-600/90 hover:bg-blue-500'
@@ -1143,25 +1152,25 @@ const MasterControlDashboard = ({
                     title={widget.isPaused ? 'Play' : 'Pause'}
                     data-testid={`button-pause-${widget.id}`}
                   >
-                    {widget.isPaused ? <Play className="w-[1rem] h-[1rem]" /> : <Pause className="w-[1rem] h-[1rem]" />}
+                    {widget.isPaused ? <Play className="w-[2rem] h-[2rem]" /> : <Pause className="w-[2rem] h-[2rem]" />}
                   </button>
 
                   <button
                     onClick={() => handleRefreshWidget(widget.id)}
-                    className="w-[2rem] h-[2rem] rounded-full transition-all duration-300 backdrop-blur-sm bg-cyan-600/90 hover:bg-cyan-500 flex items-center justify-center shadow-md border border-white/20"
+                    className="w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm bg-cyan-600/90 hover:bg-cyan-500 flex items-center justify-center shadow-lg border border-white/30"
                     title="Refresh stream"
                     data-testid={`button-refresh-${widget.id}`}
                   >
-                    <RefreshCw className="w-[1rem] h-[1rem]" />
+                    <RefreshCw className="w-[2rem] h-[2rem]" />
                   </button>
 
                   <button
                     onClick={() => handleRemoveWidget(widget.id)}
-                    className="w-[2rem] h-[2rem] rounded-full transition-all duration-300 backdrop-blur-sm bg-red-600/90 hover:bg-red-500 flex items-center justify-center shadow-md border border-white/20"
+                    className="w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm bg-red-600/90 hover:bg-red-500 flex items-center justify-center shadow-lg border border-white/30"
                     title="Delete widget"
                     data-testid={`button-delete-${widget.id}`}
                   >
-                    <Trash2 className="w-[1rem] h-[1rem]" />
+                    <Trash2 className="w-[2rem] h-[2rem]" />
                   </button>
                 </div>
               </>
@@ -1169,7 +1178,7 @@ const MasterControlDashboard = ({
 
             {isEditMode && (
               <div 
-                className="absolute top-[0.6rem] right-[0.6rem] z-40 flex gap-[0.6rem]"
+                className="absolute top-[0.6rem] right-[0.6rem] z-40 flex gap-[0.8rem]"
                 style={{ pointerEvents: 'auto' }}
               >
                 <button
@@ -1178,11 +1187,11 @@ const MasterControlDashboard = ({
                     e.preventDefault();
                     handleOpenSidebar(widget.id);
                   }}
-                  className="w-[2rem] h-[2rem] rounded-full bg-cyan-600/90 hover:bg-cyan-500 transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-md border border-white/20"
+                  className="w-[4rem] h-[4rem] rounded-full bg-cyan-600/90 hover:bg-cyan-500 transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30"
                   title="Edit widget content"
                   data-testid={`button-edit-${widget.id}`}
                 >
-                  <Settings className="w-[1rem] h-[1rem]" />
+                  <Settings className="w-[2rem] h-[2rem]" />
                 </button>
                 <button
                   onClick={(e) => {
@@ -1190,11 +1199,11 @@ const MasterControlDashboard = ({
                     e.preventDefault();
                     handleRemoveWidget(widget.id);
                   }}
-                  className="w-[2rem] h-[2rem] rounded-full bg-red-600/90 hover:bg-red-500 transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-md border border-white/20"
+                  className="w-[4rem] h-[4rem] rounded-full bg-red-600/90 hover:bg-red-500 transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30"
                   title="Remove widget"
                   data-testid={`button-remove-${widget.id}`}
                 >
-                  <Trash2 className="w-[1rem] h-[1rem]" />
+                  <Trash2 className="w-[2rem] h-[2rem]" />
                 </button>
               </div>
             )}

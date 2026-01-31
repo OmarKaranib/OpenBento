@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -199,25 +199,47 @@ function App() {
     return null;
   }, []);
 
+  // Check if any space is available for a 1x1 minimum widget
+  const isGridFull = useMemo(() => {
+    const GRID_ROWS = 6;
+    
+    // Check every cell to see if at least one 1x1 spot is free
+    for (let y = 0; y < GRID_ROWS; y++) {
+      for (let x = 0; x < GRID_COLS; x++) {
+        let cellFree = true;
+        for (const widget of widgets) {
+          const widgetRight = widget.x + widget.w;
+          const widgetBottom = widget.y + widget.h;
+          
+          if (x < widgetRight && x + 1 > widget.x && y < widgetBottom && y + 1 > widget.y) {
+            cellFree = false;
+            break;
+          }
+        }
+        if (cellFree) return false; // Found a free cell, grid is NOT full
+      }
+    }
+    return true; // No free cells found
+  }, [widgets]);
+
   const addWidget = useCallback((type: WidgetType, w = 3, h = 2, extraData?: Partial<Widget>) => {
     const widgetId = generateWidgetId();
     setWidgets(prev => {
       const smartResult = findSmartPosition(Math.min(w, GRID_COLS), h, prev);
       
-      // If grid is full, place at bottom (y = GRID_ROWS) to extend page
-      const position = smartResult || { x: 0, y: 6, w: Math.min(w, GRID_COLS), h };
-      
+      // If grid is full, do NOT add widget (no shifting/shrinking existing blocks)
       if (!smartResult) {
-        console.log('[SmartGrid] Grid is full, spawning at bottom to extend page');
+        console.log('[SmartGrid] Grid is full - cannot add widget');
+        return prev; // Return unchanged state
       }
       
       const newWidget: Widget = {
         id: widgetId,
         type,
-        x: position.x,
-        y: position.y,
-        w: position.w,
-        h: position.h,
+        x: smartResult.x,
+        y: smartResult.y,
+        w: smartResult.w,
+        h: smartResult.h,
         isMuted: true,
         isPaused: false,
         isOffline: false,
@@ -776,6 +798,7 @@ function App() {
                     setIsFullscreen={setIsFullscreen}
                     ghostPosition={ghostPosition}
                     gridContainerRef={gridContainerRef}
+                    isGridFull={isGridFull}
                   />
                 )}
               </Route>
