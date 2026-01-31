@@ -83,6 +83,7 @@ export function YouTubePlayer({
 
     const containerId = playerIdRef.current;
     
+    // Standard 2026 YouTube IFrame API handshake parameters
     const playerVars: Record<string, string | number> = {
       autoplay: 1,
       mute: 1,
@@ -90,6 +91,7 @@ export function YouTubePlayer({
       rel: 0,
       enablejsapi: 1,
       origin: window.location.origin,
+      widget_referrer: window.location.href,
       playsinline: 1,
     };
 
@@ -112,14 +114,24 @@ export function YouTubePlayer({
               }
             }
             
-            if (isMuted) {
-              event.target.mute();
-            } else {
-              event.target.unMute();
-            }
-            if (!isPaused) {
-              event.target.playVideo();
-            }
+            // Delay player control calls to ensure API is fully ready
+            setTimeout(() => {
+              try {
+                if (playerRef.current && typeof playerRef.current.mute === 'function') {
+                  if (isMuted) {
+                    playerRef.current.mute();
+                  } else {
+                    playerRef.current.unMute();
+                  }
+                  if (!isPaused && typeof playerRef.current.playVideo === 'function') {
+                    playerRef.current.playVideo();
+                  }
+                }
+              } catch (e) {
+                console.log('[YouTube] Player control error on ready:', e);
+              }
+            }, 100);
+            
             onReady?.();
           },
           onStateChange: (event) => {
@@ -130,8 +142,13 @@ export function YouTubePlayer({
             }
           },
           onError: (event) => {
+            // Error codes: 2=invalid param, 5=HTML5 error, 100=not found, 101/150=restricted
             console.log('[YouTube] Player error:', event.data, 'for widget:', widgetId);
-            onError?.();
+            // Only mark offline for critical errors (not found)
+            if (event.data === 100) {
+              onError?.();
+            }
+            // Error 150/101 = restricted, but player might still work - don't mark offline
           },
         },
       });
@@ -172,7 +189,7 @@ export function YouTubePlayer({
   }, [initializePlayer]);
 
   useEffect(() => {
-    if (playerRef.current) {
+    if (playerRef.current && typeof playerRef.current.mute === 'function') {
       try {
         if (isMuted) {
           playerRef.current.mute();
@@ -186,7 +203,7 @@ export function YouTubePlayer({
   }, [isMuted]);
 
   useEffect(() => {
-    if (playerRef.current) {
+    if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
       try {
         if (isPaused) {
           playerRef.current.pauseVideo();

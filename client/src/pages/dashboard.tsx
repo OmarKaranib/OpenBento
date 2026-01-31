@@ -4,6 +4,7 @@ import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Widget, WidgetType } from '@/App';
+import { YouTubePlayer } from '@/components/youtube-player';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -574,47 +575,34 @@ const MasterControlDashboard = ({
           return <OfflinePlaceholder widget={widget} />;
         }
 
-        // YouTube iframe with no-cookie domain, origin handshake, and referrerPolicy
-        if (widget.isYouTube && widget.youtubeChannelId) {
+        // YouTube IFrame API with 2026 Standard handshake (no URL strings)
+        if (widget.isYouTube && (widget.videoId || widget.youtubeChannelId)) {
           return (
-            <iframe
-              key={`youtube-channel-${widget.id}-${widget.lastRefresh || 0}`}
-              ref={(el) => { iframeRefs.current[widget.id] = el; }}
-              src={getYouTubeChannelEmbedUrl(widget.youtubeChannelId)}
-              className="w-full h-full"
-              style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
-              title={`YouTube Live - ${widget.id}`}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allowFullScreen
-              onError={() => {
-                console.log(`[Fallback] YouTube channel embed failed for ${widget.youtubeChannelId}`);
-                setWidgets(prev => prev.map(w => {
-                  if (w.id !== widget.id) return w;
-                  if (w.videoId) {
-                    return { ...w, youtubeChannelId: null };
-                  }
-                  return { ...w, isOffline: true };
-                }));
+            <YouTubePlayer
+              key={`youtube-api-${widget.id}-${widget.lastRefresh || 0}`}
+              widgetId={widget.id}
+              videoId={widget.videoId}
+              channelId={widget.youtubeChannelId}
+              isMuted={widget.isMuted}
+              isPaused={widget.isPaused}
+              isSeekMode={isSeekMode}
+              onReady={() => {
+                console.log(`[YouTube API] Player ready: ${widget.id}`);
               }}
-            />
-          );
-        } else if (widget.isYouTube && widget.videoId) {
-          return (
-            <iframe
-              key={`youtube-${widget.id}-${widget.lastRefresh || 0}`}
-              ref={(el) => { iframeRefs.current[widget.id] = el; }}
-              src={getYouTubeEmbedUrl(widget.videoId)}
-              className="w-full h-full"
-              style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
-              title={`YouTube - ${widget.id}`}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allowFullScreen
               onError={() => {
-                console.log(`[Error] YouTube video embed failed for ${widget.videoId}`);
+                console.log(`[YouTube API] Error for widget: ${widget.id}`);
                 setWidgets(prev => prev.map(w => 
                   w.id === widget.id ? { ...w, isOffline: true } : w
+                ));
+              }}
+              onMutedChange={(muted) => {
+                setWidgets(prev => prev.map(w =>
+                  w.id === widget.id ? { ...w, isMuted: muted } : w
+                ));
+              }}
+              onPausedChange={(paused) => {
+                setWidgets(prev => prev.map(w =>
+                  w.id === widget.id ? { ...w, isPaused: paused } : w
                 ));
               }}
             />
