@@ -289,12 +289,12 @@ const MasterControlDashboard = ({
   };
 
   const getTwitchEmbedUrl = (channel: string): string => {
-    const parentDomain = window.location.host.split(':')[0];
+    const parentDomain = window.location.hostname;
     return `https://player.twitch.tv/?channel=${channel}&parent=${parentDomain}&autoplay=true&muted=true`;
   };
 
   const getKickEmbedUrl = (channel: string): string => {
-    const parentDomain = window.location.host.split(':')[0];
+    const parentDomain = window.location.hostname;
     return `https://player.kick.com/${channel}?muted=true&autoplay=true&parent=${parentDomain}`;
   };
 

@@ -32,9 +32,9 @@ export interface WidgetTemplate {
 }
 
 const TRENDING_CHANNELS: TrendingChannel[] = [
-  { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/21X5lGlDOfg', iconType: 'science', category: 'Science', platform: 'youtube', channelId: 'UCLA_DiR1FfKNvjuUpBHmylQ' },
-  { id: 'lofi-girl', name: 'Lofi Girl', url: 'https://www.youtube.com/embed/jfKfPfyJRdk', iconType: 'music', category: 'Music', platform: 'youtube', channelId: 'UCSJ4gkVC6NrvII8umztf0Ow' },
-  { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/embed/9Auqna63EFE', iconType: 'news', category: 'News', platform: 'youtube', channelId: 'UCoMdktPbSTixAyNGwb-UYkQ' },
+  { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/live_stream?channel=UCLA_DiR1FfKNvjuUpBHmylQ', iconType: 'science', category: 'Science', platform: 'youtube', channelId: 'UCLA_DiR1FfKNvjuUpBHmylQ' },
+  { id: 'lofi-girl', name: 'Lofi Girl', url: 'https://www.youtube.com/embed/live_stream?channel=UCSJ4gkVC6NrvII8umztf0Ow', iconType: 'music', category: 'Music', platform: 'youtube', channelId: 'UCSJ4gkVC6NrvII8umztf0Ow' },
+  { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/embed/live_stream?channel=UCoMdktPbSTixAyNGwb-UYkQ', iconType: 'news', category: 'News', platform: 'youtube', channelId: 'UCoMdktPbSTixAyNGwb-UYkQ' },
   { id: 'kick-xqc', name: 'xQc (Kick)', url: 'https://kick.com/xqc', iconType: 'gaming', category: 'Gaming', platform: 'kick', channelId: 'xqc' },
   { id: 'kick-adin', name: 'Adin Ross (Kick)', url: 'https://kick.com/adinross', iconType: 'gaming', category: 'Gaming', platform: 'kick', channelId: 'adinross' },
 ];

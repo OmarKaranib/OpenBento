@@ -211,6 +211,8 @@ gap: 1rem;
 - **Live Status Badges**: Multiview.world style badges with 5-minute polling for Kick channels
 - **Shared exitAction()**: Floating X button and ESC key both call exitFullscreenAndRestoreHeader()
 - **Platform Labels**: Channels show platform (YouTube/Kick) in sidebar category display
+- **Twitch Parent Fix**: Uses window.location.hostname for proper Replit domain embedding
+- **YouTube Permanent URLs**: Trending channels use /embed/live_stream?channel=CHANNEL_ID format (no expiring video IDs)
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px
