@@ -11,6 +11,7 @@ export interface LiveChannel {
   platform: 'youtube' | 'twitch' | 'kick';
   iconType: 'news' | 'science' | 'music' | 'finance' | 'gaming';
   category: string;
+  isLive: boolean; // True for live streams (refresh every 10 min), false for normal videos (no refresh)
 }
 
 export interface LinksData {
@@ -28,14 +29,19 @@ const YOUTUBE_CHANNELS: Omit<LiveChannel, 'videoId' | 'lastUpdated'>[] = [
 ];
 
 const STATIC_CHANNELS: LiveChannel[] = [
-  { id: 'twitch-esl', name: 'ESL CS:GO', channelHandle: 'esl_csgo', videoId: null, lastUpdated: Date.now(), platform: 'twitch', iconType: 'gaming', category: 'Esports' },
-  { id: 'twitch-rocket', name: 'Rocket League', channelHandle: 'rocketleague', videoId: null, lastUpdated: Date.now(), platform: 'twitch', iconType: 'gaming', category: 'Esports' },
-  { id: 'twitch-gaules', name: 'Gaules', channelHandle: 'gaules', videoId: null, lastUpdated: Date.now(), platform: 'twitch', iconType: 'gaming', category: 'Gaming' },
-  { id: 'kick-xqc', name: 'xQc', channelHandle: 'xqc', videoId: null, lastUpdated: Date.now(), platform: 'kick', iconType: 'gaming', category: 'Gaming' },
-  { id: 'kick-adin', name: 'Adin Ross', channelHandle: 'adinross', videoId: null, lastUpdated: Date.now(), platform: 'kick', iconType: 'gaming', category: 'Gaming' },
+  { id: 'twitch-esl', name: 'ESL CS:GO', channelHandle: 'esl_csgo', videoId: null, lastUpdated: Date.now(), platform: 'twitch', iconType: 'gaming', category: 'Esports', isLive: true },
+  { id: 'twitch-rocket', name: 'Rocket League', channelHandle: 'rocketleague', videoId: null, lastUpdated: Date.now(), platform: 'twitch', iconType: 'gaming', category: 'Esports', isLive: true },
+  { id: 'twitch-gaules', name: 'Gaules', channelHandle: 'gaules', videoId: null, lastUpdated: Date.now(), platform: 'twitch', iconType: 'gaming', category: 'Gaming', isLive: true },
+  { id: 'kick-xqc', name: 'xQc', channelHandle: 'xqc', videoId: null, lastUpdated: Date.now(), platform: 'kick', iconType: 'gaming', category: 'Gaming', isLive: true },
+  { id: 'kick-adin', name: 'Adin Ross', channelHandle: 'adinross', videoId: null, lastUpdated: Date.now(), platform: 'kick', iconType: 'gaming', category: 'Gaming', isLive: true },
 ];
 
-async function fetchYouTubeLiveVideoId(channelHandle: string): Promise<string | null> {
+interface YouTubeFetchResult {
+  videoId: string | null;
+  isLive: boolean;
+}
+
+async function fetchYouTubeLiveVideoId(channelHandle: string): Promise<YouTubeFetchResult> {
   try {
     const liveUrl = `https://www.youtube.com/@${channelHandle}/live`;
     log(`[LinkRefresher] Fetching live stream for @${channelHandle}...`);
@@ -51,28 +57,33 @@ async function fetchYouTubeLiveVideoId(channelHandle: string): Promise<string | 
 
     if (!response.ok) {
       log(`[LinkRefresher] Failed to fetch @${channelHandle}: ${response.status}`);
-      return null;
+      return { videoId: null, isLive: false };
     }
 
     const html = await response.text();
     
+    // Check if this is an active live broadcast using liveBroadcastContent marker
+    const isLiveBroadcast = html.includes('"isLive":true') || 
+                            html.includes('"liveBroadcastContent":"live"') ||
+                            html.includes('"isLiveContent":true');
+    
     const videoIdMatch = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
     if (videoIdMatch && videoIdMatch[1]) {
-      log(`[LinkRefresher] Found video ID for @${channelHandle}: ${videoIdMatch[1]}`);
-      return videoIdMatch[1];
+      log(`[LinkRefresher] Found video ID for @${channelHandle}: ${videoIdMatch[1]} (isLive: ${isLiveBroadcast})`);
+      return { videoId: videoIdMatch[1], isLive: isLiveBroadcast };
     }
 
     const canonicalMatch = html.match(/href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})"/);
     if (canonicalMatch && canonicalMatch[1]) {
-      log(`[LinkRefresher] Found canonical video ID for @${channelHandle}: ${canonicalMatch[1]}`);
-      return canonicalMatch[1];
+      log(`[LinkRefresher] Found canonical video ID for @${channelHandle}: ${canonicalMatch[1]} (isLive: ${isLiveBroadcast})`);
+      return { videoId: canonicalMatch[1], isLive: isLiveBroadcast };
     }
 
     log(`[LinkRefresher] No live stream found for @${channelHandle}`);
-    return null;
+    return { videoId: null, isLive: false };
   } catch (error) {
     log(`[LinkRefresher] Error fetching @${channelHandle}: ${error}`);
-    return null;
+    return { videoId: null, isLive: false };
   }
 }
 
@@ -118,10 +129,11 @@ export async function refreshAllLinks(): Promise<LinksData> {
   const now = Date.now();
 
   for (const channel of YOUTUBE_CHANNELS) {
-    const videoId = await fetchYouTubeLiveVideoId(channel.channelHandle);
+    const result = await fetchYouTubeLiveVideoId(channel.channelHandle);
     channels.push({
       ...channel,
-      videoId,
+      videoId: result.videoId,
+      isLive: result.isLive,
       lastUpdated: now,
     });
     await new Promise(resolve => setTimeout(resolve, 1000));

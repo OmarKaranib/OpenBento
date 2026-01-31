@@ -46,6 +46,7 @@ export interface Widget {
   imageUrl?: string;
   lastRefresh?: number;
   isOffline?: boolean; // Track offline state
+  isLive?: boolean; // True for live streams, false for normal videos (affects refresh interval)
 }
 
 const GRID_COLS = 12;
