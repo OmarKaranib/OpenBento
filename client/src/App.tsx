@@ -112,20 +112,25 @@ function App() {
     if (url.includes('live_stream?channel=') || url.includes('live_stream&channel=')) {
       return null;
     }
-    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    // Updated regex to handle youtube-nocookie.com URLs (Pro format)
+    const regExp = /^.*((youtu\.be\/)|(youtube(-nocookie)?\.com\/(v\/|u\/\w\/|embed\/|watch\?)))\??v?=?([^#&?]*).*/;
     const match = url.match(regExp);
-    return (match && match[7].length === 11) ? match[7] : null;
+    return (match && match[6] && match[6].length === 11) ? match[6] : null;
   };
 
   // Extract YouTube channel ID from permanent live stream URLs
   const extractYouTubeChannelId = (url: string): string | null => {
-    const channelRegex = /youtube\.com\/embed\/live_stream\?channel=([a-zA-Z0-9_-]+)/;
+    // Support both youtube.com and youtube-nocookie.com (Pro format)
+    const channelRegex = /youtube(-nocookie)?\.com\/embed\/live_stream\?channel=([a-zA-Z0-9_-]+)/;
     const channelRegex2 = /youtube\.com\/@([a-zA-Z0-9_-]+)/;
     const channelRegex3 = /youtube\.com\/channel\/([a-zA-Z0-9_-]+)/;
     const channelRegex4 = /youtube\.com\/c\/([a-zA-Z0-9_-]+)/;
 
-    const match = url.match(channelRegex) || url.match(channelRegex2) || url.match(channelRegex3) || url.match(channelRegex4);
-    return match ? match[1] : null;
+    const match1 = url.match(channelRegex);
+    if (match1) return match1[2]; // Group 2 for youtube-nocookie regex
+    
+    const match2 = url.match(channelRegex2) || url.match(channelRegex3) || url.match(channelRegex4);
+    return match2 ? match2[1] : null;
   };
 
   const extractTwitchChannel = (url: string): string | null => {

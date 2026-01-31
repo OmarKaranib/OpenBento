@@ -31,13 +31,25 @@ export interface WidgetTemplate {
   color: string;
 }
 
+// Helper to generate Pro YouTube embed URL with handshake parameters
+const getProYouTubeEmbedUrl = (videoId: string): string => {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://localhost';
+  return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&origin=${encodeURIComponent(origin)}`;
+};
+
+// Helper to generate Pro YouTube channel live stream URL
+const getProYouTubeChannelUrl = (channelId: string): string => {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://localhost';
+  return `https://www.youtube-nocookie.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&origin=${encodeURIComponent(origin)}`;
+};
+
 const TRENDING_CHANNELS: TrendingChannel[] = [
-  // YouTube 24/7 Live Streams using verified 2026 video IDs
-  { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/watch?v=21X5lGlDOfg', iconType: 'science', category: 'Science', platform: 'youtube', channelId: undefined },
-  { id: 'lofi-girl', name: 'Lofi Girl', url: 'https://www.youtube.com/embed/live_stream?channel=UCSJ4gkVC6NrvII8umztf0Ow', iconType: 'music', category: 'Music', platform: 'youtube', channelId: 'UCSJ4gkVC6NrvII8umztf0Ow' },
-  // News channels using verified stable video IDs (2026)
-  { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/watch?v=9Auqkrry-jE', iconType: 'news', category: 'News', platform: 'youtube', channelId: undefined },
-  { id: 'abc-news', name: 'ABC News', url: 'https://www.youtube.com/watch?v=I9u-j-2V_Vw', iconType: 'news', category: 'News', platform: 'youtube', channelId: undefined },
+  // YouTube 24/7 Live Streams using Pro youtube-nocookie.com format with handshake
+  { id: 'nasa-live', name: 'NASA Live', url: getProYouTubeEmbedUrl('21X5lGlDOfg'), iconType: 'science', category: 'Science', platform: 'youtube', channelId: undefined },
+  { id: 'lofi-girl', name: 'Lofi Girl', url: getProYouTubeChannelUrl('UCSJ4gkVC6NrvII8umztf0Ow'), iconType: 'music', category: 'Music', platform: 'youtube', channelId: 'UCSJ4gkVC6NrvII8umztf0Ow' },
+  // News channels using Pro youtube-nocookie.com format with handshake
+  { id: 'sky-news', name: 'Sky News', url: getProYouTubeEmbedUrl('9Auqkrry-jE'), iconType: 'news', category: 'News', platform: 'youtube', channelId: undefined },
+  { id: 'abc-news', name: 'ABC News', url: getProYouTubeEmbedUrl('I9u-j-2V_Vw'), iconType: 'news', category: 'News', platform: 'youtube', channelId: undefined },
   // Twitch Trending Channels
   { id: 'twitch-esl', name: 'ESL CS:GO', url: 'https://www.twitch.tv/esl_csgo', iconType: 'gaming', category: 'Esports', platform: 'twitch', channelId: 'esl_csgo' },
   { id: 'twitch-rocket', name: 'Rocket League', url: 'https://www.twitch.tv/rocketleague', iconType: 'gaming', category: 'Esports', platform: 'twitch', channelId: 'rocketleague' },
