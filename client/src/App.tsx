@@ -427,6 +427,43 @@ function App() {
     return { x: targetX, y: targetY };
   }, [isPositionOccupied]);
 
+  // Find colliding widgets at a specific position
+  const findCollidingWidgets = useCallback((x: number, y: number, w: number, h: number, excludeWidgetId: string, currentWidgets: Widget[]): Widget[] => {
+    return currentWidgets.filter(widget => {
+      if (widget.id === excludeWidgetId) return false;
+      const widgetRight = widget.x + widget.w;
+      const widgetBottom = widget.y + widget.h;
+      const newRight = x + w;
+      const newBottom = y + h;
+      return x < widgetRight && newRight > widget.x && y < widgetBottom && newBottom > widget.y;
+    });
+  }, []);
+
+  // Find next available slot for a pushed widget (row by row scan)
+  const findNextAvailableSlot = useCallback((widget: Widget, allWidgets: Widget[], excludeIds: string[]): { x: number; y: number } | null => {
+    const GRID_ROWS = 6;
+    for (let y = 0; y <= GRID_ROWS - widget.h; y++) {
+      for (let x = 0; x <= GRID_COLS - widget.w; x++) {
+        let collision = false;
+        for (const other of allWidgets) {
+          if (excludeIds.includes(other.id)) continue;
+          const widgetRight = other.x + other.w;
+          const widgetBottom = other.y + other.h;
+          const newRight = x + widget.w;
+          const newBottom = y + widget.h;
+          if (x < widgetRight && newRight > other.x && y < widgetBottom && newBottom > other.y) {
+            collision = true;
+            break;
+          }
+        }
+        if (!collision) {
+          return { x, y };
+        }
+      }
+    }
+    return null; // No available slot
+  }, []);
+
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active } = event;
     const finalGhostPosition = ghostPositionRef.current; // Use ref for immediate access
@@ -450,7 +487,7 @@ function App() {
       return;
     }
 
-    // Handle sortable widget drop - update x/y based on ghost position
+    // Handle sortable widget drop - update x/y based on ghost position with push logic
     if (activeData?.type === 'sortable-widget' && finalGhostPosition) {
       const widgetId = active.id as string;
 
@@ -459,29 +496,44 @@ function App() {
         if (widgetIndex === -1) return currentWidgets;
 
         const widget = currentWidgets[widgetIndex];
+        const targetX = finalGhostPosition.x;
+        const targetY = finalGhostPosition.y;
 
-        // Find nearest available position (no-overlap rule)
-        const { x: newX, y: newY } = findNearestAvailable(
-          finalGhostPosition.x, 
-          finalGhostPosition.y, 
-          widget.w, 
-          widget.h, 
-          widgetId, 
-          currentWidgets
-        );
+        // Check for collisions at the target position
+        const collidingWidgets = findCollidingWidgets(targetX, targetY, widget.w, widget.h, widgetId, currentWidgets);
 
-        // Update widget position
-        const updatedWidgets = [...currentWidgets];
-        updatedWidgets[widgetIndex] = {
-          ...widget,
-          x: newX,
-          y: newY
-        };
+        if (collidingWidgets.length === 0) {
+          // No collision - move directly to target
+          const updatedWidgets = [...currentWidgets];
+          updatedWidgets[widgetIndex] = { ...widget, x: targetX, y: targetY };
+          return updatedWidgets;
+        }
+
+        // Push logic: Move the dragged widget to target, push colliding widgets to next slots
+        let updatedWidgets = [...currentWidgets];
+        
+        // First, move the dragged widget to the target position
+        updatedWidgets[widgetIndex] = { ...widget, x: targetX, y: targetY };
+
+        // Then, push each colliding widget to the next available slot
+        for (const collidingWidget of collidingWidgets) {
+          const newSlot = findNextAvailableSlot(collidingWidget, updatedWidgets, [collidingWidget.id]);
+          
+          if (newSlot === null) {
+            // No room to push - block the move entirely (keep original positions)
+            return currentWidgets;
+          }
+
+          // Move the colliding widget to the new slot
+          updatedWidgets = updatedWidgets.map(w =>
+            w.id === collidingWidget.id ? { ...w, x: newSlot.x, y: newSlot.y } : w
+          );
+        }
 
         return updatedWidgets;
       });
     }
-  }, [addVideoWidget, addWidget, setWidgets, findNearestAvailable]);
+  }, [addVideoWidget, addWidget, setWidgets, findCollidingWidgets, findNextAvailableSlot]);
 
   const handleChannelClick = useCallback((channel: TrendingChannel) => {
     const videoId = extractYouTubeId(channel.url);

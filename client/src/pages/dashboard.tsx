@@ -574,7 +574,7 @@ const MasterControlDashboard = ({
           return <OfflinePlaceholder widget={widget} />;
         }
 
-        // YouTube channel-based live stream (permanent URL)
+        // YouTube channel-based live stream (permanent URL) with fallback to video ID
         if (widget.isYouTube && widget.youtubeChannelId) {
           return (
             <iframe
@@ -587,10 +587,16 @@ const MasterControlDashboard = ({
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               onError={() => {
-                console.log(`[Error] YouTube channel embed failed for ${widget.youtubeChannelId}`);
-                setWidgets(prev => prev.map(w => 
-                  w.id === widget.id ? { ...w, isOffline: true } : w
-                ));
+                console.log(`[Fallback] YouTube channel embed failed for ${widget.youtubeChannelId}, attempting video ID fallback...`);
+                // Fallback: If widget has a video ID, switch to video ID mode; otherwise mark offline
+                setWidgets(prev => prev.map(w => {
+                  if (w.id !== widget.id) return w;
+                  if (w.videoId) {
+                    console.log(`[Fallback] Switching to video ID: ${w.videoId}`);
+                    return { ...w, youtubeChannelId: null }; // Clear channelId to trigger videoId embed
+                  }
+                  return { ...w, isOffline: true };
+                }));
               }}
             />
           );
