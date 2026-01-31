@@ -149,49 +149,75 @@ function App() {
   };
 
 
-  // Find first available position for a new widget
-  const findAvailablePosition = useCallback((w: number, h: number, currentWidgets: Widget[]): { x: number; y: number } => {
+  // Smart auto-filling grid: Find first available position and shrink to fit if needed
+  const findSmartPosition = useCallback((requestedW: number, requestedH: number, currentWidgets: Widget[]): { x: number; y: number; w: number; h: number } | null => {
     const GRID_ROWS = 6;
-
-    // Try each position in the grid
-    for (let y = 0; y <= GRID_ROWS - h; y++) {
-      for (let x = 0; x <= GRID_COLS - w; x++) {
-        let occupied = false;
-
-        for (const widget of currentWidgets) {
-          // Check if this position overlaps with existing widget
-          const widgetRight = widget.x + widget.w;
-          const widgetBottom = widget.y + widget.h;
-          const newRight = x + w;
-          const newBottom = y + h;
-
-          if (x < widgetRight && newRight > widget.x && y < widgetBottom && newBottom > widget.y) {
-            occupied = true;
-            break;
-          }
+    
+    // Helper to check if a position is free for given dimensions
+    const isPositionFree = (x: number, y: number, w: number, h: number): boolean => {
+      if (x + w > GRID_COLS || y + h > GRID_ROWS) return false;
+      
+      for (const widget of currentWidgets) {
+        const widgetRight = widget.x + widget.w;
+        const widgetBottom = widget.y + widget.h;
+        const newRight = x + w;
+        const newBottom = y + h;
+        
+        if (x < widgetRight && newRight > widget.x && y < widgetBottom && newBottom > widget.y) {
+          return false;
         }
-
-        if (!occupied) {
-          return { x, y };
+      }
+      return true;
+    };
+    
+    // Try original size first, scan grid left-to-right, top-to-bottom
+    for (let y = 0; y <= GRID_ROWS - requestedH; y++) {
+      for (let x = 0; x <= GRID_COLS - requestedW; x++) {
+        if (isPositionFree(x, y, requestedW, requestedH)) {
+          return { x, y, w: requestedW, h: requestedH };
         }
       }
     }
-
-    // Fallback to 0,0 if no space found
-    return { x: 0, y: 0 };
+    
+    // Shrink to fit: Try progressively smaller sizes down to 1x1
+    for (let tryH = requestedH; tryH >= 1; tryH--) {
+      for (let tryW = requestedW; tryW >= 1; tryW--) {
+        if (tryW === requestedW && tryH === requestedH) continue; // Already tried
+        
+        for (let y = 0; y <= GRID_ROWS - tryH; y++) {
+          for (let x = 0; x <= GRID_COLS - tryW; x++) {
+            if (isPositionFree(x, y, tryW, tryH)) {
+              console.log(`[SmartGrid] Shrunk widget from ${requestedW}x${requestedH} to ${tryW}x${tryH} to fit`);
+              return { x, y, w: tryW, h: tryH };
+            }
+          }
+        }
+      }
+    }
+    
+    // Grid is 100% full - return null to indicate no space
+    return null;
   }, []);
 
   const addWidget = useCallback((type: WidgetType, w = 3, h = 2, extraData?: Partial<Widget>) => {
     const widgetId = generateWidgetId();
     setWidgets(prev => {
-      const position = findAvailablePosition(Math.min(w, GRID_COLS), h, prev);
+      const smartResult = findSmartPosition(Math.min(w, GRID_COLS), h, prev);
+      
+      // If grid is full, place at bottom (y = GRID_ROWS) to extend page
+      const position = smartResult || { x: 0, y: 6, w: Math.min(w, GRID_COLS), h };
+      
+      if (!smartResult) {
+        console.log('[SmartGrid] Grid is full, spawning at bottom to extend page');
+      }
+      
       const newWidget: Widget = {
         id: widgetId,
         type,
         x: position.x,
         y: position.y,
-        w: Math.min(w, GRID_COLS),
-        h,
+        w: position.w,
+        h: position.h,
         isMuted: true,
         isPaused: false,
         isOffline: false,
@@ -200,7 +226,7 @@ function App() {
       return [...prev, newWidget];
     });
     return widgetId;
-  }, [findAvailablePosition]);
+  }, [findSmartPosition]);
 
   const addVideoWidget = useCallback((channel: TrendingChannel, w = 3, h = 2) => {
     const videoId = extractYouTubeId(channel.url);
