@@ -378,7 +378,7 @@ const MasterControlDashboard = ({
 
   // Generate embed URL for YouTube channel-based live streams (permanent, never expires)
   const getYouTubeChannelEmbedUrl = (channelId: string): string => {
-    return `https://www.youtube.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&modestbranding=1&rel=0`;
+    return `https://www.youtube.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
   };
 
   // CRITICAL FIX: Dynamic Twitch Parent Detection
@@ -583,6 +583,7 @@ const MasterControlDashboard = ({
               style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
               title={`YouTube Live - ${widget.id}`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
               onError={() => {
                 console.log(`[Fallback] YouTube channel embed failed for ${widget.youtubeChannelId}, attempting video ID fallback...`);
@@ -609,6 +610,7 @@ const MasterControlDashboard = ({
               style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
               title={`YouTube - ${widget.id}`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
               onError={() => {
                 console.log(`[Error] YouTube video embed failed for ${widget.videoId}`);
@@ -628,6 +630,7 @@ const MasterControlDashboard = ({
               style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
               title={`Twitch - ${widget.id}`}
               allow="autoplay; encrypted-media"
+              referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
               onError={() => {
                 console.log(`[Error] Twitch embed failed for ${widget.twitchChannel}`);
@@ -647,6 +650,7 @@ const MasterControlDashboard = ({
               style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
               title={`Kick - ${widget.id}`}
               allow="autoplay; encrypted-media"
+              referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
               onError={() => {
                 console.log(`[Error] Kick embed failed for ${widget.kickChannel}`);
@@ -664,6 +668,7 @@ const MasterControlDashboard = ({
               style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
               title={widget.id}
               allow="autoplay; encrypted-media"
+              referrerPolicy="strict-origin-when-cross-origin"
               sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
             />
           );
