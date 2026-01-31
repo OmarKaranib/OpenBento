@@ -140,15 +140,15 @@ export async function refreshAllLinks(): Promise<LinksData> {
   return data;
 }
 
-const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
 export function startLinkRefresher(): void {
-  log('[LinkRefresher] Starting background link refresher (24h interval)');
+  log('[LinkRefresher] Starting background link refresher (6h interval)');
   
   const existingData = loadLinks();
   const timeSinceLastRefresh = Date.now() - existingData.lastRefresh;
   
-  if (existingData.channels.length === 0 || timeSinceLastRefresh > TWENTY_FOUR_HOURS_MS) {
+  if (existingData.channels.length === 0 || timeSinceLastRefresh > SIX_HOURS_MS) {
     log('[LinkRefresher] Running initial refresh...');
     refreshAllLinks().catch(err => log(`[LinkRefresher] Initial refresh error: ${err}`));
   } else {
@@ -156,9 +156,9 @@ export function startLinkRefresher(): void {
   }
 
   setInterval(() => {
-    log('[LinkRefresher] Running scheduled 24h refresh...');
+    log('[LinkRefresher] Running scheduled 6h refresh...');
     refreshAllLinks().catch(err => log(`[LinkRefresher] Scheduled refresh error: ${err}`));
-  }, TWENTY_FOUR_HOURS_MS);
+  }, SIX_HOURS_MS);
 }
 
 export function getChannelUrl(channel: LiveChannel, origin: string): string {
