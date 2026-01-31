@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useMemo, useCallback, memo } from 'react';
 
 declare global {
   interface Window {
@@ -54,7 +54,7 @@ interface YouTubePlayerProps {
   onPausedChange?: (paused: boolean) => void;
 }
 
-export function YouTubePlayer({
+function YouTubePlayerInner({
   widgetId,
   videoId,
   channelId,
@@ -262,3 +262,17 @@ export function YouTubePlayer({
     </div>
   );
 }
+
+// React.memo wrapper - only re-render if videoId or widgetId changes
+// Other props (isMuted, isPaused, etc.) are handled internally via refs
+export const YouTubePlayer = memo(YouTubePlayerInner, (prevProps, nextProps) => {
+  // Return true if props are equal (skip re-render)
+  // Only re-render when these critical props change:
+  return (
+    prevProps.videoId === nextProps.videoId &&
+    prevProps.widgetId === nextProps.widgetId &&
+    prevProps.isSeekMode === nextProps.isSeekMode &&
+    prevProps.isMuted === nextProps.isMuted &&
+    prevProps.isPaused === nextProps.isPaused
+  );
+});
