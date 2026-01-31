@@ -372,7 +372,8 @@ const MasterControlDashboard = ({
     };
   }, [resizing, setWidgets]);
 
-  // Privacy-enhanced YouTube embed using no-cookie domain
+  // Privacy-enhanced YouTube embed using no-cookie domain with proper Referer handling
+  // referrerPolicy="strict-origin-when-cross-origin" is set on iframes for valid Referer header
   const getYouTubeEmbedUrl = (videoId: string): string => {
     return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
   };
