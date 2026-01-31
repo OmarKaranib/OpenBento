@@ -837,7 +837,7 @@ const MasterControlDashboard = ({
                   setIsFullscreen(true);
                 }
               }}
-              className={`p-[0.6rem] slot-button transition-all duration-300 border ${
+              className={`min-w-[4.4rem] min-h-[4.4rem] p-[1rem] slot-button transition-all duration-300 border flex items-center justify-center ${
                 isFullscreen 
                   ? 'bg-cyan-600 hover:bg-cyan-500 border-cyan-500/50' 
                   : 'bg-slate-800/80 hover:bg-slate-700 border-slate-600/50 hover:border-cyan-500/50'
@@ -845,10 +845,10 @@ const MasterControlDashboard = ({
               title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Mode'}
               data-testid="button-toggle-fullscreen"
             >
-              {isFullscreen ? <Minimize2 className="w-[1.6rem] h-[1.6rem] text-white" /> : <Maximize2 className="w-[1.6rem] h-[1.6rem] text-slate-400" />}
+              {isFullscreen ? <Minimize2 className="w-[2.4rem] h-[2.4rem] text-white" strokeWidth={2} /> : <Maximize2 className="w-[2.4rem] h-[2.4rem] text-slate-400" strokeWidth={2} />}
             </button>
             <div className="relative">
-              <Power className="w-[2rem] h-[2rem] text-cyan-400 animate-pulse" data-testid="icon-power" />
+              <Power className="w-[2.4rem] h-[2.4rem] text-cyan-400 animate-pulse" strokeWidth={2} data-testid="icon-power" />
               <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-50 pointer-events-none"></div>
             </div>
             <h1 className="text-[2rem] font-bold tracking-wider bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent" data-testid="text-title">
@@ -862,58 +862,58 @@ const MasterControlDashboard = ({
             </span>
           </div>
 
-          <div className="flex gap-[0.8rem] items-center">
+          <div className="flex gap-[1.2rem] items-center">
             <button
               onClick={handleOpenSidebarToContent}
-              className="px-[1.2rem] py-[0.6rem] bg-emerald-600 hover:bg-emerald-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-emerald-900/50 text-[1.2rem]"
+              className="min-w-[4.4rem] min-h-[4.4rem] px-[1.2rem] py-[1rem] bg-emerald-600 hover:bg-emerald-500 slot-button font-semibold flex items-center justify-center gap-[0.8rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-emerald-900/50 text-[1.2rem]"
               data-testid="button-add-block"
             >
-              <Plus className="w-[1.4rem] h-[1.4rem]" />
+              <Plus className="w-[2.4rem] h-[2.4rem]" strokeWidth={2} />
               Add Block
             </button>
 
             <button
               onClick={handleRefreshAllWidgets}
-              className="px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-[1.2rem]"
+              className="min-w-[4.4rem] min-h-[4.4rem] px-[1.2rem] py-[1rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center justify-center gap-[0.8rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-[1.2rem]"
               data-testid="button-refresh-all"
             >
-              <RefreshCw className="w-[1.4rem] h-[1.4rem]" />
+              <RefreshCw className="w-[2.4rem] h-[2.4rem]" strokeWidth={2} />
               Refresh All
             </button>
 
             <button
               onClick={() => setIsEditMode(!isEditMode)}
-              className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
+              className={`min-w-[4.4rem] min-h-[4.4rem] px-[1.2rem] py-[1rem] slot-button font-semibold flex items-center justify-center gap-[0.8rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
                 isEditMode 
                   ? 'bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-900/50 ring-2 ring-purple-400' 
                   : 'bg-slate-700 hover:bg-slate-600 shadow-lg shadow-slate-900/50'
               }`}
               data-testid="button-edit-layout"
             >
-              {isEditMode ? <Lock className="w-[1.4rem] h-[1.4rem]" /> : <Edit3 className="w-[1.4rem] h-[1.4rem]" />}
+              {isEditMode ? <Lock className="w-[2.4rem] h-[2.4rem]" strokeWidth={2} /> : <Edit3 className="w-[2.4rem] h-[2.4rem]" strokeWidth={2} />}
               {isEditMode ? 'LOCK' : 'EDIT LAYOUT'}
             </button>
 
             <button
               onClick={handleMasterMute}
-              className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
+              className={`min-w-[4.4rem] min-h-[4.4rem] px-[1.2rem] py-[1rem] slot-button font-semibold flex items-center justify-center gap-[0.8rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
                 masterMute 
                   ? 'bg-red-600 hover:bg-red-500 shadow-lg shadow-red-900/50' 
                   : 'bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-900/50'
               }`}
               data-testid="button-master-mute"
             >
-              {masterMute ? <VolumeX className="w-[1.4rem] h-[1.4rem]" /> : <Volume2 className="w-[1.4rem] h-[1.4rem]" />}
+              {masterMute ? <VolumeX className="w-[2.4rem] h-[2.4rem]" strokeWidth={2} /> : <Volume2 className="w-[2.4rem] h-[2.4rem]" strokeWidth={2} />}
               {masterMute ? 'MUTED' : 'LIVE'}
             </button>
 
             <button
               id="save-button"
               onClick={handleSaveLayout}
-              className="px-[1.2rem] py-[0.6rem] bg-cyan-700 hover:bg-cyan-600 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-[1.2rem]"
+              className="min-w-[4.4rem] min-h-[4.4rem] px-[1.2rem] py-[1rem] bg-cyan-700 hover:bg-cyan-600 slot-button font-semibold flex items-center justify-center gap-[0.8rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-[1.2rem]"
               data-testid="button-save-layout"
             >
-              <Save className="w-[1.4rem] h-[1.4rem]" />
+              <Save className="w-[2.4rem] h-[2.4rem]" strokeWidth={2} />
               SAVE
             </button>
           </div>
