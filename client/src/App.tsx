@@ -243,6 +243,39 @@ function App() {
     setActiveWidgetId(null);
   }, [addWidget]);
 
+  // Handle inline URL submission from widget directly (no sidebar)
+  const handleInlineUrlSubmit = useCallback((widgetId: string, url: string) => {
+    if (!url.trim()) return;
+
+    let finalUrl = url.trim();
+    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      finalUrl = 'https://' + finalUrl;
+    }
+
+    const youtubeId = extractYouTubeId(finalUrl);
+    const twitchChannel = extractTwitchChannel(finalUrl);
+    const kickChannel = extractKickChannel(finalUrl);
+
+    setWidgets(prev => prev.map(w => 
+      w.id === widgetId ? {
+        ...w,
+        type: 'video',
+        url: finalUrl,
+        isYouTube: !!youtubeId,
+        videoId: youtubeId,
+        isTwitch: !!twitchChannel,
+        twitchChannel,
+        isKick: !!kickChannel,
+        kickChannel,
+        error: null,
+        embedBlocked: false,
+        isPaused: false,
+        isMuted: true,
+        lastRefresh: Date.now()
+      } : w
+    ));
+  }, []);
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id);
     
@@ -529,6 +562,7 @@ function App() {
                     sidebarOpen={sidebarOpen && !isFullscreen}
                     activeId={activeId}
                     handleOpenSidebar={handleOpenSidebar}
+                    onInlineUrlSubmit={handleInlineUrlSubmit}
                     handleOpenSidebarToContent={handleOpenSidebarToContent}
                     addWidget={addWidget}
                     isFullscreen={isFullscreen}

@@ -94,6 +94,7 @@ interface MasterControlDashboardProps {
   sidebarOpen: boolean;
   activeId: UniqueIdentifier | null;
   handleOpenSidebar: (widgetId?: string) => void;
+  onInlineUrlSubmit: (widgetId: string, url: string) => void;
   handleOpenSidebarToContent: () => void;
   addWidget: (type: WidgetType, w?: number, h?: number, extraData?: Partial<Widget>) => string;
   isFullscreen: boolean;
@@ -118,6 +119,7 @@ const MasterControlDashboard = ({
   sidebarOpen,
   activeId,
   handleOpenSidebar,
+  onInlineUrlSubmit,
   handleOpenSidebarToContent,
   addWidget,
   isFullscreen,
@@ -130,6 +132,8 @@ const MasterControlDashboard = ({
   const [headerVisible, setHeaderVisible] = useState(true);
   const [exitButtonDismissed, setExitButtonDismissed] = useState(false);
   const [seekModeWidgets, setSeekModeWidgets] = useState<Set<string>>(new Set());
+  const [inlineInputWidgetId, setInlineInputWidgetId] = useState<string | null>(null);
+  const [inlineInputValue, setInlineInputValue] = useState('');
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
 
   const minCellHeight = 80;
@@ -491,10 +495,71 @@ const MasterControlDashboard = ({
             />
           );
         }
+        // Show inline URL input when this widget is selected for inline editing
+        if (inlineInputWidgetId === widget.id) {
+          return (
+            <div className="w-full h-full flex flex-col items-center justify-center p-[1.5rem] gap-[1rem]">
+              <div className="text-cyan-400 text-[1.2rem] font-semibold">Paste Video URL</div>
+              <input
+                type="text"
+                value={inlineInputValue}
+                onChange={(e) => setInlineInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter' && inlineInputValue.trim()) {
+                    onInlineUrlSubmit(widget.id, inlineInputValue.trim());
+                    setInlineInputWidgetId(null);
+                    setInlineInputValue('');
+                  } else if (e.key === 'Escape') {
+                    setInlineInputWidgetId(null);
+                    setInlineInputValue('');
+                  }
+                }}
+                placeholder="https://youtube.com/watch?v=..."
+                className="w-full max-w-[28rem] px-[1rem] py-[0.8rem] bg-slate-800 border border-cyan-500/50 rounded-lg focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 transition-all text-[1.2rem] text-white placeholder:text-slate-500"
+                autoFocus
+                data-testid={`input-inline-url-${widget.id}`}
+              />
+              <div className="flex gap-[0.8rem]">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (inlineInputValue.trim()) {
+                      onInlineUrlSubmit(widget.id, inlineInputValue.trim());
+                      setInlineInputWidgetId(null);
+                      setInlineInputValue('');
+                    }
+                  }}
+                  className="px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-lg transition-colors text-[1.1rem]"
+                  data-testid={`button-submit-url-${widget.id}`}
+                >
+                  Add
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setInlineInputWidgetId(null);
+                    setInlineInputValue('');
+                  }}
+                  className="px-[1.2rem] py-[0.6rem] bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium rounded-lg transition-colors text-[1.1rem]"
+                  data-testid={`button-cancel-url-${widget.id}`}
+                >
+                  Cancel
+                </button>
+              </div>
+              <div className="text-slate-500 text-[1rem]">Supports YouTube, Twitch, Kick</div>
+            </div>
+          );
+        }
+        
         return (
           <div className="w-full h-full flex items-center justify-center">
             <button
-              onClick={() => handleOpenSidebar(widget.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setInlineInputWidgetId(widget.id);
+                setInlineInputValue('');
+              }}
               className="flex flex-col items-center gap-2 text-cyan-400/60 hover:text-cyan-400 transition-colors"
               data-testid={`button-add-video-${widget.id}`}
             >
@@ -562,16 +627,16 @@ const MasterControlDashboard = ({
         <div className="absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
-      {/* Exit Fullscreen X Button - visible initially, click to dismiss, hover to reveal, click revealed to exit */}
+      {/* Exit Fullscreen X Button - visible initially, click to exit fullscreen */}
       {isFullscreen && !headerVisible && !exitButtonDismissed && (
         <div 
           className="fixed top-[1rem] left-1/2 -translate-x-1/2 z-[10001]"
           data-testid="exit-fullscreen-container"
         >
           <button
-            onClick={() => setExitButtonDismissed(true)}
+            onClick={exitFullscreenAndRestoreHeader}
             className="p-[0.8rem] bg-slate-800/90 hover:bg-red-600 backdrop-blur-md slot-button text-slate-300 hover:text-white shadow-lg border border-slate-600/50 transition-all duration-200"
-            title="Hide (hover top to reveal)"
+            title="Exit Fullscreen (click to exit, or press ESC)"
             data-testid="button-exit-fullscreen-floating"
           >
             <X className="w-[1.4rem] h-[1.4rem]" />

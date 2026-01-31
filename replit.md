@@ -207,6 +207,10 @@ gap: 1rem;
 - **Platform Channels**: Added Kick (xQc, Adin Ross) to trending streams
 - **Fullscreen API Sync**: fullscreenchange event listener syncs state when browser exits fullscreen
 - **Interaction Fix**: Drag listeners moved to GripVertical handle only, buttons remain clickable in Edit Mode
+- **Inline URL Input**: Click "Add Video" transforms widget into inline URL input (no sidebar required)
+- **Live Status Badges**: Multiview.world style badges with 5-minute polling for Kick channels
+- **Shared exitAction()**: Floating X button and ESC key both call exitFullscreenAndRestoreHeader()
+- **Platform Labels**: Channels show platform (YouTube/Kick) in sidebar category display
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px

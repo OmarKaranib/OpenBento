@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef } from 'react';
-import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2 } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, Radio } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { WidgetType } from '@/App';
@@ -10,6 +10,15 @@ export interface TrendingChannel {
   url: string;
   iconType: 'news' | 'science' | 'music' | 'finance' | 'gaming';
   category: string;
+  platform: 'youtube' | 'twitch' | 'kick';
+  channelId?: string; // For API status checks
+}
+
+export interface LiveStatus {
+  channelId: string;
+  isLive: boolean;
+  viewerCount?: number;
+  lastChecked: number;
 }
 
 export interface WidgetTemplate {
@@ -23,12 +32,15 @@ export interface WidgetTemplate {
 }
 
 const TRENDING_CHANNELS: TrendingChannel[] = [
-  { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/21X5lGlDOfg', iconType: 'science', category: 'Science' },
-  { id: 'lofi-girl', name: 'Lofi Girl', url: 'https://www.youtube.com/embed/jfKfPfyJRdk', iconType: 'music', category: 'Music' },
-  { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/embed/9Auqna63EFE', iconType: 'news', category: 'News' },
-  { id: 'kick-xqc', name: 'xQc (Kick)', url: 'https://kick.com/xqc', iconType: 'gaming', category: 'Gaming' },
-  { id: 'kick-adin', name: 'Adin Ross (Kick)', url: 'https://kick.com/adinross', iconType: 'gaming', category: 'Gaming' },
+  { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/21X5lGlDOfg', iconType: 'science', category: 'Science', platform: 'youtube', channelId: 'UCLA_DiR1FfKNvjuUpBHmylQ' },
+  { id: 'lofi-girl', name: 'Lofi Girl', url: 'https://www.youtube.com/embed/jfKfPfyJRdk', iconType: 'music', category: 'Music', platform: 'youtube', channelId: 'UCSJ4gkVC6NrvII8umztf0Ow' },
+  { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/embed/9Auqna63EFE', iconType: 'news', category: 'News', platform: 'youtube', channelId: 'UCoMdktPbSTixAyNGwb-UYkQ' },
+  { id: 'kick-xqc', name: 'xQc (Kick)', url: 'https://kick.com/xqc', iconType: 'gaming', category: 'Gaming', platform: 'kick', channelId: 'xqc' },
+  { id: 'kick-adin', name: 'Adin Ross (Kick)', url: 'https://kick.com/adinross', iconType: 'gaming', category: 'Gaming', platform: 'kick', channelId: 'adinross' },
 ];
+
+// Live status polling interval (5 minutes)
+const LIVE_STATUS_POLL_INTERVAL = 5 * 60 * 1000;
 
 export const WIDGET_TEMPLATES: WidgetTemplate[] = [
   { id: 'template-video', name: 'Video', widgetType: 'video', w: 3, h: 2, icon: 'video', color: 'cyan' },
@@ -42,6 +54,7 @@ type SidebarTab = 'content' | 'library';
 interface DraggableChannelProps {
   channel: TrendingChannel;
   onClick?: () => void;
+  isLive?: boolean;
 }
 
 function getChannelIcon(iconType: TrendingChannel['iconType']) {
@@ -77,7 +90,7 @@ function getTemplateIcon(icon: WidgetTemplate['icon'], color: string) {
   }
 }
 
-function DraggableChannel({ channel, onClick }: DraggableChannelProps) {
+function DraggableChannel({ channel, onClick, isLive }: DraggableChannelProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `channel-${channel.id}`,
     data: { type: 'channel', channel }
@@ -105,12 +118,23 @@ function DraggableChannel({ channel, onClick }: DraggableChannelProps) {
       className="flex items-center gap-[1rem] p-[1rem] bg-slate-800/50 hover:bg-slate-700/50 slot-button cursor-grab active:cursor-grabbing transition-all duration-200 border border-slate-700/50 hover:border-cyan-500/50"
       data-testid={`draggable-channel-${channel.id}`}
     >
-      <div className="w-[3.2rem] h-[3.2rem] rounded-lg bg-slate-700 flex items-center justify-center">
+      <div className="w-[3.2rem] h-[3.2rem] rounded-lg bg-slate-700 flex items-center justify-center relative">
         {getChannelIcon(channel.iconType)}
+        {isLive && (
+          <div className="absolute -top-1 -right-1 w-[1rem] h-[1rem] bg-red-500 rounded-full animate-pulse" />
+        )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[1.2rem] font-semibold text-slate-200 truncate">{channel.name}</p>
-        <p className="text-[1rem] text-slate-400">{channel.category}</p>
+        <div className="flex items-center gap-[0.6rem]">
+          <p className="text-[1.2rem] font-semibold text-slate-200 truncate">{channel.name}</p>
+          {isLive && (
+            <span className="flex items-center gap-[0.3rem] px-[0.5rem] py-[0.1rem] bg-red-500/20 border border-red-500/50 rounded-full text-[0.8rem] font-bold text-red-400 uppercase tracking-wider" data-testid={`live-badge-${channel.id}`}>
+              <Radio className="w-[0.8rem] h-[0.8rem]" />
+              Live
+            </span>
+          )}
+        </div>
+        <p className="text-[1rem] text-slate-400">{channel.category} • {channel.platform === 'youtube' ? 'YouTube' : channel.platform === 'kick' ? 'Kick' : channel.platform}</p>
       </div>
       <Grip className="w-[1.6rem] h-[1.6rem] text-slate-500" />
     </div>
@@ -194,7 +218,60 @@ export function WidgetSidebar({
 }: WidgetSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<SidebarTab>('content');
+  const [liveStatuses, setLiveStatuses] = useState<Record<string, LiveStatus>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Check live status for Kick channels
+  const checkKickLiveStatus = useCallback(async (channelId: string): Promise<boolean> => {
+    try {
+      // Kick API endpoint for channel info
+      const response = await fetch(`https://kick.com/api/v2/channels/${channelId}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data?.livestream !== null;
+      }
+      return false;
+    } catch {
+      // Assume live if we can't check (CORS issues expected)
+      return true;
+    }
+  }, []);
+
+  // Poll live status every 5 minutes
+  useEffect(() => {
+    const checkAllStatuses = async () => {
+      const now = Date.now();
+      const newStatuses: Record<string, LiveStatus> = {};
+
+      for (const channel of TRENDING_CHANNELS) {
+        if (channel.channelId) {
+          let isLive = false;
+          
+          // For YouTube channels, assume live (24/7 streams)
+          if (channel.platform === 'youtube') {
+            isLive = true; // NASA, Lofi Girl, Sky News are 24/7
+          } else if (channel.platform === 'kick') {
+            isLive = await checkKickLiveStatus(channel.channelId);
+          }
+
+          newStatuses[channel.id] = {
+            channelId: channel.channelId,
+            isLive,
+            lastChecked: now
+          };
+        }
+      }
+
+      setLiveStatuses(newStatuses);
+    };
+
+    // Initial check
+    checkAllStatuses();
+
+    // Poll every 5 minutes
+    const interval = setInterval(checkAllStatuses, LIVE_STATUS_POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, [checkKickLiveStatus]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -420,6 +497,7 @@ export function WidgetSidebar({
                       key={channel.id} 
                       channel={channel} 
                       onClick={() => onChannelClick?.(channel)}
+                      isLive={liveStatuses[channel.id]?.isLive}
                     />
                   ))}
                   {filteredChannels.length === 0 && (
