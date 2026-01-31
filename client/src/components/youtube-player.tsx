@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useMemo, useCallback } from 'react';
 
 declare global {
   interface Window {
@@ -68,49 +68,75 @@ export function YouTubePlayer({
 }: YouTubePlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
-  const playerIdRef = useRef(`yt-player-${widgetId}`);
+  const isInitializedRef = useRef(false);
+  
+  // Use refs to track current state without causing re-renders
+  const isMutedRef = useRef(isMuted);
+  const isPausedRef = useRef(isPaused);
+  const onReadyRef = useRef(onReady);
+  const onErrorRef = useRef(onError);
+  const onPausedChangeRef = useRef(onPausedChange);
+  
+  // Keep refs in sync with props
+  useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
+  useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+  useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
+  useEffect(() => { onPausedChangeRef.current = onPausedChange; }, [onPausedChange]);
+
+  // Memoize the stable player ID - only changes if widgetId changes
+  const playerId = useMemo(() => `yt-player-${widgetId}`, [widgetId]);
+  
+  // Memoize the stable video ID - only recalculate when videoId prop changes
+  const stableVideoId = useMemo(() => videoId || null, [videoId]);
+
+  // Hardcoded origin for handshake - computed once
+  const origin = useMemo(() => window.location.origin, []);
 
   const initializePlayer = useCallback(() => {
     if (!containerRef.current || !window.YT?.Player) return;
+    if (isInitializedRef.current && playerRef.current) return; // Already initialized
     
+    // Cleanup existing player
     if (playerRef.current) {
       try {
         playerRef.current.destroy();
       } catch (e) {
         console.log('[YouTube] Player cleanup error:', e);
       }
+      playerRef.current = null;
     }
 
-    const containerId = playerIdRef.current;
-    
-    // Standard 2026 YouTube IFrame API handshake parameters
+    // Standard 2026 YouTube IFrame API handshake parameters - hardcoded strings
     const playerVars: Record<string, string | number> = {
       autoplay: 1,
       mute: 1,
       modestbranding: 1,
       rel: 0,
       enablejsapi: 1,
-      origin: window.location.origin,
+      origin: origin,
       widget_referrer: window.location.href,
       playsinline: 1,
     };
 
     try {
-      playerRef.current = new window.YT.Player(containerId, {
-        videoId: videoId || undefined,
+      console.log('[YouTube] Initializing player for widget:', widgetId, 'videoId:', stableVideoId);
+      
+      playerRef.current = new window.YT.Player(playerId, {
+        videoId: stableVideoId || undefined,
         host: 'https://www.youtube-nocookie.com',
         playerVars,
         events: {
           onReady: (event) => {
             console.log('[YouTube] Player ready for widget:', widgetId);
+            isInitializedRef.current = true;
             
             // Set referrerPolicy on the generated iframe
-            const playerElement = document.getElementById(containerId);
+            const playerElement = document.getElementById(playerId);
             if (playerElement) {
               const iframe = playerElement.tagName === 'IFRAME' ? playerElement as HTMLIFrameElement : playerElement.querySelector('iframe');
               if (iframe) {
                 iframe.referrerPolicy = 'strict-origin-when-cross-origin';
-                console.log('[YouTube] Set referrerPolicy on iframe');
               }
             }
             
@@ -118,12 +144,12 @@ export function YouTubePlayer({
             setTimeout(() => {
               try {
                 if (playerRef.current && typeof playerRef.current.mute === 'function') {
-                  if (isMuted) {
+                  if (isMutedRef.current) {
                     playerRef.current.mute();
                   } else {
                     playerRef.current.unMute();
                   }
-                  if (!isPaused && typeof playerRef.current.playVideo === 'function') {
+                  if (!isPausedRef.current && typeof playerRef.current.playVideo === 'function') {
                     playerRef.current.playVideo();
                   }
                 }
@@ -132,33 +158,35 @@ export function YouTubePlayer({
               }
             }, 100);
             
-            onReady?.();
+            onReadyRef.current?.();
           },
           onStateChange: (event) => {
             if (event.data === window.YT.PlayerState.PLAYING) {
-              onPausedChange?.(false);
+              onPausedChangeRef.current?.(false);
             } else if (event.data === window.YT.PlayerState.PAUSED) {
-              onPausedChange?.(true);
+              onPausedChangeRef.current?.(true);
             }
           },
           onError: (event) => {
-            // Error codes: 2=invalid param, 5=HTML5 error, 100=not found, 101/150=restricted
             console.log('[YouTube] Player error:', event.data, 'for widget:', widgetId);
             // Only mark offline for critical errors (not found)
             if (event.data === 100) {
-              onError?.();
+              onErrorRef.current?.();
             }
-            // Error 150/101 = restricted, but player might still work - don't mark offline
           },
         },
       });
     } catch (e) {
       console.error('[YouTube] Failed to initialize player:', e);
-      onError?.();
+      onErrorRef.current?.();
     }
-  }, [videoId, widgetId, isMuted, isPaused, onReady, onError, onPausedChange]);
+  }, [playerId, stableVideoId, widgetId, origin]); // Only re-init when video/widget changes
 
+  // Initialize player only when videoId changes
   useEffect(() => {
+    // Reset initialization flag when video changes
+    isInitializedRef.current = false;
+    
     if (window.YT?.Player) {
       initializePlayer();
     } else {
@@ -184,12 +212,14 @@ export function YouTubePlayer({
           console.log('[YouTube] Cleanup error:', e);
         }
         playerRef.current = null;
+        isInitializedRef.current = false;
       }
     };
-  }, [initializePlayer]);
+  }, [stableVideoId, initializePlayer]); // Only reinitialize when videoId changes
 
+  // Handle mute changes without reinitializing player
   useEffect(() => {
-    if (playerRef.current && typeof playerRef.current.mute === 'function') {
+    if (playerRef.current && isInitializedRef.current && typeof playerRef.current.mute === 'function') {
       try {
         if (isMuted) {
           playerRef.current.mute();
@@ -202,8 +232,9 @@ export function YouTubePlayer({
     }
   }, [isMuted]);
 
+  // Handle pause changes without reinitializing player
   useEffect(() => {
-    if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
+    if (playerRef.current && isInitializedRef.current && typeof playerRef.current.playVideo === 'function') {
       try {
         if (isPaused) {
           playerRef.current.pauseVideo();
@@ -223,7 +254,11 @@ export function YouTubePlayer({
       style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
       data-referrerpolicy="strict-origin-when-cross-origin"
     >
-      <div id={playerIdRef.current} className="w-full h-full" />
+      <div 
+        key={stableVideoId || 'no-video'} 
+        id={playerId} 
+        className="w-full h-full" 
+      />
     </div>
   );
 }
