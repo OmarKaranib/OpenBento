@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -205,16 +205,16 @@ const MasterControlDashboard = ({
   // YouTube Live ID Watchdog - Auto-refresh YouTube embeds every 60 seconds to recover from errors
   useEffect(() => {
     const WATCHDOG_INTERVAL = 60000; // 60 seconds
-    
+
     const checkAndRefreshYouTubeWidgets = () => {
       const now = Date.now();
-      
+
       setWidgets(prev => prev.map(widget => {
         // Only check YouTube widgets with video IDs
         if (widget.type === 'video' && widget.isYouTube && widget.videoId) {
           const lastRefresh = widget.lastRefresh || 0;
           const timeSinceRefresh = now - lastRefresh;
-          
+
           // If widget hasn't been refreshed in 60+ seconds, trigger a refresh
           // by updating the lastRefresh timestamp (which forces iframe re-render)
           if (timeSinceRefresh >= WATCHDOG_INTERVAL) {
@@ -230,7 +230,7 @@ const MasterControlDashboard = ({
     };
 
     const intervalId = setInterval(checkAndRefreshYouTubeWidgets, WATCHDOG_INTERVAL);
-    
+
     return () => clearInterval(intervalId);
   }, [setWidgets]);
 
@@ -245,6 +245,39 @@ const MasterControlDashboard = ({
       }
       return next;
     });
+  };
+
+  // Helper: Check if two widget bounds overlap
+  const checkCollision = (
+    x1: number, y1: number, w1: number, h1: number,
+    x2: number, y2: number, w2: number, h2: number
+  ): boolean => {
+    return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
+  };
+
+  // Helper: Find next available slot for a pushed widget
+  const findNextAvailableSlot = (
+    widget: Widget,
+    allWidgets: Widget[],
+    excludeId: string
+  ): { x: number; y: number } | null => {
+    // Try each position in the grid (row by row, left to right)
+    for (let y = 0; y <= GRID_ROWS - widget.h; y++) {
+      for (let x = 0; x <= GRID_COLS - widget.w; x++) {
+        let collision = false;
+        for (const other of allWidgets) {
+          if (other.id === widget.id || other.id === excludeId) continue;
+          if (checkCollision(x, y, widget.w, widget.h, other.x, other.y, other.w, other.h)) {
+            collision = true;
+            break;
+          }
+        }
+        if (!collision) {
+          return { x, y };
+        }
+      }
+    }
+    return null; // No available slot
   };
 
   useEffect(() => {
@@ -266,9 +299,64 @@ const MasterControlDashboard = ({
       const newW = Math.max(1, Math.min(GRID_COLS, resizing.startW + colChange));
       const newH = Math.max(1, Math.min(GRID_ROWS, resizing.startH + rowChange));
 
-      setWidgets(prev => prev.map(w => 
-        w.id === resizing.widgetId ? { ...w, w: newW, h: newH } : w
-      ));
+      setWidgets(prev => {
+        const resizingWidget = prev.find(w => w.id === resizing.widgetId);
+        if (!resizingWidget) return prev;
+
+        // Calculate new bounds of the resizing widget
+        const newBounds = {
+          x: resizingWidget.x,
+          y: resizingWidget.y,
+          w: newW,
+          h: newH
+        };
+
+        // Check if new size exceeds grid bounds
+        if (newBounds.x + newW > GRID_COLS || newBounds.y + newH > GRID_ROWS) {
+          // Block resize - exceeds grid
+          return prev;
+        }
+
+        // Find all widgets that would collide with the new size
+        const collidingWidgets = prev.filter(w => {
+          if (w.id === resizing.widgetId) return false;
+          return checkCollision(
+            newBounds.x, newBounds.y, newW, newH,
+            w.x, w.y, w.w, w.h
+          );
+        });
+
+        if (collidingWidgets.length === 0) {
+          // No collision - allow resize
+          return prev.map(w => 
+            w.id === resizing.widgetId ? { ...w, w: newW, h: newH } : w
+          );
+        }
+
+        // Push logic: Try to move each colliding widget to next available slot
+        let updatedWidgets = [...prev];
+        
+        // First, update the resizing widget
+        updatedWidgets = updatedWidgets.map(w => 
+          w.id === resizing.widgetId ? { ...w, w: newW, h: newH } : w
+        );
+
+        for (const collidingWidget of collidingWidgets) {
+          const newSlot = findNextAvailableSlot(collidingWidget, updatedWidgets, collidingWidget.id);
+          
+          if (newSlot === null) {
+            // No room to push - block the resize entirely
+            return prev;
+          }
+
+          // Move the colliding widget to the new slot
+          updatedWidgets = updatedWidgets.map(w =>
+            w.id === collidingWidget.id ? { ...w, x: newSlot.x, y: newSlot.y } : w
+          );
+        }
+
+        return updatedWidgets;
+      });
     };
 
     const handleMouseUp = () => {
@@ -293,9 +381,12 @@ const MasterControlDashboard = ({
     return `https://www.youtube.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&modestbranding=1&rel=0`;
   };
 
+  // CRITICAL FIX: Robust Twitch Parent Detection with Multiple Fallbacks
   const getTwitchEmbedUrl = (channel: string): string => {
-    const parentDomain = window.location.hostname;
-    return `https://player.twitch.tv/?channel=${channel}&parent=${parentDomain}&autoplay=true&muted=true`;
+    // Use multiple parent domains to cover all Replit preview states
+    const parents = [window.location.hostname, 'replit.app', 'replit.dev'];
+    const parentParams = parents.map(p => `parent=${p}`).join('&');
+    return `https://player.twitch.tv/?channel=${channel}&${parentParams}&autoplay=true&muted=true`;
   };
 
   const getKickEmbedUrl = (channel: string): string => {
@@ -350,22 +441,25 @@ const MasterControlDashboard = ({
     setWidgets(prev => {
       const updated = prev.map(w => {
         if (w.id === widgetId && w.type === 'video') {
-          return { ...w, url: '' };
+          return { ...w, url: '', lastRefresh: Date.now(), isOffline: false };
         }
         return w;
       });
       return updated;
     });
-    
+
     setTimeout(() => {
       setWidgets(prev => {
         const widget = prev.find(w => w.id === widgetId);
         if (widget) {
           const videoId = widget.videoId;
+          const youtubeChannelId = widget.youtubeChannelId;
           const twitchChannel = widget.twitchChannel;
           return prev.map(w => {
             if (w.id === widgetId) {
-              if (w.isYouTube && videoId) {
+              if (w.isYouTube && youtubeChannelId) {
+                return { ...w, url: `https://www.youtube.com/embed/live_stream?channel=${youtubeChannelId}` };
+              } else if (w.isYouTube && videoId) {
                 return { ...w, url: `https://www.youtube.com/watch?v=${videoId}` };
               } else if (w.isTwitch && twitchChannel) {
                 return { ...w, url: `https://www.twitch.tv/${twitchChannel}` };
@@ -385,7 +479,7 @@ const MasterControlDashboard = ({
 
     setWidgets(prev => prev.map(w => {
       if (w.type === 'video' && w.url) {
-        return { ...w, url: '' };
+        return { ...w, url: '', lastRefresh: Date.now(), isOffline: false };
       }
       return w;
     }));
@@ -393,7 +487,9 @@ const MasterControlDashboard = ({
     setTimeout(() => {
       setWidgets(prev => prev.map(w => {
         if (w.type === 'video') {
-          if (w.isYouTube && w.videoId) {
+          if (w.isYouTube && w.youtubeChannelId) {
+            return { ...w, url: `https://www.youtube.com/embed/live_stream?channel=${w.youtubeChannelId}` };
+          } else if (w.isYouTube && w.videoId) {
             return { ...w, url: `https://www.youtube.com/watch?v=${w.videoId}` };
           } else if (w.isTwitch && w.twitchChannel) {
             return { ...w, url: `https://www.twitch.tv/${w.twitchChannel}` };
@@ -407,7 +503,7 @@ const MasterControlDashboard = ({
   const handleMasterMute = () => {
     const newMute = !masterMute;
     setMasterMute(newMute);
-    
+
     setWidgets(prev => prev.map(w => {
       if (w.type === 'video' && w.isYouTube) {
         sendYouTubeCommand(w.id, newMute ? 'mute' : 'unMute');
@@ -418,7 +514,7 @@ const MasterControlDashboard = ({
 
   const handleSaveLayout = () => {
     localStorage.setItem('openBentoWidgets', JSON.stringify(widgets));
-    
+
     const saveButton = document.getElementById('save-button');
     if (saveButton) {
       saveButton.classList.add('ring-2', 'ring-cyan-400', 'scale-110');
@@ -446,11 +542,38 @@ const MasterControlDashboard = ({
     ));
   };
 
+  // Offline Placeholder Component
+  const OfflinePlaceholder = ({ widget }: { widget: Widget }) => {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/50 p-[1.5rem]">
+        <AlertCircle className="w-[3rem] h-[3rem] text-orange-400 mb-[1rem]" />
+        <h3 className="text-[1.3rem] font-semibold text-orange-400 mb-[0.5rem]">Stream Offline</h3>
+        <p className="text-slate-400 text-center text-[1rem] mb-[1rem]">
+          {widget.isTwitch && `@${widget.twitchChannel} is not currently streaming`}
+          {widget.isYouTube && `This channel is not currently live`}
+          {widget.isKick && `@${widget.kickChannel} is not currently streaming`}
+        </p>
+        <button
+          onClick={() => handleRefreshWidget(widget.id)}
+          className="px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300"
+        >
+          <RefreshCw className="w-[1.2rem] h-[1.2rem]" />
+          Check Again
+        </button>
+      </div>
+    );
+  };
+
   const renderWidgetContent = (widget: Widget) => {
     const isSeekMode = seekModeWidgets.has(widget.id);
-    
+
     switch (widget.type) {
       case 'video':
+        // Show offline placeholder if stream is offline
+        if (widget.isOffline) {
+          return <OfflinePlaceholder widget={widget} />;
+        }
+
         // YouTube channel-based live stream (permanent URL)
         if (widget.isYouTube && widget.youtubeChannelId) {
           return (
@@ -463,6 +586,12 @@ const MasterControlDashboard = ({
               title={`YouTube Live - ${widget.id}`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
+              onError={() => {
+                console.log(`[Error] YouTube channel embed failed for ${widget.youtubeChannelId}`);
+                setWidgets(prev => prev.map(w => 
+                  w.id === widget.id ? { ...w, isOffline: true } : w
+                ));
+              }}
             />
           );
         } else if (widget.isYouTube && widget.videoId) {
@@ -477,11 +606,18 @@ const MasterControlDashboard = ({
               title={`YouTube - ${widget.id}`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
+              onError={() => {
+                console.log(`[Error] YouTube video embed failed for ${widget.videoId}`);
+                setWidgets(prev => prev.map(w => 
+                  w.id === widget.id ? { ...w, isOffline: true } : w
+                ));
+              }}
             />
           );
         } else if (widget.isTwitch && widget.twitchChannel) {
           return (
             <iframe
+              key={`twitch-${widget.id}-${widget.lastRefresh || 0}`}
               ref={(el) => { iframeRefs.current[widget.id] = el; }}
               src={getTwitchEmbedUrl(widget.twitchChannel)}
               className="w-full h-full"
@@ -489,11 +625,18 @@ const MasterControlDashboard = ({
               title={`Twitch - ${widget.id}`}
               allow="autoplay; encrypted-media"
               allowFullScreen
+              onError={() => {
+                console.log(`[Error] Twitch embed failed for ${widget.twitchChannel}`);
+                setWidgets(prev => prev.map(w => 
+                  w.id === widget.id ? { ...w, isOffline: true } : w
+                ));
+              }}
             />
           );
         } else if (widget.isKick && widget.kickChannel) {
           return (
             <iframe
+              key={`kick-${widget.id}-${widget.lastRefresh || 0}`}
               ref={(el) => { iframeRefs.current[widget.id] = el; }}
               src={getKickEmbedUrl(widget.kickChannel)}
               className="w-full h-full"
@@ -501,6 +644,12 @@ const MasterControlDashboard = ({
               title={`Kick - ${widget.id}`}
               allow="autoplay; encrypted-media"
               allowFullScreen
+              onError={() => {
+                console.log(`[Error] Kick embed failed for ${widget.kickChannel}`);
+                setWidgets(prev => prev.map(w => 
+                  w.id === widget.id ? { ...w, isOffline: true } : w
+                ));
+              }}
             />
           );
         } else if (widget.url) {
@@ -571,7 +720,7 @@ const MasterControlDashboard = ({
             </div>
           );
         }
-        
+
         return (
           <div className="w-full h-full flex items-center justify-center">
             <button
@@ -716,7 +865,7 @@ const MasterControlDashboard = ({
               {GRID_COLS}-col grid
             </span>
           </div>
-          
+
           <div className="flex gap-[0.8rem] items-center">
             <button
               onClick={handleOpenSidebarToContent}
@@ -726,7 +875,7 @@ const MasterControlDashboard = ({
               <Plus className="w-[1.4rem] h-[1.4rem]" />
               Add Block
             </button>
-            
+
             <button
               onClick={handleRefreshAllWidgets}
               className="px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-[1.2rem]"
@@ -735,7 +884,7 @@ const MasterControlDashboard = ({
               <RefreshCw className="w-[1.4rem] h-[1.4rem]" />
               Refresh All
             </button>
-            
+
             <button
               onClick={() => setIsEditMode(!isEditMode)}
               className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
@@ -748,7 +897,7 @@ const MasterControlDashboard = ({
               {isEditMode ? <Lock className="w-[1.4rem] h-[1.4rem]" /> : <Edit3 className="w-[1.4rem] h-[1.4rem]" />}
               {isEditMode ? 'LOCK' : 'EDIT LAYOUT'}
             </button>
-            
+
             <button
               onClick={handleMasterMute}
               className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
@@ -761,7 +910,7 @@ const MasterControlDashboard = ({
               {masterMute ? <VolumeX className="w-[1.4rem] h-[1.4rem]" /> : <Volume2 className="w-[1.4rem] h-[1.4rem]" />}
               {masterMute ? 'MUTED' : 'LIVE'}
             </button>
-            
+
             <button
               id="save-button"
               onClick={handleSaveLayout}
@@ -773,7 +922,7 @@ const MasterControlDashboard = ({
             </button>
           </div>
         </div>
-        
+
         <div className="h-[0.2rem] bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full"></div>
       </div>
 
@@ -798,7 +947,7 @@ const MasterControlDashboard = ({
             <div key={i} className="ghost-cell" />
           ))}
         </div>
-        
+
         {/* Ghost Preview - shows during drag */}
         {ghostPosition && (
           <div 
@@ -820,7 +969,7 @@ const MasterControlDashboard = ({
             />
           </div>
         )}
-        
+
         <div 
           ref={gridContainerRef}
           className="relative z-10 grid gap-[1rem] h-full"
@@ -833,7 +982,7 @@ const MasterControlDashboard = ({
         >
         {widgets.map((widget) => (
           <SortableWidget key={widget.id} widget={widget} isEditMode={isEditMode}>
-            {widget.type === 'video' && (widget.url || widget.videoId || widget.youtubeChannelId || widget.twitchChannel || widget.kickChannel) && !isEditMode && (
+            {widget.type === 'video' && (widget.url || widget.videoId || widget.youtubeChannelId || widget.twitchChannel || widget.kickChannel) && !isEditMode && !widget.isOffline && (
               <>
                 {/* Seek Mode "Done" button - always visible when seek mode is active */}
                 {seekModeWidgets.has(widget.id) && (
@@ -855,7 +1004,7 @@ const MasterControlDashboard = ({
                     </button>
                   </div>
                 )}
-                
+
                 {/* Regular hover controls - always interactive with high z-index */}
                 <div 
                   className={`absolute top-[0.6rem] right-[0.6rem] z-50 flex gap-[0.3rem] transition-opacity duration-200 ${seekModeWidgets.has(widget.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
@@ -879,7 +1028,7 @@ const MasterControlDashboard = ({
                   >
                     <Sliders className="w-[1rem] h-[1rem]" />
                   </button>
-                  
+
                   <button
                     onClick={() => toggleWidgetMute(widget.id)}
                     className={`p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm ${
@@ -892,7 +1041,7 @@ const MasterControlDashboard = ({
                   >
                     {widget.isMuted ? <VolumeX className="w-[1rem] h-[1rem]" /> : <Volume2 className="w-[1rem] h-[1rem]" />}
                   </button>
-                  
+
                   <button
                     onClick={() => toggleWidgetPause(widget.id)}
                     className={`p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm ${
@@ -905,7 +1054,7 @@ const MasterControlDashboard = ({
                   >
                     {widget.isPaused ? <Play className="w-[1rem] h-[1rem]" /> : <Pause className="w-[1rem] h-[1rem]" />}
                   </button>
-                  
+
                   <button
                     onClick={() => handleRefreshWidget(widget.id)}
                     className="p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm bg-cyan-600/90 hover:bg-cyan-500"
@@ -914,7 +1063,7 @@ const MasterControlDashboard = ({
                   >
                     <RefreshCw className="w-[1rem] h-[1rem]" />
                   </button>
-                  
+
                   <button
                     onClick={() => handleRemoveWidget(widget.id)}
                     className="p-[0.5rem] slot-button transition-all duration-300 backdrop-blur-sm bg-red-600/90 hover:bg-red-500"

@@ -219,6 +219,10 @@ gap: 1rem;
 - **YouTube Channel Embeds**: Uses permanent /embed/live_stream?channel=CHANNEL_ID format for news channels
 - **Twitch Player Detection**: extractTwitchChannel matches both twitch.tv and player.twitch.tv URLs
 - **Widget youtubeChannelId**: New property for channel-based live streams vs video ID-based embeds
+- **Collision Prevention**: Push logic moves passive widgets to next available slot during resize
+- **No-Overlap Rule**: Resizing blocked when no room to push colliding widgets
+- **Twitch Multi-Parent**: Uses [hostname, 'replit.app', 'replit.dev'] for all Replit preview states
+- **News Video IDs**: Sky News (9Auqkrry-jE) and ABC News (I9u-j-2V_Vw) use stable video IDs
 
 ## Responsive Widget Scaling (Apple HIG Standard)
 - Global scaling: html { font-size: 62.5% } makes 1rem = 10px

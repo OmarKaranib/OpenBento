@@ -45,6 +45,7 @@ export interface Widget {
   noteContent?: string;
   imageUrl?: string;
   lastRefresh?: number;
+  isOffline?: boolean; // Track offline state
 }
 
 const GRID_COLS = 12;
@@ -93,6 +94,7 @@ function App() {
           ...w,
           isMuted: w.isMuted ?? true,
           isPaused: w.isPaused ?? false,
+          isOffline: w.isOffline ?? false,
           x: w.x ?? 0,
           y: w.y ?? 0,
           w: w.w ?? 3,
@@ -118,7 +120,11 @@ function App() {
   // Extract YouTube channel ID from permanent live stream URLs
   const extractYouTubeChannelId = (url: string): string | null => {
     const channelRegex = /youtube\.com\/embed\/live_stream\?channel=([a-zA-Z0-9_-]+)/;
-    const match = url.match(channelRegex);
+    const channelRegex2 = /youtube\.com\/@([a-zA-Z0-9_-]+)/;
+    const channelRegex3 = /youtube\.com\/channel\/([a-zA-Z0-9_-]+)/;
+    const channelRegex4 = /youtube\.com\/c\/([a-zA-Z0-9_-]+)/;
+
+    const match = url.match(channelRegex) || url.match(channelRegex2) || url.match(channelRegex3) || url.match(channelRegex4);
     return match ? match[1] : null;
   };
 
@@ -140,31 +146,31 @@ function App() {
   // Find first available position for a new widget
   const findAvailablePosition = useCallback((w: number, h: number, currentWidgets: Widget[]): { x: number; y: number } => {
     const GRID_ROWS = 6;
-    
+
     // Try each position in the grid
     for (let y = 0; y <= GRID_ROWS - h; y++) {
       for (let x = 0; x <= GRID_COLS - w; x++) {
         let occupied = false;
-        
+
         for (const widget of currentWidgets) {
           // Check if this position overlaps with existing widget
           const widgetRight = widget.x + widget.w;
           const widgetBottom = widget.y + widget.h;
           const newRight = x + w;
           const newBottom = y + h;
-          
+
           if (x < widgetRight && newRight > widget.x && y < widgetBottom && newBottom > widget.y) {
             occupied = true;
             break;
           }
         }
-        
+
         if (!occupied) {
           return { x, y };
         }
       }
     }
-    
+
     // Fallback to 0,0 if no space found
     return { x: 0, y: 0 };
   }, []);
@@ -182,6 +188,7 @@ function App() {
         h,
         isMuted: true,
         isPaused: false,
+        isOffline: false,
         ...extraData
       };
       return [...prev, newWidget];
@@ -239,6 +246,7 @@ function App() {
           embedBlocked: false,
           isPaused: false,
           isMuted: true,
+          isOffline: false,
           lastRefresh: Date.now()
         } : w
       ));
@@ -292,6 +300,7 @@ function App() {
         embedBlocked: false,
         isPaused: false,
         isMuted: true,
+        isOffline: false,
         lastRefresh: Date.now()
       } : w
     ));
@@ -299,11 +308,11 @@ function App() {
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id);
-    
+
     // Get the widget being dragged to determine ghost size
     const activeData = event.active.data.current;
     let ghostPos: { x: number; y: number; w: number; h: number };
-    
+
     if (activeData?.type === 'channel' || activeData?.type === 'widget-template') {
       // Sidebar items use default 3x2 or template size
       const template = activeData.template as WidgetTemplate | undefined;
@@ -322,7 +331,7 @@ function App() {
         ghostPos = { x: 0, y: 0, w: 3, h: 2 };
       }
     }
-    
+
     // Update both state and ref
     ghostPositionRef.current = ghostPos;
     setGhostPosition(ghostPos);
@@ -331,16 +340,16 @@ function App() {
   const handleDragMove = useCallback((event: DragMoveEvent) => {
     if (!gridContainerRef.current) return;
     if (!ghostPositionRef.current) return;
-    
+
     const gridRect = gridContainerRef.current.getBoundingClientRect();
-    
+
     // Use translated rect, fallback to initial rect + delta
     let dragX = 0;
     let dragY = 0;
-    
+
     const translated = event.active.rect.current.translated;
     const initial = event.active.rect.current.initial;
-    
+
     if (translated) {
       dragX = translated.left;
       dragY = translated.top;
@@ -350,18 +359,18 @@ function App() {
     } else {
       return;
     }
-    
+
     // Calculate cell dimensions
     const cellWidth = gridRect.width / GRID_COLS;
     const cellHeight = gridRect.height / 6; // GRID_ROWS = 6
-    
+
     // Calculate grid position based on the drag overlay's top-left corner
     const relativeX = dragX - gridRect.left;
     const relativeY = dragY - gridRect.top;
-    
+
     const gridX = Math.max(0, Math.min(GRID_COLS - 1, Math.floor(relativeX / cellWidth)));
     const gridY = Math.max(0, Math.min(5, Math.floor(relativeY / cellHeight))); // 0-5 for 6 rows
-    
+
     // Update both ref and state
     ghostPositionRef.current = { ...ghostPositionRef.current, x: gridX, y: gridY };
     setGhostPosition(ghostPositionRef.current);
@@ -371,13 +380,13 @@ function App() {
   const isPositionOccupied = useCallback((x: number, y: number, w: number, h: number, excludeWidgetId: string, currentWidgets: Widget[]): boolean => {
     for (const widget of currentWidgets) {
       if (widget.id === excludeWidgetId) continue;
-      
+
       // Check for overlap
       const widgetRight = widget.x + widget.w;
       const widgetBottom = widget.y + widget.h;
       const newRight = x + w;
       const newBottom = y + h;
-      
+
       if (x < widgetRight && newRight > widget.x && y < widgetBottom && newBottom > widget.y) {
         return true;
       }
@@ -388,32 +397,32 @@ function App() {
   // Find nearest available position using spiral search
   const findNearestAvailable = useCallback((targetX: number, targetY: number, w: number, h: number, excludeWidgetId: string, currentWidgets: Widget[]): { x: number; y: number } => {
     const GRID_ROWS = 6;
-    
+
     // Try the target position first
     if (!isPositionOccupied(targetX, targetY, w, h, excludeWidgetId, currentWidgets)) {
       return { x: targetX, y: targetY };
     }
-    
+
     // Spiral search for nearest available spot
     for (let distance = 1; distance < Math.max(GRID_COLS, GRID_ROWS); distance++) {
       for (let dx = -distance; dx <= distance; dx++) {
         for (let dy = -distance; dy <= distance; dy++) {
           if (Math.abs(dx) !== distance && Math.abs(dy) !== distance) continue;
-          
+
           const newX = targetX + dx;
           const newY = targetY + dy;
-          
+
           // Clamp to grid bounds
           const clampedX = Math.max(0, Math.min(GRID_COLS - w, newX));
           const clampedY = Math.max(0, Math.min(GRID_ROWS - h, newY));
-          
+
           if (!isPositionOccupied(clampedX, clampedY, w, h, excludeWidgetId, currentWidgets)) {
             return { x: clampedX, y: clampedY };
           }
         }
       }
     }
-    
+
     // Fallback to original position (shouldn't happen)
     return { x: targetX, y: targetY };
   }, [isPositionOccupied]);
@@ -421,7 +430,7 @@ function App() {
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active } = event;
     const finalGhostPosition = ghostPositionRef.current; // Use ref for immediate access
-    
+
     setActiveId(null);
     setGhostPosition(null);
     ghostPositionRef.current = null;
@@ -444,13 +453,13 @@ function App() {
     // Handle sortable widget drop - update x/y based on ghost position
     if (activeData?.type === 'sortable-widget' && finalGhostPosition) {
       const widgetId = active.id as string;
-      
+
       setWidgets((currentWidgets) => {
         const widgetIndex = currentWidgets.findIndex(w => w.id === widgetId);
         if (widgetIndex === -1) return currentWidgets;
-        
+
         const widget = currentWidgets[widgetIndex];
-        
+
         // Find nearest available position (no-overlap rule)
         const { x: newX, y: newY } = findNearestAvailable(
           finalGhostPosition.x, 
@@ -460,7 +469,7 @@ function App() {
           widgetId, 
           currentWidgets
         );
-        
+
         // Update widget position
         const updatedWidgets = [...currentWidgets];
         updatedWidgets[widgetIndex] = {
@@ -468,7 +477,7 @@ function App() {
           x: newX,
           y: newY
         };
-        
+
         return updatedWidgets;
       });
     }
@@ -476,6 +485,7 @@ function App() {
 
   const handleChannelClick = useCallback((channel: TrendingChannel) => {
     const videoId = extractYouTubeId(channel.url);
+    const youtubeChannelId = extractYouTubeChannelId(channel.url);
     const twitchChannel = extractTwitchChannel(channel.url);
     const currentActiveWidgetId = activeWidgetIdRef.current;
 
@@ -485,14 +495,16 @@ function App() {
           ...w,
           type: 'video',
           url: channel.url,
-          isYouTube: !!videoId,
+          isYouTube: !!videoId || !!youtubeChannelId,
           videoId,
+          youtubeChannelId,
           isTwitch: !!twitchChannel,
           twitchChannel,
           error: null,
           embedBlocked: false,
           isPaused: false,
-          isMuted: true
+          isMuted: true,
+          isOffline: false
         } : w
       ));
     } else {
@@ -596,7 +608,7 @@ function App() {
               <Route component={NotFound} />
             </Switch>
           </SortableContext>
-          
+
           <DragOverlay>
             {activeId ? (
               <div 

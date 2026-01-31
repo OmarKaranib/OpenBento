@@ -35,8 +35,9 @@ const TRENDING_CHANNELS: TrendingChannel[] = [
   // YouTube 24/7 Live Streams (using permanent channel URLs)
   { id: 'nasa-live', name: 'NASA Live', url: 'https://www.youtube.com/embed/live_stream?channel=UCLA_DiR1FfKNvjuUpBHmylQ', iconType: 'science', category: 'Science', platform: 'youtube', channelId: 'UCLA_DiR1FfKNvjuUpBHmylQ' },
   { id: 'lofi-girl', name: 'Lofi Girl', url: 'https://www.youtube.com/embed/live_stream?channel=UCSJ4gkVC6NrvII8umztf0Ow', iconType: 'music', category: 'Music', platform: 'youtube', channelId: 'UCSJ4gkVC6NrvII8umztf0Ow' },
-  { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/embed/live_stream?channel=UCoMdktPbSTixAyNGwb-UYkQ', iconType: 'news', category: 'News', platform: 'youtube', channelId: 'UCoMdktPbSTixAyNGwb-UYkQ' },
-  { id: 'abc-news', name: 'ABC News', url: 'https://www.youtube.com/embed/live_stream?channel=UCBi2mrWuNuyYy4gbM6fU18Q', iconType: 'news', category: 'News', platform: 'youtube', channelId: 'UCBi2mrWuNuyYy4gbM6fU18Q' },
+  // News channels using verified stable video IDs (2026)
+  { id: 'sky-news', name: 'Sky News', url: 'https://www.youtube.com/watch?v=9Auqkrry-jE', iconType: 'news', category: 'News', platform: 'youtube', channelId: undefined },
+  { id: 'abc-news', name: 'ABC News', url: 'https://www.youtube.com/watch?v=I9u-j-2V_Vw', iconType: 'news', category: 'News', platform: 'youtube', channelId: undefined },
   // Twitch Trending Channels
   { id: 'twitch-esl', name: 'ESL CS:GO', url: 'https://www.twitch.tv/esl_csgo', iconType: 'gaming', category: 'Esports', platform: 'twitch', channelId: 'esl_csgo' },
   { id: 'twitch-rocket', name: 'Rocket League', url: 'https://www.twitch.tv/rocketleague', iconType: 'gaming', category: 'Esports', platform: 'twitch', channelId: 'rocketleague' },
