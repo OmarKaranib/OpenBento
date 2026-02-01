@@ -773,8 +773,8 @@ function App() {
     setActiveWidgetId(null);
   }, [addVideoWidget]);
 
-  // Dashboard-only mode flag - prevents sidebar from opening
-  const dashboardOnlyMode = true;
+  // Dashboard-only mode flag - set to false to allow sidebar with filtered content
+  const dashboardOnlyMode = false;
   
   const handleOpenSidebar = useCallback((widgetId?: string) => {
     // Blocked in dashboard-only mode

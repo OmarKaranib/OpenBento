@@ -295,15 +295,15 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, onSave, onRemove,
           getFallbackIcon()
         )}
         {isLive && (
-          <div className="absolute -top-1 -right-1 w-[1rem] h-[1rem] bg-red-500 rounded-full animate-pulse" />
+          <div className="live-badge absolute -top-1 -right-1 w-[1rem] h-[1rem] bg-red-500 rounded-full animate-pulse" />
         )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-[0.6rem]">
           <p className="text-[1.2rem] font-semibold text-slate-200 truncate">{channel.name}</p>
           {isLive && (
-            <span className="flex items-center gap-[0.3rem] px-[0.5rem] py-[0.1rem] bg-red-500/20 border border-red-500/50 rounded-full text-[0.8rem] font-bold text-red-400 uppercase tracking-wider" data-testid={`live-badge-${channel.id}`}>
-              <span className="w-[0.6rem] h-[0.6rem] rounded-full bg-red-500 animate-pulse" />
+            <span className="live-badge flex items-center gap-[0.3rem] px-[0.5rem] py-[0.1rem] bg-red-500/20 border border-red-500/50 rounded-full text-[0.8rem] font-bold text-red-400 uppercase tracking-wider" data-testid={`live-badge-${channel.id}`}>
+              <span className="live-badge w-[0.6rem] h-[0.6rem] rounded-full bg-red-500 animate-pulse" />
               Live
             </span>
           )}
@@ -621,30 +621,15 @@ export function WidgetSidebar({
             </button>
           </div>
           
+          {/* Streams-only tab - Library tab hidden since builder tools are hidden */}
           <div className="flex gap-[0.4rem] bg-slate-800 p-[0.4rem] rounded-lg">
             <button
-              onClick={() => setActiveTab('library')}
-              className={`flex-1 flex items-center justify-center gap-[0.6rem] py-[0.8rem] px-[1.2rem] rounded-md text-[1.2rem] font-medium transition-all duration-200 ${
-                activeTab === 'library'
-                  ? 'bg-purple-600 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
-              }`}
-              data-testid="tab-library"
-            >
-              <Layout className="w-[1.4rem] h-[1.4rem]" />
-              Library
-            </button>
-            <button
               onClick={() => setActiveTab('content')}
-              className={`flex-1 flex items-center justify-center gap-[0.6rem] py-[0.8rem] px-[1.2rem] rounded-md text-[1.2rem] font-medium transition-all duration-200 ${
-                activeTab === 'content'
-                  ? 'bg-cyan-600 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
-              }`}
+              className={`flex-1 flex items-center justify-center gap-[0.6rem] py-[0.8rem] px-[1.2rem] rounded-md text-[1.2rem] font-medium transition-all duration-200 bg-cyan-600 text-white shadow-lg`}
               data-testid="tab-content"
             >
               <Layers className="w-[1.4rem] h-[1.4rem]" />
-              Streams
+              News / Stream Library
             </button>
           </div>
           

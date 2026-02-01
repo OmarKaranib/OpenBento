@@ -98,10 +98,49 @@ body.light-theme .menu-btn {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
+/* Indicator buttons (Muted/Live) need high-contrast dark text in light mode */
+body.light-theme .indicator-btn {
+  color: #1a1a1a !important;
+  text-shadow: none;
+}
+
 /* Amber (Light mode theme button) needs dark text for contrast */
 body.light-theme .menu-btn[class*="bg-amber"] {
   color: #78350f !important;
   text-shadow: none;
+}
+
+/* LIVE badge lockdown - Keep vibrant red in light mode */
+body.light-theme .live-badge {
+  background-color: #ef4444 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+/* LIVE badge text container (the pill) */
+body.light-theme span.live-badge {
+  background-color: rgba(239, 68, 68, 0.3) !important;
+  border-color: rgba(239, 68, 68, 0.6) !important;
+  color: #dc2626 !important;
+}
+
+/* LIVE badge dot */
+body.light-theme span.live-badge span.live-badge {
+  background-color: #ef4444 !important;
+}
+
+/* Preserve red backgrounds for muted/live buttons */
+body.light-theme .indicator-btn[class*="bg-red"] {
+  background-color: #dc2626 !important;
+}
+
+body.light-theme .indicator-btn[class*="bg-emerald"] {
+  background-color: #059669 !important;
+}
+
+/* Indicator button icons - keep visible in light mode */
+body.light-theme .indicator-btn svg {
+  color: #1a1a1a !important;
 }
 
 /* Light mode - Canvas container */

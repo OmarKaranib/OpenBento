@@ -1140,12 +1140,11 @@ const MasterControlDashboard = ({
               </button>
             )}
 
-            {/* Block button - Hidden for dashboard-only view */}
-            {/* 
+            {/* Block button - Opens Stream Library sidebar */}
             <button
               onClick={handleOpenSidebarToContent}
               disabled={isGridFull}
-              className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform shadow-lg text-[1.2rem] ${
+              className={`menu-btn px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform shadow-lg text-[1.2rem] ${
                 isGridFull 
                   ? 'bg-slate-600 cursor-not-allowed opacity-60 shadow-slate-900/50' 
                   : 'bg-emerald-600 hover:bg-emerald-500 hover:scale-105 shadow-emerald-900/50'
@@ -1154,9 +1153,8 @@ const MasterControlDashboard = ({
               data-testid="button-add-block"
             >
               <Plus className="w-[1.4rem] h-[1.4rem]" />
-              {isGridFull ? 'Full' : 'Block'}
+              {isGridFull ? 'Full' : '+Block'}
             </button>
-            */}
 
             <button
               onClick={handleRefreshAllWidgets}
@@ -1188,7 +1186,7 @@ const MasterControlDashboard = ({
 
             <button
               onClick={handleMasterMute}
-              className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
+              className={`menu-btn indicator-btn px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
                 masterMute 
                   ? 'bg-red-600 hover:bg-red-500 shadow-lg shadow-red-900/50' 
                   : 'bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-900/50'
