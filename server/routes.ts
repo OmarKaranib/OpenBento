@@ -2,11 +2,16 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from "./link-refresher";
+import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Setup authentication (BEFORE other routes)
+  await setupAuth(app);
+  registerAuthRoutes(app);
+
   // Start the background link refresher (24h interval)
   startLinkRefresher();
 

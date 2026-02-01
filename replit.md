@@ -1,7 +1,7 @@
-# Master Control Dashboard
+# OpenBento Dashboard
 
 ## Overview
-The Master Control Dashboard is a magnetic, bento-style Mission Control interface built upon OpenBento architecture standards. It features a 12-column grid, a dynamic widget system with drag-to-resize functionality, and integrates YouTube and Twitch with custom TV-style controls. The dashboard aims to provide a highly customizable and persistent workspace for monitoring and managing various streams and information, akin to a personalized mission control. Key capabilities include displaying video streams, notes, images, and spacers, all within a responsive, fit-to-screen layout with localStorage persistence.
+The OpenBento Dashboard is a magnetic, bento-style Mission Control interface featuring a 12-column grid, dynamic widget system with drag-to-resize functionality, and YouTube/Twitch/Kick video integration. It features a 12-column grid, a dynamic widget system with drag-to-resize functionality, and integrates YouTube and Twitch with custom TV-style controls. The dashboard aims to provide a highly customizable and persistent workspace for monitoring and managing various streams and information, akin to a personalized mission control. Key capabilities include displaying video streams, notes, images, and spacers, all within a responsive, fit-to-screen layout with localStorage persistence.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -70,6 +70,26 @@ The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to 
 - **Light mode:** `:not(.menu-btn)` excludes menu buttons from white background override
 - **Text colors:** White text with text-shadow for colored buttons; amber and indicator buttons get dark text for contrast
 - **LIVE Badge Lockdown:** `.live-badge` class preserves vibrant red in light mode for channel LIVE indicators
+
+**Authentication & Paywall System (2026-02-01):**
+- **Replit Auth Integration:** Uses Replit's OIDC authentication via `server/replit_integrations/auth/`
+- **User Tiers:**
+  - **Free Tier:** 4 blocks maximum, no background images, shows Upgrade button
+  - **Pro Tier:** Unlimited blocks + custom background images (requires login)
+- **Auth Endpoints:**
+  - `GET /api/login` - Redirects to Replit Auth
+  - `GET /api/logout` - Logs out user and redirects to home
+  - `GET /api/auth/user` - Returns current user data or 401 if not authenticated
+- **Menu Bar Auth Buttons:**
+  - **Upgrade Button:** Gold gradient (amber-500 to amber-600), visible only for Free tier, opens UpgradePopup
+  - **Login Button:** Cyan background (cyan-700), visible when not logged in
+  - **User Avatar/Logout:** Shows user avatar + name when logged in, clicks to logout
+- **UpgradePopup Component:** Bento-styled modal showing Pro features, triggered by:
+  - Clicking Upgrade button in menu bar
+  - Attempting to add more than 4 blocks (Free tier limit)
+  - Attempting to use background image feature (Free tier restriction)
+- **Background Image Restriction:** Pro-only feature - Free users see disabled input with "Pro feature" placeholder
+- **Architecture:** QueryClientProvider wraps AppContent component to enable useAuth hook usage
 
 **Core Features:**
 - **Dynamic Widget System:** Supports Video, Note, Spacer, and Image widget types, each with unique functionalities. Widgets are added, removed, and content swapped dynamically.

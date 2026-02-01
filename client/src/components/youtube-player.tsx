@@ -113,7 +113,7 @@ function YouTubePlayerInner({
       try {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: `Stream ${widgetId}`,
-          artist: 'Master Control Dashboard',
+          artist: 'OpenBento Dashboard',
           album: 'Live Streams',
         });
 

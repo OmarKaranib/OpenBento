@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon } from 'lucide-react';
+import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, Crown, LogIn, LogOut, User } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -100,12 +100,15 @@ interface MasterControlDashboardProps {
   handleOpenSidebar: (widgetId?: string) => void;
   onInlineUrlSubmit: (widgetId: string, url: string) => void;
   handleOpenSidebarToContent: () => void;
-  addWidget: (type: WidgetType, w?: number, h?: number, extraData?: Partial<Widget>) => string;
+  addWidget: (type: WidgetType, w?: number, h?: number, extraData?: Partial<Widget>) => string | null;
   isFullscreen: boolean;
   setIsFullscreen: Dispatch<SetStateAction<boolean>>;
   ghostPosition: { x: number; y: number; w: number; h: number } | null;
   gridContainerRef: MutableRefObject<HTMLDivElement | null>;
   isGridFull: boolean;
+  userTier: 'Free' | 'Pro';
+  user: { id: string; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null } | null | undefined;
+  onShowUpgradePopup: (feature: 'blocks' | 'background') => void;
 }
 
 interface ResizeState {
@@ -131,7 +134,10 @@ const MasterControlDashboard = ({
   setIsFullscreen,
   ghostPosition,
   gridContainerRef,
-  isGridFull
+  isGridFull,
+  userTier,
+  user,
+  onShowUpgradePopup
 }: MasterControlDashboardProps) => {
   const [masterMute, setMasterMute] = useState(true);
   const [resizing, setResizing] = useState<ResizeState | null>(null);
@@ -229,8 +235,14 @@ const MasterControlDashboard = ({
     window.dispatchEvent(new Event('globalBgUpdated'));
   }, [globalBgImage]);
 
-  // Handle background image upload
+  // Handle background image upload - Pro only
   const handleBgImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    // Check for Pro tier
+    if (userTier === 'Free') {
+      onShowUpgradePopup('background');
+      return;
+    }
+    
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -240,7 +252,7 @@ const MasterControlDashboard = ({
       };
       reader.readAsDataURL(file);
     }
-  }, []);
+  }, [userTier, onShowUpgradePopup]);
 
   // Set custom color for a specific widget (Bento.me Color Droplet)
   const setWidgetColor = useCallback((widgetId: string, color: string | undefined) => {
@@ -1270,10 +1282,15 @@ const MasterControlDashboard = ({
                     <div className="flex gap-[0.4rem]">
                       <input
                         type="text"
-                        placeholder="Or paste image URL..."
-                        className="flex-1 px-[0.8rem] py-[0.5rem] bg-slate-900 border border-slate-600 rounded-lg text-[0.9rem] text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                        placeholder={userTier === 'Free' ? 'Pro feature - Upgrade to use' : 'Or paste image URL...'}
+                        disabled={userTier === 'Free'}
+                        className={`flex-1 px-[0.8rem] py-[0.5rem] bg-slate-900 border border-slate-600 rounded-lg text-[0.9rem] text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 ${userTier === 'Free' ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
+                            if (userTier === 'Free') {
+                              onShowUpgradePopup('background');
+                              return;
+                            }
                             const url = (e.target as HTMLInputElement).value.trim();
                             if (url) {
                               setGlobalBgImage(url);
@@ -1351,6 +1368,50 @@ const MasterControlDashboard = ({
               {isDarkMode ? <Moon className="w-[1.4rem] h-[1.4rem] relative z-10" /> : <Sun className="w-[1.4rem] h-[1.4rem] relative z-10" />}
               <span className="relative z-10">{isDarkMode ? 'Dark' : 'Light'}</span>
             </button>
+
+            {/* Upgrade Button - Only shown for Free tier */}
+            {userTier === 'Free' && (
+              <button
+                onClick={() => onShowUpgradePopup('blocks')}
+                className="menu-btn px-[1.2rem] py-[0.6rem] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 slot-button font-bold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] shadow-lg shadow-amber-500/30 text-slate-900"
+                data-testid="button-upgrade"
+                title="Upgrade to OpenBento Pro"
+              >
+                <Crown className="w-[1.4rem] h-[1.4rem]" />
+                Upgrade
+              </button>
+            )}
+
+            {/* Auth Button - Login or User Avatar */}
+            {user ? (
+              <a
+                href="/api/logout"
+                className="menu-btn px-[1.2rem] py-[0.6rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] shadow-lg shadow-slate-900/50"
+                data-testid="button-logout"
+                title={`Logged in as ${user.firstName || 'Pro User'} - Click to logout`}
+              >
+                {user.profileImageUrl ? (
+                  <img 
+                    src={user.profileImageUrl} 
+                    alt="User" 
+                    className="w-[1.8rem] h-[1.8rem] rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="w-[1.4rem] h-[1.4rem]" />
+                )}
+                <span className="max-w-[8rem] truncate">{user.firstName || 'Pro'}</span>
+              </a>
+            ) : (
+              <a
+                href="/api/login"
+                className="menu-btn px-[1.2rem] py-[0.6rem] bg-cyan-700 hover:bg-cyan-600 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] shadow-lg shadow-cyan-900/50"
+                data-testid="button-login"
+                title="Login to unlock Pro features"
+              >
+                <LogIn className="w-[1.4rem] h-[1.4rem]" />
+                Login
+              </a>
+            )}
           </div>
         </div>
 

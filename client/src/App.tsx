@@ -1,4 +1,9 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useAuth } from '@/hooks/use-auth';
+import { UpgradePopup } from '@/components/upgrade-popup';
+
+// User tier constants
+const FREE_BLOCK_LIMIT = 4;
 
 // Global Background Engine - Applied directly to document.body
 const GlobalCanvasBackground = () => {
@@ -110,7 +115,8 @@ function generateWidgetId(): string {
   return `widget-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
-function App() {
+// Inner App component that uses hooks requiring QueryClientProvider
+function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
@@ -118,6 +124,14 @@ function App() {
   const [urlInputValue, setUrlInputValue] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [ghostPosition, setGhostPosition] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  
+  // Auth and tier state - must be inside QueryClientProvider
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
+  const [showUpgradePopup, setShowUpgradePopup] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState<'blocks' | 'background'>('blocks');
+  
+  // User tier: Pro if authenticated, Free otherwise
+  const userTier = isAuthenticated ? 'Pro' : 'Free';
 
   const activeWidgetIdRef = useRef<string | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
@@ -280,8 +294,20 @@ function App() {
   }, [widgets]);
 
   const addWidget = useCallback((type: WidgetType, w = 3, h = 2, extraData?: Partial<Widget>) => {
+    // Check block limit for Free tier
+    if (userTier === 'Free' && widgets.length >= FREE_BLOCK_LIMIT) {
+      setUpgradeFeature('blocks');
+      setShowUpgradePopup(true);
+      return null;
+    }
+    
     const widgetId = generateWidgetId();
     setWidgets(prev => {
+      // Double-check limit inside callback (widgets may have changed)
+      if (userTier === 'Free' && prev.length >= FREE_BLOCK_LIMIT) {
+        return prev;
+      }
+      
       const smartResult = findSmartPosition(Math.min(w, GRID_COLS), h, prev);
       
       // If grid is full, do NOT add widget (no shifting/shrinking existing blocks)
@@ -307,7 +333,7 @@ function App() {
       return [...prev, newWidget];
     });
     return widgetId;
-  }, [findSmartPosition]);
+  }, [findSmartPosition, userTier, widgets.length]);
 
   const addVideoWidget = useCallback((channel: TrendingChannel, w = 3, h = 2) => {
     const videoId = extractYouTubeId(channel.url);
@@ -825,89 +851,107 @@ function App() {
   }, [addWidget]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        {/* Global Canvas Background - At root level, behind everything */}
-        <GlobalCanvasBackground />
-        <DndContext 
-          sensors={sensors} 
-          collisionDetection={rectIntersection}
-          onDragStart={handleDragStart}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={widgets.map(w => w.id)} strategy={rectSortingStrategy}>
-            {/* WidgetSidebar - Hidden in dashboard-only mode */}
-            {!dashboardOnlyMode && (
-              <WidgetSidebar 
-                isOpen={sidebarOpen} 
-                onClose={() => {
-                  setSidebarOpen(false);
-                  activeWidgetIdRef.current = null;
-                  setActiveWidgetId(null);
-                  setUrlInputValue('');
-                }}
-                onChannelClick={handleChannelClick}
-                onTemplateClick={handleTemplateClick}
-                urlValue={urlInputValue}
-                onUrlChange={setUrlInputValue}
-                onUrlSubmit={handleSubmitUrl}
-                activeWidgetId={activeWidgetId}
-                onImageUpload={handleImageUpload}
-              />
-            )}
-            <Switch>
-              <Route path="/">
-                {() => (
-                  <MasterControlDashboard 
-                    widgets={widgets}
-                    setWidgets={setWidgets}
-                    isEditMode={isEditMode}
-                    setIsEditMode={setIsEditMode}
-                    sidebarOpen={sidebarOpen && !isFullscreen}
-                    activeId={activeId}
-                    handleOpenSidebar={handleOpenSidebar}
-                    onInlineUrlSubmit={handleInlineUrlSubmit}
-                    handleOpenSidebarToContent={handleOpenSidebarToContent}
-                    addWidget={addWidget}
-                    isFullscreen={isFullscreen}
-                    setIsFullscreen={setIsFullscreen}
-                    ghostPosition={ghostPosition}
-                    gridContainerRef={gridContainerRef}
-                    isGridFull={isGridFull}
-                  />
-                )}
-              </Route>
-              <Route component={NotFound} />
-            </Switch>
-          </SortableContext>
+    <TooltipProvider>
+      {/* Global Canvas Background - At root level, behind everything */}
+      <GlobalCanvasBackground />
+      <DndContext 
+        sensors={sensors} 
+        collisionDetection={rectIntersection}
+        onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={widgets.map(w => w.id)} strategy={rectSortingStrategy}>
+          {/* WidgetSidebar - Hidden in dashboard-only mode */}
+          {!dashboardOnlyMode && (
+            <WidgetSidebar 
+              isOpen={sidebarOpen} 
+              onClose={() => {
+                setSidebarOpen(false);
+                activeWidgetIdRef.current = null;
+                setActiveWidgetId(null);
+                setUrlInputValue('');
+              }}
+              onChannelClick={handleChannelClick}
+              onTemplateClick={handleTemplateClick}
+              urlValue={urlInputValue}
+              onUrlChange={setUrlInputValue}
+              onUrlSubmit={handleSubmitUrl}
+              activeWidgetId={activeWidgetId}
+              onImageUpload={handleImageUpload}
+            />
+          )}
+          <Switch>
+            <Route path="/">
+              {() => (
+                <MasterControlDashboard 
+                  widgets={widgets}
+                  setWidgets={setWidgets}
+                  isEditMode={isEditMode}
+                  setIsEditMode={setIsEditMode}
+                  sidebarOpen={sidebarOpen && !isFullscreen}
+                  activeId={activeId}
+                  handleOpenSidebar={handleOpenSidebar}
+                  onInlineUrlSubmit={handleInlineUrlSubmit}
+                  handleOpenSidebarToContent={handleOpenSidebarToContent}
+                  addWidget={addWidget}
+                  isFullscreen={isFullscreen}
+                  setIsFullscreen={setIsFullscreen}
+                  ghostPosition={ghostPosition}
+                  gridContainerRef={gridContainerRef}
+                  isGridFull={isGridFull}
+                  userTier={userTier}
+                  user={user}
+                  onShowUpgradePopup={(feature: 'blocks' | 'background') => {
+                    setUpgradeFeature(feature);
+                    setShowUpgradePopup(true);
+                  }}
+                />
+              )}
+            </Route>
+            <Route component={NotFound} />
+          </Switch>
+        </SortableContext>
 
-          <DragOverlay>
-            {activeId ? (
-              <div 
-                className="dashboard-slot bg-slate-900/80 backdrop-blur-sm border border-cyan-400 shadow-2xl shadow-cyan-500/40 pointer-events-none"
-                style={{
-                  width: '12rem',
-                  height: '8rem',
-                  opacity: 0.9
-                }}
-              >
-                <div className="flex items-center justify-center h-full">
-                  <span className="text-cyan-400 font-bold text-[1.2rem]">
-                    {String(activeId).includes('channel-') 
-                      ? 'Channel'
-                      : String(activeId).includes('template-')
-                        ? 'Widget'
-                        : 'Widget'
-                    }
-                  </span>
-                </div>
+        <DragOverlay>
+          {activeId ? (
+            <div 
+              className="dashboard-slot bg-slate-900/80 backdrop-blur-sm border border-cyan-400 shadow-2xl shadow-cyan-500/40 pointer-events-none"
+              style={{
+                width: '12rem',
+                height: '8rem',
+                opacity: 0.9
+              }}
+            >
+              <div className="flex items-center justify-center h-full">
+                <span className="text-cyan-400 font-bold text-[1.2rem]">
+                  {String(activeId).includes('channel-') 
+                    ? 'Channel'
+                    : String(activeId).includes('template-')
+                      ? 'Widget'
+                      : 'Widget'
+                  }
+                </span>
               </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-        <Toaster />
-      </TooltipProvider>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+      <UpgradePopup 
+        isOpen={showUpgradePopup} 
+        onClose={() => setShowUpgradePopup(false)} 
+        feature={upgradeFeature}
+      />
+      <Toaster />
+    </TooltipProvider>
+  );
+}
+
+// Main App component - Provides QueryClientProvider wrapper
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
     </QueryClientProvider>
   );
 }
