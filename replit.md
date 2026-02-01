@@ -34,11 +34,22 @@ The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to 
 - **Color Droplet Button:** Relocated to right side of widget controls (circular 4rem button matching Settings/Delete)
 
 **Menu Bar Refinements (2026-02-01):**
-- **Label Cleanup:** "Add Block" → "Block", "Edit Layout" → "Edit"
+- **Label Cleanup:** "Add Block" → "Block", "Edit Layout" → "Edit", "Refresh All" → "Refresh"
 - **Edit-to-Save Toggle:** Edit button transforms to "Save" when clicked; clicking Save locks layout, saves to localStorage, and reverts to Edit
 - **Dedicated Save Button:** Removed (integrated into Edit toggle)
 - **Theme Toggle:** Dark/Light mode button added to menu bar with Moon/Sun icons
 - **Content Purge:** All Music/Lofi/Radio content removed from sidebar, self-healing script, and data files
+
+**True Light Mode (2026-02-01):**
+- **High Contrast:** Light gray background (#f8f9fa), dark text (#1a1a1a for primary, #374151 for secondary)
+- **Soft Shadows:** Dashboard slots use box-shadows instead of borders for depth
+- **Token Overrides:** html.light class overrides all Tailwind CSS tokens (background, foreground, card, sidebar, etc.)
+- **Text Visibility:** Slate text classes force dark colors in light mode via CSS overrides
+
+**Channel Library Logos (2026-02-01):**
+- **Logo URLs:** CHANNEL_LOGOS map stores official channel profile images
+- **Fallback Icons:** Globe (news), Rocket (science), Gamepad2 (gaming), DollarSign (finance), Zap (default)
+- **Error Handling:** logoError state triggers fallback icon when image fails to load
 
 **Core Features:**
 - **Dynamic Widget System:** Supports Video, Note, Spacer, and Image widget types, each with unique functionalities. Widgets are added, removed, and content swapped dynamically.
