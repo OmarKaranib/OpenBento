@@ -34,7 +34,22 @@ export async function signInWithGoogle(): Promise<User | null> {
     return result.user;
   } catch (error: any) {
     console.error("Firebase Auth Error:", error.code, error.message);
-    return null;
+    
+    // Provide actionable error messages
+    if (error.code === 'auth/configuration-not-found') {
+      throw new Error('Google Sign-In is not configured. Please enable it in Firebase Console → Authentication → Sign-in method.');
+    }
+    if (error.code === 'auth/unauthorized-domain') {
+      throw new Error(`This domain is not authorized. Add "${window.location.hostname}" to Firebase Console → Authentication → Settings → Authorized domains.`);
+    }
+    if (error.code === 'auth/popup-closed-by-user') {
+      return null; // User cancelled, not an error
+    }
+    if (error.code === 'auth/popup-blocked') {
+      throw new Error('Popup was blocked. Please allow popups for this site and try again.');
+    }
+    
+    throw error;
   }
 }
 
