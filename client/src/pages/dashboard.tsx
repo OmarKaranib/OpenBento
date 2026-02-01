@@ -157,6 +157,19 @@ const MasterControlDashboard = ({
   const [clearHoldProgress, setClearHoldProgress] = useState(0);
   const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
   const [colorPickerWidget, setColorPickerWidget] = useState<string | null>(null);
+  
+  // Global Background Engine
+  const [globalBgColor, setGlobalBgColor] = useState<string>(() => {
+    const saved = localStorage.getItem('openBentoBgColor');
+    return saved || '';
+  });
+  const [globalBgImage, setGlobalBgImage] = useState<string>(() => {
+    const saved = localStorage.getItem('openBentoBgImage');
+    return saved || '';
+  });
+  const [showBgPicker, setShowBgPicker] = useState(false);
+  const bgImageInputRef = useRef<HTMLInputElement>(null);
+  
   const clearHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clearHoldStartRef = useRef<number | null>(null);
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
@@ -182,6 +195,36 @@ const MasterControlDashboard = ({
       localStorage.setItem('openBentoWidgets', widgetsJson);
     }
   }, [widgets]);
+
+  // Persist global background settings
+  useEffect(() => {
+    if (globalBgColor) {
+      localStorage.setItem('openBentoBgColor', globalBgColor);
+    } else {
+      localStorage.removeItem('openBentoBgColor');
+    }
+  }, [globalBgColor]);
+
+  useEffect(() => {
+    if (globalBgImage) {
+      localStorage.setItem('openBentoBgImage', globalBgImage);
+    } else {
+      localStorage.removeItem('openBentoBgImage');
+    }
+  }, [globalBgImage]);
+
+  // Handle background image upload
+  const handleBgImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        setGlobalBgImage(dataUrl);
+      };
+      reader.readAsDataURL(file);
+    }
+  }, []);
 
   // Set custom color for a specific widget (Bento.me Color Droplet)
   const setWidgetColor = useCallback((widgetId: string, color: string | undefined) => {
@@ -928,8 +971,35 @@ const MasterControlDashboard = ({
     }
   };
 
+  // Background picker colors
+  const bgPresetColors = [
+    '#0f172a', '#1e293b', '#334155', '#1e1b4b', '#312e81',
+    '#1f2937', '#111827', '#0c4a6e', '#164e63', '#134e4a',
+    '#14532d', '#3f3f46', '#27272a', '#292524', '#1c1917'
+  ];
+
   return (
-    <div className={`h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 font-mono flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} style={{ padding: isFullscreen && !headerVisible ? '0' : '1.6rem' }}>
+    <div 
+      className={`h-screen overflow-hidden text-slate-100 font-mono flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} 
+      style={{ 
+        padding: isFullscreen && !headerVisible ? '0' : '1.6rem',
+        backgroundColor: globalBgImage ? undefined : (globalBgColor || undefined),
+        backgroundImage: globalBgImage ? `url(${globalBgImage})` : (globalBgColor ? 'none' : 'linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a)'),
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}
+      data-testid="main-dashboard"
+    >
+      {/* Hidden file input for background image upload */}
+      <input
+        ref={bgImageInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleBgImageUpload}
+        className="hidden"
+        data-testid="input-bg-image-upload"
+      />
       <div className="fixed inset-0 opacity-30 pointer-events-none z-0">
         <div className="absolute top-[8rem] left-[8rem] w-[38rem] h-[38rem] bg-cyan-500 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
@@ -1118,6 +1188,136 @@ const MasterControlDashboard = ({
               <Save className="w-[1.4rem] h-[1.4rem]" />
               SAVE
             </button>
+
+            {/* Global Background Controls */}
+            <div className="relative">
+              <button
+                onClick={() => setShowBgPicker(!showBgPicker)}
+                className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
+                  showBgPicker 
+                    ? 'bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-900/50 ring-2 ring-purple-400' 
+                    : 'bg-slate-700 hover:bg-slate-600 shadow-lg shadow-slate-900/50'
+                }`}
+                data-testid="button-bg-picker"
+                title="Customize Background"
+              >
+                <Paintbrush className="w-[1.4rem] h-[1.4rem]" />
+                BG
+              </button>
+
+              {/* Background Picker Popup */}
+              {showBgPicker && (
+                <div 
+                  className="absolute top-full right-0 mt-[0.4rem] p-[1.2rem] bg-slate-800/95 backdrop-blur-md slot-button shadow-xl border border-slate-600/50 z-[10002] min-w-[22rem]"
+                  data-testid="bg-picker-popup"
+                >
+                  <div className="flex items-center justify-between mb-[0.8rem]">
+                    <span className="text-[1rem] font-semibold text-slate-300">Site Background</span>
+                    <button 
+                      onClick={() => setShowBgPicker(false)}
+                      className="p-[0.3rem] hover:bg-slate-700 rounded transition-colors"
+                      data-testid="button-close-bg-picker"
+                    >
+                      <X className="w-[1.2rem] h-[1.2rem] text-slate-400" />
+                    </button>
+                  </div>
+
+                  {/* Color Picker Section */}
+                  <div className="mb-[1rem]">
+                    <span className="text-[0.9rem] text-slate-400 mb-[0.5rem] block">Background Color</span>
+                    <div className="grid grid-cols-5 gap-[0.4rem]">
+                      {bgPresetColors.map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => {
+                            setGlobalBgColor(color);
+                            setGlobalBgImage(''); // Clear image when selecting color
+                          }}
+                          className={`w-[3rem] h-[3rem] rounded-lg transition-all hover:scale-110 border-2 ${
+                            globalBgColor === color && !globalBgImage 
+                              ? 'border-cyan-400 ring-2 ring-cyan-400/50' 
+                              : 'border-slate-600/50 hover:border-slate-500'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={color}
+                          data-testid={`bg-color-${color}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Image Upload Section */}
+                  <div className="mb-[1rem]">
+                    <span className="text-[0.9rem] text-slate-400 mb-[0.5rem] block">Background Image</span>
+                    <div className="flex gap-[0.5rem] mb-[0.5rem]">
+                      <button
+                        onClick={() => bgImageInputRef.current?.click()}
+                        className="flex-1 px-[0.8rem] py-[0.6rem] bg-slate-700 hover:bg-slate-600 slot-button text-[0.9rem] flex items-center justify-center gap-[0.4rem] transition-colors"
+                        data-testid="button-upload-bg-image"
+                      >
+                        <ImagePlus className="w-[1.2rem] h-[1.2rem]" />
+                        Upload
+                      </button>
+                    </div>
+                    <div className="flex gap-[0.4rem]">
+                      <input
+                        type="text"
+                        placeholder="Or paste image URL..."
+                        className="flex-1 px-[0.8rem] py-[0.5rem] bg-slate-900 border border-slate-600 rounded-lg text-[0.9rem] text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const url = (e.target as HTMLInputElement).value.trim();
+                            if (url) {
+                              setGlobalBgImage(url);
+                              (e.target as HTMLInputElement).value = '';
+                            }
+                          }
+                        }}
+                        data-testid="input-bg-image-url"
+                      />
+                    </div>
+                    {globalBgImage && (
+                      <div className="mt-[0.5rem] flex items-center gap-[0.5rem]">
+                        <div 
+                          className="w-[4rem] h-[3rem] rounded bg-cover bg-center border border-slate-600"
+                          style={{ backgroundImage: `url(${globalBgImage})` }}
+                        />
+                        <span className="text-[0.8rem] text-cyan-400 flex-1 truncate">Image set</span>
+                        <button
+                          onClick={() => setGlobalBgImage('')}
+                          className="p-[0.3rem] hover:bg-slate-700 rounded transition-colors"
+                          title="Remove image"
+                          data-testid="button-remove-bg-image"
+                        >
+                          <X className="w-[1rem] h-[1rem] text-slate-400" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Reset Button */}
+                  <div className="flex gap-[0.5rem]">
+                    <button
+                      onClick={() => {
+                        setGlobalBgColor('');
+                        setGlobalBgImage('');
+                      }}
+                      className="flex-1 px-[0.8rem] py-[0.5rem] bg-slate-700 hover:bg-slate-600 slot-button text-[0.9rem] transition-colors"
+                      data-testid="button-reset-bg"
+                    >
+                      Reset to Default
+                    </button>
+                    <button
+                      onClick={() => setShowBgPicker(false)}
+                      className="px-[1rem] py-[0.5rem] bg-cyan-600 hover:bg-cyan-500 slot-button text-[0.9rem] transition-colors"
+                      data-testid="button-done-bg"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

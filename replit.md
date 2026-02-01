@@ -9,15 +9,21 @@ I want iterative development.
 Ask before making major changes.
 
 ## System Architecture
-The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to optimize widget placement and `gap: 1.6rem` (16px). A ghost placeholder layer of 72 cells (12x6) with dashed cyan borders provides a visual snapping guide for widgets. The UI/UX incorporates glassmorphism for widgets, using `backdrop-filter: blur(10px)` and semi-transparent borders.
+The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to optimize widget placement and `gap: 1.6rem` (16px). A ghost placeholder layer of 72 cells (12x6) with dashed cyan borders provides a visual snapping guide for widgets. Blocks use solid background colors for better visibility.
 
 **Bento.me Visual Overhaul:**
 - **Typography:** Inter font (Google Fonts), font-weight 700 for headers, font-weight 500 for buttons/controls
-- **Geometry:** 24px (2.4rem) squircle border-radius on all blocks, 16px gap between blocks, 20px internal padding
-- **Glass Mode:** Global toggle in header - when enabled, blocks become semi-transparent with stronger blur (blur: 20px)
+- **Geometry:** 12px (1.2rem) border-radius on all blocks, 16px gap between blocks, 20px internal padding
 - **Color Droplet:** Per-widget custom background color picker (visible in Edit Mode only), stored in widget's customColor field
 - **Hover Effects:** Blocks scale up (scale: 1.02) with enhanced shadow on hover, 0.3s ease-in-out transitions
-- **Persistence:** Glass Mode saved to localStorage ('openBentoGlassMode'), custom colors saved with widget data
+- **Persistence:** Custom colors saved with widget data
+
+**Global Background Engine:**
+- **BG Button:** Opens background customization popup in header
+- **Color Picker:** 15 preset dark/neutral colors for site background
+- **Image Uploader:** Upload custom background image (stored as dataURL in localStorage)
+- **CSS:** Background uses background-size: cover, background-position: center, background-attachment: fixed
+- **Persistence:** Background color saved to 'openBentoBgColor', image saved to 'openBentoBgImage' in localStorage
 
 **Core Features:**
 - **Dynamic Widget System:** Supports Video, Note, Spacer, and Image widget types, each with unique functionalities. Widgets are added, removed, and content swapped dynamically.
