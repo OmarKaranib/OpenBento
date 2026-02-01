@@ -48,6 +48,7 @@ interface YouTubePlayerProps {
   isMuted: boolean;
   isPaused: boolean;
   isSeekMode: boolean;
+  refreshKey?: number;
   onReady?: () => void;
   onError?: () => void;
   onMutedChange?: (muted: boolean) => void;
@@ -61,6 +62,7 @@ function YouTubePlayerInner({
   isMuted,
   isPaused,
   isSeekMode,
+  refreshKey = 0,
   onReady,
   onError,
   onMutedChange,
@@ -83,6 +85,9 @@ function YouTubePlayerInner({
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
   useEffect(() => { onPausedChangeRef.current = onPausedChange; }, [onPausedChange]);
+  
+  // Track refreshKey to force reinitialization when manual refresh is triggered
+  const lastRefreshKeyRef = useRef(refreshKey);
 
   // Memoize the stable player ID - only changes if widgetId changes
   const playerId = useMemo(() => `yt-player-${widgetId}`, [widgetId]);
@@ -254,6 +259,30 @@ function YouTubePlayerInner({
     };
   }, [stableVideoId, initializePlayer]); // Only reinitialize when videoId changes
 
+  // Handle refreshKey changes - force reinitialize when manual refresh is triggered
+  useEffect(() => {
+    if (refreshKey !== lastRefreshKeyRef.current) {
+      console.log(`[YouTube] RefreshKey changed from ${lastRefreshKeyRef.current} to ${refreshKey} - reinitializing player`);
+      lastRefreshKeyRef.current = refreshKey;
+      
+      // Destroy and reinitialize
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy();
+        } catch (e) {
+          console.log('[YouTube] Refresh cleanup error:', e);
+        }
+        playerRef.current = null;
+        isInitializedRef.current = false;
+      }
+      
+      // Reinitialize after a short delay
+      setTimeout(() => {
+        initializePlayer();
+      }, 100);
+    }
+  }, [refreshKey, initializePlayer]);
+
   // Handle mute changes without reinitializing player
   useEffect(() => {
     if (playerRef.current && isInitializedRef.current && typeof playerRef.current.mute === 'function') {
@@ -300,7 +329,7 @@ function YouTubePlayerInner({
   );
 }
 
-// React.memo wrapper - only re-render if videoId or widgetId changes
+// React.memo wrapper - only re-render if critical props change
 // Other props (isMuted, isPaused, etc.) are handled internally via refs
 export const YouTubePlayer = memo(YouTubePlayerInner, (prevProps, nextProps) => {
   // Return true if props are equal (skip re-render)
@@ -310,6 +339,7 @@ export const YouTubePlayer = memo(YouTubePlayerInner, (prevProps, nextProps) => 
     prevProps.widgetId === nextProps.widgetId &&
     prevProps.isSeekMode === nextProps.isSeekMode &&
     prevProps.isMuted === nextProps.isMuted &&
-    prevProps.isPaused === nextProps.isPaused
+    prevProps.isPaused === nextProps.isPaused &&
+    prevProps.refreshKey === nextProps.refreshKey
   );
 });

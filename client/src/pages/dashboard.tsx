@@ -620,16 +620,18 @@ const MasterControlDashboard = ({
         }
 
         // YouTube IFrame API with MediaSession for background play, rel=0, iv_load_policy=3
+        // Key is ONLY widget.id for stability - refreshKey prop handles manual refresh
         if (widget.isYouTube && (widget.videoId || widget.youtubeChannelId)) {
           return (
             <YouTubePlayer
-              key={`youtube-${widget.id}-${widget.lastRefresh || 0}`}
+              key={widget.id}
               widgetId={widget.id}
               videoId={widget.videoId}
               channelId={widget.youtubeChannelId}
               isMuted={widget.isMuted}
               isPaused={widget.isPaused}
               isSeekMode={isSeekMode}
+              refreshKey={widget.lastRefresh || 0}
               onReady={() => {
                 console.log(`[YouTube] Player ready: ${widget.id}`);
               }}
@@ -652,11 +654,13 @@ const MasterControlDashboard = ({
             />
           );
         } else if (widget.isTwitch && widget.twitchChannel) {
+          // Stable key with refresh in src parameter for controlled refresh
+          const twitchSrc = `${getTwitchEmbedUrl(widget.twitchChannel)}${widget.lastRefresh ? `&_r=${widget.lastRefresh}` : ''}`;
           return (
             <iframe
-              key={`twitch-${widget.id}-${widget.lastRefresh || 0}`}
+              key={widget.id}
               ref={(el) => { iframeRefs.current[widget.id] = el; }}
-              src={getTwitchEmbedUrl(widget.twitchChannel)}
+              src={twitchSrc}
               className="w-full h-full"
               style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
               title={`Twitch - ${widget.id}`}
@@ -672,11 +676,13 @@ const MasterControlDashboard = ({
             />
           );
         } else if (widget.isKick && widget.kickChannel) {
+          // Stable key with refresh in src parameter for controlled refresh
+          const kickSrc = `${getKickEmbedUrl(widget.kickChannel)}${widget.lastRefresh ? `&_r=${widget.lastRefresh}` : ''}`;
           return (
             <iframe
-              key={`kick-${widget.id}-${widget.lastRefresh || 0}`}
+              key={widget.id}
               ref={(el) => { iframeRefs.current[widget.id] = el; }}
-              src={getKickEmbedUrl(widget.kickChannel)}
+              src={kickSrc}
               className="w-full h-full"
               style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
               title={`Kick - ${widget.id}`}
