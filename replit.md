@@ -48,13 +48,17 @@ The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to 
 
 **Channel Library Logos (2026-02-01):**
 - **Logo URLs:** CHANNEL_LOGOS map stores official channel profile images
-- **Dynamic Favicon:** Falls back to Google Favicon API using channel.url domain extraction
-- **Fallback Icons:** Colored circle with first letter of channel name (category-colored: blue-news, purple-science, green-gaming, amber-finance, cyan-default)
+- **Platform-Specific Fallbacks:**
+  - YouTube: `https://www.google.com/s2/favicons?domain=youtube.com&sz=128&url={channelUrl}`
+  - Twitch: Google favicon API with channel URL
+  - Kick: Google favicon API with channel URL
+- **Generic Fallback:** Domain extraction from channel.url for favicon lookup
+- **Final Failsafe:** Colored circle with first letter of channel name (category-colored: blue-news, purple-science, green-gaming, amber-finance, cyan-default)
 - **Error Handling:** logoError state triggers colored circle fallback on image load failure
 
 **Stream Library Mode (2026-02-01):**
-- **dashboardOnlyMode flag:** Set to `false` in App.tsx to allow +Block sidebar access
-- **+Block Button:** Restored to menu bar, opens filtered sidebar showing News/Stream Library only
+- **dashboardOnlyMode flag:** Set to `false` in App.tsx to allow Block sidebar access
+- **Block Button:** Menu bar button (no leading "+"), opens filtered sidebar showing News/Stream Library only
 - **Sidebar Filtering:** Library tab hidden, only "News / Stream Library" tab visible
 - **Builder Tools Hidden:** Note, Photo, Spacer, Video templates remain commented out
 - **Purpose:** Allows adding streams from library while hiding all builder/template tools
