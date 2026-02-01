@@ -9,7 +9,15 @@ I want iterative development.
 Ask before making major changes.
 
 ## System Architecture
-The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to optimize widget placement and `gap: 1rem`. A ghost placeholder layer of 72 cells (12x6) with dashed cyan borders provides a visual snapping guide for widgets. The UI/UX incorporates glassmorphism for widgets, using `backdrop-filter: blur(10px)` and semi-transparent borders.
+The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to optimize widget placement and `gap: 1.6rem` (16px). A ghost placeholder layer of 72 cells (12x6) with dashed cyan borders provides a visual snapping guide for widgets. The UI/UX incorporates glassmorphism for widgets, using `backdrop-filter: blur(10px)` and semi-transparent borders.
+
+**Bento.me Visual Overhaul:**
+- **Typography:** Inter font (Google Fonts), font-weight 700 for headers, font-weight 500 for buttons/controls
+- **Geometry:** 24px (2.4rem) squircle border-radius on all blocks, 16px gap between blocks, 20px internal padding
+- **Glass Mode:** Global toggle in header - when enabled, blocks become semi-transparent with stronger blur (blur: 20px)
+- **Color Droplet:** Per-widget custom background color picker (visible in Edit Mode only), stored in widget's customColor field
+- **Hover Effects:** Blocks scale up (scale: 1.02) with enhanced shadow on hover, 0.3s ease-in-out transitions
+- **Persistence:** Glass Mode saved to localStorage ('openBentoGlassMode'), custom colors saved with widget data
 
 **Core Features:**
 - **Dynamic Widget System:** Supports Video, Note, Spacer, and Image widget types, each with unique functionalities. Widgets are added, removed, and content swapped dynamically.
