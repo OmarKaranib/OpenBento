@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Widget, WidgetType } from '@/App';
 import { YouTubePlayer } from '@/components/youtube-player';
+import { SavedChannel, loadPersonalLibrary, savePersonalLibrary } from '@/components/widget-sidebar';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -138,9 +139,65 @@ const MasterControlDashboard = ({
   const [inlineInputWidgetId, setInlineInputWidgetId] = useState<string | null>(null);
   const [inlineInputValue, setInlineInputValue] = useState('');
   const [clearHoldProgress, setClearHoldProgress] = useState(0);
+  const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
   const clearHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clearHoldStartRef = useRef<number | null>(null);
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
+
+  // Save widget to Personal Library
+  const saveWidgetToLibrary = useCallback((widget: Widget) => {
+    if (widget.type !== 'video') return;
+    
+    const savedChannel: SavedChannel = {
+      id: `saved-${widget.id}`,
+      name: widget.videoId ? `Video ${widget.videoId}` : widget.twitchChannel || widget.kickChannel || 'Saved Stream',
+      url: widget.url || '',
+      iconType: widget.isYouTube ? 'news' : widget.isTwitch ? 'gaming' : widget.isKick ? 'gaming' : 'news',
+      category: widget.isYouTube ? 'Saved' : widget.isTwitch ? 'Twitch' : widget.isKick ? 'Kick' : 'Saved',
+      platform: widget.isYouTube ? 'youtube' : widget.isTwitch ? 'twitch' : widget.isKick ? 'kick' : 'youtube',
+      channelId: widget.youtubeChannelId || widget.twitchChannel || widget.kickChannel || undefined,
+      videoId: widget.videoId,
+      savedAt: Date.now()
+    };
+    
+    setPersonalLibrary(prev => {
+      const exists = prev.some(c => 
+        c.videoId === savedChannel.videoId || 
+        c.channelId === savedChannel.channelId
+      );
+      if (exists) return prev;
+      
+      const updated = [...prev, savedChannel];
+      savePersonalLibrary(updated);
+      return updated;
+    });
+  }, []);
+
+  // Check if widget is saved in Personal Library
+  const isWidgetSaved = useCallback((widget: Widget) => {
+    return personalLibrary.some(c => 
+      (widget.videoId && c.videoId === widget.videoId) ||
+      (widget.youtubeChannelId && c.channelId === widget.youtubeChannelId) ||
+      (widget.twitchChannel && c.channelId === widget.twitchChannel) ||
+      (widget.kickChannel && c.channelId === widget.kickChannel)
+    );
+  }, [personalLibrary]);
+
+  // Remove widget from Personal Library
+  const removeWidgetFromLibrary = useCallback((widget: Widget) => {
+    setPersonalLibrary(prev => {
+      const updated = prev.filter(c => 
+        !(
+          (widget.videoId && c.videoId === widget.videoId) ||
+          (widget.youtubeChannelId && c.channelId === widget.youtubeChannelId) ||
+          (widget.twitchChannel && c.channelId === widget.twitchChannel) ||
+          (widget.kickChannel && c.channelId === widget.kickChannel)
+        )
+      );
+      savePersonalLibrary(updated);
+      return updated;
+    });
+  }, []);
 
   const minCellHeight = 80;
 
@@ -1168,6 +1225,25 @@ const MasterControlDashboard = ({
                     data-testid={`button-refresh-${widget.id}`}
                   >
                     <RefreshCw className="w-[2rem] h-[2rem]" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (isWidgetSaved(widget)) {
+                        removeWidgetFromLibrary(widget);
+                      } else {
+                        saveWidgetToLibrary(widget);
+                      }
+                    }}
+                    className={`w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30 ${
+                      isWidgetSaved(widget)
+                        ? 'bg-amber-500/90 hover:bg-amber-400'
+                        : 'bg-slate-600/90 hover:bg-amber-500'
+                    }`}
+                    title={isWidgetSaved(widget) ? 'Remove from Personal Library' : 'Save to Personal Library'}
+                    data-testid={`button-save-${widget.id}`}
+                  >
+                    <Star className={`w-[2rem] h-[2rem] ${isWidgetSaved(widget) ? 'fill-white' : ''}`} />
                   </button>
 
                   <button

@@ -1,9 +1,44 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, Radio, RefreshCw } from 'lucide-react';
+import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, Radio, RefreshCw, Star, Trash2, Globe, Heart } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { WidgetType } from '@/App';
 import { useQuery } from '@tanstack/react-query';
+
+// Personal Library storage key
+const PERSONAL_LIBRARY_KEY = 'openBentoPersonalLibrary';
+
+// Saved channel type for Personal Library
+export interface SavedChannel {
+  id: string;
+  name: string;
+  url: string;
+  iconType: 'news' | 'science' | 'music' | 'finance' | 'gaming';
+  category: string;
+  platform: 'youtube' | 'twitch' | 'kick';
+  channelId?: string;
+  videoId?: string | null;
+  savedAt: number;
+}
+
+// Load personal library from localStorage
+function loadPersonalLibrary(): SavedChannel[] {
+  try {
+    const stored = localStorage.getItem(PERSONAL_LIBRARY_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Save personal library to localStorage
+function savePersonalLibrary(channels: SavedChannel[]): void {
+  try {
+    localStorage.setItem(PERSONAL_LIBRARY_KEY, JSON.stringify(channels));
+  } catch (e) {
+    console.error('[Personal Library] Save error:', e);
+  }
+}
 
 export interface TrendingChannel {
   id: string;
@@ -80,11 +115,16 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
 ];
 
 type SidebarTab = 'content' | 'library';
+type ContentCategory = 'all' | 'news' | 'music' | 'gaming' | 'personal';
 
 interface DraggableChannelProps {
-  channel: TrendingChannel;
+  channel: TrendingChannel | SavedChannel;
   onClick?: () => void;
   isLive?: boolean;
+  isSaved?: boolean;
+  onSave?: () => void;
+  onRemove?: () => void;
+  showSaveButton?: boolean;
 }
 
 function getChannelIcon(iconType: TrendingChannel['iconType']) {
@@ -120,7 +160,7 @@ function getTemplateIcon(icon: WidgetTemplate['icon'], color: string) {
   }
 }
 
-function DraggableChannel({ channel, onClick, isLive }: DraggableChannelProps) {
+function DraggableChannel({ channel, onClick, isLive, isSaved, onSave, onRemove, showSaveButton }: DraggableChannelProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `channel-${channel.id}`,
     data: { type: 'channel', channel }
@@ -135,6 +175,16 @@ function DraggableChannel({ channel, onClick, isLive }: DraggableChannelProps) {
   const handleClick = (e: React.MouseEvent) => {
     if (!isDragging && onClick) {
       onClick();
+    }
+  };
+
+  const handleSaveClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (isSaved && onRemove) {
+      onRemove();
+    } else if (onSave) {
+      onSave();
     }
   };
 
@@ -166,6 +216,21 @@ function DraggableChannel({ channel, onClick, isLive }: DraggableChannelProps) {
         </div>
         <p className="text-[1rem] text-slate-400">{channel.category} • {channel.platform === 'youtube' ? 'YouTube' : channel.platform === 'kick' ? 'Kick' : channel.platform}</p>
       </div>
+      {showSaveButton && (
+        <button
+          onClick={handleSaveClick}
+          onPointerDown={(e) => e.stopPropagation()}
+          className={`p-[0.6rem] rounded-lg transition-colors ${
+            isSaved 
+              ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400' 
+              : 'hover:bg-slate-700 text-slate-500 hover:text-amber-400'
+          }`}
+          title={isSaved ? 'Remove from Personal Library' : 'Save to Personal Library'}
+          data-testid={`save-channel-${channel.id}`}
+        >
+          <Star className={`w-[1.4rem] h-[1.4rem] ${isSaved ? 'fill-amber-400' : ''}`} />
+        </button>
+      )}
       <Grip className="w-[1.6rem] h-[1.6rem] text-slate-500" />
     </div>
   );
@@ -248,8 +313,48 @@ export function WidgetSidebar({
 }: WidgetSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<SidebarTab>('content');
+  const [activeCategory, setActiveCategory] = useState<ContentCategory>('all');
   const [liveStatuses, setLiveStatuses] = useState<Record<string, LiveStatus>>({});
+  const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Save to Personal Library
+  const saveToPersonalLibrary = useCallback((channel: TrendingChannel) => {
+    setPersonalLibrary(prev => {
+      const exists = prev.some(c => c.id === channel.id);
+      if (exists) return prev;
+      
+      const savedChannel: SavedChannel = {
+        id: channel.id,
+        name: channel.name,
+        url: channel.url,
+        iconType: channel.iconType,
+        category: channel.category,
+        platform: channel.platform,
+        channelId: channel.channelId,
+        videoId: channel.videoId,
+        savedAt: Date.now()
+      };
+      
+      const updated = [...prev, savedChannel];
+      savePersonalLibrary(updated);
+      return updated;
+    });
+  }, []);
+
+  // Remove from Personal Library
+  const removeFromPersonalLibrary = useCallback((channelId: string) => {
+    setPersonalLibrary(prev => {
+      const updated = prev.filter(c => c.id !== channelId);
+      savePersonalLibrary(updated);
+      return updated;
+    });
+  }, []);
+
+  // Check if channel is in Personal Library
+  const isInPersonalLibrary = useCallback((channelId: string) => {
+    return personalLibrary.some(c => c.id === channelId);
+  }, [personalLibrary]);
 
   // Fetch live channels from API (self-healing video library)
   const { data: linksData, isLoading: isLoadingLinks, refetch: refetchLinks } = useQuery<LinksApiResponse>({
@@ -323,15 +428,45 @@ export function WidgetSidebar({
     }
   };
 
+  // Filter channels by search query and category
   const filteredChannels = useMemo(() => {
-    if (!searchQuery.trim()) return channels;
+    let filtered: TrendingChannel[] = channels;
+    
+    // Filter by category
+    if (activeCategory === 'news') {
+      filtered = channels.filter(c => c.category === 'Global News' || c.category === 'Science');
+    } else if (activeCategory === 'music') {
+      filtered = channels.filter(c => c.category === 'Lofi/Music');
+    } else if (activeCategory === 'gaming') {
+      filtered = channels.filter(c => c.category === 'Gaming' || c.category === 'Esports');
+    }
+    // 'all' shows everything, 'personal' is handled separately
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (channel: TrendingChannel) => 
+          channel.name.toLowerCase().includes(query) ||
+          channel.category.toLowerCase().includes(query) ||
+          channel.platform.toLowerCase().includes(query)
+      );
+    }
+    
+    return filtered;
+  }, [searchQuery, channels, activeCategory]);
+
+  // Filter personal library by search
+  const filteredPersonalLibrary = useMemo(() => {
+    if (!searchQuery.trim()) return personalLibrary;
     const query = searchQuery.toLowerCase();
-    return channels.filter(
-      (channel: TrendingChannel) => 
+    return personalLibrary.filter(
+      (channel: SavedChannel) => 
         channel.name.toLowerCase().includes(query) ||
-        channel.category.toLowerCase().includes(query)
+        channel.category.toLowerCase().includes(query) ||
+        channel.platform.toLowerCase().includes(query)
     );
-  }, [searchQuery, channels]);
+  }, [searchQuery, personalLibrary]);
 
   return (
     <>
@@ -516,48 +651,168 @@ export function WidgetSidebar({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search streams..."
+                  placeholder="Search 100+ streams..."
                   className="w-full pl-[3.6rem] pr-[1rem] py-[0.8rem] bg-slate-800 border border-slate-700 slot-button focus:border-cyan-500 focus:outline-none transition-colors text-[1.2rem]"
                   data-testid="input-search-channels"
                 />
               </div>
               
-              <div>
-                <div className="flex items-center justify-between mb-[1rem]">
-                  <h3 className="text-[1.4rem] font-semibold text-cyan-400 flex items-center gap-[0.6rem]">
-                    <Tv className="w-[1.6rem] h-[1.6rem]" />
-                    Trending Streams
-                  </h3>
-                  <button
-                    onClick={() => refetchLinks()}
-                    className="p-[0.6rem] hover:bg-slate-800 slot-button transition-colors"
-                    title="Refresh stream links"
-                    data-testid="button-refresh-links"
-                  >
-                    <RefreshCw className={`w-[1.4rem] h-[1.4rem] text-cyan-400 ${isLoadingLinks ? 'animate-spin' : ''}`} />
-                  </button>
+              <div className="flex flex-wrap gap-[0.4rem]">
+                <button
+                  onClick={() => setActiveCategory('all')}
+                  className={`flex items-center gap-[0.4rem] px-[1rem] py-[0.5rem] rounded-full text-[1.1rem] font-medium transition-all ${
+                    activeCategory === 'all'
+                      ? 'bg-cyan-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                  }`}
+                  data-testid="category-all"
+                >
+                  <Layers className="w-[1.2rem] h-[1.2rem]" />
+                  All
+                </button>
+                <button
+                  onClick={() => setActiveCategory('news')}
+                  className={`flex items-center gap-[0.4rem] px-[1rem] py-[0.5rem] rounded-full text-[1.1rem] font-medium transition-all ${
+                    activeCategory === 'news'
+                      ? 'bg-cyan-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                  }`}
+                  data-testid="category-news"
+                >
+                  <Globe className="w-[1.2rem] h-[1.2rem]" />
+                  News
+                </button>
+                <button
+                  onClick={() => setActiveCategory('music')}
+                  className={`flex items-center gap-[0.4rem] px-[1rem] py-[0.5rem] rounded-full text-[1.1rem] font-medium transition-all ${
+                    activeCategory === 'music'
+                      ? 'bg-pink-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                  }`}
+                  data-testid="category-music"
+                >
+                  <Music className="w-[1.2rem] h-[1.2rem]" />
+                  Lofi
+                </button>
+                <button
+                  onClick={() => setActiveCategory('gaming')}
+                  className={`flex items-center gap-[0.4rem] px-[1rem] py-[0.5rem] rounded-full text-[1.1rem] font-medium transition-all ${
+                    activeCategory === 'gaming'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                  }`}
+                  data-testid="category-gaming"
+                >
+                  <Gamepad2 className="w-[1.2rem] h-[1.2rem]" />
+                  Gaming
+                </button>
+                <button
+                  onClick={() => setActiveCategory('personal')}
+                  className={`flex items-center gap-[0.4rem] px-[1rem] py-[0.5rem] rounded-full text-[1.1rem] font-medium transition-all ${
+                    activeCategory === 'personal'
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                  }`}
+                  data-testid="category-personal"
+                >
+                  <Heart className="w-[1.2rem] h-[1.2rem]" />
+                  Saved
+                  {personalLibrary.length > 0 && (
+                    <span className="ml-[0.2rem] px-[0.5rem] py-[0.1rem] bg-amber-500/30 rounded-full text-[0.9rem]">
+                      {personalLibrary.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+              
+              {activeCategory !== 'personal' ? (
+                <div>
+                  <div className="flex items-center justify-between mb-[1rem]">
+                    <h3 className="text-[1.4rem] font-semibold text-cyan-400 flex items-center gap-[0.6rem]">
+                      <Tv className="w-[1.6rem] h-[1.6rem]" />
+                      {activeCategory === 'all' && 'All Streams'}
+                      {activeCategory === 'news' && 'Global News'}
+                      {activeCategory === 'music' && 'Lofi & Music'}
+                      {activeCategory === 'gaming' && 'Gaming & Esports'}
+                      <span className="text-[1.1rem] text-slate-500 font-normal ml-[0.4rem]">
+                        ({filteredChannels.length})
+                      </span>
+                    </h3>
+                    <button
+                      onClick={() => refetchLinks()}
+                      className="p-[0.6rem] hover:bg-slate-800 slot-button transition-colors"
+                      title="Refresh stream links"
+                      data-testid="button-refresh-links"
+                    >
+                      <RefreshCw className={`w-[1.4rem] h-[1.4rem] text-cyan-400 ${isLoadingLinks ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                  <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
+                    {linksData?.lastRefresh 
+                      ? `Auto-updated ${new Date(linksData.lastRefresh).toLocaleDateString()} • Click star to save`
+                      : 'Click star to save to Personal Library'}
+                  </p>
+                  <div className="space-y-[0.8rem]">
+                    {filteredChannels.map((channel) => (
+                      <DraggableChannel 
+                        key={channel.id} 
+                        channel={channel} 
+                        onClick={() => onChannelClick?.(channel)}
+                        isLive={liveStatuses[channel.id]?.isLive}
+                        showSaveButton={true}
+                        isSaved={isInPersonalLibrary(channel.id)}
+                        onSave={() => saveToPersonalLibrary(channel)}
+                        onRemove={() => removeFromPersonalLibrary(channel.id)}
+                      />
+                    ))}
+                    {filteredChannels.length === 0 && (
+                      <p className="text-[1.2rem] text-slate-500 text-center py-[2rem]">
+                        No streams found
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
-                  {linksData?.lastRefresh 
-                    ? `Auto-updated ${new Date(linksData.lastRefresh).toLocaleDateString()}`
-                    : 'Drag or click to add live streams'}
-                </p>
-                <div className="space-y-[0.8rem]">
-                  {filteredChannels.map((channel) => (
-                    <DraggableChannel 
-                      key={channel.id} 
-                      channel={channel} 
-                      onClick={() => onChannelClick?.(channel)}
-                      isLive={liveStatuses[channel.id]?.isLive}
-                    />
-                  ))}
-                  {filteredChannels.length === 0 && (
-                    <p className="text-[1.2rem] text-slate-500 text-center py-[2rem]">
-                      No streams found
-                    </p>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-[1rem]">
+                    <h3 className="text-[1.4rem] font-semibold text-amber-400 flex items-center gap-[0.6rem]">
+                      <Heart className="w-[1.6rem] h-[1.6rem]" />
+                      Personal Library
+                      <span className="text-[1.1rem] text-slate-500 font-normal ml-[0.4rem]">
+                        ({filteredPersonalLibrary.length})
+                      </span>
+                    </h3>
+                  </div>
+                  <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
+                    Your saved streams • Click star to remove
+                  </p>
+                  {filteredPersonalLibrary.length > 0 ? (
+                    <div className="space-y-[0.8rem]">
+                      {filteredPersonalLibrary.map((channel) => (
+                        <DraggableChannel 
+                          key={channel.id} 
+                          channel={channel as TrendingChannel} 
+                          onClick={() => onChannelClick?.(channel as TrendingChannel)}
+                          isLive={true}
+                          showSaveButton={true}
+                          isSaved={true}
+                          onRemove={() => removeFromPersonalLibrary(channel.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-[3rem]">
+                      <Star className="w-[3rem] h-[3rem] text-slate-600 mx-auto mb-[1rem]" />
+                      <p className="text-[1.2rem] text-slate-500 mb-[0.5rem]">
+                        No saved streams yet
+                      </p>
+                      <p className="text-[1.1rem] text-slate-600">
+                        Click the star icon on any stream to save it here
+                      </p>
+                    </div>
                   )}
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -574,4 +829,4 @@ export function WidgetSidebar({
   );
 }
 
-export { FALLBACK_CHANNELS as TRENDING_CHANNELS };
+export { FALLBACK_CHANNELS as TRENDING_CHANNELS, loadPersonalLibrary, savePersonalLibrary };
