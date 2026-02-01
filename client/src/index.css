@@ -12,6 +12,49 @@ body {
   font-size: 1.6rem;
 }
 
+/* Theme-aware text and surface colors */
+body.dark-theme {
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+  --surface-primary: rgba(15, 23, 42, 0.15);
+  --surface-secondary: rgba(30, 41, 59, 0.8);
+}
+
+body.light-theme {
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #94a3b8;
+  --surface-primary: rgba(255, 255, 255, 0.85);
+  --surface-secondary: rgba(241, 245, 249, 0.9);
+}
+
+/* Light mode overrides for dashboard elements */
+body.light-theme .dashboard-slot {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(148, 163, 184, 0.5);
+  box-shadow: 
+    0 4px 30px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+body.light-theme .slot-button {
+  background: rgba(241, 245, 249, 0.95);
+  color: #0f172a;
+  border-color: rgba(148, 163, 184, 0.4);
+}
+
+body.light-theme .canvas-container {
+  background: rgba(241, 245, 249, 0.5);
+}
+
+/* Default to dark theme */
+body {
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+}
+
 /* LIGHT MODE */
 :root {
   /* Squircle Geometry - Bento.me Style (24px border-radius) */

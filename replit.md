@@ -33,6 +33,13 @@ The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to 
 - **Custom Colors:** Solid (fully opaque) backgrounds with 50% lighter border for visual pop
 - **Color Droplet Button:** Relocated to right side of widget controls (circular 4rem button matching Settings/Delete)
 
+**Menu Bar Refinements (2026-02-01):**
+- **Label Cleanup:** "Add Block" → "Block", "Edit Layout" → "Edit"
+- **Edit-to-Save Toggle:** Edit button transforms to "Save" when clicked; clicking Save locks layout, saves to localStorage, and reverts to Edit
+- **Dedicated Save Button:** Removed (integrated into Edit toggle)
+- **Theme Toggle:** Dark/Light mode button added to menu bar with Moon/Sun icons
+- **Content Purge:** All Music/Lofi/Radio content removed from sidebar, self-healing script, and data files
+
 **Core Features:**
 - **Dynamic Widget System:** Supports Video, Note, Spacer, and Image widget types, each with unique functionalities. Widgets are added, removed, and content swapped dynamically.
 - **Edit Layout Mode:** Toggles between locked and editable states, enabling widget resizing via bottom-right handles, and access to settings/delete options. Widgets jiggle in edit mode, and an overlay prevents iframe interaction during drag operations.

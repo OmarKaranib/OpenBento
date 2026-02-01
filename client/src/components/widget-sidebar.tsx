@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, Music, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, Radio, RefreshCw, Star, Trash2, Globe, Heart } from 'lucide-react';
+import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, RefreshCw, Star, Trash2, Globe, Heart } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { WidgetType } from '@/App';
@@ -13,7 +13,7 @@ export interface SavedChannel {
   id: string;
   name: string;
   url: string;
-  iconType: 'news' | 'science' | 'music' | 'finance' | 'gaming';
+  iconType: 'news' | 'science' | 'finance' | 'gaming';
   category: string;
   platform: 'youtube' | 'twitch' | 'kick';
   channelId?: string;
@@ -44,7 +44,7 @@ export interface TrendingChannel {
   id: string;
   name: string;
   url: string;
-  iconType: 'news' | 'science' | 'music' | 'finance' | 'gaming';
+  iconType: 'news' | 'science' | 'finance' | 'gaming';
   category: string;
   platform: 'youtube' | 'twitch' | 'kick';
   channelId?: string;
@@ -84,10 +84,9 @@ const getProYouTubeChannelUrl = (channelId: string): string => {
   return `https://www.youtube-nocookie.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&origin=${encodeURIComponent(origin)}&parent=${encodeURIComponent(hostname)}`;
 };
 
-// Fallback channels (used when API is not available)
+// Fallback channels (used when API is not available) - Music/Lofi content removed
 const FALLBACK_CHANNELS: TrendingChannel[] = [
   { id: 'nasa-live', name: 'NASA Live', url: getProYouTubeEmbedUrl('21X5lGlDOfg'), iconType: 'science', category: 'Science', platform: 'youtube', channelId: undefined },
-  { id: 'lofi-girl', name: 'Lofi Girl', url: getProYouTubeChannelUrl('UCSJ4gkVC6NrvII8umztf0Ow'), iconType: 'music', category: 'Music', platform: 'youtube', channelId: 'UCSJ4gkVC6NrvII8umztf0Ow' },
   { id: 'sky-news', name: 'Sky News', url: getProYouTubeEmbedUrl('9Auqkrry-jE'), iconType: 'news', category: 'News', platform: 'youtube', channelId: undefined },
   { id: 'abc-news', name: 'ABC News', url: getProYouTubeEmbedUrl('I9u-j-2V_Vw'), iconType: 'news', category: 'News', platform: 'youtube', channelId: undefined },
   { id: 'twitch-esl', name: 'ESL CS:GO', url: 'https://www.twitch.tv/esl_csgo', iconType: 'gaming', category: 'Esports', platform: 'twitch', channelId: 'esl_csgo' },
@@ -115,7 +114,7 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
 ];
 
 type SidebarTab = 'content' | 'library';
-type ContentCategory = 'all' | 'news' | 'music' | 'gaming' | 'personal';
+type ContentCategory = 'all' | 'news' | 'gaming' | 'personal';
 
 interface DraggableChannelProps {
   channel: TrendingChannel | SavedChannel;
@@ -133,8 +132,6 @@ function getChannelIcon(iconType: TrendingChannel['iconType']) {
       return <Newspaper className="w-[1.6rem] h-[1.6rem] text-cyan-400" />;
     case 'science':
       return <Rocket className="w-[1.6rem] h-[1.6rem] text-purple-400" />;
-    case 'music':
-      return <Music className="w-[1.6rem] h-[1.6rem] text-pink-400" />;
     case 'finance':
       return <TrendingUp className="w-[1.6rem] h-[1.6rem] text-emerald-400" />;
     case 'gaming':
@@ -209,7 +206,7 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, onSave, onRemove,
           <p className="text-[1.2rem] font-semibold text-slate-200 truncate">{channel.name}</p>
           {isLive && (
             <span className="flex items-center gap-[0.3rem] px-[0.5rem] py-[0.1rem] bg-red-500/20 border border-red-500/50 rounded-full text-[0.8rem] font-bold text-red-400 uppercase tracking-wider" data-testid={`live-badge-${channel.id}`}>
-              <Radio className="w-[0.8rem] h-[0.8rem]" />
+              <span className="w-[0.6rem] h-[0.6rem] rounded-full bg-red-500 animate-pulse" />
               Live
             </span>
           )}
@@ -446,15 +443,19 @@ export function WidgetSidebar({
   const filteredChannels = useMemo(() => {
     let filtered: TrendingChannel[] = channels;
     
-    // Filter by category
+    // Filter by category - Music/Lofi content excluded from all views
+    // First, filter out any music-related categories that might come from API
+    filtered = channels.filter(c => 
+      c.category !== 'Lofi/Music' && 
+      c.category !== 'Music'
+    );
+    
     if (activeCategory === 'news') {
-      filtered = channels.filter(c => c.category === 'Global News' || c.category === 'Science');
-    } else if (activeCategory === 'music') {
-      filtered = channels.filter(c => c.category === 'Lofi/Music');
+      filtered = filtered.filter(c => c.category === 'Global News' || c.category === 'Science');
     } else if (activeCategory === 'gaming') {
-      filtered = channels.filter(c => c.category === 'Gaming' || c.category === 'Esports');
+      filtered = filtered.filter(c => c.category === 'Gaming' || c.category === 'Esports');
     }
-    // 'all' shows everything, 'personal' is handled separately
+    // 'all' shows everything (except music), 'personal' is handled separately
     
     // Filter by search query
     if (searchQuery.trim()) {
@@ -697,18 +698,6 @@ export function WidgetSidebar({
                   News
                 </button>
                 <button
-                  onClick={() => setActiveCategory('music')}
-                  className={`flex items-center gap-[0.4rem] px-[1rem] py-[0.5rem] rounded-full text-[1.1rem] font-medium transition-all ${
-                    activeCategory === 'music'
-                      ? 'bg-pink-600 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
-                  }`}
-                  data-testid="category-music"
-                >
-                  <Music className="w-[1.2rem] h-[1.2rem]" />
-                  Lofi
-                </button>
-                <button
                   onClick={() => setActiveCategory('gaming')}
                   className={`flex items-center gap-[0.4rem] px-[1rem] py-[0.5rem] rounded-full text-[1.1rem] font-medium transition-all ${
                     activeCategory === 'gaming'
@@ -746,7 +735,6 @@ export function WidgetSidebar({
                       <Tv className="w-[1.6rem] h-[1.6rem]" />
                       {activeCategory === 'all' && 'All Streams'}
                       {activeCategory === 'news' && 'Global News'}
-                      {activeCategory === 'music' && 'Lofi & Music'}
                       {activeCategory === 'gaming' && 'Gaming & Esports'}
                       <span className="text-[1.1rem] text-slate-500 font-normal ml-[0.4rem]">
                         ({filteredChannels.length})

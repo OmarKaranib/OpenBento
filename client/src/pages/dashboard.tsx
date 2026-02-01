@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus } from 'lucide-react';
+import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -157,6 +157,12 @@ const MasterControlDashboard = ({
   const [showBgPicker, setShowBgPicker] = useState(false);
   const bgImageInputRef = useRef<HTMLInputElement>(null);
   
+  // Theme Mode (dark/light)
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('openBentoTheme');
+    return saved !== 'light'; // Default to dark mode
+  });
+  
   const clearHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clearHoldStartRef = useRef<number | null>(null);
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
@@ -170,6 +176,25 @@ const MasterControlDashboard = ({
     window.addEventListener('personalLibraryUpdated', handleLibraryUpdate);
     return () => window.removeEventListener('personalLibraryUpdated', handleLibraryUpdate);
   }, []);
+
+  // Theme toggle effect - apply dark/light mode using class on document element
+  useEffect(() => {
+    localStorage.setItem('openBentoTheme', isDarkMode ? 'dark' : 'light');
+    
+    // Toggle dark class on document element (standard Tailwind dark mode approach)
+    const root = document.documentElement;
+    if (isDarkMode) {
+      root.classList.add('dark');
+      root.classList.remove('light');
+      document.body.classList.remove('light-theme');
+      document.body.classList.add('dark-theme');
+    } else {
+      root.classList.remove('dark');
+      root.classList.add('light');
+      document.body.classList.remove('dark-theme');
+      document.body.classList.add('light-theme');
+    }
+  }, [isDarkMode]);
 
   // Auto-save widgets to localStorage with debounce to avoid excessive writes
   // This ensures media control states (volume) persist across sessions
@@ -1127,7 +1152,7 @@ const MasterControlDashboard = ({
               data-testid="button-add-block"
             >
               <Plus className="w-[1.4rem] h-[1.4rem]" />
-              {isGridFull ? 'Grid Full' : 'Add Block'}
+              {isGridFull ? 'Full' : 'Block'}
             </button>
 
             <button
@@ -1140,16 +1165,22 @@ const MasterControlDashboard = ({
             </button>
 
             <button
-              onClick={() => setIsEditMode(!isEditMode)}
+              onClick={() => {
+                if (isEditMode) {
+                  // Save and lock when in edit mode
+                  handleSaveLayout();
+                }
+                setIsEditMode(!isEditMode);
+              }}
               className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
                 isEditMode 
-                  ? 'bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-900/50 ring-2 ring-purple-400' 
+                  ? 'bg-cyan-600 hover:bg-cyan-500 shadow-lg shadow-cyan-900/50 ring-2 ring-cyan-400' 
                   : 'bg-slate-700 hover:bg-slate-600 shadow-lg shadow-slate-900/50'
               }`}
               data-testid="button-edit-layout"
             >
-              {isEditMode ? <Lock className="w-[1.4rem] h-[1.4rem]" /> : <Edit3 className="w-[1.4rem] h-[1.4rem]" />}
-              {isEditMode ? 'LOCK' : 'EDIT LAYOUT'}
+              {isEditMode ? <Save className="w-[1.4rem] h-[1.4rem]" /> : <Edit3 className="w-[1.4rem] h-[1.4rem]" />}
+              {isEditMode ? 'Save' : 'Edit'}
             </button>
 
             <button
@@ -1163,16 +1194,6 @@ const MasterControlDashboard = ({
             >
               {masterMute ? <VolumeX className="w-[1.4rem] h-[1.4rem]" /> : <Volume2 className="w-[1.4rem] h-[1.4rem]" />}
               {masterMute ? 'MUTED' : 'LIVE'}
-            </button>
-
-            <button
-              id="save-button"
-              onClick={handleSaveLayout}
-              className="px-[1.2rem] py-[0.6rem] bg-cyan-700 hover:bg-cyan-600 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-[1.2rem]"
-              data-testid="button-save-layout"
-            >
-              <Save className="w-[1.4rem] h-[1.4rem]" />
-              SAVE
             </button>
 
             {/* Global Background Controls */}
@@ -1304,6 +1325,21 @@ const MasterControlDashboard = ({
                 </div>
               )}
             </div>
+
+            {/* Theme Toggle */}
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
+                isDarkMode 
+                  ? 'bg-slate-700 hover:bg-slate-600 shadow-lg shadow-slate-900/50' 
+                  : 'bg-amber-500 hover:bg-amber-400 shadow-lg shadow-amber-900/50 text-slate-900'
+              }`}
+              data-testid="button-theme-toggle"
+              title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {isDarkMode ? <Moon className="w-[1.4rem] h-[1.4rem]" /> : <Sun className="w-[1.4rem] h-[1.4rem]" />}
+              {isDarkMode ? 'Dark' : 'Light'}
+            </button>
           </div>
         </div>
 
