@@ -232,6 +232,19 @@ body {
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    font-weight: 400;
+  }
+
+  /* Bento.me Typography - Inter font weights */
+  h1, h2, h3, h4, h5, h6,
+  .font-heading {
+    font-weight: 700;
+  }
+
+  button,
+  [role="button"],
+  .font-button {
+    font-weight: 500;
   }
 }
 
