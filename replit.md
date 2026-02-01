@@ -22,8 +22,16 @@ The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to 
 - **BG Button:** Opens background customization popup in header
 - **Color Picker:** 15 preset dark/neutral colors for site background
 - **Image Uploader:** Upload custom background image (stored as dataURL in localStorage)
+- **URL Input:** Paste image URL and press Enter to set as background
 - **CSS:** Background uses background-size: cover, background-position: center, background-attachment: fixed
 - **Persistence:** Background color saved to 'openBentoBgColor', image saved to 'openBentoBgImage' in localStorage
+- **Architecture:** GlobalCanvasBackground component at App.tsx root level with fixed positioning (z-index: -9999), synced via 'globalBgUpdated' events
+
+**Global Canvas Widget Transparency:**
+- **Default Widgets:** Semi-transparent background rgba(15, 23, 42, 0.15) to show global background through blocks
+- **Default Border:** Lighter version of background color using color-mix() CSS function
+- **Custom Colors:** Solid (fully opaque) backgrounds with 50% lighter border for visual pop
+- **Color Droplet Button:** Relocated to right side of widget controls (circular 4rem button matching Settings/Delete)
 
 **Core Features:**
 - **Dynamic Widget System:** Supports Video, Note, Spacer, and Image widget types, each with unique functionalities. Widgets are added, removed, and content swapped dynamically.

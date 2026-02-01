@@ -1,4 +1,56 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+
+// Global Background Engine - Applied directly to document.body
+const GlobalCanvasBackground = () => {
+  const [bgColor, setBgColor] = useState<string>(() => {
+    const saved = localStorage.getItem('openBentoBgColor');
+    return saved || '';
+  });
+  const [bgImage, setBgImage] = useState<string>(() => {
+    const saved = localStorage.getItem('openBentoBgImage');
+    return saved || '';
+  });
+
+  // Listen for background updates from dashboard
+  useEffect(() => {
+    const handleBgUpdate = () => {
+      setBgColor(localStorage.getItem('openBentoBgColor') || '');
+      setBgImage(localStorage.getItem('openBentoBgImage') || '');
+    };
+    
+    window.addEventListener('globalBgUpdated', handleBgUpdate);
+    window.addEventListener('storage', handleBgUpdate);
+    
+    return () => {
+      window.removeEventListener('globalBgUpdated', handleBgUpdate);
+      window.removeEventListener('storage', handleBgUpdate);
+    };
+  }, []);
+
+  // Apply background directly to document.body for true top-level coverage
+  useEffect(() => {
+    const body = document.body;
+    
+    if (bgImage) {
+      body.style.backgroundColor = '';
+      body.style.backgroundImage = `url(${bgImage})`;
+    } else if (bgColor) {
+      body.style.backgroundColor = bgColor;
+      body.style.backgroundImage = 'none';
+    } else {
+      body.style.backgroundColor = '#0f172a';
+      body.style.backgroundImage = 'linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a)';
+    }
+    
+    body.style.backgroundSize = 'cover';
+    body.style.backgroundPosition = 'center';
+    body.style.backgroundAttachment = 'fixed';
+    body.style.minHeight = '100vh';
+  }, [bgColor, bgImage]);
+
+  // No need for a visible element - background is applied to body
+  return null;
+};
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -766,6 +818,8 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        {/* Global Canvas Background - At root level, behind everything */}
+        <GlobalCanvasBackground />
         <DndContext 
           sensors={sensors} 
           collisionDetection={rectIntersection}

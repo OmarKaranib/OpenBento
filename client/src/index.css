@@ -394,19 +394,22 @@ body {
   background: transparent;
 }
 
-/* Slot styling with solid colors - Bento.me style */
+/* Slot styling with transparent background for Global Canvas effect */
 .dashboard-slot {
   border-radius: var(--outer-radius);
   position: relative;
   overflow: hidden;
   min-height: 0;
-  background: #1e293b;
-  border: 1px solid #334155;
+  /* Semi-transparent default background to show global canvas */
+  --slot-bg-rgb: 15, 23, 42;
+  background: rgba(var(--slot-bg-rgb), 0.15);
+  /* Border is a lighter version - derived from mixing background base with white */
+  border: 1px solid rgba(148, 163, 184, 0.4);
   box-shadow: 
     0 4px 30px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   /* Bento.me transitions */
-  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out, background-color 0.3s ease-in-out;
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out, background-color 0.3s ease-in-out, border-color 0.3s ease-in-out;
 }
 
 /* Bento hover effect - only when not in edit mode and not dragging */
@@ -418,9 +421,13 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-/* Custom color override for individual widgets */
+/* Custom color override for individual widgets - vivid colors with contrast border */
 .dashboard-slot[style*="--widget-bg"] {
+  /* Solid background for custom colors - no transparency, fully vivid */
   background-color: var(--widget-bg) !important;
+  /* Lighter border for visual pop - mix with white for contrast */
+  border-color: color-mix(in srgb, var(--widget-bg) 50%, white 50%) !important;
+  border-width: 1px !important;
 }
 
 /* Inner elements use concentric radius */

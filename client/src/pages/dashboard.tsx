@@ -82,19 +82,6 @@ const SortableWidget = ({ widget, isEditMode, onColorPickerOpen, children }: Sor
               {widget.type}
             </span>
           )}
-          <button
-            onClick={(e) => { e.stopPropagation(); onColorPickerOpen?.(); }}
-            className={`p-[0.4rem] slot-button transition-colors ${
-              widget.customColor 
-                ? 'hover:opacity-80' 
-                : 'bg-slate-700/90 hover:bg-slate-600'
-            }`}
-            style={widget.customColor ? { backgroundColor: widget.customColor } : {}}
-            title="Change block color"
-            data-testid={`color-picker-${widget.id}`}
-          >
-            <Palette className="w-[1.2rem] h-[1.2rem] text-white" />
-          </button>
         </div>
       )}
 
@@ -196,13 +183,15 @@ const MasterControlDashboard = ({
     }
   }, [widgets]);
 
-  // Persist global background settings
+  // Persist global background settings and notify App component
   useEffect(() => {
     if (globalBgColor) {
       localStorage.setItem('openBentoBgColor', globalBgColor);
     } else {
       localStorage.removeItem('openBentoBgColor');
     }
+    // Dispatch event to notify GlobalCanvasBackground in App.tsx
+    window.dispatchEvent(new Event('globalBgUpdated'));
   }, [globalBgColor]);
 
   useEffect(() => {
@@ -211,6 +200,8 @@ const MasterControlDashboard = ({
     } else {
       localStorage.removeItem('openBentoBgImage');
     }
+    // Dispatch event to notify GlobalCanvasBackground in App.tsx
+    window.dispatchEvent(new Event('globalBgUpdated'));
   }, [globalBgImage]);
 
   // Handle background image upload
@@ -982,12 +973,7 @@ const MasterControlDashboard = ({
     <div 
       className={`h-screen overflow-hidden text-slate-100 font-mono flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} 
       style={{ 
-        padding: isFullscreen && !headerVisible ? '0' : '1.6rem',
-        backgroundColor: globalBgImage ? undefined : (globalBgColor || undefined),
-        backgroundImage: globalBgImage ? `url(${globalBgImage})` : (globalBgColor ? 'none' : 'linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a)'),
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed'
+        padding: isFullscreen && !headerVisible ? '0' : '1.6rem'
       }}
       data-testid="main-dashboard"
     >
@@ -1504,6 +1490,24 @@ const MasterControlDashboard = ({
                 className="absolute top-[0.6rem] right-[0.6rem] z-40 flex gap-[0.8rem]"
                 style={{ pointerEvents: 'auto' }}
               >
+                {/* Color Droplet - Same circular shape as other buttons */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setColorPickerWidget(colorPickerWidget === widget.id ? null : widget.id);
+                  }}
+                  className={`w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30 ${
+                    widget.customColor 
+                      ? 'hover:opacity-80' 
+                      : 'bg-purple-600/90 hover:bg-purple-500'
+                  }`}
+                  style={widget.customColor ? { backgroundColor: widget.customColor } : {}}
+                  title="Change block color"
+                  data-testid={`color-picker-${widget.id}`}
+                >
+                  <Palette className="w-[2rem] h-[2rem]" />
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1534,7 +1538,7 @@ const MasterControlDashboard = ({
             {/* Bento.me Color Picker Popup */}
             {colorPickerWidget === widget.id && isEditMode && (
               <div 
-                className="absolute top-[5rem] left-[0.6rem] z-[10001] bg-slate-900/95 backdrop-blur-sm rounded-[1.6rem] p-[1.2rem] shadow-2xl border border-white/20"
+                className="absolute top-[5rem] right-[0.6rem] z-[10001] bg-slate-900/95 backdrop-blur-sm rounded-[1.6rem] p-[1.2rem] shadow-2xl border border-white/20"
                 style={{ pointerEvents: 'auto' }}
               >
                 <div className="flex flex-col gap-[0.8rem]">
