@@ -318,6 +318,16 @@ export function WidgetSidebar({
   const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Listen for personal library updates from dashboard (block star button)
+  useEffect(() => {
+    const handleLibraryUpdate = () => {
+      setPersonalLibrary(loadPersonalLibrary());
+    };
+    
+    window.addEventListener('personalLibraryUpdated', handleLibraryUpdate);
+    return () => window.removeEventListener('personalLibraryUpdated', handleLibraryUpdate);
+  }, []);
+
   // Save to Personal Library
   const saveToPersonalLibrary = useCallback((channel: TrendingChannel) => {
     setPersonalLibrary(prev => {
@@ -338,6 +348,8 @@ export function WidgetSidebar({
       
       const updated = [...prev, savedChannel];
       savePersonalLibrary(updated);
+      // Dispatch event to sync dashboard star buttons
+      window.dispatchEvent(new CustomEvent('personalLibraryUpdated'));
       return updated;
     });
   }, []);
@@ -347,6 +359,8 @@ export function WidgetSidebar({
     setPersonalLibrary(prev => {
       const updated = prev.filter(c => c.id !== channelId);
       savePersonalLibrary(updated);
+      // Dispatch event to sync dashboard
+      window.dispatchEvent(new CustomEvent('personalLibraryUpdated'));
       return updated;
     });
   }, []);

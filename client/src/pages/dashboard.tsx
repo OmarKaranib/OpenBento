@@ -144,16 +144,40 @@ const MasterControlDashboard = ({
   const clearHoldStartRef = useRef<number | null>(null);
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
 
+  // Listen for personal library updates from sidebar
+  useEffect(() => {
+    const handleLibraryUpdate = () => {
+      setPersonalLibrary(loadPersonalLibrary());
+    };
+    
+    window.addEventListener('personalLibraryUpdated', handleLibraryUpdate);
+    return () => window.removeEventListener('personalLibraryUpdated', handleLibraryUpdate);
+  }, []);
+
   // Save widget to Personal Library
   const saveWidgetToLibrary = useCallback((widget: Widget) => {
     if (widget.type !== 'video') return;
     
+    // Generate descriptive name based on platform and channel
+    let name = 'Saved Stream';
+    if (widget.isYouTube) {
+      name = widget.youtubeChannelId 
+        ? `YouTube: ${widget.youtubeChannelId}` 
+        : widget.videoId 
+          ? `YouTube Video` 
+          : 'YouTube Stream';
+    } else if (widget.isTwitch && widget.twitchChannel) {
+      name = `Twitch: ${widget.twitchChannel}`;
+    } else if (widget.isKick && widget.kickChannel) {
+      name = `Kick: ${widget.kickChannel}`;
+    }
+    
     const savedChannel: SavedChannel = {
-      id: `saved-${widget.id}`,
-      name: widget.videoId ? `Video ${widget.videoId}` : widget.twitchChannel || widget.kickChannel || 'Saved Stream',
+      id: `saved-${Date.now()}-${widget.videoId || widget.twitchChannel || widget.kickChannel || 'stream'}`,
+      name,
       url: widget.url || '',
       iconType: widget.isYouTube ? 'news' : widget.isTwitch ? 'gaming' : widget.isKick ? 'gaming' : 'news',
-      category: widget.isYouTube ? 'Saved' : widget.isTwitch ? 'Twitch' : widget.isKick ? 'Kick' : 'Saved',
+      category: 'Saved',
       platform: widget.isYouTube ? 'youtube' : widget.isTwitch ? 'twitch' : widget.isKick ? 'kick' : 'youtube',
       channelId: widget.youtubeChannelId || widget.twitchChannel || widget.kickChannel || undefined,
       videoId: widget.videoId,
@@ -162,13 +186,15 @@ const MasterControlDashboard = ({
     
     setPersonalLibrary(prev => {
       const exists = prev.some(c => 
-        c.videoId === savedChannel.videoId || 
-        c.channelId === savedChannel.channelId
+        (savedChannel.videoId && c.videoId === savedChannel.videoId) || 
+        (savedChannel.channelId && c.channelId === savedChannel.channelId)
       );
       if (exists) return prev;
       
       const updated = [...prev, savedChannel];
       savePersonalLibrary(updated);
+      // Dispatch event to sync sidebar
+      window.dispatchEvent(new CustomEvent('personalLibraryUpdated'));
       return updated;
     });
   }, []);
@@ -195,6 +221,8 @@ const MasterControlDashboard = ({
         )
       );
       savePersonalLibrary(updated);
+      // Dispatch event to sync sidebar
+      window.dispatchEvent(new CustomEvent('personalLibraryUpdated'));
       return updated;
     });
   }, []);
@@ -1243,7 +1271,7 @@ const MasterControlDashboard = ({
                     title={isWidgetSaved(widget) ? 'Remove from Personal Library' : 'Save to Personal Library'}
                     data-testid={`button-save-${widget.id}`}
                   >
-                    <Star className={`w-[2rem] h-[2rem] ${isWidgetSaved(widget) ? 'fill-white' : ''}`} />
+                    <Star className={`w-[2rem] h-[2rem] transition-colors ${isWidgetSaved(widget) ? 'fill-amber-300 text-amber-300' : 'text-white'}`} />
                   </button>
 
                   <button
