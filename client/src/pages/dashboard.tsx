@@ -1140,6 +1140,8 @@ const MasterControlDashboard = ({
               </button>
             )}
 
+            {/* Block button - Hidden for dashboard-only view */}
+            {/* 
             <button
               onClick={handleOpenSidebarToContent}
               disabled={isGridFull}
@@ -1154,10 +1156,11 @@ const MasterControlDashboard = ({
               <Plus className="w-[1.4rem] h-[1.4rem]" />
               {isGridFull ? 'Full' : 'Block'}
             </button>
+            */}
 
             <button
               onClick={handleRefreshAllWidgets}
-              className="px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-[1.2rem]"
+              className="menu-btn px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-[1.2rem]"
               data-testid="button-refresh-all"
             >
               <RefreshCw className="w-[1.4rem] h-[1.4rem]" />
@@ -1172,7 +1175,7 @@ const MasterControlDashboard = ({
                 }
                 setIsEditMode(!isEditMode);
               }}
-              className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
+              className={`menu-btn px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
                 isEditMode 
                   ? 'bg-teal-600 hover:bg-teal-500 shadow-lg shadow-teal-900/50 ring-2 ring-teal-400' 
                   : 'bg-orange-600 hover:bg-orange-500 shadow-lg shadow-orange-900/50'
@@ -1200,7 +1203,7 @@ const MasterControlDashboard = ({
             <div className="relative">
               <button
                 onClick={() => setShowBgPicker(!showBgPicker)}
-                className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
+                className={`menu-btn px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
                   showBgPicker 
                     ? 'bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-900/50 ring-2 ring-purple-400' 
                     : 'bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-900/50'
@@ -1329,7 +1332,7 @@ const MasterControlDashboard = ({
             {/* Theme Toggle - Starry Night (Dark) / Yellowish Sun (Light) */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`relative px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] overflow-hidden ${
+              className={`menu-btn relative px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] overflow-hidden ${
                 isDarkMode 
                   ? 'bg-indigo-900 hover:bg-indigo-800 shadow-lg shadow-indigo-900/50 text-slate-100' 
                   : 'bg-amber-400 hover:bg-amber-300 shadow-lg shadow-amber-500/50 text-amber-900'
@@ -1554,6 +1557,8 @@ const MasterControlDashboard = ({
                 >
                   <Palette className="w-[2rem] h-[2rem]" />
                 </button>
+                {/* Widget edit button - Hidden for dashboard-only view */}
+                {/* 
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1566,6 +1571,7 @@ const MasterControlDashboard = ({
                 >
                   <Settings className="w-[2rem] h-[2rem]" />
                 </button>
+                */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

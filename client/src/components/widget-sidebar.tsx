@@ -211,23 +211,63 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, onSave, onRemove,
     }
   };
 
-  // Get channel logo URL or use fallback icon
-  const logoUrl = CHANNEL_LOGOS[channel.id];
+  // Get channel logo URL - Try static map first, then derive from channel URL
+  const getLogoUrl = () => {
+    // First check static CHANNEL_LOGOS map
+    if (CHANNEL_LOGOS[channel.id]) {
+      return CHANNEL_LOGOS[channel.id];
+    }
+    
+    // Try to extract domain from channel URL for more specific favicon
+    if (channel.url) {
+      try {
+        const urlObj = new URL(channel.url);
+        return `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
+      } catch {
+        // Invalid URL, fall through to platform-based logic
+      }
+    }
+    
+    // Generate dynamic favicon URL based on platform
+    if (channel.platform === 'youtube') {
+      return 'https://www.google.com/s2/favicons?domain=youtube.com&sz=128';
+    } else if (channel.platform === 'twitch') {
+      return 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128';
+    } else if (channel.platform === 'kick') {
+      return 'https://www.google.com/s2/favicons?domain=kick.com&sz=128';
+    }
+    
+    // No logo available
+    return null;
+  };
   
-  // Fallback icons by category
-  const getFallbackIcon = () => {
+  const logoUrl = getLogoUrl();
+  
+  // Get color based on category for fallback circle
+  const getFallbackColor = () => {
     switch (channel.iconType) {
       case 'news':
-        return <Globe className="w-[1.8rem] h-[1.8rem] text-blue-400" />;
+        return 'bg-blue-500';
       case 'science':
-        return <Rocket className="w-[1.8rem] h-[1.8rem] text-purple-400" />;
+        return 'bg-purple-500';
       case 'gaming':
-        return <Gamepad2 className="w-[1.8rem] h-[1.8rem] text-green-400" />;
+        return 'bg-green-500';
       case 'finance':
-        return <DollarSign className="w-[1.8rem] h-[1.8rem] text-amber-400" />;
+        return 'bg-amber-500';
       default:
-        return <Zap className="w-[1.8rem] h-[1.8rem] text-cyan-400" />;
+        return 'bg-cyan-500';
     }
+  };
+
+  // Fallback: Colored circle with first letter of channel name
+  const getFallbackIcon = () => {
+    const firstLetter = channel.name.charAt(0).toUpperCase();
+    const bgColor = getFallbackColor();
+    return (
+      <div className={`w-full h-full ${bgColor} flex items-center justify-center rounded-lg`}>
+        <span className="text-white font-bold text-[1.4rem]">{firstLetter}</span>
+      </div>
+    );
   };
 
   // Show logo if available and not errored, otherwise show fallback icon
@@ -642,7 +682,8 @@ export function WidgetSidebar({
         <div className="flex-1 overflow-y-auto p-[1.6rem]">
           {activeTab === 'library' && (
             <div className="space-y-[1.6rem]">
-              {/* Block Types (Note, Photo, Spacer, Video) - Hidden for future use */}
+              {/* All builder tools hidden for dashboard-only view */}
+              {/* Block Types, Upload Image, and OpenBento Grid - Hidden */}
               {/* 
               <div>
                 <h3 className="text-[1.4rem] font-semibold text-purple-400 mb-[1rem] flex items-center gap-[0.6rem]">
@@ -662,7 +703,6 @@ export function WidgetSidebar({
                   ))}
                 </div>
               </div>
-              */}
               
               <div className="bg-purple-900/30 p-[1.2rem] rounded-lg border border-purple-500/50">
                 <h4 className="text-[1.2rem] font-semibold text-purple-300 mb-[0.8rem] flex items-center gap-[0.6rem]">
@@ -715,6 +755,7 @@ export function WidgetSidebar({
                   </li>
                 </ul>
               </div>
+              */}
             </div>
           )}
           

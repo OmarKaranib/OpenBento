@@ -773,7 +773,13 @@ function App() {
     setActiveWidgetId(null);
   }, [addVideoWidget]);
 
+  // Dashboard-only mode flag - prevents sidebar from opening
+  const dashboardOnlyMode = true;
+  
   const handleOpenSidebar = useCallback((widgetId?: string) => {
+    // Blocked in dashboard-only mode
+    if (dashboardOnlyMode) return;
+    
     const id = widgetId || null;
     activeWidgetIdRef.current = id;
     setActiveWidgetId(id);
@@ -781,6 +787,9 @@ function App() {
   }, []);
 
   const handleOpenSidebarToContent = useCallback(() => {
+    // Blocked in dashboard-only mode
+    if (dashboardOnlyMode) return;
+    
     activeWidgetIdRef.current = null;
     setActiveWidgetId(null);
     setSidebarOpen(true);
@@ -828,22 +837,25 @@ function App() {
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={widgets.map(w => w.id)} strategy={rectSortingStrategy}>
-            <WidgetSidebar 
-              isOpen={sidebarOpen} 
-              onClose={() => {
-                setSidebarOpen(false);
-                activeWidgetIdRef.current = null;
-                setActiveWidgetId(null);
-                setUrlInputValue('');
-              }}
-              onChannelClick={handleChannelClick}
-              onTemplateClick={handleTemplateClick}
-              urlValue={urlInputValue}
-              onUrlChange={setUrlInputValue}
-              onUrlSubmit={handleSubmitUrl}
-              activeWidgetId={activeWidgetId}
-              onImageUpload={handleImageUpload}
-            />
+            {/* WidgetSidebar - Hidden in dashboard-only mode */}
+            {!dashboardOnlyMode && (
+              <WidgetSidebar 
+                isOpen={sidebarOpen} 
+                onClose={() => {
+                  setSidebarOpen(false);
+                  activeWidgetIdRef.current = null;
+                  setActiveWidgetId(null);
+                  setUrlInputValue('');
+                }}
+                onChannelClick={handleChannelClick}
+                onTemplateClick={handleTemplateClick}
+                urlValue={urlInputValue}
+                onUrlChange={setUrlInputValue}
+                onUrlSubmit={handleSubmitUrl}
+                activeWidgetId={activeWidgetId}
+                onImageUpload={handleImageUpload}
+              />
+            )}
             <Switch>
               <Route path="/">
                 {() => (

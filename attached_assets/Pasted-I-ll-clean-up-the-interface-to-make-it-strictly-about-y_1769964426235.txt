@@ -1,0 +1,40 @@
+I’ll clean up the interface to make it strictly about your dashboard and fix those theme-breaking color bugs. It sounds like the Light Mode logic is currently "painting over" your custom button colors instead of just changing the background, which we will stop.
+
+🛠️ The "Total Interface Lockdown" Prompt
+Copy this to the Replit Agent to hide the library, fix the buttons, and repair the logos.
+
+Task: Interface Purge, Theme Color Persistence, and Logo Repair
+
+1. Total Library & Builder Purge (Hide/Remove):
+
+Library Button: Remove or hide the main button/icon used to open the Content Library/Sidebar.
+
+Upload/Grid Tools: Completely hide the "Upload from computer," "OpenBento Grid," and all associated builder tools.
+
+The Goal: The user should only see the dashboard. There should be no visible way to open the library or use the builder tools for now.
+
+2. Menu Button Color Lockdown:
+
+Fix Light Mode "Washout": Stop the Light Mode CSS from changing the background-color or filter of the menu buttons.
+
+Persistence: Ensure that Block, Edit/Save, Refresh, and BG buttons keep their specific assigned colors regardless of whether the theme is Light or Dark.
+
+Text Contrast: In Light Mode, the labels on these colored buttons should be high-contrast (e.g., white or black text) to stay readable against the button's unique color.
+
+3. Global Logo Repair:
+
+Consistency: For any channel where the logo is missing, use the YouTube IFrame API or a favicon service (https://www.google.com/s2/favicons?domain=youtube.com&sz=128&url=[VIDEO_URL]) to dynamically pull the channel's icon.
+
+Broken Image Fallback: Add an onError handler to the logo images so that if a logo fails to load, it displays a clean, colored circle with the first letter of the channel name instead of a "broken image" icon.
+
+4. Theme Button Refinement:
+
+Dark Mode: Keep the Starry Night (Deep Blue + Stars).
+
+Light Mode: Keep the Yellowish Sun.
+
+Constraint: These buttons must remain styled even when the other theme is active.
+
+5. STRICT MECHANICS LOCK:
+
+Do not touch the YouTube/Twitch playback logic, Edit-to-Save logic, or persistent IDs.

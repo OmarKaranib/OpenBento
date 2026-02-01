@@ -78,17 +78,30 @@ body.light-theme .dashboard-slot {
     0 4px 16px rgba(0, 0, 0, 0.04);
 }
 
-/* Light mode - Buttons and controls */
-body.light-theme .slot-button {
+/* Light mode - Buttons and controls (excluding menu buttons) */
+body.light-theme .slot-button:not(.menu-btn) {
   background: #ffffff;
   color: #1a1a1a;
   border-color: rgba(0, 0, 0, 0.1);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-body.light-theme .slot-button:hover {
+body.light-theme .slot-button:not(.menu-btn):hover {
   background: #f3f4f6;
   border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Menu button color lockdown - Preserve unique colors in light mode */
+/* These buttons have the .menu-btn class and should keep their colors */
+body.light-theme .menu-btn {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Amber (Light mode theme button) needs dark text for contrast */
+body.light-theme .menu-btn[class*="bg-amber"] {
+  color: #78350f !important;
+  text-shadow: none;
 }
 
 /* Light mode - Canvas container */
