@@ -125,3 +125,18 @@ The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to 
 - **@dnd-kit/utilities:** Utility functions for transforms in drag-and-drop.
 - **lucide-react:** Icon library.
 - **localStorage:** Browser API for client-side data persistence.
+
+## SEO & AI Discoverability (2026-02-01)
+- **Meta Tags:** Comprehensive primary meta tags including title, description, keywords, author, robots directives
+- **Open Graph:** Full Open Graph protocol tags for Facebook/social media sharing with og:image support
+- **Twitter Cards:** Twitter-specific meta tags for enhanced tweet previews (summary_large_image)
+- **Structured Data:** JSON-LD schema.org markup for WebApplication type with features, pricing, and ratings
+- **AI Crawler Support:** 
+  - robots.txt explicitly allows GPTBot, ChatGPT-User, PerplexityBot, ClaudeBot, Google-Extended
+  - llms.txt file provides structured information for AI assistants
+- **SEO Files:**
+  - `/robots.txt` - Crawler directives and sitemap reference
+  - `/sitemap.xml` - XML sitemap for search engine indexing
+  - `/llms.txt` - AI/LLM-specific information file
+- **Theme Colors:** Mobile browser theme color (#0f172a) for consistent branding
+- **Canonical URL:** Prevents duplicate content issues with proper canonical link
