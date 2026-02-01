@@ -1,21 +1,29 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, RefreshCw, Star, Trash2, Globe, Heart, DollarSign, Zap } from 'lucide-react';
 
-// Channel logo URLs - Official channel logos
+// Channel logo URLs - Using Google Favicon API for reliable high-quality logos
 const CHANNEL_LOGOS: Record<string, string> = {
-  'nasa-live': 'https://yt3.googleusercontent.com/ytc/AIdro_mxGaT3Pq3d6CQxkMjlkE_MFxqHC71kwN3nC2t0M-I=s176-c-k-c0x00ffffff-no-rj',
-  'sky-news': 'https://yt3.googleusercontent.com/ytc/AIdro_kWnhqwwL0-BNdwTRImxr_0z9vBjPLOxfCVPYl1=s176-c-k-c0x00ffffff-no-rj',
-  'abc-news': 'https://yt3.googleusercontent.com/ytc/AIdro_lHHH0NR4CiWJl0M0A1fgjT3lIY0I-K3tW0vQ=s176-c-k-c0x00ffffff-no-rj',
-  'bbc-news': 'https://yt3.googleusercontent.com/ytc/AIdro_lwhR0-xsJLKqDsS3hRcIgHtCjKqHbczVYqSbqp0Q=s176-c-k-c0x00ffffff-no-rj',
-  'cnn-live': 'https://yt3.googleusercontent.com/ytc/AIdro_kDQcnHZI3sI4Q-H1o_R_OcQA=s176-c-k-c0x00ffffff-no-rj',
-  'fox-news': 'https://yt3.googleusercontent.com/ytc/AIdro_l0zHXO3Lb-PR3uZxY=s176-c-k-c0x00ffffff-no-rj',
-  'al-jazeera': 'https://yt3.googleusercontent.com/gQP-bhJg4Q9xS1G4uL9uYNjP-y8lOWgbmI2Aqe9A=s176-c-k-c0x00ffffff-no-rj',
-  'dw-news': 'https://yt3.googleusercontent.com/ytc/AIdro_nq_8cO-dU7ZOxaIgfV2j4nR7o=s176-c-k-c0x00ffffff-no-rj',
-  'france24': 'https://yt3.googleusercontent.com/ytc/AIdro_nGLMkn_kAVqCfqPYlA=s176-c-k-c0x00ffffff-no-rj',
-  'twitch-esl': 'https://static-cdn.jtvnw.net/jtv_user_pictures/51412619-9afb-4e8e-8d0e-4a9e7bfc0c88-profile_image-150x150.png',
-  'twitch-rocket': 'https://static-cdn.jtvnw.net/jtv_user_pictures/rocketleague-profile_image-310cffa89cbb65fa-150x150.png',
-  'kick-xqc': 'https://files.kick.com/images/user/6/profile_image/conversion/aad43be0-d7f7-49f8-a82b-8b41ac0fc271-thumb.webp',
-  'kick-adin': 'https://files.kick.com/images/user/4486982/profile_image/conversion/ae02ffb7-2e66-4d0e-9b26-a78e2d93f61a-thumb.webp',
+  // News channels - using Google Favicon API
+  'nasa-live': 'https://www.google.com/s2/favicons?domain=nasa.gov&sz=128',
+  'sky-news': 'https://www.google.com/s2/favicons?domain=news.sky.com&sz=128',
+  'abc-news': 'https://www.google.com/s2/favicons?domain=abcnews.go.com&sz=128',
+  'bbc-news': 'https://www.google.com/s2/favicons?domain=bbc.com&sz=128',
+  'cnn-live': 'https://www.google.com/s2/favicons?domain=cnn.com&sz=128',
+  'fox-news': 'https://www.google.com/s2/favicons?domain=foxnews.com&sz=128',
+  'al-jazeera': 'https://www.google.com/s2/favicons?domain=aljazeera.com&sz=128',
+  'dw-news': 'https://www.google.com/s2/favicons?domain=dw.com&sz=128',
+  'france24': 'https://www.google.com/s2/favicons?domain=france24.com&sz=128',
+  'euronews': 'https://www.google.com/s2/favicons?domain=euronews.com&sz=128',
+  'nhk-world': 'https://www.google.com/s2/favicons?domain=nhk.or.jp&sz=128',
+  'reuters': 'https://www.google.com/s2/favicons?domain=reuters.com&sz=128',
+  'bloomberg': 'https://www.google.com/s2/favicons?domain=bloomberg.com&sz=128',
+  'cnbc': 'https://www.google.com/s2/favicons?domain=cnbc.com&sz=128',
+  // Gaming/Streaming platforms
+  'twitch-esl': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-rocket': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-gaules': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'kick-xqc': 'https://www.google.com/s2/favicons?domain=kick.com&sz=128',
+  'kick-adin': 'https://www.google.com/s2/favicons?domain=kick.com&sz=128',
 };
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -634,13 +642,15 @@ export function WidgetSidebar({
         <div className="flex-1 overflow-y-auto p-[1.6rem]">
           {activeTab === 'library' && (
             <div className="space-y-[1.6rem]">
+              {/* Block Types (Note, Photo, Spacer, Video) - Hidden for future use */}
+              {/* 
               <div>
                 <h3 className="text-[1.4rem] font-semibold text-purple-400 mb-[1rem] flex items-center gap-[0.6rem]">
                   <LayoutGrid className="w-[1.6rem] h-[1.6rem]" />
                   Block Types
                 </h3>
                 <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
-                  Click to add • Resize in Edit Mode
+                  Click to add - Resize in Edit Mode
                 </p>
                 <div className="space-y-[0.8rem]">
                   {WIDGET_TEMPLATES.map((template) => (
@@ -652,6 +662,7 @@ export function WidgetSidebar({
                   ))}
                 </div>
               </div>
+              */}
               
               <div className="bg-purple-900/30 p-[1.2rem] rounded-lg border border-purple-500/50">
                 <h4 className="text-[1.2rem] font-semibold text-purple-300 mb-[0.8rem] flex items-center gap-[0.6rem]">

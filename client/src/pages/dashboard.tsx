@@ -1174,8 +1174,8 @@ const MasterControlDashboard = ({
               }}
               className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
                 isEditMode 
-                  ? 'bg-cyan-600 hover:bg-cyan-500 shadow-lg shadow-cyan-900/50 ring-2 ring-cyan-400' 
-                  : 'bg-slate-700 hover:bg-slate-600 shadow-lg shadow-slate-900/50'
+                  ? 'bg-teal-600 hover:bg-teal-500 shadow-lg shadow-teal-900/50 ring-2 ring-teal-400' 
+                  : 'bg-orange-600 hover:bg-orange-500 shadow-lg shadow-orange-900/50'
               }`}
               data-testid="button-edit-layout"
             >
@@ -1203,7 +1203,7 @@ const MasterControlDashboard = ({
                 className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
                   showBgPicker 
                     ? 'bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-900/50 ring-2 ring-purple-400' 
-                    : 'bg-slate-700 hover:bg-slate-600 shadow-lg shadow-slate-900/50'
+                    : 'bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-900/50'
                 }`}
                 data-testid="button-bg-picker"
                 title="Customize Background"
@@ -1326,19 +1326,29 @@ const MasterControlDashboard = ({
               )}
             </div>
 
-            {/* Theme Toggle */}
+            {/* Theme Toggle - Starry Night (Dark) / Yellowish Sun (Light) */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
+              className={`relative px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] overflow-hidden ${
                 isDarkMode 
-                  ? 'bg-slate-700 hover:bg-slate-600 shadow-lg shadow-slate-900/50' 
-                  : 'bg-amber-500 hover:bg-amber-400 shadow-lg shadow-amber-900/50 text-slate-900'
+                  ? 'bg-indigo-900 hover:bg-indigo-800 shadow-lg shadow-indigo-900/50 text-slate-100' 
+                  : 'bg-amber-400 hover:bg-amber-300 shadow-lg shadow-amber-500/50 text-amber-900'
               }`}
               data-testid="button-theme-toggle"
               title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
-              {isDarkMode ? <Moon className="w-[1.4rem] h-[1.4rem]" /> : <Sun className="w-[1.4rem] h-[1.4rem]" />}
-              {isDarkMode ? 'Dark' : 'Light'}
+              {/* Starry Night decorations for dark mode */}
+              {isDarkMode && (
+                <>
+                  <span className="absolute top-[0.3rem] left-[0.5rem] w-[0.2rem] h-[0.2rem] bg-white rounded-full opacity-80" />
+                  <span className="absolute top-[0.8rem] left-[1rem] w-[0.15rem] h-[0.15rem] bg-white rounded-full opacity-60" />
+                  <span className="absolute bottom-[0.4rem] left-[0.7rem] w-[0.18rem] h-[0.18rem] bg-white rounded-full opacity-70" />
+                  <span className="absolute top-[0.5rem] right-[2rem] w-[0.2rem] h-[0.2rem] bg-white rounded-full opacity-75" />
+                  <span className="absolute bottom-[0.3rem] right-[1.5rem] w-[0.15rem] h-[0.15rem] bg-white rounded-full opacity-65" />
+                </>
+              )}
+              {isDarkMode ? <Moon className="w-[1.4rem] h-[1.4rem] relative z-10" /> : <Sun className="w-[1.4rem] h-[1.4rem] relative z-10" />}
+              <span className="relative z-10">{isDarkMode ? 'Dark' : 'Light'}</span>
             </button>
           </div>
         </div>
