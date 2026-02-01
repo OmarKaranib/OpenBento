@@ -1,59 +1,19 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { UpgradePopup } from '@/components/upgrade-popup';
+import { LoginPage } from '@/components/login-page';
 
-// User tier constants
-const FREE_BLOCK_LIMIT = 4;
-
-// Global Background Engine - Applied directly to document.body
-const GlobalCanvasBackground = () => {
-  const [bgColor, setBgColor] = useState<string>(() => {
-    const saved = localStorage.getItem('openBentoBgColor');
-    return saved || '';
-  });
-  const [bgImage, setBgImage] = useState<string>(() => {
-    const saved = localStorage.getItem('openBentoBgImage');
-    return saved || '';
-  });
-
-  // Listen for background updates from dashboard
-  useEffect(() => {
-    const handleBgUpdate = () => {
-      setBgColor(localStorage.getItem('openBentoBgColor') || '');
-      setBgImage(localStorage.getItem('openBentoBgImage') || '');
-    };
-    
-    window.addEventListener('globalBgUpdated', handleBgUpdate);
-    window.addEventListener('storage', handleBgUpdate);
-    
-    return () => {
-      window.removeEventListener('globalBgUpdated', handleBgUpdate);
-      window.removeEventListener('storage', handleBgUpdate);
-    };
-  }, []);
-
-  // Apply background directly to document.body for true top-level coverage
+// Static background - Starry Night theme (no custom BG engine)
+const StaticBackground = () => {
   useEffect(() => {
     const body = document.body;
-    
-    if (bgImage) {
-      body.style.backgroundColor = '';
-      body.style.backgroundImage = `url(${bgImage})`;
-    } else if (bgColor) {
-      body.style.backgroundColor = bgColor;
-      body.style.backgroundImage = 'none';
-    } else {
-      body.style.backgroundColor = '#0f172a';
-      body.style.backgroundImage = 'linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a)';
-    }
-    
+    body.style.backgroundColor = '#0f172a';
+    body.style.backgroundImage = 'linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a)';
     body.style.backgroundSize = 'cover';
     body.style.backgroundPosition = 'center';
     body.style.backgroundAttachment = 'fixed';
     body.style.minHeight = '100vh';
-  }, [bgColor, bgImage]);
+  }, []);
 
-  // No need for a visible element - background is applied to body
   return null;
 };
 import { Switch, Route } from "wouter";
@@ -125,13 +85,8 @@ function AppContent() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [ghostPosition, setGhostPosition] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   
-  // Auth and tier state - must be inside QueryClientProvider
-  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
-  const [showUpgradePopup, setShowUpgradePopup] = useState(false);
-  const [upgradeFeature, setUpgradeFeature] = useState<'blocks' | 'background'>('blocks');
-  
-  // User tier: Pro if authenticated, Free otherwise
-  const userTier = isAuthenticated ? 'Pro' : 'Free';
+  // Auth state - must be inside QueryClientProvider
+  const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
 
   const activeWidgetIdRef = useRef<string | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
@@ -294,20 +249,8 @@ function AppContent() {
   }, [widgets]);
 
   const addWidget = useCallback((type: WidgetType, w = 3, h = 2, extraData?: Partial<Widget>) => {
-    // Check block limit for Free tier
-    if (userTier === 'Free' && widgets.length >= FREE_BLOCK_LIMIT) {
-      setUpgradeFeature('blocks');
-      setShowUpgradePopup(true);
-      return null;
-    }
-    
     const widgetId = generateWidgetId();
     setWidgets(prev => {
-      // Double-check limit inside callback (widgets may have changed)
-      if (userTier === 'Free' && prev.length >= FREE_BLOCK_LIMIT) {
-        return prev;
-      }
-      
       const smartResult = findSmartPosition(Math.min(w, GRID_COLS), h, prev);
       
       // If grid is full, do NOT add widget (no shifting/shrinking existing blocks)
@@ -333,7 +276,7 @@ function AppContent() {
       return [...prev, newWidget];
     });
     return widgetId;
-  }, [findSmartPosition, userTier, widgets.length]);
+  }, [findSmartPosition]);
 
   const addVideoWidget = useCallback((channel: TrendingChannel, w = 3, h = 2) => {
     const videoId = extractYouTubeId(channel.url);
@@ -850,10 +793,34 @@ function AppContent() {
     setActiveWidgetId(null);
   }, [addWidget]);
 
+  // Show login page if not authenticated
+  if (!isAuthenticated && !authLoading) {
+    return (
+      <TooltipProvider>
+        <StaticBackground />
+        <LoginPage />
+        <Toaster />
+      </TooltipProvider>
+    );
+  }
+
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <TooltipProvider>
+        <StaticBackground />
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-cyan-400 text-xl">Loading...</div>
+        </div>
+        <Toaster />
+      </TooltipProvider>
+    );
+  }
+
   return (
     <TooltipProvider>
-      {/* Global Canvas Background - At root level, behind everything */}
-      <GlobalCanvasBackground />
+      {/* Static Background - Starry Night theme */}
+      <StaticBackground />
       <DndContext 
         sensors={sensors} 
         collisionDetection={rectIntersection}
@@ -900,12 +867,8 @@ function AppContent() {
                   ghostPosition={ghostPosition}
                   gridContainerRef={gridContainerRef}
                   isGridFull={isGridFull}
-                  userTier={userTier}
                   user={user}
-                  onShowUpgradePopup={(feature: 'blocks' | 'background') => {
-                    setUpgradeFeature(feature);
-                    setShowUpgradePopup(true);
-                  }}
+                  onLogout={logout}
                 />
               )}
             </Route>
@@ -937,11 +900,6 @@ function AppContent() {
           ) : null}
         </DragOverlay>
       </DndContext>
-      <UpgradePopup 
-        isOpen={showUpgradePopup} 
-        onClose={() => setShowUpgradePopup(false)} 
-        feature={upgradeFeature}
-      />
       <Toaster />
     </TooltipProvider>
   );
