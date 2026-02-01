@@ -8,7 +8,8 @@
       "iconType": "science",
       "category": "Science",
       "videoId": "xCrPD7tfcr0",
-      "lastUpdated": 1769888837519
+      "isLive": true,
+      "lastUpdated": 1769949062989
     },
     {
       "id": "lofi-girl",
@@ -18,7 +19,8 @@
       "iconType": "music",
       "category": "Music",
       "videoId": "XSXEaikz0Bc",
-      "lastUpdated": 1769888837519
+      "isLive": true,
+      "lastUpdated": 1769949062989
     },
     {
       "id": "sky-news",
@@ -28,7 +30,8 @@
       "iconType": "news",
       "category": "News",
       "videoId": "YDvsBbKfLPA",
-      "lastUpdated": 1769888837519
+      "isLive": true,
+      "lastUpdated": 1769949062989
     },
     {
       "id": "abc-news",
@@ -37,59 +40,65 @@
       "platform": "youtube",
       "iconType": "news",
       "category": "News",
-      "videoId": "IKBEbNq5gW8",
-      "lastUpdated": 1769888837519
+      "videoId": "iipR5yUp36o",
+      "isLive": true,
+      "lastUpdated": 1769949062989
     },
     {
       "id": "twitch-esl",
       "name": "ESL CS:GO",
       "channelHandle": "esl_csgo",
       "videoId": null,
-      "lastUpdated": 1769888837519,
+      "lastUpdated": 1769949062989,
       "platform": "twitch",
       "iconType": "gaming",
-      "category": "Esports"
+      "category": "Esports",
+      "isLive": true
     },
     {
       "id": "twitch-rocket",
       "name": "Rocket League",
       "channelHandle": "rocketleague",
       "videoId": null,
-      "lastUpdated": 1769888837519,
+      "lastUpdated": 1769949062989,
       "platform": "twitch",
       "iconType": "gaming",
-      "category": "Esports"
+      "category": "Esports",
+      "isLive": true
     },
     {
       "id": "twitch-gaules",
       "name": "Gaules",
       "channelHandle": "gaules",
       "videoId": null,
-      "lastUpdated": 1769888837519,
+      "lastUpdated": 1769949062989,
       "platform": "twitch",
       "iconType": "gaming",
-      "category": "Gaming"
+      "category": "Gaming",
+      "isLive": true
     },
     {
       "id": "kick-xqc",
       "name": "xQc",
       "channelHandle": "xqc",
       "videoId": null,
-      "lastUpdated": 1769888837519,
+      "lastUpdated": 1769949062989,
       "platform": "kick",
       "iconType": "gaming",
-      "category": "Gaming"
+      "category": "Gaming",
+      "isLive": true
     },
     {
       "id": "kick-adin",
       "name": "Adin Ross",
       "channelHandle": "adinross",
       "videoId": null,
-      "lastUpdated": 1769888837519,
+      "lastUpdated": 1769949062989,
       "platform": "kick",
       "iconType": "gaming",
-      "category": "Gaming"
+      "category": "Gaming",
+      "isLive": true
     }
   ],
-  "lastRefresh": 1769888837519
+  "lastRefresh": 1769949062989
 }
