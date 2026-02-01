@@ -211,33 +211,47 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, onSave, onRemove,
     }
   };
 
-  // Get channel logo URL - Try static map first, then derive from channel URL
+  // Get channel logo URL - Try static map first, then platform-specific fallbacks
   const getLogoUrl = () => {
     // First check static CHANNEL_LOGOS map
     if (CHANNEL_LOGOS[channel.id]) {
       return CHANNEL_LOGOS[channel.id];
     }
     
-    // Try to extract domain from channel URL for more specific favicon
+    // Platform-specific logo fallbacks
+    if (channel.platform === 'youtube') {
+      // YouTube: Use Google favicon API with channel URL for best results
+      if (channel.url) {
+        return `https://www.google.com/s2/favicons?domain=youtube.com&sz=128&url=${encodeURIComponent(channel.url)}`;
+      }
+      return 'https://www.google.com/s2/favicons?domain=youtube.com&sz=128';
+    } else if (channel.platform === 'twitch') {
+      // Twitch: Use high-quality favicon service with channel URL
+      // The jtvnw.net preview URLs are unreliable (404 when offline)
+      // Instead use favicon service which works more reliably
+      if (channel.url) {
+        return `https://www.google.com/s2/favicons?domain=twitch.tv&sz=128&url=${encodeURIComponent(channel.url)}`;
+      }
+      return 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128';
+    } else if (channel.platform === 'kick') {
+      // Kick: Use favicon service with channel URL for profile approximation
+      if (channel.url) {
+        return `https://www.google.com/s2/favicons?domain=kick.com&sz=128&url=${encodeURIComponent(channel.url)}`;
+      }
+      return 'https://www.google.com/s2/favicons?domain=kick.com&sz=128';
+    }
+    
+    // Generic fallback: Try to extract domain from channel URL
     if (channel.url) {
       try {
         const urlObj = new URL(channel.url);
         return `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
       } catch {
-        // Invalid URL, fall through to platform-based logic
+        // Invalid URL
       }
     }
     
-    // Generate dynamic favicon URL based on platform
-    if (channel.platform === 'youtube') {
-      return 'https://www.google.com/s2/favicons?domain=youtube.com&sz=128';
-    } else if (channel.platform === 'twitch') {
-      return 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128';
-    } else if (channel.platform === 'kick') {
-      return 'https://www.google.com/s2/favicons?domain=kick.com&sz=128';
-    }
-    
-    // No logo available
+    // No logo available - will trigger colored circle fallback
     return null;
   };
   

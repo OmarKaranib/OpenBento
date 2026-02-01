@@ -1153,7 +1153,7 @@ const MasterControlDashboard = ({
               data-testid="button-add-block"
             >
               <Plus className="w-[1.4rem] h-[1.4rem]" />
-              {isGridFull ? 'Full' : '+Block'}
+              {isGridFull ? 'Full' : 'Block'}
             </button>
 
             <button
