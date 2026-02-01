@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Subtitles } from 'lucide-react';
+import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -156,7 +156,7 @@ const MasterControlDashboard = ({
   }, []);
 
   // Auto-save widgets to localStorage with debounce to avoid excessive writes
-  // This ensures media control states (volume, ccEnabled) persist across sessions
+  // This ensures media control states (volume) persist across sessions
   const widgetsJsonRef = useRef<string>('');
   useEffect(() => {
     const widgetsJson = JSON.stringify(widgets);
@@ -498,9 +498,14 @@ const MasterControlDashboard = ({
         if (w.isYouTube) {
           sendYouTubeCommand(widgetId, newMuted ? 'mute' : 'unMute');
         }
-        // When unmuting, set volume to 50 if it was 0
-        const newVolume = !newMuted && w.volume === 0 ? 50 : w.volume;
-        return { ...w, isMuted: newMuted, volume: newVolume };
+        if (newMuted) {
+          // When muting, store current volume for later restore
+          return { ...w, isMuted: true, previousVolume: w.volume > 0 ? w.volume : (w.previousVolume || 50), volume: 0 };
+        } else {
+          // When unmuting, restore to previous volume (or default 50)
+          const restoreVolume = w.previousVolume || 50;
+          return { ...w, isMuted: false, volume: restoreVolume };
+        }
       }
       return w;
     }));
@@ -513,17 +518,9 @@ const MasterControlDashboard = ({
       if (w.id === widgetId) {
         // Auto-mute if volume is 0, auto-unmute if volume > 0
         const newMuted = clampedVolume === 0;
-        return { ...w, volume: clampedVolume, isMuted: newMuted };
-      }
-      return w;
-    }));
-  };
-
-  // Toggle closed captions for a widget
-  const toggleWidgetCC = (widgetId: string) => {
-    setWidgets(prev => prev.map(w => {
-      if (w.id === widgetId) {
-        return { ...w, ccEnabled: !w.ccEnabled };
+        // Update previousVolume when setting non-zero volume so mute/unmute restores correctly
+        const newPreviousVolume = clampedVolume > 0 ? clampedVolume : w.previousVolume;
+        return { ...w, volume: clampedVolume, isMuted: newMuted, previousVolume: newPreviousVolume };
       }
       return w;
     }));
@@ -702,7 +699,6 @@ const MasterControlDashboard = ({
               isMuted={widget.isMuted}
               isPaused={widget.isPaused}
               volume={widget.volume}
-              ccEnabled={widget.ccEnabled || false}
               isSeekMode={isSeekMode}
               refreshKey={widget.lastRefresh || 0}
               onReady={() => {
@@ -1208,65 +1204,22 @@ const MasterControlDashboard = ({
                     <Sliders className="w-[2rem] h-[2rem]" />
                   </button>
 
-                  {/* Volume Control Group */}
-                  <div 
-                    className="relative flex items-center"
-                    onMouseEnter={() => setVolumeSliderWidget(widget.id)}
-                    onMouseLeave={() => setVolumeSliderWidget(null)}
-                  >
-                    <button
-                      onClick={() => toggleWidgetMute(widget.id)}
-                      className={`w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30 ${
-                        widget.isMuted || widget.volume === 0
-                          ? 'bg-red-600/90 hover:bg-red-500' 
-                          : 'bg-emerald-600/90 hover:bg-emerald-500'
-                      }`}
-                      title={widget.isMuted ? 'Unmute' : 'Mute'}
-                      data-testid={`button-mute-${widget.id}`}
-                    >
-                      {getVolumeIcon(widget)}
-                    </button>
-                    
-                    {/* Volume Slider - appears on hover */}
-                    <div 
-                      className={`absolute left-[4.5rem] flex items-center transition-all duration-300 ${
-                        volumeSliderWidget === widget.id 
-                          ? 'opacity-100 translate-x-0' 
-                          : 'opacity-0 -translate-x-2 pointer-events-none'
-                      }`}
-                    >
-                      <div className="bg-slate-900/95 backdrop-blur-sm rounded-full px-[1rem] py-[0.8rem] flex items-center gap-[0.8rem] shadow-lg border border-white/20">
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={widget.volume}
-                          onChange={(e) => setWidgetVolume(widget.id, parseInt(e.target.value))}
-                          className="w-[8rem] h-[0.4rem] bg-slate-600 rounded-full appearance-none cursor-pointer accent-emerald-500"
-                          style={{
-                            background: `linear-gradient(to right, #10b981 0%, #10b981 ${widget.volume}%, #475569 ${widget.volume}%, #475569 100%)`
-                          }}
-                          data-testid={`slider-volume-${widget.id}`}
-                        />
-                        <span className="text-[1.2rem] font-mono text-white min-w-[3rem] text-center">
-                          {widget.volume}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* CC Toggle Button */}
+                  {/* Volume Control Button - Click to toggle mute AND show slider at bottom */}
                   <button
-                    onClick={() => toggleWidgetCC(widget.id)}
+                    onClick={() => {
+                      toggleWidgetMute(widget.id);
+                      // Toggle volume slider visibility
+                      setVolumeSliderWidget(prev => prev === widget.id ? null : widget.id);
+                    }}
                     className={`w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30 ${
-                      widget.ccEnabled
-                        ? 'bg-amber-500/90 hover:bg-amber-400 ring-2 ring-amber-300' 
-                        : 'bg-slate-600/90 hover:bg-slate-500'
+                      widget.isMuted || widget.volume === 0
+                        ? 'bg-red-600/90 hover:bg-red-500' 
+                        : 'bg-emerald-600/90 hover:bg-emerald-500'
                     }`}
-                    title={widget.ccEnabled ? 'Disable Closed Captions' : 'Enable Closed Captions'}
-                    data-testid={`button-cc-${widget.id}`}
+                    title={widget.isMuted ? 'Unmute' : 'Mute'}
+                    data-testid={`button-mute-${widget.id}`}
                   >
-                    <Subtitles className="w-[2rem] h-[2rem]" />
+                    {getVolumeIcon(widget)}
                   </button>
 
                   <button
@@ -1299,15 +1252,11 @@ const MasterControlDashboard = ({
                         saveWidgetToLibrary(widget);
                       }
                     }}
-                    className={`w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30 ${
-                      isWidgetSaved(widget)
-                        ? 'bg-amber-500/90 hover:bg-amber-400'
-                        : 'bg-slate-600/90 hover:bg-amber-500'
-                    }`}
+                    className="w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30 bg-slate-700/90 hover:bg-slate-600"
                     title={isWidgetSaved(widget) ? 'Remove from Personal Library' : 'Save to Personal Library'}
                     data-testid={`button-save-${widget.id}`}
                   >
-                    <Star className={`w-[2rem] h-[2rem] transition-colors ${isWidgetSaved(widget) ? 'fill-amber-300 text-amber-300' : 'text-white'}`} />
+                    <Star className={`w-[2rem] h-[2rem] transition-colors ${isWidgetSaved(widget) ? 'fill-amber-400 text-amber-400' : 'text-white'}`} />
                   </button>
 
                   <button
@@ -1362,6 +1311,40 @@ const MasterControlDashboard = ({
             >
               {renderWidgetContent(widget)}
             </div>
+
+            {/* Volume Slider - appears at bottom when volume icon clicked */}
+            {widget.type === 'video' && volumeSliderWidget === widget.id && !isEditMode && (
+              <div 
+                className="absolute bottom-[1rem] left-1/2 -translate-x-1/2 z-50 transition-all duration-300"
+                style={{ pointerEvents: 'auto' }}
+              >
+                <div className="bg-slate-900/95 backdrop-blur-sm rounded-full px-[1.5rem] py-[1rem] flex items-center gap-[1rem] shadow-lg border border-white/20">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={widget.volume}
+                    onChange={(e) => setWidgetVolume(widget.id, parseInt(e.target.value))}
+                    className="w-[12rem] h-[0.5rem] bg-slate-600 rounded-full appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #10b981 0%, #10b981 ${widget.volume}%, #475569 ${widget.volume}%, #475569 100%)`
+                    }}
+                    data-testid={`slider-volume-${widget.id}`}
+                  />
+                  <span className="text-[1.4rem] font-mono text-white min-w-[3.5rem] text-center" data-testid={`text-volume-${widget.id}`}>
+                    {widget.volume}%
+                  </span>
+                  <button
+                    onClick={() => setVolumeSliderWidget(null)}
+                    className="ml-[0.5rem] w-[2.5rem] h-[2.5rem] rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center transition-colors"
+                    title="Close volume control"
+                    data-testid={`button-close-volume-${widget.id}`}
+                  >
+                    <X className="w-[1.4rem] h-[1.4rem] text-white" />
+                  </button>
+                </div>
+              </div>
+            )}
 
             {isEditMode && (
               <div

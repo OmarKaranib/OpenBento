@@ -53,7 +53,6 @@ interface YouTubePlayerProps {
   isMuted: boolean;
   isPaused: boolean;
   volume: number;
-  ccEnabled: boolean;
   isSeekMode: boolean;
   refreshKey?: number;
   onReady?: () => void;
@@ -69,7 +68,6 @@ function YouTubePlayerInner({
   isMuted,
   isPaused,
   volume,
-  ccEnabled,
   isSeekMode,
   refreshKey = 0,
   onReady,
@@ -85,7 +83,6 @@ function YouTubePlayerInner({
   const isMutedRef = useRef(isMuted);
   const isPausedRef = useRef(isPaused);
   const volumeRef = useRef(volume);
-  const ccEnabledRef = useRef(ccEnabled);
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
   const onPausedChangeRef = useRef(onPausedChange);
@@ -94,7 +91,6 @@ function YouTubePlayerInner({
   useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
   useEffect(() => { volumeRef.current = volume; }, [volume]);
-  useEffect(() => { ccEnabledRef.current = ccEnabled; }, [ccEnabled]);
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
   useEffect(() => { onPausedChangeRef.current = onPausedChange; }, [onPausedChange]);
@@ -338,27 +334,6 @@ function YouTubePlayerInner({
     }
   }, [volume]);
 
-  // Handle CC/subtitle toggle without reinitializing player
-  useEffect(() => {
-    if (playerRef.current && isInitializedRef.current) {
-      try {
-        // Use setOption to control captions module
-        if (typeof playerRef.current.setOption === 'function') {
-          if (ccEnabled) {
-            // Turn on captions - load auto-generated or default track
-            playerRef.current.setOption('captions', 'track', { languageCode: 'en' });
-          } else {
-            // Turn off captions
-            playerRef.current.setOption('captions', 'track', {});
-          }
-          console.log('[YouTube] CC toggled:', ccEnabled);
-        }
-      } catch (e) {
-        console.log('[YouTube] CC control error:', e);
-      }
-    }
-  }, [ccEnabled]);
-
   return (
     <div
       ref={containerRef}
@@ -387,7 +362,6 @@ export const YouTubePlayer = memo(YouTubePlayerInner, (prevProps, nextProps) => 
     prevProps.isMuted === nextProps.isMuted &&
     prevProps.isPaused === nextProps.isPaused &&
     prevProps.volume === nextProps.volume &&
-    prevProps.ccEnabled === nextProps.ccEnabled &&
     prevProps.refreshKey === nextProps.refreshKey
   );
 });

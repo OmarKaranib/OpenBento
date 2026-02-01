@@ -41,7 +41,7 @@ export interface Widget {
   isMuted: boolean;
   isPaused: boolean;
   volume: number; // 0-100
-  ccEnabled?: boolean;
+  previousVolume?: number; // Stores volume before mute for restore
   error?: string | null;
   embedBlocked?: boolean;
   noteContent?: string;
@@ -98,7 +98,7 @@ function App() {
           isMuted: w.isMuted ?? true,
           isPaused: w.isPaused ?? false,
           volume: w.volume ?? 0,
-          ccEnabled: w.ccEnabled ?? false,
+          previousVolume: w.previousVolume ?? 50,
           isOffline: w.isOffline ?? false,
           x: w.x ?? 0,
           y: w.y ?? 0,
@@ -247,7 +247,7 @@ function App() {
         isMuted: true,
         isPaused: false,
         volume: 0,
-        ccEnabled: false,
+        previousVolume: 50,
         isOffline: false,
         ...extraData
       };
@@ -312,7 +312,6 @@ function App() {
           isPaused: false,
           isMuted: true,
           volume: 0,
-          ccEnabled: false,
           isOffline: false,
           lastRefresh: Date.now()
         } : w
@@ -370,7 +369,6 @@ function App() {
         isPaused: false,
         isMuted: true,
         volume: 0,
-        ccEnabled: false,
         isOffline: false,
         lastRefresh: Date.now()
       } : w
@@ -710,7 +708,6 @@ function App() {
           isPaused: false,
           isMuted: true,
           volume: 0,
-          ccEnabled: false,
           isOffline: false,
           lastRefresh: Date.now()
         } : w
