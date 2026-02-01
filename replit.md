@@ -48,8 +48,22 @@ The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to 
 
 **Channel Library Logos (2026-02-01):**
 - **Logo URLs:** CHANNEL_LOGOS map stores official channel profile images
-- **Fallback Icons:** Globe (news), Rocket (science), Gamepad2 (gaming), DollarSign (finance), Zap (default)
-- **Error Handling:** logoError state triggers fallback icon when image fails to load
+- **Dynamic Favicon:** Falls back to Google Favicon API using channel.url domain extraction
+- **Fallback Icons:** Colored circle with first letter of channel name (category-colored: blue-news, purple-science, green-gaming, amber-finance, cyan-default)
+- **Error Handling:** logoError state triggers colored circle fallback on image load failure
+
+**Dashboard-Only Mode (2026-02-01):**
+- **dashboardOnlyMode flag:** Set to `true` in App.tsx to disable all library/builder access
+- **Sidebar Hidden:** WidgetSidebar is not rendered when dashboardOnlyMode is true
+- **Handlers Blocked:** handleOpenSidebar and handleOpenSidebarToContent return early if blocked
+- **Menu Buttons Hidden:** Block button and widget edit buttons are commented out
+- **Purpose:** Locks dashboard to view-only mode for production display
+
+**Menu Button Color Persistence (2026-02-01):**
+- **menu-btn class:** Applied to Refresh, Edit/Save, BG, and Theme Toggle buttons
+- **CSS targeting:** Uses `.menu-btn` class directly instead of substring matching
+- **Light mode:** `:not(.menu-btn)` excludes menu buttons from white background override
+- **Text colors:** White text with text-shadow for colored buttons; amber gets dark text for contrast
 
 **Core Features:**
 - **Dynamic Widget System:** Supports Video, Note, Spacer, and Image widget types, each with unique functionalities. Widgets are added, removed, and content swapped dynamically.
