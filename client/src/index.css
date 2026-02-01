@@ -12,40 +12,166 @@ body {
   font-size: 1.6rem;
 }
 
-/* Theme-aware text and surface colors */
+/* ========================================
+   TRUE LIGHT MODE - High Contrast System
+   ======================================== */
+
+/* Dark theme (default) */
 body.dark-theme {
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
   --text-tertiary: #64748b;
-  --surface-primary: rgba(15, 23, 42, 0.15);
-  --surface-secondary: rgba(30, 41, 59, 0.8);
+  --surface-primary: rgba(15, 23, 42, 0.85);
+  --surface-secondary: rgba(30, 41, 59, 0.9);
+  --surface-bg: #0f172a;
 }
 
+/* Light theme - High contrast for readability */
 body.light-theme {
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-tertiary: #94a3b8;
-  --surface-primary: rgba(255, 255, 255, 0.85);
-  --surface-secondary: rgba(241, 245, 249, 0.9);
+  --text-primary: #1a1a1a;
+  --text-secondary: #374151;
+  --text-tertiary: #6b7280;
+  --surface-primary: rgba(255, 255, 255, 0.95);
+  --surface-secondary: #f8f9fa;
+  --surface-bg: #f8f9fa;
 }
 
-/* Light mode overrides for dashboard elements */
+/* Light mode global background */
+body.light-theme {
+  background-color: #f8f9fa !important;
+}
+
+/* Light mode - Override Tailwind CSS tokens */
+html.light {
+  --background: 210 17% 98%;
+  --foreground: 222 47% 11%;
+  --border: 214 32% 85%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --card-border: 214 32% 85%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 222 47% 11%;
+  --sidebar-border: 214 32% 85%;
+  --sidebar-accent: 214 32% 91%;
+  --sidebar-accent-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --popover-border: 214 32% 85%;
+  --secondary: 214 32% 91%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 214 32% 91%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 214 32% 91%;
+  --accent-foreground: 222 47% 11%;
+  --input: 214 32% 85%;
+  --ring: 187 78% 52%;
+  --elevate-1: rgba(0,0,0, .04);
+  --elevate-2: rgba(0,0,0, .10);
+}
+
+/* Light mode - Dashboard slots with soft shadows instead of borders */
 body.light-theme .dashboard-slot {
-  background: rgba(255, 255, 255, 0.75);
-  border-color: rgba(148, 163, 184, 0.5);
+  background: rgba(255, 255, 255, 0.98);
+  border-color: transparent;
   box-shadow: 
-    0 4px 30px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    0 4px 16px rgba(0, 0, 0, 0.04);
 }
 
+/* Light mode - Buttons and controls */
 body.light-theme .slot-button {
-  background: rgba(241, 245, 249, 0.95);
-  color: #0f172a;
-  border-color: rgba(148, 163, 184, 0.4);
+  background: #ffffff;
+  color: #1a1a1a;
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
+body.light-theme .slot-button:hover {
+  background: #f3f4f6;
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Light mode - Canvas container */
 body.light-theme .canvas-container {
-  background: rgba(241, 245, 249, 0.5);
+  background: #f8f9fa;
+}
+
+/* Light mode - Sidebar and panels */
+body.light-theme .sidebar-panel,
+body.light-theme [class*="bg-slate-900"],
+body.light-theme [class*="bg-slate-800"] {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Light mode - Text colors for slate variants */
+body.light-theme [class*="text-slate-200"],
+body.light-theme [class*="text-slate-100"],
+body.light-theme [class*="text-slate-300"] {
+  color: #1a1a1a !important;
+}
+
+body.light-theme [class*="text-slate-400"] {
+  color: #374151 !important;
+}
+
+body.light-theme [class*="text-slate-500"] {
+  color: #6b7280 !important;
+}
+
+/* Light mode - Header bar */
+body.light-theme .header-bar,
+body.light-theme [class*="bg-slate-900/95"] {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Light mode - Input fields */
+body.light-theme input[type="text"],
+body.light-theme textarea {
+  background: #ffffff !important;
+  color: #1a1a1a !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+body.light-theme input::placeholder,
+body.light-theme textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Light mode - Channel items in library */
+body.light-theme .channel-item,
+body.light-theme [class*="bg-slate-800/50"] {
+  background: rgba(248, 249, 250, 0.95) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-theme .channel-item:hover,
+body.light-theme [class*="hover:bg-slate-700"]:hover {
+  background: #f3f4f6 !important;
+}
+
+/* Light mode - Preserve cyan/purple accent colors */
+body.light-theme [class*="text-cyan-400"],
+body.light-theme [class*="text-cyan-500"] {
+  color: #0891b2 !important;
+}
+
+body.light-theme [class*="text-purple-400"],
+body.light-theme [class*="text-purple-500"] {
+  color: #9333ea !important;
+}
+
+body.light-theme [class*="text-amber-400"] {
+  color: #d97706 !important;
+}
+
+/* Light mode - Category pills */
+body.light-theme [class*="rounded-full"][class*="bg-slate-800"] {
+  background: #e5e7eb !important;
+  color: #374151 !important;
 }
 
 /* Default to dark theme */
@@ -53,6 +179,8 @@ body {
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
   --text-tertiary: #64748b;
+  --surface-primary: rgba(15, 23, 42, 0.85);
+  --surface-secondary: rgba(30, 41, 59, 0.9);
 }
 
 /* LIGHT MODE */

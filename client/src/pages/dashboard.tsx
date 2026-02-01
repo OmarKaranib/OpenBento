@@ -1161,7 +1161,7 @@ const MasterControlDashboard = ({
               data-testid="button-refresh-all"
             >
               <RefreshCw className="w-[1.4rem] h-[1.4rem]" />
-              Refresh All
+              Refresh
             </button>
 
             <button

@@ -1,5 +1,22 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, RefreshCw, Star, Trash2, Globe, Heart } from 'lucide-react';
+import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, RefreshCw, Star, Trash2, Globe, Heart, DollarSign, Zap } from 'lucide-react';
+
+// Channel logo URLs - Official channel logos
+const CHANNEL_LOGOS: Record<string, string> = {
+  'nasa-live': 'https://yt3.googleusercontent.com/ytc/AIdro_mxGaT3Pq3d6CQxkMjlkE_MFxqHC71kwN3nC2t0M-I=s176-c-k-c0x00ffffff-no-rj',
+  'sky-news': 'https://yt3.googleusercontent.com/ytc/AIdro_kWnhqwwL0-BNdwTRImxr_0z9vBjPLOxfCVPYl1=s176-c-k-c0x00ffffff-no-rj',
+  'abc-news': 'https://yt3.googleusercontent.com/ytc/AIdro_lHHH0NR4CiWJl0M0A1fgjT3lIY0I-K3tW0vQ=s176-c-k-c0x00ffffff-no-rj',
+  'bbc-news': 'https://yt3.googleusercontent.com/ytc/AIdro_lwhR0-xsJLKqDsS3hRcIgHtCjKqHbczVYqSbqp0Q=s176-c-k-c0x00ffffff-no-rj',
+  'cnn-live': 'https://yt3.googleusercontent.com/ytc/AIdro_kDQcnHZI3sI4Q-H1o_R_OcQA=s176-c-k-c0x00ffffff-no-rj',
+  'fox-news': 'https://yt3.googleusercontent.com/ytc/AIdro_l0zHXO3Lb-PR3uZxY=s176-c-k-c0x00ffffff-no-rj',
+  'al-jazeera': 'https://yt3.googleusercontent.com/gQP-bhJg4Q9xS1G4uL9uYNjP-y8lOWgbmI2Aqe9A=s176-c-k-c0x00ffffff-no-rj',
+  'dw-news': 'https://yt3.googleusercontent.com/ytc/AIdro_nq_8cO-dU7ZOxaIgfV2j4nR7o=s176-c-k-c0x00ffffff-no-rj',
+  'france24': 'https://yt3.googleusercontent.com/ytc/AIdro_nGLMkn_kAVqCfqPYlA=s176-c-k-c0x00ffffff-no-rj',
+  'twitch-esl': 'https://static-cdn.jtvnw.net/jtv_user_pictures/51412619-9afb-4e8e-8d0e-4a9e7bfc0c88-profile_image-150x150.png',
+  'twitch-rocket': 'https://static-cdn.jtvnw.net/jtv_user_pictures/rocketleague-profile_image-310cffa89cbb65fa-150x150.png',
+  'kick-xqc': 'https://files.kick.com/images/user/6/profile_image/conversion/aad43be0-d7f7-49f8-a82b-8b41ac0fc271-thumb.webp',
+  'kick-adin': 'https://files.kick.com/images/user/4486982/profile_image/conversion/ae02ffb7-2e66-4d0e-9b26-a78e2d93f61a-thumb.webp',
+};
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { WidgetType } from '@/App';
@@ -158,6 +175,7 @@ function getTemplateIcon(icon: WidgetTemplate['icon'], color: string) {
 }
 
 function DraggableChannel({ channel, onClick, isLive, isSaved, onSave, onRemove, showSaveButton }: DraggableChannelProps) {
+  const [logoError, setLogoError] = useState(false);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `channel-${channel.id}`,
     data: { type: 'channel', channel }
@@ -185,6 +203,28 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, onSave, onRemove,
     }
   };
 
+  // Get channel logo URL or use fallback icon
+  const logoUrl = CHANNEL_LOGOS[channel.id];
+  
+  // Fallback icons by category
+  const getFallbackIcon = () => {
+    switch (channel.iconType) {
+      case 'news':
+        return <Globe className="w-[1.8rem] h-[1.8rem] text-blue-400" />;
+      case 'science':
+        return <Rocket className="w-[1.8rem] h-[1.8rem] text-purple-400" />;
+      case 'gaming':
+        return <Gamepad2 className="w-[1.8rem] h-[1.8rem] text-green-400" />;
+      case 'finance':
+        return <DollarSign className="w-[1.8rem] h-[1.8rem] text-amber-400" />;
+      default:
+        return <Zap className="w-[1.8rem] h-[1.8rem] text-cyan-400" />;
+    }
+  };
+
+  // Show logo if available and not errored, otherwise show fallback icon
+  const showLogo = logoUrl && !logoError;
+
   return (
     <div
       ref={setNodeRef}
@@ -192,11 +232,20 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, onSave, onRemove,
       {...attributes}
       {...listeners}
       onClick={handleClick}
-      className="flex items-center gap-[1rem] p-[1rem] bg-slate-800/50 hover:bg-slate-700/50 slot-button cursor-grab active:cursor-grabbing transition-all duration-200 border border-slate-700/50 hover:border-cyan-500/50"
+      className="channel-item flex items-center gap-[1rem] p-[1rem] bg-slate-800/50 hover:bg-slate-700/50 slot-button cursor-grab active:cursor-grabbing transition-all duration-200 border border-slate-700/50 hover:border-cyan-500/50"
       data-testid={`draggable-channel-${channel.id}`}
     >
-      <div className="w-[3.2rem] h-[3.2rem] rounded-lg bg-slate-700 flex items-center justify-center relative">
-        {getChannelIcon(channel.iconType)}
+      <div className="w-[3.2rem] h-[3.2rem] rounded-lg bg-slate-700 flex items-center justify-center relative overflow-hidden">
+        {showLogo ? (
+          <img 
+            src={logoUrl} 
+            alt={channel.name} 
+            className="w-full h-full object-cover rounded-lg"
+            onError={() => setLogoError(true)}
+          />
+        ) : (
+          getFallbackIcon()
+        )}
         {isLive && (
           <div className="absolute -top-1 -right-1 w-[1rem] h-[1rem] bg-red-500 rounded-full animate-pulse" />
         )}
