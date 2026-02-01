@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, Crown, LogIn, LogOut, User } from 'lucide-react';
+import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, Crown, LogIn, LogOut, User, Loader2 } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Widget, WidgetType } from '@/App';
 import { YouTubePlayer } from '@/components/youtube-player';
 import { SavedChannel, loadPersonalLibrary, savePersonalLibrary } from '@/components/widget-sidebar';
+import { useStreamHealing } from '@/hooks/use-stream-healing';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -157,6 +158,8 @@ const MasterControlDashboard = ({
   const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
   const [colorPickerWidget, setColorPickerWidget] = useState<string | null>(null);
   
+  const { triggerHeal, getHealingState, registerChannel } = useStreamHealing();
+  
   // Theme Mode (dark/light)
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('openBentoTheme');
@@ -283,11 +286,37 @@ const MasterControlDashboard = ({
         )
       );
       savePersonalLibrary(updated);
-      // Dispatch event to sync sidebar
       window.dispatchEvent(new CustomEvent('personalLibraryUpdated'));
       return updated;
     });
   }, []);
+
+  const handleVideoError = useCallback((widget: Widget) => {
+    console.log(`[Self-Healing] Error detected for widget: ${widget.id}`);
+    
+    setWidgets(prev => prev.map(w => 
+      w.id === widget.id ? { ...w, isOffline: true } : w
+    ));
+    
+    if (widget.isYouTube && widget.youtubeChannelId) {
+      const channelName = widget.channelName || widget.youtubeChannelId;
+      
+      triggerHeal(
+        widget.id,
+        widget.youtubeChannelId,
+        channelName,
+        widget.videoId || undefined,
+        (newVideoId) => {
+          console.log(`[Self-Healing] Healed ${widget.id} with new videoId: ${newVideoId}`);
+          setWidgets(prev => prev.map(w => 
+            w.id === widget.id 
+              ? { ...w, videoId: newVideoId, isOffline: false, lastRefresh: Date.now() } 
+              : w
+          ));
+        }
+      );
+    }
+  }, [triggerHeal, setWidgets]);
 
   const minCellHeight = 80;
 
@@ -753,12 +782,7 @@ const MasterControlDashboard = ({
               onReady={() => {
                 console.log(`[YouTube] Player ready: ${widget.id}`);
               }}
-              onError={() => {
-                console.log(`[YouTube] Error for widget: ${widget.id}`);
-                setWidgets(prev => prev.map(w => 
-                  w.id === widget.id ? { ...w, isOffline: true } : w
-                ));
-              }}
+              onError={() => handleVideoError(widget)}
               onMutedChange={(muted) => {
                 setWidgets(prev => prev.map(w =>
                   w.id === widget.id ? { ...w, isMuted: muted } : w
@@ -785,12 +809,7 @@ const MasterControlDashboard = ({
               allow="autoplay; encrypted-media"
               referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
-              onError={() => {
-                console.log(`[Error] Twitch embed failed for ${widget.twitchChannel}`);
-                setWidgets(prev => prev.map(w => 
-                  w.id === widget.id ? { ...w, isOffline: true } : w
-                ));
-              }}
+              onError={() => handleVideoError(widget)}
             />
           );
         } else if (widget.isKick && widget.kickChannel) {
@@ -807,12 +826,7 @@ const MasterControlDashboard = ({
               allow="autoplay; encrypted-media"
               referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
-              onError={() => {
-                console.log(`[Error] Kick embed failed for ${widget.kickChannel}`);
-                setWidgets(prev => prev.map(w => 
-                  w.id === widget.id ? { ...w, isOffline: true } : w
-                ));
-              }}
+              onError={() => handleVideoError(widget)}
             />
           );
         } else if (widget.url) {

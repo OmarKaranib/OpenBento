@@ -51,22 +51,23 @@ export interface Widget {
   isYouTube?: boolean;
   videoId?: string | null;
   youtubeChannelId?: string | null;
+  channelName?: string;
   isTwitch?: boolean;
   twitchChannel?: string | null;
   isKick?: boolean;
   kickChannel?: string | null;
   isMuted: boolean;
   isPaused: boolean;
-  volume: number; // 0-100
-  previousVolume?: number; // Stores volume before mute for restore
+  volume: number;
+  previousVolume?: number;
   error?: string | null;
   embedBlocked?: boolean;
   noteContent?: string;
   imageUrl?: string;
   lastRefresh?: number;
-  isOffline?: boolean; // Track offline state
-  isLive?: boolean; // True for live streams, false for normal videos (affects refresh interval)
-  customColor?: string; // Bento.me per-widget custom background color (hex)
+  isOffline?: boolean;
+  isLive?: boolean;
+  customColor?: string;
 }
 
 const GRID_COLS = 12;

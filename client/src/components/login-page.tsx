@@ -6,10 +6,10 @@ import { signInWithGoogle } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 
 interface LoginPageProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess?: () => void;
 }
 
-export function LoginPage({ onLoginSuccess }: LoginPageProps) {
+export function LoginPage({ onLoginSuccess }: LoginPageProps = {}) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +20,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
     try {
       const user = await signInWithGoogle();
       if (user) {
-        onLoginSuccess();
+        onLoginSuccess?.();
       } else {
         setError('Login was cancelled or failed. Please try again.');
       }

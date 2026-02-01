@@ -196,7 +196,7 @@ export async function registerRoutes(
 
   app.delete("/api/library/:id", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
-    const { id } = req.params;
+    const id = req.params.id as string;
     
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
@@ -212,7 +212,7 @@ export async function registerRoutes(
 
   app.patch("/api/library/:id", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
-    const { id } = req.params;
+    const id = req.params.id as string;
     
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
