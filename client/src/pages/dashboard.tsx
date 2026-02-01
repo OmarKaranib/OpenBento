@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star } from 'lucide-react';
+import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Subtitles } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -136,6 +136,7 @@ const MasterControlDashboard = ({
   const [headerVisible, setHeaderVisible] = useState(true);
   const [exitButtonDismissed, setExitButtonDismissed] = useState(false);
   const [seekModeWidgets, setSeekModeWidgets] = useState<Set<string>>(new Set());
+  const [volumeSliderWidget, setVolumeSliderWidget] = useState<string | null>(null);
   const [inlineInputWidgetId, setInlineInputWidgetId] = useState<string | null>(null);
   const [inlineInputValue, setInlineInputValue] = useState('');
   const [clearHoldProgress, setClearHoldProgress] = useState(0);
@@ -153,6 +154,18 @@ const MasterControlDashboard = ({
     window.addEventListener('personalLibraryUpdated', handleLibraryUpdate);
     return () => window.removeEventListener('personalLibraryUpdated', handleLibraryUpdate);
   }, []);
+
+  // Auto-save widgets to localStorage with debounce to avoid excessive writes
+  // This ensures media control states (volume, ccEnabled) persist across sessions
+  const widgetsJsonRef = useRef<string>('');
+  useEffect(() => {
+    const widgetsJson = JSON.stringify(widgets);
+    // Only save if actual content changed (not just reference)
+    if (widgetsJson !== widgetsJsonRef.current) {
+      widgetsJsonRef.current = widgetsJson;
+      localStorage.setItem('openBentoWidgets', widgetsJson);
+    }
+  }, [widgets]);
 
   // Save widget to Personal Library
   const saveWidgetToLibrary = useCallback((widget: Widget) => {
@@ -255,44 +268,9 @@ const MasterControlDashboard = ({
     return () => document.removeEventListener('mousemove', handleMouseMove);
   }, [isFullscreen, headerVisible]);
 
-  // 10-minute refresh interval for live widgets only
-  // Normal videos (isLive=false) do not get automatic refresh
-  const TEN_MINUTES_MS = 10 * 60 * 1000;
-  const liveWidgetCount = widgets.filter(w => w.type === 'video' && w.isLive === true).length;
-  
-  useEffect(() => {
-    if (liveWidgetCount === 0) {
-      return; // No live widgets, no need for refresh interval
-    }
-    
-    console.log(`[Dashboard] Starting 10-min refresh interval for ${liveWidgetCount} live widget(s)`);
-    
-    const refreshInterval = setInterval(() => {
-      const now = Date.now();
-      console.log('[Dashboard] Running 10-min live widget refresh check');
-      
-      setWidgets(prev => prev.map(w => {
-        // Only refresh live video widgets
-        if (w.type !== 'video' || w.isLive !== true) {
-          return w;
-        }
-        
-        // Check if 10 minutes have passed since last refresh
-        const timeSinceRefresh = now - (w.lastRefresh || 0);
-        if (timeSinceRefresh >= TEN_MINUTES_MS) {
-          console.log(`[Dashboard] Refreshing live widget: ${w.id}`);
-          return { ...w, lastRefresh: now };
-        }
-        
-        return w;
-      }));
-    }, TEN_MINUTES_MS);
-    
-    return () => {
-      console.log('[Dashboard] Cleaning up live widget refresh interval');
-      clearInterval(refreshInterval);
-    };
-  }, [liveWidgetCount, setWidgets]);
+  // NUCLEAR LOCKDOWN: 10-minute live widget refresh interval disabled
+  // Players only rebuild when videoId actually changes or user clicks manual refresh button
+  // This prevents unexpected stream interruptions and preserves playback state
 
   // Helper function to exit fullscreen and restore header
   const exitFullscreenAndRestoreHeader = () => {
@@ -332,37 +310,9 @@ const MasterControlDashboard = ({
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [setIsFullscreen]);
 
-  // YouTube Live ID Watchdog - Auto-refresh YouTube embeds every 60 seconds to recover from errors
-  useEffect(() => {
-    const WATCHDOG_INTERVAL = 60000; // 60 seconds
-
-    const checkAndRefreshYouTubeWidgets = () => {
-      const now = Date.now();
-
-      setWidgets(prev => prev.map(widget => {
-        // Only check YouTube widgets with video IDs
-        if (widget.type === 'video' && widget.isYouTube && widget.videoId) {
-          const lastRefresh = widget.lastRefresh || 0;
-          const timeSinceRefresh = now - lastRefresh;
-
-          // If widget hasn't been refreshed in 60+ seconds, trigger a refresh
-          // by updating the lastRefresh timestamp (which forces iframe re-render)
-          if (timeSinceRefresh >= WATCHDOG_INTERVAL) {
-            console.log(`[YouTube Watchdog] Refreshing widget ${widget.id} (${timeSinceRefresh}ms since last refresh)`);
-            return {
-              ...widget,
-              lastRefresh: now
-            };
-          }
-        }
-        return widget;
-      }));
-    };
-
-    const intervalId = setInterval(checkAndRefreshYouTubeWidgets, WATCHDOG_INTERVAL);
-
-    return () => clearInterval(intervalId);
-  }, [setWidgets]);
+  // NUCLEAR LOCKDOWN: Automatic watchdog disabled to prevent iframe refresh
+  // Players only rebuild when videoId actually changes or user clicks manual refresh
+  // The refresh button still works for manual refresh when needed
 
   // Toggle seek mode for a specific widget
   const toggleSeekMode = (widgetId: string) => {
@@ -548,10 +498,46 @@ const MasterControlDashboard = ({
         if (w.isYouTube) {
           sendYouTubeCommand(widgetId, newMuted ? 'mute' : 'unMute');
         }
-        return { ...w, isMuted: newMuted };
+        // When unmuting, set volume to 50 if it was 0
+        const newVolume = !newMuted && w.volume === 0 ? 50 : w.volume;
+        return { ...w, isMuted: newMuted, volume: newVolume };
       }
       return w;
     }));
+  };
+
+  // Set volume for a widget (0-100)
+  const setWidgetVolume = (widgetId: string, volume: number) => {
+    const clampedVolume = Math.max(0, Math.min(100, volume));
+    setWidgets(prev => prev.map(w => {
+      if (w.id === widgetId) {
+        // Auto-mute if volume is 0, auto-unmute if volume > 0
+        const newMuted = clampedVolume === 0;
+        return { ...w, volume: clampedVolume, isMuted: newMuted };
+      }
+      return w;
+    }));
+  };
+
+  // Toggle closed captions for a widget
+  const toggleWidgetCC = (widgetId: string) => {
+    setWidgets(prev => prev.map(w => {
+      if (w.id === widgetId) {
+        return { ...w, ccEnabled: !w.ccEnabled };
+      }
+      return w;
+    }));
+  };
+
+  // Get volume icon based on current volume level
+  const getVolumeIcon = (widget: Widget) => {
+    if (widget.isMuted || widget.volume === 0) {
+      return <VolumeX className="w-[2rem] h-[2rem]" />;
+    } else if (widget.volume < 50) {
+      return <Volume1 className="w-[2rem] h-[2rem]" />;
+    } else {
+      return <Volume2 className="w-[2rem] h-[2rem]" />;
+    }
   };
 
   const toggleWidgetPause = (widgetId: string) => {
@@ -715,6 +701,8 @@ const MasterControlDashboard = ({
               channelId={widget.youtubeChannelId}
               isMuted={widget.isMuted}
               isPaused={widget.isPaused}
+              volume={widget.volume}
+              ccEnabled={widget.ccEnabled || false}
               isSeekMode={isSeekMode}
               refreshKey={widget.lastRefresh || 0}
               onReady={() => {
@@ -1220,17 +1208,65 @@ const MasterControlDashboard = ({
                     <Sliders className="w-[2rem] h-[2rem]" />
                   </button>
 
-                  <button
-                    onClick={() => toggleWidgetMute(widget.id)}
-                    className={`w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30 ${
-                      widget.isMuted 
-                        ? 'bg-red-600/90 hover:bg-red-500' 
-                        : 'bg-emerald-600/90 hover:bg-emerald-500'
-                    }`}
-                    title={widget.isMuted ? 'Unmute' : 'Mute'}
-                    data-testid={`button-mute-${widget.id}`}
+                  {/* Volume Control Group */}
+                  <div 
+                    className="relative flex items-center"
+                    onMouseEnter={() => setVolumeSliderWidget(widget.id)}
+                    onMouseLeave={() => setVolumeSliderWidget(null)}
                   >
-                    {widget.isMuted ? <VolumeX className="w-[2rem] h-[2rem]" /> : <Volume2 className="w-[2rem] h-[2rem]" />}
+                    <button
+                      onClick={() => toggleWidgetMute(widget.id)}
+                      className={`w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30 ${
+                        widget.isMuted || widget.volume === 0
+                          ? 'bg-red-600/90 hover:bg-red-500' 
+                          : 'bg-emerald-600/90 hover:bg-emerald-500'
+                      }`}
+                      title={widget.isMuted ? 'Unmute' : 'Mute'}
+                      data-testid={`button-mute-${widget.id}`}
+                    >
+                      {getVolumeIcon(widget)}
+                    </button>
+                    
+                    {/* Volume Slider - appears on hover */}
+                    <div 
+                      className={`absolute left-[4.5rem] flex items-center transition-all duration-300 ${
+                        volumeSliderWidget === widget.id 
+                          ? 'opacity-100 translate-x-0' 
+                          : 'opacity-0 -translate-x-2 pointer-events-none'
+                      }`}
+                    >
+                      <div className="bg-slate-900/95 backdrop-blur-sm rounded-full px-[1rem] py-[0.8rem] flex items-center gap-[0.8rem] shadow-lg border border-white/20">
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={widget.volume}
+                          onChange={(e) => setWidgetVolume(widget.id, parseInt(e.target.value))}
+                          className="w-[8rem] h-[0.4rem] bg-slate-600 rounded-full appearance-none cursor-pointer accent-emerald-500"
+                          style={{
+                            background: `linear-gradient(to right, #10b981 0%, #10b981 ${widget.volume}%, #475569 ${widget.volume}%, #475569 100%)`
+                          }}
+                          data-testid={`slider-volume-${widget.id}`}
+                        />
+                        <span className="text-[1.2rem] font-mono text-white min-w-[3rem] text-center">
+                          {widget.volume}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CC Toggle Button */}
+                  <button
+                    onClick={() => toggleWidgetCC(widget.id)}
+                    className={`w-[4rem] h-[4rem] rounded-full transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30 ${
+                      widget.ccEnabled
+                        ? 'bg-amber-500/90 hover:bg-amber-400 ring-2 ring-amber-300' 
+                        : 'bg-slate-600/90 hover:bg-slate-500'
+                    }`}
+                    title={widget.ccEnabled ? 'Disable Closed Captions' : 'Enable Closed Captions'}
+                    data-testid={`button-cc-${widget.id}`}
+                  >
+                    <Subtitles className="w-[2rem] h-[2rem]" />
                   </button>
 
                   <button

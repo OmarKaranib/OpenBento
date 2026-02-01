@@ -36,9 +36,14 @@ interface YTPlayer {
   unMute: () => void;
   isMuted: () => boolean;
   getPlayerState: () => number;
+  getVolume: () => number;
+  setVolume: (volume: number) => void;
   destroy: () => void;
-  loadVideoById: (videoId: string) => void;
+  loadVideoById: (videoIdOrObject: string | { videoId: string; startSeconds?: number }) => void;
   cueVideoById: (videoId: string) => void;
+  setOption: (module: string, option: string, value: unknown) => void;
+  getOption: (module: string, option: string) => unknown;
+  getOptions: (module?: string) => string[];
 }
 
 interface YouTubePlayerProps {
@@ -47,6 +52,8 @@ interface YouTubePlayerProps {
   channelId?: string | null;
   isMuted: boolean;
   isPaused: boolean;
+  volume: number;
+  ccEnabled: boolean;
   isSeekMode: boolean;
   refreshKey?: number;
   onReady?: () => void;
@@ -61,6 +68,8 @@ function YouTubePlayerInner({
   channelId,
   isMuted,
   isPaused,
+  volume,
+  ccEnabled,
   isSeekMode,
   refreshKey = 0,
   onReady,
@@ -75,6 +84,8 @@ function YouTubePlayerInner({
   // Use refs to track current state without causing re-renders
   const isMutedRef = useRef(isMuted);
   const isPausedRef = useRef(isPaused);
+  const volumeRef = useRef(volume);
+  const ccEnabledRef = useRef(ccEnabled);
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
   const onPausedChangeRef = useRef(onPausedChange);
@@ -82,6 +93,8 @@ function YouTubePlayerInner({
   // Keep refs in sync with props
   useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+  useEffect(() => { volumeRef.current = volume; }, [volume]);
+  useEffect(() => { ccEnabledRef.current = ccEnabled; }, [ccEnabled]);
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
   useEffect(() => { onPausedChangeRef.current = onPausedChange; }, [onPausedChange]);
@@ -313,6 +326,39 @@ function YouTubePlayerInner({
     }
   }, [isPaused]);
 
+  // Handle volume changes without reinitializing player
+  useEffect(() => {
+    if (playerRef.current && isInitializedRef.current && typeof playerRef.current.setVolume === 'function') {
+      try {
+        playerRef.current.setVolume(volume);
+        console.log('[YouTube] Volume set to:', volume);
+      } catch (e) {
+        console.log('[YouTube] Volume control error:', e);
+      }
+    }
+  }, [volume]);
+
+  // Handle CC/subtitle toggle without reinitializing player
+  useEffect(() => {
+    if (playerRef.current && isInitializedRef.current) {
+      try {
+        // Use setOption to control captions module
+        if (typeof playerRef.current.setOption === 'function') {
+          if (ccEnabled) {
+            // Turn on captions - load auto-generated or default track
+            playerRef.current.setOption('captions', 'track', { languageCode: 'en' });
+          } else {
+            // Turn off captions
+            playerRef.current.setOption('captions', 'track', {});
+          }
+          console.log('[YouTube] CC toggled:', ccEnabled);
+        }
+      } catch (e) {
+        console.log('[YouTube] CC control error:', e);
+      }
+    }
+  }, [ccEnabled]);
+
   return (
     <div
       ref={containerRef}
@@ -340,6 +386,8 @@ export const YouTubePlayer = memo(YouTubePlayerInner, (prevProps, nextProps) => 
     prevProps.isSeekMode === nextProps.isSeekMode &&
     prevProps.isMuted === nextProps.isMuted &&
     prevProps.isPaused === nextProps.isPaused &&
+    prevProps.volume === nextProps.volume &&
+    prevProps.ccEnabled === nextProps.ccEnabled &&
     prevProps.refreshKey === nextProps.refreshKey
   );
 });

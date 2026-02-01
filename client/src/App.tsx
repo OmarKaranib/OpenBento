@@ -40,6 +40,8 @@ export interface Widget {
   kickChannel?: string | null;
   isMuted: boolean;
   isPaused: boolean;
+  volume: number; // 0-100
+  ccEnabled?: boolean;
   error?: string | null;
   embedBlocked?: boolean;
   noteContent?: string;
@@ -95,6 +97,8 @@ function App() {
           ...w,
           isMuted: w.isMuted ?? true,
           isPaused: w.isPaused ?? false,
+          volume: w.volume ?? 0,
+          ccEnabled: w.ccEnabled ?? false,
           isOffline: w.isOffline ?? false,
           x: w.x ?? 0,
           y: w.y ?? 0,
@@ -242,6 +246,8 @@ function App() {
         h: smartResult.h,
         isMuted: true,
         isPaused: false,
+        volume: 0,
+        ccEnabled: false,
         isOffline: false,
         ...extraData
       };
@@ -305,6 +311,8 @@ function App() {
           embedBlocked: false,
           isPaused: false,
           isMuted: true,
+          volume: 0,
+          ccEnabled: false,
           isOffline: false,
           lastRefresh: Date.now()
         } : w
@@ -361,6 +369,8 @@ function App() {
         embedBlocked: false,
         isPaused: false,
         isMuted: true,
+        volume: 0,
+        ccEnabled: false,
         isOffline: false,
         lastRefresh: Date.now()
       } : w
@@ -699,6 +709,8 @@ function App() {
           embedBlocked: false,
           isPaused: false,
           isMuted: true,
+          volume: 0,
+          ccEnabled: false,
           isOffline: false,
           lastRefresh: Date.now()
         } : w
