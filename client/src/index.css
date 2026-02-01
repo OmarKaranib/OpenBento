@@ -15,7 +15,7 @@ body {
 /* LIGHT MODE */
 :root {
   /* Squircle Geometry - Bento.me Style (24px border-radius) */
-  --outer-radius: 2.4rem;
+  --outer-radius: 1.2rem;
   --inner-radius: calc(var(--outer-radius) - 0.8rem);
   --button-radius: calc(var(--outer-radius) - 1rem);
   
@@ -420,14 +420,6 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-/* Glass Mode - semi-transparent with stronger blur */
-.dashboard-slot.glass-mode {
-  background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
 /* Custom color override for individual widgets */
 .dashboard-slot[style*="--widget-bg"] {
   background-color: var(--widget-bg) !important;
@@ -450,7 +442,7 @@ body {
   }
   
   :root {
-    --outer-radius: 1.6rem;
+    --outer-radius: 1.2rem;
     --inner-radius: calc(var(--outer-radius) - 0.6rem);
     --button-radius: calc(var(--outer-radius) - 0.8rem);
     --slot-gap: 0.6rem;

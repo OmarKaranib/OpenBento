@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Droplet, Palette } from 'lucide-react';
+import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -13,12 +13,11 @@ const GRID_ROWS = 6;
 interface SortableWidgetProps {
   widget: Widget;
   isEditMode: boolean;
-  glassMode: boolean;
   onColorPickerOpen?: () => void;
   children: React.ReactNode;
 }
 
-const SortableWidget = ({ widget, isEditMode, glassMode, onColorPickerOpen, children }: SortableWidgetProps) => {
+const SortableWidget = ({ widget, isEditMode, onColorPickerOpen, children }: SortableWidgetProps) => {
   const {
     attributes,
     listeners,
@@ -49,8 +48,6 @@ const SortableWidget = ({ widget, isEditMode, glassMode, onColorPickerOpen, chil
       ref={setNodeRef}
       style={style}
       className={`dashboard-slot relative border group shadow-xl overflow-hidden ${
-        glassMode ? 'glass-mode' : ''
-      } ${
         isEditMode
           ? 'border-purple-500/70 ring-1 ring-purple-400/30 animate-jiggle is-editing'
           : 'border-slate-700/50'
@@ -159,10 +156,6 @@ const MasterControlDashboard = ({
   const [inlineInputValue, setInlineInputValue] = useState('');
   const [clearHoldProgress, setClearHoldProgress] = useState(0);
   const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
-  const [glassMode, setGlassMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem('openBentoGlassMode');
-    return saved ? JSON.parse(saved) : false;
-  });
   const [colorPickerWidget, setColorPickerWidget] = useState<string | null>(null);
   const clearHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clearHoldStartRef = useRef<number | null>(null);
@@ -189,11 +182,6 @@ const MasterControlDashboard = ({
       localStorage.setItem('openBentoWidgets', widgetsJson);
     }
   }, [widgets]);
-
-  // Persist Glass Mode setting
-  useEffect(() => {
-    localStorage.setItem('openBentoGlassMode', JSON.stringify(glassMode));
-  }, [glassMode]);
 
   // Set custom color for a specific widget (Bento.me Color Droplet)
   const setWidgetColor = useCallback((widgetId: string, color: string | undefined) => {
@@ -1109,20 +1097,6 @@ const MasterControlDashboard = ({
             </button>
 
             <button
-              onClick={() => setGlassMode(!glassMode)}
-              className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
-                glassMode 
-                  ? 'bg-cyan-600 hover:bg-cyan-500 shadow-lg shadow-cyan-900/50 ring-2 ring-cyan-400' 
-                  : 'bg-slate-700 hover:bg-slate-600 shadow-lg shadow-slate-900/50'
-              }`}
-              data-testid="button-glass-mode"
-              title="Toggle Glass Mode"
-            >
-              <Droplet className="w-[1.4rem] h-[1.4rem]" />
-              GLASS
-            </button>
-
-            <button
               onClick={handleMasterMute}
               className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
                 masterMute 
@@ -1209,7 +1183,6 @@ const MasterControlDashboard = ({
             key={widget.id} 
             widget={widget} 
             isEditMode={isEditMode}
-            glassMode={glassMode}
             onColorPickerOpen={() => setColorPickerWidget(colorPickerWidget === widget.id ? null : widget.id)}
           >
             {widget.type === 'video' && (widget.url || widget.videoId || widget.youtubeChannelId || widget.twitchChannel || widget.kickChannel) && !isEditMode && !widget.isOffline && (
