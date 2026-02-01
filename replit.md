@@ -52,18 +52,20 @@ The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to 
 - **Fallback Icons:** Colored circle with first letter of channel name (category-colored: blue-news, purple-science, green-gaming, amber-finance, cyan-default)
 - **Error Handling:** logoError state triggers colored circle fallback on image load failure
 
-**Dashboard-Only Mode (2026-02-01):**
-- **dashboardOnlyMode flag:** Set to `true` in App.tsx to disable all library/builder access
-- **Sidebar Hidden:** WidgetSidebar is not rendered when dashboardOnlyMode is true
-- **Handlers Blocked:** handleOpenSidebar and handleOpenSidebarToContent return early if blocked
-- **Menu Buttons Hidden:** Block button and widget edit buttons are commented out
-- **Purpose:** Locks dashboard to view-only mode for production display
+**Stream Library Mode (2026-02-01):**
+- **dashboardOnlyMode flag:** Set to `false` in App.tsx to allow +Block sidebar access
+- **+Block Button:** Restored to menu bar, opens filtered sidebar showing News/Stream Library only
+- **Sidebar Filtering:** Library tab hidden, only "News / Stream Library" tab visible
+- **Builder Tools Hidden:** Note, Photo, Spacer, Video templates remain commented out
+- **Purpose:** Allows adding streams from library while hiding all builder/template tools
 
 **Menu Button Color Persistence (2026-02-01):**
-- **menu-btn class:** Applied to Refresh, Edit/Save, BG, and Theme Toggle buttons
+- **menu-btn class:** Applied to +Block, Refresh, Edit/Save, BG, and Theme Toggle buttons
+- **indicator-btn class:** Applied to MUTED/LIVE button for high-contrast dark text in light mode
 - **CSS targeting:** Uses `.menu-btn` class directly instead of substring matching
 - **Light mode:** `:not(.menu-btn)` excludes menu buttons from white background override
-- **Text colors:** White text with text-shadow for colored buttons; amber gets dark text for contrast
+- **Text colors:** White text with text-shadow for colored buttons; amber and indicator buttons get dark text for contrast
+- **LIVE Badge Lockdown:** `.live-badge` class preserves vibrant red in light mode for channel LIVE indicators
 
 **Core Features:**
 - **Dynamic Widget System:** Supports Video, Note, Spacer, and Image widget types, each with unique functionalities. Widgets are added, removed, and content swapped dynamically.
