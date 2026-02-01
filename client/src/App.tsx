@@ -49,6 +49,7 @@ export interface Widget {
   lastRefresh?: number;
   isOffline?: boolean; // Track offline state
   isLive?: boolean; // True for live streams, false for normal videos (affects refresh interval)
+  customColor?: string; // Bento.me per-widget custom background color (hex)
 }
 
 const GRID_COLS = 12;

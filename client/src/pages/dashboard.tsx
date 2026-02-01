@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star } from 'lucide-react';
+import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Droplet, Palette } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -13,10 +13,12 @@ const GRID_ROWS = 6;
 interface SortableWidgetProps {
   widget: Widget;
   isEditMode: boolean;
+  glassMode: boolean;
+  onColorPickerOpen?: () => void;
   children: React.ReactNode;
 }
 
-const SortableWidget = ({ widget, isEditMode, children }: SortableWidgetProps) => {
+const SortableWidget = ({ widget, isEditMode, glassMode, onColorPickerOpen, children }: SortableWidgetProps) => {
   const {
     attributes,
     listeners,
@@ -33,23 +35,26 @@ const SortableWidget = ({ widget, isEditMode, children }: SortableWidgetProps) =
     }
   });
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
     gridColumn: `${widget.x + 1} / span ${Math.min(widget.w, GRID_COLS - widget.x)}`,
-    gridRow: `${widget.y + 1} / span ${Math.min(widget.h, GRID_ROWS - widget.y)}`
+    gridRow: `${widget.y + 1} / span ${Math.min(widget.h, GRID_ROWS - widget.y)}`,
+    ...(widget.customColor ? { '--widget-bg': widget.customColor, backgroundColor: widget.customColor } as React.CSSProperties : {})
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`dashboard-slot relative bg-slate-900/50 backdrop-blur-sm border group transition-all duration-300 shadow-xl overflow-hidden ${
+      className={`dashboard-slot relative border group shadow-xl overflow-hidden ${
+        glassMode ? 'glass-mode' : ''
+      } ${
         isEditMode
-          ? 'border-purple-500/70 ring-1 ring-purple-400/30 animate-jiggle'
-          : 'border-slate-700/50 hover:border-cyan-500/50'
-      } ${isDragging ? 'z-[9999]' : 'z-10'}`}
+          ? 'border-purple-500/70 ring-1 ring-purple-400/30 animate-jiggle is-editing'
+          : 'border-slate-700/50'
+      } ${isDragging ? 'z-[9999] is-dragging' : 'z-10'}`}
       data-testid={`widget-${widget.id}`}
     >
       {/* Overlay blocks iframe interactions in Edit Mode but not buttons */}
@@ -80,6 +85,19 @@ const SortableWidget = ({ widget, isEditMode, children }: SortableWidgetProps) =
               {widget.type}
             </span>
           )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onColorPickerOpen?.(); }}
+            className={`p-[0.4rem] slot-button transition-colors ${
+              widget.customColor 
+                ? 'hover:opacity-80' 
+                : 'bg-slate-700/90 hover:bg-slate-600'
+            }`}
+            style={widget.customColor ? { backgroundColor: widget.customColor } : {}}
+            title="Change block color"
+            data-testid={`color-picker-${widget.id}`}
+          >
+            <Palette className="w-[1.2rem] h-[1.2rem] text-white" />
+          </button>
         </div>
       )}
 
@@ -141,6 +159,11 @@ const MasterControlDashboard = ({
   const [inlineInputValue, setInlineInputValue] = useState('');
   const [clearHoldProgress, setClearHoldProgress] = useState(0);
   const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
+  const [glassMode, setGlassMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('openBentoGlassMode');
+    return saved ? JSON.parse(saved) : false;
+  });
+  const [colorPickerWidget, setColorPickerWidget] = useState<string | null>(null);
   const clearHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clearHoldStartRef = useRef<number | null>(null);
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
@@ -166,6 +189,19 @@ const MasterControlDashboard = ({
       localStorage.setItem('openBentoWidgets', widgetsJson);
     }
   }, [widgets]);
+
+  // Persist Glass Mode setting
+  useEffect(() => {
+    localStorage.setItem('openBentoGlassMode', JSON.stringify(glassMode));
+  }, [glassMode]);
+
+  // Set custom color for a specific widget (Bento.me Color Droplet)
+  const setWidgetColor = useCallback((widgetId: string, color: string | undefined) => {
+    setWidgets(prev => prev.map(w => 
+      w.id === widgetId ? { ...w, customColor: color } : w
+    ));
+    setColorPickerWidget(null);
+  }, [setWidgets]);
 
   // Save widget to Personal Library
   const saveWidgetToLibrary = useCallback((widget: Widget) => {
@@ -1072,6 +1108,19 @@ const MasterControlDashboard = ({
               {isEditMode ? 'LOCK' : 'EDIT LAYOUT'}
             </button>
 
+            <button
+              onClick={() => setGlassMode(!glassMode)}
+              className={`px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
+                glassMode 
+                  ? 'bg-cyan-600 hover:bg-cyan-500 shadow-lg shadow-cyan-900/50 ring-2 ring-cyan-400' 
+                  : 'bg-slate-700 hover:bg-slate-600 shadow-lg shadow-slate-900/50'
+              }`}
+              data-testid="button-glass-mode"
+              title="Toggle Glass Mode"
+            >
+              <Droplet className="w-[1.4rem] h-[1.4rem]" />
+              GLASS
+            </button>
 
             <button
               onClick={handleMasterMute}
@@ -1156,7 +1205,13 @@ const MasterControlDashboard = ({
           data-testid="widget-grid"
         >
         {widgets.map((widget) => (
-          <SortableWidget key={widget.id} widget={widget} isEditMode={isEditMode}>
+          <SortableWidget 
+            key={widget.id} 
+            widget={widget} 
+            isEditMode={isEditMode}
+            glassMode={glassMode}
+            onColorPickerOpen={() => setColorPickerWidget(colorPickerWidget === widget.id ? null : widget.id)}
+          >
             {widget.type === 'video' && (widget.url || widget.videoId || widget.youtubeChannelId || widget.twitchChannel || widget.kickChannel) && !isEditMode && !widget.isOffline && (
               <>
                 {/* Seek Mode "Done" button - always visible when seek mode is active */}
@@ -1300,6 +1355,53 @@ const MasterControlDashboard = ({
                 >
                   <Trash2 className="w-[2rem] h-[2rem]" />
                 </button>
+              </div>
+            )}
+
+            {/* Bento.me Color Picker Popup */}
+            {colorPickerWidget === widget.id && isEditMode && (
+              <div 
+                className="absolute top-[5rem] left-[0.6rem] z-[10001] bg-slate-900/95 backdrop-blur-sm rounded-[1.6rem] p-[1.2rem] shadow-2xl border border-white/20"
+                style={{ pointerEvents: 'auto' }}
+              >
+                <div className="flex flex-col gap-[0.8rem]">
+                  <span className="text-[1rem] font-semibold text-white/80 mb-[0.4rem]">Block Color</span>
+                  <div className="grid grid-cols-5 gap-[0.6rem]">
+                    {[
+                      '#1e293b', '#0f172a', '#18181b', '#1c1917', '#0c0a09',
+                      '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6',
+                      '#3b82f6', '#8b5cf6', '#ec4899', '#f43f5e', '#6366f1',
+                      '#06b6d4', '#0ea5e9', '#a855f7', '#d946ef', '#84cc16'
+                    ].map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => setWidgetColor(widget.id, color)}
+                        className={`w-[2.4rem] h-[2.4rem] rounded-full border-2 transition-all hover:scale-110 ${
+                          widget.customColor === color ? 'border-white ring-2 ring-white/50' : 'border-white/20'
+                        }`}
+                        style={{ backgroundColor: color }}
+                        title={color}
+                        data-testid={`color-swatch-${color}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex gap-[0.6rem] mt-[0.6rem]">
+                    <button
+                      onClick={() => setWidgetColor(widget.id, undefined)}
+                      className="flex-1 px-[0.8rem] py-[0.5rem] bg-slate-700 hover:bg-slate-600 rounded-full text-[0.9rem] font-medium transition-colors"
+                      data-testid="button-reset-color"
+                    >
+                      Reset
+                    </button>
+                    <button
+                      onClick={() => setColorPickerWidget(null)}
+                      className="flex-1 px-[0.8rem] py-[0.5rem] bg-cyan-600 hover:bg-cyan-500 rounded-full text-[0.9rem] font-medium transition-colors"
+                      data-testid="button-close-color-picker"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
