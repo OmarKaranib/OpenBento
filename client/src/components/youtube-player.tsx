@@ -103,6 +103,9 @@ function YouTubePlayerInner({
   
   // Memoize the stable video ID - only recalculate when videoId prop changes
   const stableVideoId = useMemo(() => videoId || null, [videoId]);
+  
+  // Memoize the stable channel ID for live streams - fallback when no videoId
+  const stableChannelId = useMemo(() => channelId || null, [channelId]);
 
   // Hardcoded origin for handshake - computed once
   const origin = useMemo(() => window.location.origin, []);
@@ -168,12 +171,17 @@ function YouTubePlayerInner({
     };
 
     try {
-      console.log('[YouTube] Initializing player for widget:', widgetId, 'videoId:', stableVideoId);
+      // If we have a channelId but no videoId, use channel live stream format
+      const effectiveVideoId = stableVideoId || (stableChannelId ? `live_stream?channel=${stableChannelId}` : undefined);
+      
+      console.log('[YouTube] Initializing player for widget:', widgetId, 'videoId:', effectiveVideoId);
       
       playerRef.current = new window.YT.Player(playerId, {
         videoId: stableVideoId || undefined,
         host: 'https://www.youtube-nocookie.com',
-        playerVars,
+        playerVars: stableChannelId && !stableVideoId 
+          ? { ...playerVars, listType: 'user_uploads', list: stableChannelId }
+          : playerVars,
         events: {
           onReady: (event) => {
             console.log('[YouTube] Player ready for widget:', widgetId);
@@ -231,7 +239,7 @@ function YouTubePlayerInner({
       console.error('[YouTube] Failed to initialize player:', e);
       onErrorRef.current?.();
     }
-  }, [playerId, stableVideoId, widgetId, origin, setupMediaSession]); // Only re-init when video/widget changes
+  }, [playerId, stableVideoId, stableChannelId, widgetId, origin, setupMediaSession]); // Only re-init when video/widget/channel changes
 
   // Initialize player only when videoId changes
   useEffect(() => {
@@ -334,6 +342,28 @@ function YouTubePlayerInner({
     }
   }, [volume]);
 
+  // For channel-based live streams (no videoId, but has channelId), use direct iframe
+  if (!stableVideoId && stableChannelId) {
+    const channelLiveUrl = `https://www.youtube-nocookie.com/embed/live_stream?channel=${stableChannelId}&autoplay=1&mute=1&origin=${encodeURIComponent(origin)}&enablejsapi=1`;
+    console.log('[YouTube] Using channel live stream iframe for:', stableChannelId);
+    
+    return (
+      <div
+        ref={containerRef}
+        className="w-full h-full"
+        style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
+      >
+        <iframe
+          src={channelLiveUrl}
+          className="w-full h-full border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -357,6 +387,7 @@ export const YouTubePlayer = memo(YouTubePlayerInner, (prevProps, nextProps) => 
   // Only re-render when these critical props change:
   return (
     prevProps.videoId === nextProps.videoId &&
+    prevProps.channelId === nextProps.channelId &&
     prevProps.widgetId === nextProps.widgetId &&
     prevProps.isSeekMode === nextProps.isSeekMode &&
     prevProps.isMuted === nextProps.isMuted &&

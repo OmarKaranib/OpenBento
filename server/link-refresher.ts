@@ -183,10 +183,9 @@ export function getChannelUrl(channel: LiveChannel, origin: string): string {
     }
   }
 
-  if (channel.platform === 'youtube' && channel.videoId) {
-    return `https://www.youtube-nocookie.com/embed/${channel.videoId}?autoplay=1&mute=1&origin=${encodeURIComponent(safeOrigin)}&parent=${encodeURIComponent(safeHostname)}`;
-  } else if (channel.platform === 'youtube' && !channel.videoId) {
-    return `https://www.youtube-nocookie.com/embed/live_stream?channel=${channel.channelHandle}&autoplay=1&mute=1&origin=${encodeURIComponent(safeOrigin)}&parent=${encodeURIComponent(safeHostname)}`;
+  if (channel.platform === 'youtube') {
+    // Return channel live URL - let the frontend extract the current live videoId dynamically
+    return `https://www.youtube.com/@${channel.channelHandle}/live`;
   } else if (channel.platform === 'twitch') {
     return `https://www.twitch.tv/${channel.channelHandle}`;
   } else if (channel.platform === 'kick') {
