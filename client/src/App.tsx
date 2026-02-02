@@ -119,11 +119,31 @@ function AppContent() {
     })
   );
 
+  // Default news streams to show when database/localStorage is empty
+  const getDefaultWidgets = (): Widget[] => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+    const getEmbedUrl = (videoId: string) => 
+      `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&origin=${encodeURIComponent(origin)}&parent=${hostname}`;
+    
+    return [
+      { id: `widget-default-1`, type: 'video', content: getEmbedUrl('9Auq_BjS0FE'), title: 'Sky News Live', x: 0, y: 0, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, platform: 'youtube', isOffline: false },
+      { id: `widget-default-2`, type: 'video', content: getEmbedUrl('w_Ma8oQLmSM'), title: 'ABC News Live', x: 4, y: 0, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, platform: 'youtube', isOffline: false },
+      { id: `widget-default-3`, type: 'video', content: getEmbedUrl('21X5lGlDOfg'), title: 'NASA Live', x: 8, y: 0, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, platform: 'youtube', isOffline: false },
+      { id: `widget-default-4`, type: 'video', content: getEmbedUrl('oJUvTVdTMyY'), title: 'Reuters Live', x: 0, y: 3, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, platform: 'youtube', isOffline: false },
+      { id: `widget-default-5`, type: 'video', content: getEmbedUrl('jL8uDJJBjMA'), title: 'Al Jazeera', x: 4, y: 3, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, platform: 'youtube', isOffline: false },
+      { id: `widget-default-6`, type: 'video', content: getEmbedUrl('ntmPIzlbj7k'), title: 'France 24', x: 8, y: 3, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, platform: 'youtube', isOffline: false },
+    ];
+  };
+
   const [widgets, setWidgets] = useState<Widget[]>(() => {
     const saved = localStorage.getItem('openBentoWidgets');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        if (parsed.length === 0) {
+          return getDefaultWidgets();
+        }
         return parsed.map((w: Widget) => ({
           ...w,
           isMuted: w.isMuted ?? true,
@@ -137,10 +157,10 @@ function AppContent() {
           h: w.h ?? 2
         }));
       } catch {
-        return [];
+        return getDefaultWidgets();
       }
     }
-    return [];
+    return getDefaultWidgets();
   });
 
   const extractYouTubeId = (url: string): string | null => {

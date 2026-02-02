@@ -168,8 +168,11 @@ const MasterControlDashboard = ({
   
   const { triggerHeal, getHealingState, registerChannel } = useStreamHealing();
   
-  // Theme Mode - LOCKED TO LIGHT MODE (#F8F9FA background, #1A1A1A text)
-  const isDarkMode = false; // Design locked to light mode
+  // Theme Mode (dark/light) - User toggleable
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('openBentoTheme');
+    return saved !== 'light'; // Default to dark mode
+  });
   
   const clearHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clearHoldStartRef = useRef<number | null>(null);
@@ -977,15 +980,15 @@ const MasterControlDashboard = ({
       className={`h-screen overflow-hidden font-sans flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} 
       style={{ 
         padding: isFullscreen && !headerVisible ? '0' : '1.6rem',
-        background: '#F8F9FA',
-        color: '#1A1A1A'
+        background: isDarkMode ? '#0f172a' : '#F8F9FA',
+        color: isDarkMode ? '#f1f5f9' : '#1A1A1A'
       }}
       data-testid="main-dashboard"
     >
-      {/* Subtle decorative gradients for light mode */}
-      <div className="fixed inset-0 opacity-10 pointer-events-none z-0">
-        <div className="absolute top-[8rem] left-[8rem] w-[38rem] h-[38rem] bg-cyan-400 rounded-full blur-[120px]"></div>
-        <div className="absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] bg-purple-400 rounded-full blur-[120px]"></div>
+      {/* Decorative gradients */}
+      <div className={`fixed inset-0 pointer-events-none z-0 ${isDarkMode ? 'opacity-30' : 'opacity-10'}`}>
+        <div className={`absolute top-[8rem] left-[8rem] w-[38rem] h-[38rem] rounded-full blur-[120px] ${isDarkMode ? 'bg-cyan-500 animate-pulse' : 'bg-cyan-400'}`}></div>
+        <div className={`absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] rounded-full blur-[120px] ${isDarkMode ? 'bg-purple-500 animate-pulse' : 'bg-purple-400'}`} style={isDarkMode ? { animationDelay: '1s' } : {}}></div>
       </div>
 
       {/* 40px hover zone at top-center - reveals exit button when hovering (only when header hidden) */}
@@ -1010,7 +1013,7 @@ const MasterControlDashboard = ({
       <div 
         className={`z-30 mb-[1rem] flex-shrink-0 ${
           isFullscreen 
-            ? 'fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md px-[1.6rem] py-[0.8rem] shadow-lg border-b border-gray-200' 
+            ? `fixed top-0 left-0 right-0 backdrop-blur-md px-[1.6rem] py-[0.8rem] shadow-lg border-b ${isDarkMode ? 'bg-slate-950/95 border-slate-800/50' : 'bg-white/95 border-gray-200'}`
             : 'relative'
         }`}
         style={{ 
@@ -1036,24 +1039,26 @@ const MasterControlDashboard = ({
               className={`p-[0.6rem] slot-button transition-all duration-300 border ${
                 isFullscreen 
                   ? 'bg-cyan-600 hover:bg-cyan-500 border-cyan-500/50' 
-                  : 'bg-gray-200 hover:bg-gray-300 border-gray-300 hover:border-cyan-500/50'
+                  : isDarkMode 
+                    ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-600/50 hover:border-cyan-500/50'
+                    : 'bg-gray-200 hover:bg-gray-300 border-gray-300 hover:border-cyan-500/50'
               }`}
               title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Mode'}
               data-testid="button-toggle-fullscreen"
             >
-              {isFullscreen ? <Minimize2 className="w-[1.6rem] h-[1.6rem] text-white" /> : <Maximize2 className="w-[1.6rem] h-[1.6rem] text-gray-600" />}
+              {isFullscreen ? <Minimize2 className="w-[1.6rem] h-[1.6rem] text-white" /> : <Maximize2 className={`w-[1.6rem] h-[1.6rem] ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`} />}
             </button>
             <div className="relative">
               <Power className="w-[2rem] h-[2rem] text-cyan-400 animate-pulse" data-testid="icon-power" />
               <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-50 pointer-events-none"></div>
             </div>
-            <h1 className="text-[2rem] font-bold tracking-wider text-gray-900" data-testid="text-title" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <h1 className={`text-[2rem] font-bold tracking-wider ${isDarkMode ? 'bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent' : 'text-gray-900'}`} data-testid="text-title" style={{ fontFamily: 'Inter, sans-serif' }}>
               OpenBento
             </h1>
-            <span className="text-[1rem] text-gray-600 bg-gray-200 px-[0.8rem] py-[0.3rem] rounded-full">
+            <span className={`text-[1rem] px-[0.8rem] py-[0.3rem] rounded-full ${isDarkMode ? 'text-slate-400 bg-slate-800/50' : 'text-gray-600 bg-gray-200'}`}>
               {widgets.length} widgets
             </span>
-            <span className="text-[0.9rem] text-cyan-600 bg-cyan-100 px-[0.6rem] py-[0.2rem] rounded-full border border-cyan-300">
+            <span className={`text-[0.9rem] px-[0.6rem] py-[0.2rem] rounded-full border ${isDarkMode ? 'text-cyan-400/70 bg-cyan-900/30 border-cyan-500/30' : 'text-cyan-600 bg-cyan-100 border-cyan-300'}`}>
               {GRID_COLS}-col grid
             </span>
             
@@ -1139,10 +1144,6 @@ const MasterControlDashboard = ({
 
             <button
               onClick={() => {
-                if (!isAuthenticated) {
-                  openLoginModal('Sign in to edit and save your dashboard layout');
-                  return;
-                }
                 if (isEditMode) {
                   handleSaveLayout();
                 }
@@ -1170,6 +1171,21 @@ const MasterControlDashboard = ({
             >
               {masterMute ? <VolumeX className="w-[1.4rem] h-[1.4rem]" /> : <Volume2 className="w-[1.4rem] h-[1.4rem]" />}
               {masterMute ? 'MUTED' : 'LIVE'}
+            </button>
+
+            {/* Theme Toggle - Sun/Moon */}
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className={`menu-btn relative px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] overflow-hidden ${
+                isDarkMode 
+                  ? 'bg-indigo-900 hover:bg-indigo-800 shadow-lg shadow-indigo-900/50 text-slate-100' 
+                  : 'bg-amber-400 hover:bg-amber-300 shadow-lg shadow-amber-500/50 text-amber-900'
+              }`}
+              data-testid="button-theme-toggle"
+              title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {isDarkMode ? <Moon className="w-[1.4rem] h-[1.4rem]" /> : <Sun className="w-[1.4rem] h-[1.4rem]" />}
+              {isDarkMode ? 'Dark' : 'Light'}
             </button>
 
             {/* Login Button - Only shown when NOT logged in */}
