@@ -1,26 +1,14 @@
 {
   "channels": [
     {
-      "id": "nasa-live",
-      "name": "NASA Live",
-      "channelHandle": "NASA",
-      "platform": "youtube",
-      "iconType": "science",
-      "category": "Science",
-      "videoId": "xCrPD7tfcr0",
-      "isLive": true,
-      "lastUpdated": 1770037051010
-    },
-    {
       "id": "sky-news",
       "name": "Sky News",
       "channelHandle": "skynews",
       "platform": "youtube",
       "iconType": "news",
       "category": "News",
-      "videoId": "YDvsBbKfLPA",
-      "isLive": true,
-      "lastUpdated": 1770037051010
+      "videoId": "9Auq_BjS0FE",
+      "isLive": true
     },
     {
       "id": "abc-news",
@@ -29,65 +17,949 @@
       "platform": "youtube",
       "iconType": "news",
       "category": "News",
-      "videoId": "x_oXTID1nH8",
-      "isLive": true,
-      "lastUpdated": 1770037051010
+      "videoId": "w_Ma8oQLmSM",
+      "isLive": true
+    },
+    {
+      "id": "nasa-live",
+      "name": "NASA Live",
+      "channelHandle": "NASA",
+      "platform": "youtube",
+      "iconType": "science",
+      "category": "Science",
+      "videoId": "21X5lGlDOfg",
+      "isLive": true
+    },
+    {
+      "id": "reuters-live",
+      "name": "Reuters Live",
+      "channelHandle": "Reuters",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "oJUvTVdTMyY",
+      "isLive": true
+    },
+    {
+      "id": "al-jazeera",
+      "name": "Al Jazeera",
+      "channelHandle": "aljaborera",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "jL8uDJJBjMA",
+      "isLive": true
+    },
+    {
+      "id": "france-24",
+      "name": "France 24",
+      "channelHandle": "france24",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "ntmPIzlbj7k",
+      "isLive": true
+    },
+    {
+      "id": "cnn-live",
+      "name": "CNN Live",
+      "channelHandle": "CNN",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "oJUvTVdTMyY",
+      "isLive": true
+    },
+    {
+      "id": "bbc-news",
+      "name": "BBC News",
+      "channelHandle": "BBCNews",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "RNiUvqOR2WI",
+      "isLive": true
+    },
+    {
+      "id": "dw-news",
+      "name": "DW News",
+      "channelHandle": "deutschewellenews",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "C04ncJI2mvE",
+      "isLive": true
+    },
+    {
+      "id": "euronews",
+      "name": "Euronews",
+      "channelHandle": "euronews",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "2Fmp3fGkSY4",
+      "isLive": true
+    },
+    {
+      "id": "nbc-news",
+      "name": "NBC News",
+      "channelHandle": "NBCNews",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "dpVa8bSHNvA",
+      "isLive": true
+    },
+    {
+      "id": "cbs-news",
+      "name": "CBS News",
+      "channelHandle": "CBSNews",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "4b71rT9fU-I",
+      "isLive": true
+    },
+    {
+      "id": "fox-news",
+      "name": "Fox News",
+      "channelHandle": "FoxNews",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "eCMjsTJuuzA",
+      "isLive": true
+    },
+    {
+      "id": "msnbc-live",
+      "name": "MSNBC Live",
+      "channelHandle": "MSNBC",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "B8AQJB9c3u8",
+      "isLive": true
+    },
+    {
+      "id": "bloomberg-live",
+      "name": "Bloomberg TV",
+      "channelHandle": "Bloomberg",
+      "platform": "youtube",
+      "iconType": "finance",
+      "category": "Finance",
+      "videoId": "dp8PhLsUcFE",
+      "isLive": true
+    },
+    {
+      "id": "cnbc-live",
+      "name": "CNBC Live",
+      "channelHandle": "CNBC",
+      "platform": "youtube",
+      "iconType": "finance",
+      "category": "Finance",
+      "videoId": "9NyxcX3rhQs",
+      "isLive": true
+    },
+    {
+      "id": "yahoo-finance",
+      "name": "Yahoo Finance",
+      "channelHandle": "YahooFinance",
+      "platform": "youtube",
+      "iconType": "finance",
+      "category": "Finance",
+      "videoId": "SJldzGsW9Ys",
+      "isLive": true
+    },
+    {
+      "id": "cheddar-news",
+      "name": "Cheddar News",
+      "channelHandle": "CheddarNews",
+      "platform": "youtube",
+      "iconType": "finance",
+      "category": "Finance",
+      "videoId": "bPqD3p24KjI",
+      "isLive": true
+    },
+    {
+      "id": "spacex-live",
+      "name": "SpaceX",
+      "channelHandle": "SpaceX",
+      "platform": "youtube",
+      "iconType": "science",
+      "category": "Science",
+      "videoId": null,
+      "isLive": false
+    },
+    {
+      "id": "iss-hd-earth",
+      "name": "ISS HD Earth",
+      "channelHandle": "NASA",
+      "platform": "youtube",
+      "iconType": "science",
+      "category": "Science",
+      "videoId": "xRPTBhmcyXY",
+      "isLive": true
+    },
+    {
+      "id": "space-videos",
+      "name": "Space Videos",
+      "channelHandle": "SpaceVideos",
+      "platform": "youtube",
+      "iconType": "science",
+      "category": "Science",
+      "videoId": "86YLFOog4GM",
+      "isLive": true
+    },
+    {
+      "id": "nasa-tv",
+      "name": "NASA TV",
+      "channelHandle": "NASAtelevision",
+      "platform": "youtube",
+      "iconType": "science",
+      "category": "Science",
+      "videoId": "21X5lGlDOfg",
+      "isLive": true
+    },
+    {
+      "id": "nhk-world",
+      "name": "NHK World",
+      "channelHandle": "NHKWorld",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "JxcKfwP4DhI",
+      "isLive": true
+    },
+    {
+      "id": "cgtn-news",
+      "name": "CGTN",
+      "channelHandle": "CGTNOfficial",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "MdwsJfE2R9Y",
+      "isLive": true
+    },
+    {
+      "id": "arirang-news",
+      "name": "Arirang",
+      "channelHandle": "ariikiingworld",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "8yc0KqhtBd4",
+      "isLive": true
+    },
+    {
+      "id": "abc-australia",
+      "name": "ABC Australia",
+      "channelHandle": "ABCAustralia",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "IWnD1t4JzqQ",
+      "isLive": true
+    },
+    {
+      "id": "wion-news",
+      "name": "WION",
+      "channelHandle": "WIONNews",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "zcXHn8nXfjw",
+      "isLive": true
+    },
+    {
+      "id": "india-today",
+      "name": "India Today",
+      "channelHandle": "IndiaToday",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "Nq2wYlWFucg",
+      "isLive": true
+    },
+    {
+      "id": "ndtv-news",
+      "name": "NDTV",
+      "channelHandle": "ndtv",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "WB4DPT0y6cc",
+      "isLive": true
+    },
+    {
+      "id": "times-now",
+      "name": "Times Now",
+      "channelHandle": "TimesNow",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "gCNeDWCI0vo",
+      "isLive": true
+    },
+    {
+      "id": "rt-news",
+      "name": "RT News",
+      "channelHandle": "RT",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "V0I5eglJMRI",
+      "isLive": true
+    },
+    {
+      "id": "trt-world",
+      "name": "TRT World",
+      "channelHandle": "TRTWorld",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "CV5Fooi8YJo",
+      "isLive": true
+    },
+    {
+      "id": "cna-news",
+      "name": "CNA",
+      "channelHandle": "channelnewsasia",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "qfnUqMfePkM",
+      "isLive": true
+    },
+    {
+      "id": "abc7-la",
+      "name": "ABC7 Los Angeles",
+      "channelHandle": "ABC7",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "PbOb9kqSsP0",
+      "isLive": true
+    },
+    {
+      "id": "fox11-la",
+      "name": "FOX 11 Los Angeles",
+      "channelHandle": "FOX11LosAngeles",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "R0B3wK0Kni0",
+      "isLive": true
     },
     {
       "id": "twitch-esl",
       "name": "ESL CS:GO",
       "channelHandle": "esl_csgo",
-      "videoId": null,
-      "lastUpdated": 1770037051010,
       "platform": "twitch",
       "iconType": "gaming",
       "category": "Esports",
+      "videoId": null,
       "isLive": true
     },
     {
-      "id": "twitch-rocket",
+      "id": "twitch-rocketleague",
       "name": "Rocket League",
       "channelHandle": "rocketleague",
-      "videoId": null,
-      "lastUpdated": 1770037051010,
       "platform": "twitch",
       "iconType": "gaming",
       "category": "Esports",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-valorant",
+      "name": "VALORANT",
+      "channelHandle": "valorant",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Esports",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-lol",
+      "name": "League of Legends",
+      "channelHandle": "riotgames",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Esports",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-dota2",
+      "name": "Dota 2",
+      "channelHandle": "dota2ti",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Esports",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-fortnite",
+      "name": "Fortnite",
+      "channelHandle": "fortnite",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Esports",
+      "videoId": null,
       "isLive": true
     },
     {
       "id": "twitch-gaules",
       "name": "Gaules",
       "channelHandle": "gaules",
-      "videoId": null,
-      "lastUpdated": 1770037051010,
       "platform": "twitch",
       "iconType": "gaming",
       "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-pokimane",
+      "name": "Pokimane",
+      "channelHandle": "pokimane",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-shroud",
+      "name": "Shroud",
+      "channelHandle": "shroud",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-summit1g",
+      "name": "Summit1g",
+      "channelHandle": "summit1g",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-timthetatman",
+      "name": "TimTheTatman",
+      "channelHandle": "timthetatman",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-nickmercs",
+      "name": "NICKMERCS",
+      "channelHandle": "nickmercs",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-drlupo",
+      "name": "DrLupo",
+      "channelHandle": "drlupo",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-lirik",
+      "name": "LIRIK",
+      "channelHandle": "lirik",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-myth",
+      "name": "Myth",
+      "channelHandle": "myth",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-xqc",
+      "name": "xQcOW",
+      "channelHandle": "xqcow",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-hasanabi",
+      "name": "HasanAbi",
+      "channelHandle": "hasanabi",
+      "platform": "twitch",
+      "iconType": "news",
+      "category": "News",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-ludwig",
+      "name": "Ludwig",
+      "channelHandle": "ludwig",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-mizkif",
+      "name": "Mizkif",
+      "channelHandle": "mizkif",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-nmplol",
+      "name": "Nmplol",
+      "channelHandle": "nmplol",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-chess",
+      "name": "Chess.com",
+      "channelHandle": "chess",
+      "platform": "twitch",
+      "iconType": "default",
+      "category": "Sports",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-overwatch",
+      "name": "Overwatch League",
+      "channelHandle": "overwatchleague",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Esports",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-cdl",
+      "name": "Call of Duty League",
+      "channelHandle": "codleague",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Esports",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-pgl",
+      "name": "PGL",
+      "channelHandle": "pgl",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Esports",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "twitch-blast",
+      "name": "BLAST Premier",
+      "channelHandle": "blastpremier",
+      "platform": "twitch",
+      "iconType": "gaming",
+      "category": "Esports",
+      "videoId": null,
       "isLive": true
     },
     {
       "id": "kick-xqc",
-      "name": "xQc",
+      "name": "xQc (Kick)",
       "channelHandle": "xqc",
-      "videoId": null,
-      "lastUpdated": 1770037051010,
       "platform": "kick",
       "iconType": "gaming",
       "category": "Gaming",
+      "videoId": null,
       "isLive": true
     },
     {
-      "id": "kick-adin",
+      "id": "kick-adinross",
       "name": "Adin Ross",
       "channelHandle": "adinross",
-      "videoId": null,
-      "lastUpdated": 1770037051010,
       "platform": "kick",
       "iconType": "gaming",
       "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "kick-trainwreckstv",
+      "name": "Trainwreck",
+      "channelHandle": "trainwreckstv",
+      "platform": "kick",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "kick-amouranth",
+      "name": "Amouranth",
+      "channelHandle": "amouranth",
+      "platform": "kick",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "kick-roshtein",
+      "name": "Roshtein",
+      "channelHandle": "roshtein",
+      "platform": "kick",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "kick-destiny",
+      "name": "Destiny",
+      "channelHandle": "destiny",
+      "platform": "kick",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "kick-nickeh30",
+      "name": "Nickeh30",
+      "channelHandle": "nickeh30",
+      "platform": "kick",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "kick-ice",
+      "name": "Ice Poseidon",
+      "channelHandle": "ice",
+      "platform": "kick",
+      "iconType": "gaming",
+      "category": "Gaming",
+      "videoId": null,
+      "isLive": true
+    },
+    {
+      "id": "weather-channel",
+      "name": "The Weather Channel",
+      "channelHandle": "weatherchannel",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "VlQXKCNcKfc",
+      "isLive": true
+    },
+    {
+      "id": "accuweather",
+      "name": "AccuWeather",
+      "channelHandle": "accuweather",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": null,
+      "isLive": false
+    },
+    {
+      "id": "earth-cam-nyc",
+      "name": "EarthCam NYC",
+      "channelHandle": "EarthCam",
+      "platform": "youtube",
+      "iconType": "default",
+      "category": "Live Cams",
+      "videoId": "1-iS7LArMPA",
+      "isLive": true
+    },
+    {
+      "id": "earth-cam-tokyo",
+      "name": "Tokyo Live",
+      "channelHandle": "EarthCam",
+      "platform": "youtube",
+      "iconType": "default",
+      "category": "Live Cams",
+      "videoId": "gFRtAAmiFbE",
+      "isLive": true
+    },
+    {
+      "id": "earth-cam-paris",
+      "name": "Paris Live",
+      "channelHandle": "EarthCam",
+      "platform": "youtube",
+      "iconType": "default",
+      "category": "Live Cams",
+      "videoId": "vb2J3iu2fOw",
+      "isLive": true
+    },
+    {
+      "id": "earth-cam-london",
+      "name": "London Live",
+      "channelHandle": "EarthCam",
+      "platform": "youtube",
+      "iconType": "default",
+      "category": "Live Cams",
+      "videoId": "eqL66R8V4eg",
+      "isLive": true
+    },
+    {
+      "id": "earth-cam-dubai",
+      "name": "Dubai Live",
+      "channelHandle": "EarthCam",
+      "platform": "youtube",
+      "iconType": "default",
+      "category": "Live Cams",
+      "videoId": "Z7jFFPKrqlM",
+      "isLive": true
+    },
+    {
+      "id": "aquarium-live",
+      "name": "Aquarium Live",
+      "channelHandle": "MontereyBayAquarium",
+      "platform": "youtube",
+      "iconType": "science",
+      "category": "Science",
+      "videoId": "a0H61vvn4oQ",
+      "isLive": true
+    },
+    {
+      "id": "explore-africa",
+      "name": "Africa Wildlife",
+      "channelHandle": "Explore",
+      "platform": "youtube",
+      "iconType": "science",
+      "category": "Science",
+      "videoId": "pLwhmQLoifQ",
+      "isLive": true
+    },
+    {
+      "id": "explore-bears",
+      "name": "Bear Cam Alaska",
+      "channelHandle": "Explore",
+      "platform": "youtube",
+      "iconType": "science",
+      "category": "Science",
+      "videoId": "pLwhmQLoifQ",
+      "isLive": true
+    },
+    {
+      "id": "sea-otter-cam",
+      "name": "Sea Otter Cam",
+      "channelHandle": "MontereyBayAquarium",
+      "platform": "youtube",
+      "iconType": "science",
+      "category": "Science",
+      "videoId": "eqL66R8V4eg",
+      "isLive": true
+    },
+    {
+      "id": "jellyfish-cam",
+      "name": "Jellyfish Cam",
+      "channelHandle": "MontereyBayAquarium",
+      "platform": "youtube",
+      "iconType": "science",
+      "category": "Science",
+      "videoId": "WzVv3EYuFms",
+      "isLive": true
+    },
+    {
+      "id": "nfl-network",
+      "name": "NFL Network",
+      "channelHandle": "NFL",
+      "platform": "youtube",
+      "iconType": "default",
+      "category": "Sports",
+      "videoId": null,
+      "isLive": false
+    },
+    {
+      "id": "nba-tv",
+      "name": "NBA TV",
+      "channelHandle": "NBA",
+      "platform": "youtube",
+      "iconType": "default",
+      "category": "Sports",
+      "videoId": null,
+      "isLive": false
+    },
+    {
+      "id": "espn-live",
+      "name": "ESPN Live",
+      "channelHandle": "espn",
+      "platform": "youtube",
+      "iconType": "default",
+      "category": "Sports",
+      "videoId": null,
+      "isLive": false
+    },
+    {
+      "id": "free-sports-tv",
+      "name": "Free Sports TV",
+      "channelHandle": "FreeSportsTV",
+      "platform": "youtube",
+      "iconType": "default",
+      "category": "Sports",
+      "videoId": null,
+      "isLive": false
+    },
+    {
+      "id": "pbs-newshour",
+      "name": "PBS NewsHour",
+      "channelHandle": "PBSNewsHour",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "RQR7DxwmOMM",
+      "isLive": true
+    },
+    {
+      "id": "cbsn-live",
+      "name": "CBSN",
+      "channelHandle": "CBSNews",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "4b71rT9fU-I",
+      "isLive": true
+    },
+    {
+      "id": "newsy-live",
+      "name": "Newsy",
+      "channelHandle": "Newsy",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "MdkDAFzDzpg",
+      "isLive": true
+    },
+    {
+      "id": "livennow-fox",
+      "name": "LiveNOW Fox",
+      "channelHandle": "LiveNOWFox",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "EhIqjMmveBE",
+      "isLive": true
+    },
+    {
+      "id": "court-tv",
+      "name": "Court TV",
+      "channelHandle": "CourtTV",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "JX2aT9x4Y2s",
+      "isLive": true
+    },
+    {
+      "id": "law-crime",
+      "name": "Law & Crime",
+      "channelHandle": "LawCrimeNetwork",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "VHqVGHdWrNE",
+      "isLive": true
+    },
+    {
+      "id": "c-span",
+      "name": "C-SPAN",
+      "channelHandle": "CSPAN",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "W5chwKEkZkg",
+      "isLive": true
+    },
+    {
+      "id": "un-webtv",
+      "name": "UN Web TV",
+      "channelHandle": "unitednations",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "t0gVQlNpPxk",
+      "isLive": true
+    },
+    {
+      "id": "global-news",
+      "name": "Global News",
+      "channelHandle": "GlobalNews",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "7jZnz0BsKbU",
+      "isLive": true
+    },
+    {
+      "id": "cp24-live",
+      "name": "CP24",
+      "channelHandle": "CP24",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "Lg8lJNWrXfA",
+      "isLive": true
+    },
+    {
+      "id": "ctv-news",
+      "name": "CTV News",
+      "channelHandle": "CTVNews",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "0i3jJO_V2L4",
+      "isLive": true
+    },
+    {
+      "id": "cbc-news",
+      "name": "CBC News",
+      "channelHandle": "CBCNews",
+      "platform": "youtube",
+      "iconType": "news",
+      "category": "News",
+      "videoId": "L5RM4PouEZE",
       "isLive": true
     }
   ],
-  "lastRefresh": 1770037051010
+  "lastRefresh": 1738531200000
 }
