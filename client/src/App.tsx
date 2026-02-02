@@ -718,46 +718,12 @@ function AppContent() {
   }, [addVideoWidget, addWidget, setWidgets, findCollidingWidgets, findNextAvailableSlot]);
 
   const handleChannelClick = useCallback((channel: TrendingChannel) => {
-    // Prefer channel.videoId directly from API, fallback to URL extraction
-    const videoId = channel.videoId || extractYouTubeId(channel.url);
-    const youtubeChannelId = channel.channelId || extractYouTubeChannelId(channel.url);
-    const twitchChannel = extractTwitchChannel(channel.url);
-    const kickChannel = extractKickChannel(channel.url);
-    const currentActiveWidgetId = activeWidgetIdRef.current;
-    
-    // Determine if this is a live stream - Twitch/Kick are always live, YouTube uses isLive flag
-    const isLiveStream = channel.platform === 'twitch' || channel.platform === 'kick' || channel.isLive === true;
-
-    if (currentActiveWidgetId) {
-      setWidgets(prev => prev.map(w => 
-        w.id === currentActiveWidgetId ? {
-          ...w,
-          type: 'video',
-          url: channel.url,
-          isYouTube: channel.platform === 'youtube',
-          videoId,
-          youtubeChannelId,
-          isTwitch: channel.platform === 'twitch',
-          twitchChannel,
-          isKick: channel.platform === 'kick',
-          kickChannel,
-          isLive: isLiveStream,
-          error: null,
-          embedBlocked: false,
-          isPaused: false,
-          isMuted: true,
-          volume: 0,
-          isOffline: false,
-          lastRefresh: Date.now()
-        } : w
-      ));
-    } else {
-      addVideoWidget(channel, 3, 2);
-    }
+    // Use the exact same logic as manual URL paste - just pass the URL
+    handleSubmitUrl(channel.url);
     setSidebarOpen(false);
     activeWidgetIdRef.current = null;
     setActiveWidgetId(null);
-  }, [addVideoWidget]);
+  }, [handleSubmitUrl]);
 
   // Dashboard-only mode flag - set to false to allow sidebar with filtered content
   const dashboardOnlyMode = false;
