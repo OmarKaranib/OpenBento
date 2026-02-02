@@ -1,13 +1,13 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { LoginPage } from '@/components/login-page';
+import { LoginModal } from '@/components/login-modal';
 
-// Static background - Starry Night theme (no custom BG engine)
+// Static background - High-contrast light mode
 const StaticBackground = () => {
   useEffect(() => {
     const body = document.body;
-    body.style.backgroundColor = '#0f172a';
-    body.style.backgroundImage = 'linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a)';
+    body.style.backgroundColor = '#F8F9FA';
+    body.style.backgroundImage = 'none';
     body.style.backgroundSize = 'cover';
     body.style.backgroundPosition = 'center';
     body.style.backgroundAttachment = 'fixed';
@@ -85,9 +85,17 @@ function AppContent() {
   const [urlInputValue, setUrlInputValue] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [ghostPosition, setGhostPosition] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [loginTriggerReason, setLoginTriggerReason] = useState<string | undefined>();
   
   // Auth state - must be inside QueryClientProvider
-  const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
+  
+  // Open login modal with optional reason
+  const openLoginModal = useCallback((reason?: string) => {
+    setLoginTriggerReason(reason);
+    setLoginModalOpen(true);
+  }, []);
 
   const activeWidgetIdRef = useRef<string | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
@@ -794,34 +802,18 @@ function AppContent() {
     setActiveWidgetId(null);
   }, [addWidget]);
 
-  // Show login page if not authenticated
-  if (!isAuthenticated && !authLoading) {
-    return (
-      <TooltipProvider>
-        <StaticBackground />
-        <LoginPage />
-        <Toaster />
-      </TooltipProvider>
-    );
-  }
-
-  // Show loading state while checking auth
-  if (authLoading) {
-    return (
-      <TooltipProvider>
-        <StaticBackground />
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-cyan-400 text-xl">Loading...</div>
-        </div>
-        <Toaster />
-      </TooltipProvider>
-    );
-  }
-
   return (
     <TooltipProvider>
-      {/* Static Background - Starry Night theme */}
+      {/* Static Background - High-contrast light mode */}
       <StaticBackground />
+      
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+        triggerReason={loginTriggerReason}
+      />
+      
       <DndContext 
         sensors={sensors} 
         collisionDetection={rectIntersection}
@@ -870,6 +862,8 @@ function AppContent() {
                   isGridFull={isGridFull}
                   user={user}
                   onLogout={logout}
+                  isAuthenticated={isAuthenticated}
+                  openLoginModal={openLoginModal}
                 />
               )}
             </Route>

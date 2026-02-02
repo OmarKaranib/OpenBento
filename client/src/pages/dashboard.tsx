@@ -121,6 +121,8 @@ interface MasterControlDashboardProps {
   isGridFull: boolean;
   user: SupabaseUser | null;
   onLogout: () => void;
+  isAuthenticated: boolean;
+  openLoginModal: (reason?: string) => void;
 }
 
 interface ResizeState {
@@ -148,7 +150,9 @@ const MasterControlDashboard = ({
   gridContainerRef,
   isGridFull,
   user,
-  onLogout
+  onLogout,
+  isAuthenticated,
+  openLoginModal
 }: MasterControlDashboardProps) => {
   const [masterMute, setMasterMute] = useState(true);
   const [resizing, setResizing] = useState<ResizeState | null>(null);
@@ -1006,7 +1010,7 @@ const MasterControlDashboard = ({
       <div 
         className={`z-30 mb-[1rem] flex-shrink-0 ${
           isFullscreen 
-            ? 'fixed top-0 left-0 right-0 bg-slate-950/95 backdrop-blur-md px-[1.6rem] py-[0.8rem] shadow-lg border-b border-slate-800/50' 
+            ? 'fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md px-[1.6rem] py-[0.8rem] shadow-lg border-b border-gray-200' 
             : 'relative'
         }`}
         style={{ 
@@ -1032,24 +1036,24 @@ const MasterControlDashboard = ({
               className={`p-[0.6rem] slot-button transition-all duration-300 border ${
                 isFullscreen 
                   ? 'bg-cyan-600 hover:bg-cyan-500 border-cyan-500/50' 
-                  : 'bg-slate-800/80 hover:bg-slate-700 border-slate-600/50 hover:border-cyan-500/50'
+                  : 'bg-gray-200 hover:bg-gray-300 border-gray-300 hover:border-cyan-500/50'
               }`}
               title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Mode'}
               data-testid="button-toggle-fullscreen"
             >
-              {isFullscreen ? <Minimize2 className="w-[1.6rem] h-[1.6rem] text-white" /> : <Maximize2 className="w-[1.6rem] h-[1.6rem] text-slate-400" />}
+              {isFullscreen ? <Minimize2 className="w-[1.6rem] h-[1.6rem] text-white" /> : <Maximize2 className="w-[1.6rem] h-[1.6rem] text-gray-600" />}
             </button>
             <div className="relative">
               <Power className="w-[2rem] h-[2rem] text-cyan-400 animate-pulse" data-testid="icon-power" />
               <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-50 pointer-events-none"></div>
             </div>
-            <h1 className="text-[2rem] font-bold tracking-wider bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent" data-testid="text-title">
-              MASTER CONTROL
+            <h1 className="text-[2rem] font-bold tracking-wider text-gray-900" data-testid="text-title" style={{ fontFamily: 'Inter, sans-serif' }}>
+              OpenBento
             </h1>
-            <span className="text-[1rem] text-slate-400 bg-slate-800/50 px-[0.8rem] py-[0.3rem] rounded-full">
+            <span className="text-[1rem] text-gray-600 bg-gray-200 px-[0.8rem] py-[0.3rem] rounded-full">
               {widgets.length} widgets
             </span>
-            <span className="text-[0.9rem] text-cyan-400/70 bg-cyan-900/30 px-[0.6rem] py-[0.2rem] rounded-full border border-cyan-500/30">
+            <span className="text-[0.9rem] text-cyan-600 bg-cyan-100 px-[0.6rem] py-[0.2rem] rounded-full border border-cyan-300">
               {GRID_COLS}-col grid
             </span>
             
@@ -1135,8 +1139,11 @@ const MasterControlDashboard = ({
 
             <button
               onClick={() => {
+                if (!isAuthenticated) {
+                  openLoginModal('Sign in to edit and save your dashboard layout');
+                  return;
+                }
                 if (isEditMode) {
-                  // Save and lock when in edit mode
                   handleSaveLayout();
                 }
                 setIsEditMode(!isEditMode);
@@ -1190,11 +1197,23 @@ const MasterControlDashboard = ({
               <span className="relative z-10">{isDarkMode ? 'Dark' : 'Light'}</span>
             </button>
 
+            {/* Login Button - Only shown when NOT logged in */}
+            {!isAuthenticated && (
+              <button
+                onClick={() => openLoginModal()}
+                className="menu-btn px-[1.2rem] py-[0.6rem] bg-gray-800 hover:bg-gray-700 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] shadow-lg text-white"
+                data-testid="button-login"
+              >
+                <User className="w-[1.4rem] h-[1.4rem]" />
+                Login
+              </button>
+            )}
+            
             {/* User Avatar/Logout - Only shown when logged in */}
-            {user && (
+            {isAuthenticated && user && (
               <button
                 onClick={onLogout}
-                className="menu-btn px-[1.2rem] py-[0.6rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] shadow-lg shadow-slate-900/50"
+                className="menu-btn px-[1.2rem] py-[0.6rem] bg-gray-800 hover:bg-gray-700 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] shadow-lg text-white"
                 data-testid="button-logout"
                 title={`Logged in as ${user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'User'} - Click to logout`}
               >
