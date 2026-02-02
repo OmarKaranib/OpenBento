@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher, updateChannelVideoId } from "./link-refresher";
+import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from "./link-refresher";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerChannel } from "./services/pulse-cache";
 import { healStream, getVideoDetails, isMusicCategory } from "./services/youtube-api";
@@ -110,8 +110,6 @@ export async function registerRoutes(
       
       if (result.success && result.newVideoId) {
         await registerChannel(channelId, channelName, 'youtube', result.newVideoId);
-        // Also update links.json so library serves fresh videoId
-        updateChannelVideoId(channelId, result.newVideoId);
       }
       
       res.json(result);

@@ -108,34 +108,6 @@ function saveLinks(data: LinksData): void {
   }
 }
 
-export function updateChannelVideoId(channelId: string, newVideoId: string): boolean {
-  try {
-    const data = loadLinks();
-    let updated = false;
-    
-    for (const channel of data.channels) {
-      if (channel.channelHandle === channelId || channel.id === channelId) {
-        if (channel.videoId !== newVideoId) {
-          log(`[LinkRefresher] Updating ${channel.name} videoId: ${channel.videoId} -> ${newVideoId}`);
-          channel.videoId = newVideoId;
-          channel.lastUpdated = Date.now();
-          updated = true;
-        }
-        break;
-      }
-    }
-    
-    if (updated) {
-      saveLinks(data);
-      return true;
-    }
-    return false;
-  } catch (error) {
-    log(`[LinkRefresher] Error updating channel ${channelId}: ${error}`);
-    return false;
-  }
-}
-
 export async function refreshAllLinks(): Promise<LinksData> {
   log('[LinkRefresher] Starting link refresh...');
   

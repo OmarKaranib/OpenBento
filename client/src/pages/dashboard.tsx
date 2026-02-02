@@ -1023,7 +1023,7 @@ const MasterControlDashboard = ({
       )}
 
       <div 
-        className={`z-30 mb-[1rem] flex-shrink-0 flex items-center ${
+        className={`z-30 mb-[1rem] flex-shrink-0 ${
           isFullscreen 
             ? `fixed top-0 left-0 right-0 backdrop-blur-md px-[1.6rem] py-[0.8rem] shadow-lg border-b ${isDarkMode ? 'bg-slate-950/95 border-slate-800/50' : 'bg-white/95 border-gray-200'}`
             : 'relative'
@@ -1038,7 +1038,7 @@ const MasterControlDashboard = ({
         data-testid="header-container"
       >
         <div className="flex items-center justify-between mb-[0.8rem] flex-wrap gap-[0.8rem]">
-          <div className="flex items-center gap-[1.2rem]">
+          <div className="flex items-center gap-[1.2rem] h-[3.2rem]">
             <button
               onClick={() => {
                 if (isFullscreen) {

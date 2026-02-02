@@ -2,7 +2,6 @@ import { db } from '../db';
 import { streamStatusCache } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { checkStreamHealth, healStream } from './youtube-api';
-import { updateChannelVideoId } from '../link-refresher';
 
 const PULSE_INTERVAL_MS = 5 * 60 * 1000;
 const TOP_CHANNELS_LIMIT = 50;
@@ -108,10 +107,6 @@ async function runPulseCheck(): Promise<void> {
           isLive: true,
           errorCode: undefined,
         });
-        
-        // Also update links.json so library serves fresh videoId
-        updateChannelVideoId(channelId, healResult.newVideoId);
-        
         console.log(`[PulseCache] Healed ${status.channelName} with new videoId: ${healResult.newVideoId}`);
       } else {
         await updateCacheEntry(channelId, {
