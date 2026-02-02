@@ -83,7 +83,7 @@ function PlyrPlayerInner({
       try {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: videoTitle || 'Live Stream',
-          artist: 'Master Control Dashboard',
+          artist: 'OpenBento Dashboard',
           album: 'Live Streams',
         });
 

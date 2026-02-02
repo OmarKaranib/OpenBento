@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon } from 'lucide-react';
+import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, Crown, LogIn, LogOut, User, Loader2 } from 'lucide-react';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Widget, WidgetType } from '@/App';
 import { YouTubePlayer } from '@/components/youtube-player';
 import { SavedChannel, loadPersonalLibrary, savePersonalLibrary } from '@/components/widget-sidebar';
+import { useStreamHealing } from '@/hooks/use-stream-healing';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -90,6 +91,18 @@ const SortableWidget = ({ widget, isEditMode, onColorPickerOpen, children }: Sor
   );
 };
 
+// Supabase User type (simplified)
+interface SupabaseUser {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    full_name?: string;
+    name?: string;
+    avatar_url?: string;
+    picture?: string;
+  };
+}
+
 interface MasterControlDashboardProps {
   widgets: Widget[];
   setWidgets: Dispatch<SetStateAction<Widget[]>>;
@@ -100,12 +113,16 @@ interface MasterControlDashboardProps {
   handleOpenSidebar: (widgetId?: string) => void;
   onInlineUrlSubmit: (widgetId: string, url: string) => void;
   handleOpenSidebarToContent: () => void;
-  addWidget: (type: WidgetType, w?: number, h?: number, extraData?: Partial<Widget>) => string;
+  addWidget: (type: WidgetType, w?: number, h?: number, extraData?: Partial<Widget>) => string | null;
   isFullscreen: boolean;
   setIsFullscreen: Dispatch<SetStateAction<boolean>>;
   ghostPosition: { x: number; y: number; w: number; h: number } | null;
   gridContainerRef: MutableRefObject<HTMLDivElement | null>;
   isGridFull: boolean;
+  user: SupabaseUser | null;
+  onLogout: () => void;
+  isAuthenticated: boolean;
+  openLoginModal: (reason?: string) => void;
 }
 
 interface ResizeState {
@@ -131,7 +148,11 @@ const MasterControlDashboard = ({
   setIsFullscreen,
   ghostPosition,
   gridContainerRef,
-  isGridFull
+  isGridFull,
+  user,
+  onLogout,
+  isAuthenticated,
+  openLoginModal
 }: MasterControlDashboardProps) => {
   const [masterMute, setMasterMute] = useState(true);
   const [resizing, setResizing] = useState<ResizeState | null>(null);
@@ -145,19 +166,9 @@ const MasterControlDashboard = ({
   const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
   const [colorPickerWidget, setColorPickerWidget] = useState<string | null>(null);
   
-  // Global Background Engine
-  const [globalBgColor, setGlobalBgColor] = useState<string>(() => {
-    const saved = localStorage.getItem('openBentoBgColor');
-    return saved || '';
-  });
-  const [globalBgImage, setGlobalBgImage] = useState<string>(() => {
-    const saved = localStorage.getItem('openBentoBgImage');
-    return saved || '';
-  });
-  const [showBgPicker, setShowBgPicker] = useState(false);
-  const bgImageInputRef = useRef<HTMLInputElement>(null);
+  const { triggerHeal, getHealingState, registerChannel } = useStreamHealing();
   
-  // Theme Mode (dark/light)
+  // Theme Mode (dark/light) - User toggleable
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('openBentoTheme');
     return saved !== 'light'; // Default to dark mode
@@ -207,40 +218,6 @@ const MasterControlDashboard = ({
       localStorage.setItem('openBentoWidgets', widgetsJson);
     }
   }, [widgets]);
-
-  // Persist global background settings and notify App component
-  useEffect(() => {
-    if (globalBgColor) {
-      localStorage.setItem('openBentoBgColor', globalBgColor);
-    } else {
-      localStorage.removeItem('openBentoBgColor');
-    }
-    // Dispatch event to notify GlobalCanvasBackground in App.tsx
-    window.dispatchEvent(new Event('globalBgUpdated'));
-  }, [globalBgColor]);
-
-  useEffect(() => {
-    if (globalBgImage) {
-      localStorage.setItem('openBentoBgImage', globalBgImage);
-    } else {
-      localStorage.removeItem('openBentoBgImage');
-    }
-    // Dispatch event to notify GlobalCanvasBackground in App.tsx
-    window.dispatchEvent(new Event('globalBgUpdated'));
-  }, [globalBgImage]);
-
-  // Handle background image upload
-  const handleBgImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target?.result as string;
-        setGlobalBgImage(dataUrl);
-      };
-      reader.readAsDataURL(file);
-    }
-  }, []);
 
   // Set custom color for a specific widget (Bento.me Color Droplet)
   const setWidgetColor = useCallback((widgetId: string, color: string | undefined) => {
@@ -317,11 +294,37 @@ const MasterControlDashboard = ({
         )
       );
       savePersonalLibrary(updated);
-      // Dispatch event to sync sidebar
       window.dispatchEvent(new CustomEvent('personalLibraryUpdated'));
       return updated;
     });
   }, []);
+
+  const handleVideoError = useCallback((widget: Widget) => {
+    console.log(`[Self-Healing] Error detected for widget: ${widget.id}`);
+    
+    setWidgets(prev => prev.map(w => 
+      w.id === widget.id ? { ...w, isOffline: true } : w
+    ));
+    
+    if (widget.isYouTube && widget.youtubeChannelId) {
+      const channelName = widget.channelName || widget.youtubeChannelId;
+      
+      triggerHeal(
+        widget.id,
+        widget.youtubeChannelId,
+        channelName,
+        widget.videoId || undefined,
+        (newVideoId) => {
+          console.log(`[Self-Healing] Healed ${widget.id} with new videoId: ${newVideoId}`);
+          setWidgets(prev => prev.map(w => 
+            w.id === widget.id 
+              ? { ...w, videoId: newVideoId, isOffline: false, lastRefresh: Date.now() } 
+              : w
+          ));
+        }
+      );
+    }
+  }, [triggerHeal, setWidgets]);
 
   const minCellHeight = 80;
 
@@ -787,12 +790,7 @@ const MasterControlDashboard = ({
               onReady={() => {
                 console.log(`[YouTube] Player ready: ${widget.id}`);
               }}
-              onError={() => {
-                console.log(`[YouTube] Error for widget: ${widget.id}`);
-                setWidgets(prev => prev.map(w => 
-                  w.id === widget.id ? { ...w, isOffline: true } : w
-                ));
-              }}
+              onError={() => handleVideoError(widget)}
               onMutedChange={(muted) => {
                 setWidgets(prev => prev.map(w =>
                   w.id === widget.id ? { ...w, isMuted: muted } : w
@@ -819,12 +817,7 @@ const MasterControlDashboard = ({
               allow="autoplay; encrypted-media"
               referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
-              onError={() => {
-                console.log(`[Error] Twitch embed failed for ${widget.twitchChannel}`);
-                setWidgets(prev => prev.map(w => 
-                  w.id === widget.id ? { ...w, isOffline: true } : w
-                ));
-              }}
+              onError={() => handleVideoError(widget)}
             />
           );
         } else if (widget.isKick && widget.kickChannel) {
@@ -841,12 +834,7 @@ const MasterControlDashboard = ({
               allow="autoplay; encrypted-media"
               referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
-              onError={() => {
-                console.log(`[Error] Kick embed failed for ${widget.kickChannel}`);
-                setWidgets(prev => prev.map(w => 
-                  w.id === widget.id ? { ...w, isOffline: true } : w
-                ));
-              }}
+              onError={() => handleVideoError(widget)}
             />
           );
         } else if (widget.url) {
@@ -987,33 +975,20 @@ const MasterControlDashboard = ({
     }
   };
 
-  // Background picker colors
-  const bgPresetColors = [
-    '#0f172a', '#1e293b', '#334155', '#1e1b4b', '#312e81',
-    '#1f2937', '#111827', '#0c4a6e', '#164e63', '#134e4a',
-    '#14532d', '#3f3f46', '#27272a', '#292524', '#1c1917'
-  ];
-
   return (
     <div 
-      className={`h-screen overflow-hidden text-slate-100 font-mono flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} 
+      className={`h-screen overflow-hidden font-sans flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} 
       style={{ 
-        padding: isFullscreen && !headerVisible ? '0' : '1.6rem'
+        padding: isFullscreen && !headerVisible ? '0' : '1.6rem',
+        background: isDarkMode ? '#0f172a' : '#F8F9FA',
+        color: isDarkMode ? '#f1f5f9' : '#1A1A1A'
       }}
       data-testid="main-dashboard"
     >
-      {/* Hidden file input for background image upload */}
-      <input
-        ref={bgImageInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleBgImageUpload}
-        className="hidden"
-        data-testid="input-bg-image-upload"
-      />
-      <div className="fixed inset-0 opacity-30 pointer-events-none z-0">
-        <div className="absolute top-[8rem] left-[8rem] w-[38rem] h-[38rem] bg-cyan-500 rounded-full blur-[120px] animate-pulse"></div>
-        <div className="absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+      {/* Decorative gradients */}
+      <div className={`fixed inset-0 pointer-events-none z-0 ${isDarkMode ? 'opacity-30' : 'opacity-10'}`}>
+        <div className={`absolute top-[8rem] left-[8rem] w-[38rem] h-[38rem] rounded-full blur-[120px] ${isDarkMode ? 'bg-cyan-500 animate-pulse' : 'bg-cyan-400'}`}></div>
+        <div className={`absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] rounded-full blur-[120px] ${isDarkMode ? 'bg-purple-500 animate-pulse' : 'bg-purple-400'}`} style={isDarkMode ? { animationDelay: '1s' } : {}}></div>
       </div>
 
       {/* 40px hover zone at top-center - reveals exit button when hovering (only when header hidden) */}
@@ -1038,7 +1013,7 @@ const MasterControlDashboard = ({
       <div 
         className={`z-30 mb-[1rem] flex-shrink-0 ${
           isFullscreen 
-            ? 'fixed top-0 left-0 right-0 bg-slate-950/95 backdrop-blur-md px-[1.6rem] py-[0.8rem] shadow-lg border-b border-slate-800/50' 
+            ? `fixed top-0 left-0 right-0 backdrop-blur-md px-[1.6rem] py-[0.8rem] shadow-lg border-b ${isDarkMode ? 'bg-slate-950/95 border-slate-800/50' : 'bg-white/95 border-gray-200'}`
             : 'relative'
         }`}
         style={{ 
@@ -1064,24 +1039,26 @@ const MasterControlDashboard = ({
               className={`p-[0.6rem] slot-button transition-all duration-300 border ${
                 isFullscreen 
                   ? 'bg-cyan-600 hover:bg-cyan-500 border-cyan-500/50' 
-                  : 'bg-slate-800/80 hover:bg-slate-700 border-slate-600/50 hover:border-cyan-500/50'
+                  : isDarkMode 
+                    ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-600/50 hover:border-cyan-500/50'
+                    : 'bg-gray-200 hover:bg-gray-300 border-gray-300 hover:border-cyan-500/50'
               }`}
               title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Mode'}
               data-testid="button-toggle-fullscreen"
             >
-              {isFullscreen ? <Minimize2 className="w-[1.6rem] h-[1.6rem] text-white" /> : <Maximize2 className="w-[1.6rem] h-[1.6rem] text-slate-400" />}
+              {isFullscreen ? <Minimize2 className="w-[1.6rem] h-[1.6rem] text-white" /> : <Maximize2 className={`w-[1.6rem] h-[1.6rem] ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`} />}
             </button>
             <div className="relative">
               <Power className="w-[2rem] h-[2rem] text-cyan-400 animate-pulse" data-testid="icon-power" />
               <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-50 pointer-events-none"></div>
             </div>
-            <h1 className="text-[2rem] font-bold tracking-wider bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent" data-testid="text-title">
-              MASTER CONTROL
+            <h1 className={`text-[2rem] font-bold tracking-wider ${isDarkMode ? 'bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent' : 'text-gray-900'}`} data-testid="text-title" style={{ fontFamily: 'Inter, sans-serif' }}>
+              OpenBento
             </h1>
-            <span className="text-[1rem] text-slate-400 bg-slate-800/50 px-[0.8rem] py-[0.3rem] rounded-full">
+            <span className={`text-[1rem] px-[0.8rem] py-[0.3rem] rounded-full ${isDarkMode ? 'text-slate-400 bg-slate-800/50' : 'text-gray-600 bg-gray-200'}`}>
               {widgets.length} widgets
             </span>
-            <span className="text-[0.9rem] text-cyan-400/70 bg-cyan-900/30 px-[0.6rem] py-[0.2rem] rounded-full border border-cyan-500/30">
+            <span className={`text-[0.9rem] px-[0.6rem] py-[0.2rem] rounded-full border ${isDarkMode ? 'text-cyan-400/70 bg-cyan-900/30 border-cyan-500/30' : 'text-cyan-600 bg-cyan-100 border-cyan-300'}`}>
               {GRID_COLS}-col grid
             </span>
             
@@ -1168,7 +1145,6 @@ const MasterControlDashboard = ({
             <button
               onClick={() => {
                 if (isEditMode) {
-                  // Save and lock when in edit mode
                   handleSaveLayout();
                 }
                 setIsEditMode(!isEditMode);
@@ -1197,137 +1173,7 @@ const MasterControlDashboard = ({
               {masterMute ? 'MUTED' : 'LIVE'}
             </button>
 
-            {/* Global Background Controls */}
-            <div className="relative">
-              <button
-                onClick={() => setShowBgPicker(!showBgPicker)}
-                className={`menu-btn px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] ${
-                  showBgPicker 
-                    ? 'bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-900/50 ring-2 ring-purple-400' 
-                    : 'bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-900/50'
-                }`}
-                data-testid="button-bg-picker"
-                title="Customize Background"
-              >
-                <Paintbrush className="w-[1.4rem] h-[1.4rem]" />
-                BG
-              </button>
-
-              {/* Background Picker Popup */}
-              {showBgPicker && (
-                <div 
-                  className="absolute top-full right-0 mt-[0.4rem] p-[1.2rem] bg-slate-800/95 backdrop-blur-md slot-button shadow-xl border border-slate-600/50 z-[10002] min-w-[22rem]"
-                  data-testid="bg-picker-popup"
-                >
-                  <div className="flex items-center justify-between mb-[0.8rem]">
-                    <span className="text-[1rem] font-semibold text-slate-300">Site Background</span>
-                    <button 
-                      onClick={() => setShowBgPicker(false)}
-                      className="p-[0.3rem] hover:bg-slate-700 rounded transition-colors"
-                      data-testid="button-close-bg-picker"
-                    >
-                      <X className="w-[1.2rem] h-[1.2rem] text-slate-400" />
-                    </button>
-                  </div>
-
-                  {/* Color Picker Section */}
-                  <div className="mb-[1rem]">
-                    <span className="text-[0.9rem] text-slate-400 mb-[0.5rem] block">Background Color</span>
-                    <div className="grid grid-cols-5 gap-[0.4rem]">
-                      {bgPresetColors.map((color) => (
-                        <button
-                          key={color}
-                          onClick={() => {
-                            setGlobalBgColor(color);
-                            setGlobalBgImage(''); // Clear image when selecting color
-                          }}
-                          className={`w-[3rem] h-[3rem] rounded-lg transition-all hover:scale-110 border-2 ${
-                            globalBgColor === color && !globalBgImage 
-                              ? 'border-cyan-400 ring-2 ring-cyan-400/50' 
-                              : 'border-slate-600/50 hover:border-slate-500'
-                          }`}
-                          style={{ backgroundColor: color }}
-                          title={color}
-                          data-testid={`bg-color-${color}`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Image Upload Section */}
-                  <div className="mb-[1rem]">
-                    <span className="text-[0.9rem] text-slate-400 mb-[0.5rem] block">Background Image</span>
-                    <div className="flex gap-[0.5rem] mb-[0.5rem]">
-                      <button
-                        onClick={() => bgImageInputRef.current?.click()}
-                        className="flex-1 px-[0.8rem] py-[0.6rem] bg-slate-700 hover:bg-slate-600 slot-button text-[0.9rem] flex items-center justify-center gap-[0.4rem] transition-colors"
-                        data-testid="button-upload-bg-image"
-                      >
-                        <ImagePlus className="w-[1.2rem] h-[1.2rem]" />
-                        Upload
-                      </button>
-                    </div>
-                    <div className="flex gap-[0.4rem]">
-                      <input
-                        type="text"
-                        placeholder="Or paste image URL..."
-                        className="flex-1 px-[0.8rem] py-[0.5rem] bg-slate-900 border border-slate-600 rounded-lg text-[0.9rem] text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            const url = (e.target as HTMLInputElement).value.trim();
-                            if (url) {
-                              setGlobalBgImage(url);
-                              (e.target as HTMLInputElement).value = '';
-                            }
-                          }
-                        }}
-                        data-testid="input-bg-image-url"
-                      />
-                    </div>
-                    {globalBgImage && (
-                      <div className="mt-[0.5rem] flex items-center gap-[0.5rem]">
-                        <div 
-                          className="w-[4rem] h-[3rem] rounded bg-cover bg-center border border-slate-600"
-                          style={{ backgroundImage: `url(${globalBgImage})` }}
-                        />
-                        <span className="text-[0.8rem] text-cyan-400 flex-1 truncate">Image set</span>
-                        <button
-                          onClick={() => setGlobalBgImage('')}
-                          className="p-[0.3rem] hover:bg-slate-700 rounded transition-colors"
-                          title="Remove image"
-                          data-testid="button-remove-bg-image"
-                        >
-                          <X className="w-[1rem] h-[1rem] text-slate-400" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Reset Button */}
-                  <div className="flex gap-[0.5rem]">
-                    <button
-                      onClick={() => {
-                        setGlobalBgColor('');
-                        setGlobalBgImage('');
-                      }}
-                      className="flex-1 px-[0.8rem] py-[0.5rem] bg-slate-700 hover:bg-slate-600 slot-button text-[0.9rem] transition-colors"
-                      data-testid="button-reset-bg"
-                    >
-                      Reset to Default
-                    </button>
-                    <button
-                      onClick={() => setShowBgPicker(false)}
-                      className="px-[1rem] py-[0.5rem] bg-cyan-600 hover:bg-cyan-500 slot-button text-[0.9rem] transition-colors"
-                      data-testid="button-done-bg"
-                    >
-                      Done
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Theme Toggle - Starry Night (Dark) / Yellowish Sun (Light) */}
+            {/* Theme Toggle - Sun/Moon */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
               className={`menu-btn relative px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] overflow-hidden ${
@@ -1338,19 +1184,42 @@ const MasterControlDashboard = ({
               data-testid="button-theme-toggle"
               title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
-              {/* Starry Night decorations for dark mode */}
-              {isDarkMode && (
-                <>
-                  <span className="absolute top-[0.3rem] left-[0.5rem] w-[0.2rem] h-[0.2rem] bg-white rounded-full opacity-80" />
-                  <span className="absolute top-[0.8rem] left-[1rem] w-[0.15rem] h-[0.15rem] bg-white rounded-full opacity-60" />
-                  <span className="absolute bottom-[0.4rem] left-[0.7rem] w-[0.18rem] h-[0.18rem] bg-white rounded-full opacity-70" />
-                  <span className="absolute top-[0.5rem] right-[2rem] w-[0.2rem] h-[0.2rem] bg-white rounded-full opacity-75" />
-                  <span className="absolute bottom-[0.3rem] right-[1.5rem] w-[0.15rem] h-[0.15rem] bg-white rounded-full opacity-65" />
-                </>
-              )}
-              {isDarkMode ? <Moon className="w-[1.4rem] h-[1.4rem] relative z-10" /> : <Sun className="w-[1.4rem] h-[1.4rem] relative z-10" />}
-              <span className="relative z-10">{isDarkMode ? 'Dark' : 'Light'}</span>
+              {isDarkMode ? <Moon className="w-[1.4rem] h-[1.4rem]" /> : <Sun className="w-[1.4rem] h-[1.4rem]" />}
+              {isDarkMode ? 'Dark' : 'Light'}
             </button>
+
+            {/* Login Button - Small, non-blocking - shown when NOT logged in */}
+            {!isAuthenticated && (
+              <button
+                onClick={() => openLoginModal()}
+                className="menu-btn px-[1rem] py-[0.5rem] bg-slate-600 hover:bg-slate-500 slot-button font-medium flex items-center gap-[0.4rem] transition-all duration-300 transform hover:scale-105 text-[1.1rem] shadow-md text-white"
+                data-testid="button-login"
+              >
+                <User className="w-[1.2rem] h-[1.2rem]" />
+                Login
+              </button>
+            )}
+            
+            {/* User Avatar/Logout - Small, shown when logged in */}
+            {isAuthenticated && user && (
+              <button
+                onClick={onLogout}
+                className="menu-btn px-[1rem] py-[0.5rem] bg-slate-600 hover:bg-slate-500 slot-button font-medium flex items-center gap-[0.4rem] transition-all duration-300 transform hover:scale-105 text-[1.1rem] shadow-md text-white"
+                data-testid="button-logout"
+                title={`Logged in as ${user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'User'} - Click to logout`}
+              >
+                {(user.user_metadata?.avatar_url || user.user_metadata?.picture) ? (
+                  <img 
+                    src={user.user_metadata?.avatar_url || user.user_metadata?.picture} 
+                    alt="User" 
+                    className="w-[1.8rem] h-[1.8rem] rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="w-[1.4rem] h-[1.4rem]" />
+                )}
+                <span className="max-w-[8rem] truncate">{(user.user_metadata?.full_name || user.user_metadata?.name || user.email)?.split(' ')[0] || 'User'}</span>
+              </button>
+            )}
           </div>
         </div>
 

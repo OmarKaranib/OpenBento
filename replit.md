@@ -1,7 +1,7 @@
-# Master Control Dashboard
+# OpenBento Dashboard
 
 ## Overview
-The Master Control Dashboard is a magnetic, bento-style Mission Control interface built upon OpenBento architecture standards. It features a 12-column grid, a dynamic widget system with drag-to-resize functionality, and integrates YouTube and Twitch with custom TV-style controls. The dashboard aims to provide a highly customizable and persistent workspace for monitoring and managing various streams and information, akin to a personalized mission control. Key capabilities include displaying video streams, notes, images, and spacers, all within a responsive, fit-to-screen layout with localStorage persistence.
+The OpenBento Dashboard is a magnetic, bento-style Mission Control interface featuring a 12-column grid, dynamic widget system with drag-to-resize functionality, and YouTube/Twitch/Kick video integration. It features a 12-column grid, a dynamic widget system with drag-to-resize functionality, and integrates YouTube and Twitch with custom TV-style controls. The dashboard aims to provide a highly customizable and persistent workspace for monitoring and managing various streams and information, akin to a personalized mission control. Key capabilities include displaying video streams, notes, images, and spacers, all within a responsive, fit-to-screen layout with localStorage persistence.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -71,6 +71,32 @@ The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to 
 - **Text colors:** White text with text-shadow for colored buttons; amber and indicator buttons get dark text for contrast
 - **LIVE Badge Lockdown:** `.live-badge` class preserves vibrant red in light mode for channel LIVE indicators
 
+**Default News Streams (2026-02-02):**
+- **Auto-Load:** When localStorage is empty, 6 default news streams load automatically
+- **Default Channels:** Sky News Live, ABC News Live, NASA Live, Reuters Live, Al Jazeera, France 24
+- **Grid Layout:** 2x3 arrangement (3 streams top row, 3 bottom row), each 4 columns × 3 rows
+- **Widget Format:** Uses url, videoId, channelName, isYouTube, isLive properties for proper healing/refresh
+- **Embed URLs:** Uses youtube-nocookie.com with autoplay=1, mute=1, and proper origin/parent parameters
+
+**Guest Access Model (2026-02-02):**
+- **Full Access:** All users can view, edit, and save dashboard without login
+- **Edit/Save:** No login restrictions - Edit and Save buttons work for all users
+- **Optional Login:** Login button available for users who want to sync across devices
+- **Login Button:** Small, non-prominent slate-600 button on far right of menu bar
+- **Login Modal:** Non-blocking popup with close (X) button, supports Email/Password and Google OAuth
+
+**Supabase Backend (2026-02-02):**
+- **Authentication:** Supabase Auth with Email/Password and Google OAuth
+- **Database:** PostgreSQL for user dashboards and layouts
+- **Credentials:** VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables
+- **Client Library:** @supabase/supabase-js in client/src/lib/supabase.ts
+
+**Authentication & Paywall System (2026-02-01):**
+- **Supabase Auth Integration:** Uses Supabase authentication for Email/Password and Google OAuth
+- **Public-First Model:** Full dashboard access without login
+- **Login Button:** Small slate-600 button, visible when not logged in
+- **User Avatar/Logout:** Shows user avatar + name when logged in, clicks to logout
+
 **Core Features:**
 - **Dynamic Widget System:** Supports Video, Note, Spacer, and Image widget types, each with unique functionalities. Widgets are added, removed, and content swapped dynamically.
 - **Edit Layout Mode:** Toggles between locked and editable states, enabling widget resizing via bottom-right handles, and access to settings/delete options. Widgets jiggle in edit mode, and an overlay prevents iframe interaction during drag operations.
@@ -105,3 +131,18 @@ The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to 
 - **@dnd-kit/utilities:** Utility functions for transforms in drag-and-drop.
 - **lucide-react:** Icon library.
 - **localStorage:** Browser API for client-side data persistence.
+
+## SEO & AI Discoverability (2026-02-01)
+- **Meta Tags:** Comprehensive primary meta tags including title, description, keywords, author, robots directives
+- **Open Graph:** Full Open Graph protocol tags for Facebook/social media sharing with og:image support
+- **Twitter Cards:** Twitter-specific meta tags for enhanced tweet previews (summary_large_image)
+- **Structured Data:** JSON-LD schema.org markup for WebApplication type with features, pricing, and ratings
+- **AI Crawler Support:** 
+  - robots.txt explicitly allows GPTBot, ChatGPT-User, PerplexityBot, ClaudeBot, Google-Extended
+  - llms.txt file provides structured information for AI assistants
+- **SEO Files:**
+  - `/robots.txt` - Crawler directives and sitemap reference
+  - `/sitemap.xml` - XML sitemap for search engine indexing
+  - `/llms.txt` - AI/LLM-specific information file
+- **Theme Colors:** Mobile browser theme color (#0f172a) for consistent branding
+- **Canonical URL:** Prevents duplicate content issues with proper canonical link

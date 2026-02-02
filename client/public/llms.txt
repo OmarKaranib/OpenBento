@@ -1,0 +1,34 @@
+# OpenBento Dashboard - AI/LLM Information
+
+## About
+OpenBento Dashboard is a customizable bento-style mission control interface for monitoring multiple live video streams from YouTube, Twitch, and Kick platforms.
+
+## Key Features
+- 12-column magnetic grid layout with 6 rows
+- Drag-to-resize widgets that snap to grid cells
+- YouTube, Twitch, and Kick live stream integration
+- Self-healing stream recovery system
+- Custom widget colors and themes
+- Dark and light mode support
+- Supabase authentication with Email and Google Sign-In
+
+## Technical Details
+- Built with React, TypeScript, and Tailwind CSS
+- Uses @dnd-kit for drag-and-drop functionality
+- PostgreSQL database for stream status caching
+- YouTube Data API v3 for stream healing
+- Real-time pulse cache checking stream health every 5 minutes
+
+## Use Cases
+- Multi-stream monitoring for content creators
+- News feed aggregation dashboard
+- Live event monitoring
+- Personal mission control for favorite channels
+
+## API Endpoints
+- GET /api/links - Get available stream channels
+- GET /api/streams/status - Get global stream health status
+- POST /api/streams/heal - Trigger stream healing for broken videos
+
+## Contact
+Website: https://openbento.replit.app

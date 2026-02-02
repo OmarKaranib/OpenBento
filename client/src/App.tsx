@@ -1,54 +1,19 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useAuth } from '@/hooks/use-auth';
+import { LoginModal } from '@/components/login-modal';
 
-// Global Background Engine - Applied directly to document.body
-const GlobalCanvasBackground = () => {
-  const [bgColor, setBgColor] = useState<string>(() => {
-    const saved = localStorage.getItem('openBentoBgColor');
-    return saved || '';
-  });
-  const [bgImage, setBgImage] = useState<string>(() => {
-    const saved = localStorage.getItem('openBentoBgImage');
-    return saved || '';
-  });
-
-  // Listen for background updates from dashboard
-  useEffect(() => {
-    const handleBgUpdate = () => {
-      setBgColor(localStorage.getItem('openBentoBgColor') || '');
-      setBgImage(localStorage.getItem('openBentoBgImage') || '');
-    };
-    
-    window.addEventListener('globalBgUpdated', handleBgUpdate);
-    window.addEventListener('storage', handleBgUpdate);
-    
-    return () => {
-      window.removeEventListener('globalBgUpdated', handleBgUpdate);
-      window.removeEventListener('storage', handleBgUpdate);
-    };
-  }, []);
-
-  // Apply background directly to document.body for true top-level coverage
+// Static background - High-contrast light mode
+const StaticBackground = () => {
   useEffect(() => {
     const body = document.body;
-    
-    if (bgImage) {
-      body.style.backgroundColor = '';
-      body.style.backgroundImage = `url(${bgImage})`;
-    } else if (bgColor) {
-      body.style.backgroundColor = bgColor;
-      body.style.backgroundImage = 'none';
-    } else {
-      body.style.backgroundColor = '#0f172a';
-      body.style.backgroundImage = 'linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a)';
-    }
-    
+    body.style.backgroundColor = '#F8F9FA';
+    body.style.backgroundImage = 'none';
     body.style.backgroundSize = 'cover';
     body.style.backgroundPosition = 'center';
     body.style.backgroundAttachment = 'fixed';
     body.style.minHeight = '100vh';
-  }, [bgColor, bgImage]);
+  }, []);
 
-  // No need for a visible element - background is applied to body
   return null;
 };
 import { Switch, Route } from "wouter";
@@ -86,22 +51,23 @@ export interface Widget {
   isYouTube?: boolean;
   videoId?: string | null;
   youtubeChannelId?: string | null;
+  channelName?: string;
   isTwitch?: boolean;
   twitchChannel?: string | null;
   isKick?: boolean;
   kickChannel?: string | null;
   isMuted: boolean;
   isPaused: boolean;
-  volume: number; // 0-100
-  previousVolume?: number; // Stores volume before mute for restore
+  volume: number;
+  previousVolume?: number;
   error?: string | null;
   embedBlocked?: boolean;
   noteContent?: string;
   imageUrl?: string;
   lastRefresh?: number;
-  isOffline?: boolean; // Track offline state
-  isLive?: boolean; // True for live streams, false for normal videos (affects refresh interval)
-  customColor?: string; // Bento.me per-widget custom background color (hex)
+  isOffline?: boolean;
+  isLive?: boolean;
+  customColor?: string;
 }
 
 const GRID_COLS = 12;
@@ -110,7 +76,8 @@ function generateWidgetId(): string {
   return `widget-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
-function App() {
+// Inner App component that uses hooks requiring QueryClientProvider
+function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
@@ -118,6 +85,17 @@ function App() {
   const [urlInputValue, setUrlInputValue] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [ghostPosition, setGhostPosition] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [loginTriggerReason, setLoginTriggerReason] = useState<string | undefined>();
+  
+  // Auth state - must be inside QueryClientProvider
+  const { user, isAuthenticated, logout } = useAuth();
+  
+  // Open login modal with optional reason
+  const openLoginModal = useCallback((reason?: string) => {
+    setLoginTriggerReason(reason);
+    setLoginModalOpen(true);
+  }, []);
 
   const activeWidgetIdRef = useRef<string | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
@@ -141,11 +119,32 @@ function App() {
     })
   );
 
+  // Default news streams to show when database/localStorage is empty
+  const getDefaultWidgets = (): Widget[] => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://localhost';
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+    const getEmbedUrl = (videoId: string) => 
+      `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&origin=${encodeURIComponent(origin)}&parent=${encodeURIComponent(hostname)}`;
+    
+    // Default news streams with videoId for proper refresh/healing support
+    return [
+      { id: `widget-default-1`, type: 'video', url: getEmbedUrl('9Auq_BjS0FE'), videoId: '9Auq_BjS0FE', channelName: 'Sky News Live', x: 0, y: 0, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
+      { id: `widget-default-2`, type: 'video', url: getEmbedUrl('w_Ma8oQLmSM'), videoId: 'w_Ma8oQLmSM', channelName: 'ABC News Live', x: 4, y: 0, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
+      { id: `widget-default-3`, type: 'video', url: getEmbedUrl('21X5lGlDOfg'), videoId: '21X5lGlDOfg', channelName: 'NASA Live', x: 8, y: 0, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
+      { id: `widget-default-4`, type: 'video', url: getEmbedUrl('oJUvTVdTMyY'), videoId: 'oJUvTVdTMyY', channelName: 'Reuters Live', x: 0, y: 3, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
+      { id: `widget-default-5`, type: 'video', url: getEmbedUrl('jL8uDJJBjMA'), videoId: 'jL8uDJJBjMA', channelName: 'Al Jazeera', x: 4, y: 3, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
+      { id: `widget-default-6`, type: 'video', url: getEmbedUrl('ntmPIzlbj7k'), videoId: 'ntmPIzlbj7k', channelName: 'France 24', x: 8, y: 3, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
+    ];
+  };
+
   const [widgets, setWidgets] = useState<Widget[]>(() => {
     const saved = localStorage.getItem('openBentoWidgets');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        if (parsed.length === 0) {
+          return getDefaultWidgets();
+        }
         return parsed.map((w: Widget) => ({
           ...w,
           isMuted: w.isMuted ?? true,
@@ -159,10 +158,10 @@ function App() {
           h: w.h ?? 2
         }));
       } catch {
-        return [];
+        return getDefaultWidgets();
       }
     }
-    return [];
+    return getDefaultWidgets();
   });
 
   const extractYouTubeId = (url: string): string | null => {
@@ -825,89 +824,108 @@ function App() {
   }, [addWidget]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        {/* Global Canvas Background - At root level, behind everything */}
-        <GlobalCanvasBackground />
-        <DndContext 
-          sensors={sensors} 
-          collisionDetection={rectIntersection}
-          onDragStart={handleDragStart}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={widgets.map(w => w.id)} strategy={rectSortingStrategy}>
-            {/* WidgetSidebar - Hidden in dashboard-only mode */}
-            {!dashboardOnlyMode && (
-              <WidgetSidebar 
-                isOpen={sidebarOpen} 
-                onClose={() => {
-                  setSidebarOpen(false);
-                  activeWidgetIdRef.current = null;
-                  setActiveWidgetId(null);
-                  setUrlInputValue('');
-                }}
-                onChannelClick={handleChannelClick}
-                onTemplateClick={handleTemplateClick}
-                urlValue={urlInputValue}
-                onUrlChange={setUrlInputValue}
-                onUrlSubmit={handleSubmitUrl}
-                activeWidgetId={activeWidgetId}
-                onImageUpload={handleImageUpload}
-              />
-            )}
-            <Switch>
-              <Route path="/">
-                {() => (
-                  <MasterControlDashboard 
-                    widgets={widgets}
-                    setWidgets={setWidgets}
-                    isEditMode={isEditMode}
-                    setIsEditMode={setIsEditMode}
-                    sidebarOpen={sidebarOpen && !isFullscreen}
-                    activeId={activeId}
-                    handleOpenSidebar={handleOpenSidebar}
-                    onInlineUrlSubmit={handleInlineUrlSubmit}
-                    handleOpenSidebarToContent={handleOpenSidebarToContent}
-                    addWidget={addWidget}
-                    isFullscreen={isFullscreen}
-                    setIsFullscreen={setIsFullscreen}
-                    ghostPosition={ghostPosition}
-                    gridContainerRef={gridContainerRef}
-                    isGridFull={isGridFull}
-                  />
-                )}
-              </Route>
-              <Route component={NotFound} />
-            </Switch>
-          </SortableContext>
+    <TooltipProvider>
+      {/* Static Background - High-contrast light mode */}
+      <StaticBackground />
+      
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+        triggerReason={loginTriggerReason}
+      />
+      
+      <DndContext 
+        sensors={sensors} 
+        collisionDetection={rectIntersection}
+        onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={widgets.map(w => w.id)} strategy={rectSortingStrategy}>
+          {/* WidgetSidebar - Hidden in dashboard-only mode */}
+          {!dashboardOnlyMode && (
+            <WidgetSidebar 
+              isOpen={sidebarOpen} 
+              onClose={() => {
+                setSidebarOpen(false);
+                activeWidgetIdRef.current = null;
+                setActiveWidgetId(null);
+                setUrlInputValue('');
+              }}
+              onChannelClick={handleChannelClick}
+              onTemplateClick={handleTemplateClick}
+              urlValue={urlInputValue}
+              onUrlChange={setUrlInputValue}
+              onUrlSubmit={handleSubmitUrl}
+              activeWidgetId={activeWidgetId}
+              onImageUpload={handleImageUpload}
+            />
+          )}
+          <Switch>
+            <Route path="/">
+              {() => (
+                <MasterControlDashboard 
+                  widgets={widgets}
+                  setWidgets={setWidgets}
+                  isEditMode={isEditMode}
+                  setIsEditMode={setIsEditMode}
+                  sidebarOpen={sidebarOpen && !isFullscreen}
+                  activeId={activeId}
+                  handleOpenSidebar={handleOpenSidebar}
+                  onInlineUrlSubmit={handleInlineUrlSubmit}
+                  handleOpenSidebarToContent={handleOpenSidebarToContent}
+                  addWidget={addWidget}
+                  isFullscreen={isFullscreen}
+                  setIsFullscreen={setIsFullscreen}
+                  ghostPosition={ghostPosition}
+                  gridContainerRef={gridContainerRef}
+                  isGridFull={isGridFull}
+                  user={user}
+                  onLogout={logout}
+                  isAuthenticated={isAuthenticated}
+                  openLoginModal={openLoginModal}
+                />
+              )}
+            </Route>
+            <Route component={NotFound} />
+          </Switch>
+        </SortableContext>
 
-          <DragOverlay>
-            {activeId ? (
-              <div 
-                className="dashboard-slot bg-slate-900/80 backdrop-blur-sm border border-cyan-400 shadow-2xl shadow-cyan-500/40 pointer-events-none"
-                style={{
-                  width: '12rem',
-                  height: '8rem',
-                  opacity: 0.9
-                }}
-              >
-                <div className="flex items-center justify-center h-full">
-                  <span className="text-cyan-400 font-bold text-[1.2rem]">
-                    {String(activeId).includes('channel-') 
-                      ? 'Channel'
-                      : String(activeId).includes('template-')
-                        ? 'Widget'
-                        : 'Widget'
-                    }
-                  </span>
-                </div>
+        <DragOverlay>
+          {activeId ? (
+            <div 
+              className="dashboard-slot bg-slate-900/80 backdrop-blur-sm border border-cyan-400 shadow-2xl shadow-cyan-500/40 pointer-events-none"
+              style={{
+                width: '12rem',
+                height: '8rem',
+                opacity: 0.9
+              }}
+            >
+              <div className="flex items-center justify-center h-full">
+                <span className="text-cyan-400 font-bold text-[1.2rem]">
+                  {String(activeId).includes('channel-') 
+                    ? 'Channel'
+                    : String(activeId).includes('template-')
+                      ? 'Widget'
+                      : 'Widget'
+                  }
+                </span>
               </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-        <Toaster />
-      </TooltipProvider>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+      <Toaster />
+    </TooltipProvider>
+  );
+}
+
+// Main App component - Provides QueryClientProvider wrapper
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
     </QueryClientProvider>
   );
 }

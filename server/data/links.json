@@ -9,7 +9,7 @@
       "category": "Science",
       "videoId": "xCrPD7tfcr0",
       "isLive": true,
-      "lastUpdated": 1770039700334
+      "lastUpdated": 1770037051010
     },
     {
       "id": "sky-news",
@@ -20,7 +20,7 @@
       "category": "News",
       "videoId": "YDvsBbKfLPA",
       "isLive": true,
-      "lastUpdated": 1770039700334
+      "lastUpdated": 1770037051010
     },
     {
       "id": "abc-news",
@@ -31,14 +31,14 @@
       "category": "News",
       "videoId": "x_oXTID1nH8",
       "isLive": true,
-      "lastUpdated": 1770039700334
+      "lastUpdated": 1770037051010
     },
     {
       "id": "twitch-esl",
       "name": "ESL CS:GO",
       "channelHandle": "esl_csgo",
       "videoId": null,
-      "lastUpdated": 1770039700334,
+      "lastUpdated": 1770037051010,
       "platform": "twitch",
       "iconType": "gaming",
       "category": "Esports",
@@ -49,7 +49,7 @@
       "name": "Rocket League",
       "channelHandle": "rocketleague",
       "videoId": null,
-      "lastUpdated": 1770039700334,
+      "lastUpdated": 1770037051010,
       "platform": "twitch",
       "iconType": "gaming",
       "category": "Esports",
@@ -60,7 +60,7 @@
       "name": "Gaules",
       "channelHandle": "gaules",
       "videoId": null,
-      "lastUpdated": 1770039700334,
+      "lastUpdated": 1770037051010,
       "platform": "twitch",
       "iconType": "gaming",
       "category": "Gaming",
@@ -71,7 +71,7 @@
       "name": "xQc",
       "channelHandle": "xqc",
       "videoId": null,
-      "lastUpdated": 1770039700334,
+      "lastUpdated": 1770037051010,
       "platform": "kick",
       "iconType": "gaming",
       "category": "Gaming",
@@ -82,12 +82,12 @@
       "name": "Adin Ross",
       "channelHandle": "adinross",
       "videoId": null,
-      "lastUpdated": 1770039700334,
+      "lastUpdated": 1770037051010,
       "platform": "kick",
       "iconType": "gaming",
       "category": "Gaming",
       "isLive": true
     }
   ],
-  "lastRefresh": 1770039700334
+  "lastRefresh": 1770037051010
 }
