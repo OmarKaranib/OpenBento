@@ -721,6 +721,9 @@ function AppContent() {
     // Robot Copy-Paste: Use 24-hour cache for videoIds
     const { getCachedVideoId, fetchFreshVideoId } = await import('@/lib/video-cache');
     
+    // Capture active widget BEFORE clearing (same as manual paste behavior)
+    const currentActiveWidgetId = activeWidgetIdRef.current;
+    
     // Close sidebar immediately for responsive feel
     setSidebarOpen(false);
     activeWidgetIdRef.current = null;
@@ -730,8 +733,12 @@ function AppContent() {
     const channelIdMatch = channel.url.match(/youtube\.com\/@([a-zA-Z0-9_-]+)/);
     const youtubeChannelId = channelIdMatch ? channelIdMatch[1] : channel.channelId;
     
-    // For non-YouTube platforms (Twitch/Kick), use direct URL processing
+    // For non-YouTube platforms (Twitch/Kick), use direct URL processing (same as manual paste)
     if (channel.platform !== 'youtube') {
+      // Restore activeWidgetIdRef temporarily for handleSubmitUrl
+      if (currentActiveWidgetId) {
+        activeWidgetIdRef.current = currentActiveWidgetId;
+      }
       handleSubmitUrl(channel.url);
       return;
     }
@@ -739,19 +746,17 @@ function AppContent() {
     // Check 24-hour cache first
     const cachedVideoId = getCachedVideoId(youtubeChannelId || channel.name);
     
-    if (cachedVideoId) {
-      // Use cached videoId - create widget directly
-      console.log(`[RobotPaste] Using cached videoId: ${cachedVideoId}`);
-      const currentActiveWidgetId = activeWidgetIdRef.current;
-      
+    // Helper to create or update widget (mirrors handleSubmitUrl behavior)
+    const applyVideoToWidget = (videoId: string | null) => {
       if (currentActiveWidgetId) {
+        // Update existing widget (same as manual paste with active widget)
         setWidgets(prev => prev.map(w => 
           w.id === currentActiveWidgetId ? {
             ...w,
             type: 'video',
             url: channel.url,
             isYouTube: true,
-            videoId: cachedVideoId,
+            videoId,
             youtubeChannelId,
             channelName: channel.name,
             isLive: true,
@@ -764,31 +769,31 @@ function AppContent() {
             lastRefresh: Date.now()
           } : w
         ));
+        return currentActiveWidgetId;
       } else {
-        addWidget('video', 3, 2, {
+        // Add new widget (same as manual paste without active widget)
+        return addWidget('video', 3, 2, {
           url: channel.url,
           isYouTube: true,
-          videoId: cachedVideoId,
+          videoId,
           youtubeChannelId,
           channelName: channel.name,
           isLive: true,
           lastRefresh: Date.now()
         });
       }
+    };
+    
+    if (cachedVideoId) {
+      // Use cached videoId - apply directly (fast path)
+      console.log(`[RobotPaste] Using cached videoId: ${cachedVideoId}`);
+      applyVideoToWidget(cachedVideoId);
     } else {
       // No cache or expired - fetch fresh via API (Robot Copy-Paste)
       console.log(`[RobotPaste] Fetching fresh videoId for: ${youtubeChannelId}`);
       
-      // Create widget immediately with channelId (will use iframe fallback)
-      const widgetId = addWidget('video', 3, 2, {
-        url: channel.url,
-        isYouTube: true,
-        videoId: null, // Will trigger fetch
-        youtubeChannelId,
-        channelName: channel.name,
-        isLive: true,
-        lastRefresh: Date.now()
-      });
+      // Create/update widget immediately with channelId (will use iframe fallback)
+      const widgetId = applyVideoToWidget(null);
       
       // Fetch fresh videoId in background
       const freshVideoId = await fetchFreshVideoId(youtubeChannelId || channel.name);
