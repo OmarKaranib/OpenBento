@@ -37,7 +37,6 @@ import {
   rectIntersection
 } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
-import { requestStreamHeal } from '@/lib/stream-api';
 
 export type WidgetType = 'video' | 'note' | 'spacer' | 'image';
 
@@ -718,83 +717,13 @@ function AppContent() {
     }
   }, [addVideoWidget, addWidget, setWidgets, findCollidingWidgets, findNextAvailableSlot]);
 
-  const handleChannelClick = useCallback(async (channel: TrendingChannel) => {
-    const youtubeChannelId = channel.channelId || extractYouTubeChannelId(channel.url);
-    const twitchChannel = extractTwitchChannel(channel.url);
-    const kickChannel = extractKickChannel(channel.url);
-    const currentActiveWidgetId = activeWidgetIdRef.current;
-    
-    // Determine if this is a live stream - Twitch/Kick are always live, YouTube uses isLive flag
-    const isLiveStream = channel.platform === 'twitch' || channel.platform === 'kick' || channel.isLive === true;
-
-    // For YouTube channels, trigger healing to get a FRESH videoId
-    let freshVideoId: string | null = null;
-    if (channel.platform === 'youtube' && youtubeChannelId) {
-      console.log(`[Library] Triggering heal for ${channel.name} to get fresh videoId`);
-      try {
-        const healResult = await requestStreamHeal(youtubeChannelId, channel.name, channel.videoId || undefined);
-        if (healResult.success && healResult.newVideoId) {
-          console.log(`[Library] Got fresh videoId: ${healResult.newVideoId}`);
-          freshVideoId = healResult.newVideoId;
-        } else {
-          console.log(`[Library] Heal failed: ${healResult.reason}, using fallback videoId`);
-          freshVideoId = channel.videoId || extractYouTubeId(channel.url);
-        }
-      } catch (error) {
-        console.error(`[Library] Heal error:`, error);
-        freshVideoId = channel.videoId || extractYouTubeId(channel.url);
-      }
-    } else {
-      freshVideoId = channel.videoId || extractYouTubeId(channel.url);
-    }
-
-    // Build fresh URL with the new videoId
-    const freshUrl = channel.platform === 'youtube' && freshVideoId 
-      ? `https://www.youtube-nocookie.com/embed/${freshVideoId}?autoplay=1&mute=1&origin=${encodeURIComponent(window.location.origin)}&parent=${encodeURIComponent(window.location.hostname)}`
-      : channel.url;
-
-    if (currentActiveWidgetId) {
-      setWidgets(prev => prev.map(w => 
-        w.id === currentActiveWidgetId ? {
-          ...w,
-          type: 'video',
-          url: freshUrl,
-          isYouTube: channel.platform === 'youtube',
-          videoId: freshVideoId,
-          youtubeChannelId,
-          isTwitch: channel.platform === 'twitch',
-          twitchChannel,
-          isKick: channel.platform === 'kick',
-          kickChannel,
-          isLive: isLiveStream,
-          error: null,
-          embedBlocked: false,
-          isPaused: false,
-          isMuted: true,
-          volume: 0,
-          isOffline: false,
-          lastRefresh: Date.now()
-        } : w
-      ));
-    } else {
-      // Create widget with fresh data
-      addWidget('video', 3, 2, {
-        url: freshUrl,
-        isYouTube: channel.platform === 'youtube',
-        videoId: freshVideoId,
-        youtubeChannelId,
-        isTwitch: channel.platform === 'twitch',
-        twitchChannel,
-        isKick: channel.platform === 'kick',
-        kickChannel,
-        isLive: isLiveStream,
-        lastRefresh: Date.now()
-      });
-    }
+  const handleChannelClick = useCallback((channel: TrendingChannel) => {
+    // Use the same function as manual URL input - just pass channel.url to handleSubmitUrl
+    handleSubmitUrl(channel.url);
     setSidebarOpen(false);
     activeWidgetIdRef.current = null;
     setActiveWidgetId(null);
-  }, [addWidget]);
+  }, [handleSubmitUrl]);
 
   // Dashboard-only mode flag - set to false to allow sidebar with filtered content
   const dashboardOnlyMode = false;

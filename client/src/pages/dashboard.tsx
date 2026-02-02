@@ -1037,8 +1037,8 @@ const MasterControlDashboard = ({
         onMouseLeave={() => isFullscreen && setHeaderVisible(false)}
         data-testid="header-container"
       >
-        <div className="flex items-center justify-between mb-[0.8rem] flex-wrap gap-[0.8rem] h-[4.8rem]">
-          <div className="flex items-center gap-[1.2rem] h-[4.8rem]">
+        <div className="flex items-center justify-between mb-[0.8rem] flex-wrap gap-[0.8rem]">
+          <div className="flex items-center gap-[1.2rem]">
             <button
               onClick={() => {
                 if (isFullscreen) {
@@ -1048,7 +1048,7 @@ const MasterControlDashboard = ({
                   setIsFullscreen(true);
                 }
               }}
-              className={`h-[4.8rem] w-[4.8rem] flex items-center justify-center slot-button transition-all duration-300 border ${
+              className={`h-[3.2rem] w-[3.2rem] flex items-center justify-center slot-button transition-all duration-300 border ${
                 isFullscreen 
                   ? 'bg-cyan-600 hover:bg-cyan-500 border-cyan-500/50' 
                   : isDarkMode 
@@ -1060,23 +1060,23 @@ const MasterControlDashboard = ({
             >
               {isFullscreen ? <Minimize2 className="w-[1.6rem] h-[1.6rem] text-white" /> : <Maximize2 className={`w-[1.6rem] h-[1.6rem] ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`} />}
             </button>
-            <div className="relative flex items-center h-[4.8rem]">
+            <div className="relative flex items-center h-[3.2rem]">
               <Power className="w-[2rem] h-[2rem] text-cyan-400 animate-pulse" data-testid="icon-power" />
               <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-50 pointer-events-none"></div>
             </div>
-            <h1 className={`text-[1.8rem] font-bold tracking-wider leading-[4.8rem] h-[4.8rem] flex items-center ${isDarkMode ? 'bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent' : 'text-gray-900'}`} data-testid="text-title" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <h1 className={`text-[1.8rem] font-bold tracking-wider leading-[3.2rem] h-[3.2rem] flex items-center ${isDarkMode ? 'bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent' : 'text-gray-900'}`} data-testid="text-title" style={{ fontFamily: 'Inter, sans-serif' }}>
               OpenBento
             </h1>
-            <span className={`h-[4.8rem] flex items-center text-[1rem] px-[0.8rem] rounded-full ${isDarkMode ? 'text-slate-400 bg-slate-800/50' : 'text-gray-600 bg-gray-200'}`}>
+            <span className={`h-[3.2rem] flex items-center text-[1rem] px-[0.8rem] rounded-full ${isDarkMode ? 'text-slate-400 bg-slate-800/50' : 'text-gray-600 bg-gray-200'}`}>
               {widgets.length} widgets
             </span>
-            <span className={`h-[4.8rem] flex items-center text-[0.9rem] px-[0.6rem] rounded-full border ${isDarkMode ? 'text-cyan-400/70 bg-cyan-900/30 border-cyan-500/30' : 'text-cyan-600 bg-cyan-100 border-cyan-300'}`}>
+            <span className={`h-[3.2rem] flex items-center text-[0.9rem] px-[0.6rem] rounded-full border ${isDarkMode ? 'text-cyan-400/70 bg-cyan-900/30 border-cyan-500/30' : 'text-cyan-600 bg-cyan-100 border-cyan-300'}`}>
               {GRID_COLS}-col grid
             </span>
             
           </div>
 
-          <div className="flex gap-[0.8rem] items-center h-[4.8rem]">
+          <div className="flex gap-[0.8rem] items-center h-[3.2rem]">
             {/* Clear All - Hold to Clear (2 seconds) - Only visible in Edit Mode */}
             {isEditMode && (
               <button
@@ -1116,7 +1116,7 @@ const MasterControlDashboard = ({
                   clearHoldStartRef.current = null;
                   setClearHoldProgress(0);
                 }}
-                className="relative h-[4.8rem] px-[1.2rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 shadow-lg shadow-slate-900/50 text-[1.2rem] leading-[4.8rem] overflow-hidden border border-slate-600"
+                className="relative h-[3.2rem] px-[1.2rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 shadow-lg shadow-slate-900/50 text-[1.2rem] leading-[3.2rem] overflow-hidden border border-slate-600"
                 title="Hold for 2 seconds to clear all widgets"
                 data-testid="button-clear-all"
               >
@@ -1133,7 +1133,7 @@ const MasterControlDashboard = ({
             <button
               onClick={handleOpenSidebarToContent}
               disabled={isGridFull}
-              className={`menu-btn h-[4.8rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform shadow-lg text-[1.2rem] leading-[4.8rem] ${
+              className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform shadow-lg text-[1.2rem] leading-[3.2rem] ${
                 isGridFull 
                   ? 'bg-slate-600 cursor-not-allowed opacity-60 shadow-slate-900/50' 
                   : 'bg-emerald-600 hover:bg-emerald-500 hover:scale-105 shadow-emerald-900/50'
@@ -1147,7 +1147,7 @@ const MasterControlDashboard = ({
 
             <button
               onClick={handleRefreshAllWidgets}
-              className="menu-btn h-[4.8rem] px-[1.2rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-[1.2rem] leading-[4.8rem]"
+              className="menu-btn h-[3.2rem] px-[1.2rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-[1.2rem] leading-[3.2rem]"
               data-testid="button-refresh-all"
             >
               <RefreshCw className="w-[1.4rem] h-[1.4rem]" />
@@ -1161,7 +1161,7 @@ const MasterControlDashboard = ({
                 }
                 setIsEditMode(!isEditMode);
               }}
-              className={`menu-btn h-[4.8rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[4.8rem] ${
+              className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] ${
                 isEditMode 
                   ? 'bg-teal-600 hover:bg-teal-500 shadow-lg shadow-teal-900/50 ring-2 ring-teal-400' 
                   : 'bg-orange-600 hover:bg-orange-500 shadow-lg shadow-orange-900/50'
@@ -1174,7 +1174,7 @@ const MasterControlDashboard = ({
 
             <button
               onClick={handleMasterMute}
-              className={`menu-btn indicator-btn h-[4.8rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[4.8rem] ${
+              className={`menu-btn indicator-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] ${
                 masterMute 
                   ? 'bg-red-600 hover:bg-red-500 shadow-lg shadow-red-900/50' 
                   : 'bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-900/50'
@@ -1188,7 +1188,7 @@ const MasterControlDashboard = ({
             {/* Theme Toggle - Sun/Moon */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`menu-btn relative h-[4.8rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[4.8rem] overflow-hidden ${
+              className={`menu-btn relative h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] overflow-hidden ${
                 isDarkMode 
                   ? 'bg-indigo-900 hover:bg-indigo-800 shadow-lg shadow-indigo-900/50 text-slate-100' 
                   : 'bg-amber-400 hover:bg-amber-300 shadow-lg shadow-amber-500/50 text-amber-900'
@@ -1204,7 +1204,7 @@ const MasterControlDashboard = ({
             {!isAuthenticated && (
               <button
                 onClick={() => openLoginModal()}
-                className="menu-btn h-[4.8rem] px-[1.2rem] bg-slate-600 hover:bg-slate-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[4.8rem] shadow-lg shadow-slate-900/50 text-white"
+                className="menu-btn h-[3.2rem] px-[1.2rem] bg-slate-600 hover:bg-slate-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-lg shadow-slate-900/50 text-white"
                 data-testid="button-login"
               >
                 <User className="w-[1.4rem] h-[1.4rem]" />
@@ -1216,7 +1216,7 @@ const MasterControlDashboard = ({
             {isAuthenticated && user && (
               <button
                 onClick={onLogout}
-                className="menu-btn h-[4.8rem] px-[1.2rem] bg-slate-600 hover:bg-slate-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[4.8rem] shadow-lg shadow-slate-900/50 text-white"
+                className="menu-btn h-[3.2rem] px-[1.2rem] bg-slate-600 hover:bg-slate-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-lg shadow-slate-900/50 text-white"
                 data-testid="button-logout"
                 title={`Logged in as ${user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'User'} - Click to logout`}
               >
