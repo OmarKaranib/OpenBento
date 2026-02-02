@@ -985,6 +985,18 @@ const MasterControlDashboard = ({
       }}
       data-testid="main-dashboard"
     >
+      {/* Starry Night Background - Only visible in dark mode */}
+      {isDarkMode && (
+        <div className="starry-night" data-testid="starry-night-background">
+          <div className="stars"></div>
+          <div className="stars2"></div>
+          <div className="stars3"></div>
+          <div className="shooting-star"></div>
+          <div className="shooting-star"></div>
+          <div className="shooting-star"></div>
+        </div>
+      )}
+
       {/* Decorative gradients */}
       <div className={`fixed inset-0 pointer-events-none z-0 ${isDarkMode ? 'opacity-30' : 'opacity-10'}`}>
         <div className={`absolute top-[8rem] left-[8rem] w-[38rem] h-[38rem] rounded-full blur-[120px] ${isDarkMode ? 'bg-cyan-500 animate-pulse' : 'bg-cyan-400'}`}></div>

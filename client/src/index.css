@@ -686,3 +686,148 @@ body {
   }
 }
 
+/* ========================================
+   STARRY NIGHT - Animated Background Effect
+   ======================================== */
+
+/* Starry night background for dark mode */
+.starry-night {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -9998;
+  overflow: hidden;
+}
+
+/* Star layers */
+.starry-night .stars,
+.starry-night .stars2,
+.starry-night .stars3 {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+/* Small stars layer */
+.starry-night .stars {
+  background-image: 
+    radial-gradient(1px 1px at 20px 30px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 40px 70px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 50px 160px, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 90px 40px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 130px 80px, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 160px 120px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 200px 20px, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 250px 90px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 300px 150px, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 350px 60px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 400px 200px, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 450px 30px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 500px 140px, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 550px 80px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 600px 170px, rgba(255, 255, 255, 0.6), transparent);
+  background-size: 620px 200px;
+  animation: twinkle 4s ease-in-out infinite;
+}
+
+/* Medium stars layer */
+.starry-night .stars2 {
+  background-image: 
+    radial-gradient(2px 2px at 70px 50px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(2px 2px at 150px 120px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(2px 2px at 250px 30px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(2px 2px at 350px 180px, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(2px 2px at 450px 70px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(2px 2px at 550px 130px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(2px 2px at 100px 190px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(2px 2px at 200px 90px, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(2px 2px at 300px 160px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(2px 2px at 400px 40px, rgba(255, 255, 255, 0.7), transparent);
+  background-size: 580px 200px;
+  animation: twinkle 5s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+/* Large bright stars layer */
+.starry-night .stars3 {
+  background-image: 
+    radial-gradient(3px 3px at 100px 100px, rgba(255, 255, 255, 1), transparent),
+    radial-gradient(3px 3px at 300px 50px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(3px 3px at 500px 150px, rgba(255, 255, 255, 1), transparent),
+    radial-gradient(2px 2px at 180px 170px, rgba(200, 220, 255, 0.9), transparent),
+    radial-gradient(2px 2px at 400px 100px, rgba(200, 220, 255, 1), transparent),
+    radial-gradient(2px 2px at 50px 180px, rgba(255, 220, 200, 0.9), transparent);
+  background-size: 540px 200px;
+  animation: twinkle 6s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+/* Twinkling animation */
+@keyframes twinkle {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Only show starry night in dark mode */
+body.light-theme .starry-night {
+  display: none;
+}
+
+/* Shooting stars (occasional) */
+.starry-night .shooting-star {
+  position: absolute;
+  width: 80px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%);
+  border-radius: 50%;
+  animation: shooting 8s ease-in-out infinite;
+  opacity: 0;
+}
+
+.starry-night .shooting-star:nth-child(4) {
+  top: 20%;
+  left: 30%;
+  animation-delay: 0s;
+}
+
+.starry-night .shooting-star:nth-child(5) {
+  top: 40%;
+  left: 60%;
+  animation-delay: 3s;
+}
+
+.starry-night .shooting-star:nth-child(6) {
+  top: 70%;
+  left: 20%;
+  animation-delay: 6s;
+}
+
+@keyframes shooting {
+  0% {
+    transform: translateX(0) translateY(0) rotate(-45deg);
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  15% {
+    transform: translateX(200px) translateY(200px) rotate(-45deg);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
