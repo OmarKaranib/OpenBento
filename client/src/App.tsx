@@ -121,18 +121,19 @@ function AppContent() {
 
   // Default news streams to show when database/localStorage is empty
   const getDefaultWidgets = (): Widget[] => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://localhost';
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
     const getEmbedUrl = (videoId: string) => 
-      `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&origin=${encodeURIComponent(origin)}&parent=${hostname}`;
+      `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&origin=${encodeURIComponent(origin)}&parent=${encodeURIComponent(hostname)}`;
     
+    // Default news streams with videoId for proper refresh/healing support
     return [
-      { id: `widget-default-1`, type: 'video', url: getEmbedUrl('9Auq_BjS0FE'), channelName: 'Sky News Live', x: 0, y: 0, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
-      { id: `widget-default-2`, type: 'video', url: getEmbedUrl('w_Ma8oQLmSM'), channelName: 'ABC News Live', x: 4, y: 0, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
-      { id: `widget-default-3`, type: 'video', url: getEmbedUrl('21X5lGlDOfg'), channelName: 'NASA Live', x: 8, y: 0, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
-      { id: `widget-default-4`, type: 'video', url: getEmbedUrl('oJUvTVdTMyY'), channelName: 'Reuters Live', x: 0, y: 3, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
-      { id: `widget-default-5`, type: 'video', url: getEmbedUrl('jL8uDJJBjMA'), channelName: 'Al Jazeera', x: 4, y: 3, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
-      { id: `widget-default-6`, type: 'video', url: getEmbedUrl('ntmPIzlbj7k'), channelName: 'France 24', x: 8, y: 3, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
+      { id: `widget-default-1`, type: 'video', url: getEmbedUrl('9Auq_BjS0FE'), videoId: '9Auq_BjS0FE', channelName: 'Sky News Live', x: 0, y: 0, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
+      { id: `widget-default-2`, type: 'video', url: getEmbedUrl('w_Ma8oQLmSM'), videoId: 'w_Ma8oQLmSM', channelName: 'ABC News Live', x: 4, y: 0, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
+      { id: `widget-default-3`, type: 'video', url: getEmbedUrl('21X5lGlDOfg'), videoId: '21X5lGlDOfg', channelName: 'NASA Live', x: 8, y: 0, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
+      { id: `widget-default-4`, type: 'video', url: getEmbedUrl('oJUvTVdTMyY'), videoId: 'oJUvTVdTMyY', channelName: 'Reuters Live', x: 0, y: 3, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
+      { id: `widget-default-5`, type: 'video', url: getEmbedUrl('jL8uDJJBjMA'), videoId: 'jL8uDJJBjMA', channelName: 'Al Jazeera', x: 4, y: 3, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
+      { id: `widget-default-6`, type: 'video', url: getEmbedUrl('ntmPIzlbj7k'), videoId: 'ntmPIzlbj7k', channelName: 'France 24', x: 8, y: 3, w: 4, h: 3, isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isLive: true, isYouTube: true, isOffline: false },
     ];
   };
 

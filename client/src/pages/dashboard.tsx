@@ -1192,11 +1192,7 @@ const MasterControlDashboard = ({
             {!isAuthenticated && (
               <button
                 onClick={() => openLoginModal()}
-                className={`menu-btn px-[1rem] py-[0.5rem] slot-button font-medium flex items-center gap-[0.4rem] transition-all duration-300 transform hover:scale-105 text-[1rem] shadow-md ${
-                  isDarkMode 
-                    ? 'bg-slate-700 hover:bg-slate-600 text-slate-200' 
-                    : 'bg-gray-700 hover:bg-gray-600 text-white'
-                }`}
+                className="menu-btn px-[1rem] py-[0.5rem] bg-slate-600 hover:bg-slate-500 slot-button font-medium flex items-center gap-[0.4rem] transition-all duration-300 transform hover:scale-105 text-[1.1rem] shadow-md text-white"
                 data-testid="button-login"
               >
                 <User className="w-[1.2rem] h-[1.2rem]" />
@@ -1208,11 +1204,7 @@ const MasterControlDashboard = ({
             {isAuthenticated && user && (
               <button
                 onClick={onLogout}
-                className={`menu-btn px-[1rem] py-[0.5rem] slot-button font-medium flex items-center gap-[0.4rem] transition-all duration-300 transform hover:scale-105 text-[1rem] shadow-md ${
-                  isDarkMode 
-                    ? 'bg-slate-700 hover:bg-slate-600 text-slate-200' 
-                    : 'bg-gray-700 hover:bg-gray-600 text-white'
-                }`}
+                className="menu-btn px-[1rem] py-[0.5rem] bg-slate-600 hover:bg-slate-500 slot-button font-medium flex items-center gap-[0.4rem] transition-all duration-300 transform hover:scale-105 text-[1.1rem] shadow-md text-white"
                 data-testid="button-logout"
                 title={`Logged in as ${user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'User'} - Click to logout`}
               >
