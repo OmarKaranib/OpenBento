@@ -21,19 +21,6 @@ export interface LinksData {
 
 const LINKS_FILE_PATH = path.join(process.cwd(), 'server', 'data', 'links.json');
 
-const YOUTUBE_CHANNELS: Omit<LiveChannel, 'videoId' | 'lastUpdated' | 'isLive'>[] = [
-  { id: 'nasa-live', name: 'NASA Live', channelHandle: 'NASA', platform: 'youtube', iconType: 'science', category: 'Science' },
-  { id: 'sky-news', name: 'Sky News', channelHandle: 'skynews', platform: 'youtube', iconType: 'news', category: 'News' },
-  { id: 'abc-news', name: 'ABC News', channelHandle: 'ABCNews', platform: 'youtube', iconType: 'news', category: 'News' },
-];
-
-const STATIC_CHANNELS: LiveChannel[] = [
-  { id: 'twitch-esl', name: 'ESL CS:GO', channelHandle: 'esl_csgo', videoId: null, lastUpdated: Date.now(), platform: 'twitch', iconType: 'gaming', category: 'Esports', isLive: true },
-  { id: 'twitch-rocket', name: 'Rocket League', channelHandle: 'rocketleague', videoId: null, lastUpdated: Date.now(), platform: 'twitch', iconType: 'gaming', category: 'Esports', isLive: true },
-  { id: 'twitch-gaules', name: 'Gaules', channelHandle: 'gaules', videoId: null, lastUpdated: Date.now(), platform: 'twitch', iconType: 'gaming', category: 'Gaming', isLive: true },
-  { id: 'kick-xqc', name: 'xQc', channelHandle: 'xqc', videoId: null, lastUpdated: Date.now(), platform: 'kick', iconType: 'gaming', category: 'Gaming', isLive: true },
-  { id: 'kick-adin', name: 'Adin Ross', channelHandle: 'adinross', videoId: null, lastUpdated: Date.now(), platform: 'kick', iconType: 'gaming', category: 'Gaming', isLive: true },
-];
 
 interface YouTubeFetchResult {
   videoId: string | null;
@@ -124,21 +111,27 @@ function saveLinks(data: LinksData): void {
 export async function refreshAllLinks(): Promise<LinksData> {
   log('[LinkRefresher] Starting link refresh...');
   
-  const channels: LiveChannel[] = [];
+  const existingData = loadLinks();
   const now = Date.now();
+  const channels: LiveChannel[] = [];
 
-  for (const channel of YOUTUBE_CHANNELS) {
-    const result = await fetchYouTubeLiveVideoId(channel.channelHandle);
-    channels.push({
-      ...channel,
-      videoId: result.videoId,
-      isLive: result.isLive,
-      lastUpdated: now,
-    });
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  for (const channel of existingData.channels) {
+    if (channel.platform === 'youtube' && channel.isLive) {
+      const result = await fetchYouTubeLiveVideoId(channel.channelHandle);
+      channels.push({
+        ...channel,
+        videoId: result.videoId || channel.videoId,
+        isLive: result.isLive,
+        lastUpdated: now,
+      });
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } else {
+      channels.push({
+        ...channel,
+        lastUpdated: now,
+      });
+    }
   }
-
-  channels.push(...STATIC_CHANNELS.map(ch => ({ ...ch, lastUpdated: now })));
 
   const data: LinksData = {
     channels,
