@@ -10,7 +10,7 @@ OpenBento Dashboard is a customizable bento-style mission control interface for 
 - Self-healing stream recovery system
 - Custom widget colors and themes
 - Dark and light mode support
-- Firebase authentication with Google Sign-In
+- Supabase authentication with Email and Google Sign-In
 
 ## Technical Details
 - Built with React, TypeScript, and Tailwind CSS
