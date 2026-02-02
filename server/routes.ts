@@ -5,7 +5,7 @@ import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from ".
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerChannel } from "./services/pulse-cache";
 import { healStream, getVideoDetails, isMusicCategory } from "./services/youtube-api";
-import { insertUserLibrarySchema } from "@shared/schema";
+import { insertUserLibrarySchema, insertDashboardSchema } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -226,6 +226,62 @@ export async function registerRoutes(
       }
       
       res.json({ item: updated });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.get("/api/dashboard", async (req: Request, res: Response) => {
+    const userId = (req as any).userId || (req as any).user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    
+    try {
+      const dashboard = await storage.getDashboard(userId);
+      res.json({ dashboard });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.post("/api/dashboard", async (req: Request, res: Response) => {
+    const userId = (req as any).userId || (req as any).user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    
+    try {
+      const validation = insertDashboardSchema.safeParse({ ...req.body, userId });
+      
+      if (!validation.success) {
+        return res.status(400).json({ error: validation.error.message });
+      }
+      
+      const dashboard = await storage.saveDashboard(validation.data);
+      res.json({ dashboard });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.patch("/api/dashboard", async (req: Request, res: Response) => {
+    const userId = (req as any).userId || (req as any).user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    
+    try {
+      const dashboard = await storage.updateDashboard(userId, req.body);
+      
+      if (!dashboard) {
+        return res.status(404).json({ error: "Dashboard not found" });
+      }
+      
+      res.json({ dashboard });
     } catch (error) {
       res.status(500).json({ error: String(error) });
     }

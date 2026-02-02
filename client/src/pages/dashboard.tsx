@@ -91,12 +91,16 @@ const SortableWidget = ({ widget, isEditMode, onColorPickerOpen, children }: Sor
   );
 };
 
-// Firebase User type (simplified)
-interface FirebaseUser {
-  uid: string;
-  displayName: string | null;
-  email: string | null;
-  photoURL: string | null;
+// Supabase User type (simplified)
+interface SupabaseUser {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    full_name?: string;
+    name?: string;
+    avatar_url?: string;
+    picture?: string;
+  };
 }
 
 interface MasterControlDashboardProps {
@@ -115,7 +119,7 @@ interface MasterControlDashboardProps {
   ghostPosition: { x: number; y: number; w: number; h: number } | null;
   gridContainerRef: MutableRefObject<HTMLDivElement | null>;
   isGridFull: boolean;
-  user: FirebaseUser | null;
+  user: SupabaseUser | null;
   onLogout: () => void;
 }
 
@@ -1186,24 +1190,24 @@ const MasterControlDashboard = ({
               <span className="relative z-10">{isDarkMode ? 'Dark' : 'Light'}</span>
             </button>
 
-            {/* User Avatar/Logout - Only shown when logged in with Firebase */}
+            {/* User Avatar/Logout - Only shown when logged in */}
             {user && (
               <button
                 onClick={onLogout}
                 className="menu-btn px-[1.2rem] py-[0.6rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] shadow-lg shadow-slate-900/50"
                 data-testid="button-logout"
-                title={`Logged in as ${user.displayName || 'User'} - Click to logout`}
+                title={`Logged in as ${user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'User'} - Click to logout`}
               >
-                {user.photoURL ? (
+                {(user.user_metadata?.avatar_url || user.user_metadata?.picture) ? (
                   <img 
-                    src={user.photoURL} 
+                    src={user.user_metadata?.avatar_url || user.user_metadata?.picture} 
                     alt="User" 
                     className="w-[1.8rem] h-[1.8rem] rounded-full object-cover"
                   />
                 ) : (
                   <User className="w-[1.4rem] h-[1.4rem]" />
                 )}
-                <span className="max-w-[8rem] truncate">{user.displayName?.split(' ')[0] || 'User'}</span>
+                <span className="max-w-[8rem] truncate">{(user.user_metadata?.full_name || user.user_metadata?.name || user.email)?.split(' ')[0] || 'User'}</span>
               </button>
             )}
           </div>
