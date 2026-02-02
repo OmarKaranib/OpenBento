@@ -122,17 +122,33 @@ import { useQuery } from '@tanstack/react-query';
 // Personal Library storage key
 const PERSONAL_LIBRARY_KEY = 'openBentoPersonalLibrary';
 
+// Blocked Channels storage key
+const BLOCKED_CHANNELS_KEY = 'openBentoBlockedChannels';
+
 // Saved channel type for Personal Library
 export interface SavedChannel {
   id: string;
   name: string;
   url: string;
-  iconType: 'news' | 'science' | 'finance' | 'gaming';
+  iconType: 'news' | 'science' | 'finance' | 'gaming' | 'default';
   category: string;
   platform: 'youtube' | 'twitch' | 'kick';
   channelId?: string;
   videoId?: string | null;
   savedAt: number;
+}
+
+// Blocked channel type - preserves all channel data including logo info
+export interface BlockedChannel {
+  id: string;
+  name: string;
+  url: string;
+  iconType: 'news' | 'science' | 'finance' | 'gaming' | 'default';
+  category: string;
+  platform: 'youtube' | 'twitch' | 'kick';
+  channelId?: string;
+  videoId?: string | null;
+  blockedAt: number;
 }
 
 // Load personal library from localStorage
@@ -154,11 +170,30 @@ function savePersonalLibrary(channels: SavedChannel[]): void {
   }
 }
 
+// Load blocked channels from localStorage
+function loadBlockedChannels(): BlockedChannel[] {
+  try {
+    const stored = localStorage.getItem(BLOCKED_CHANNELS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Save blocked channels to localStorage
+function saveBlockedChannels(channels: BlockedChannel[]): void {
+  try {
+    localStorage.setItem(BLOCKED_CHANNELS_KEY, JSON.stringify(channels));
+  } catch (e) {
+    console.error('[Blocked Channels] Save error:', e);
+  }
+}
+
 export interface TrendingChannel {
   id: string;
   name: string;
   url: string;
-  iconType: 'news' | 'science' | 'finance' | 'gaming';
+  iconType: 'news' | 'science' | 'finance' | 'gaming' | 'default';
   category: string;
   platform: 'youtube' | 'twitch' | 'kick';
   channelId?: string;
@@ -228,15 +263,18 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
 ];
 
 type SidebarTab = 'content' | 'library';
-type ContentCategory = 'all' | 'news' | 'gaming' | 'personal';
+type ContentCategory = 'all' | 'news' | 'gaming' | 'personal' | 'blocked';
 
 interface DraggableChannelProps {
-  channel: TrendingChannel | SavedChannel;
+  channel: TrendingChannel | SavedChannel | BlockedChannel;
   onClick?: () => void;
   isLive?: boolean;
   isSaved?: boolean;
+  isBlocked?: boolean;
   onSave?: () => void;
   onRemove?: () => void;
+  onBlock?: () => void;
+  onUnblock?: () => void;
   showSaveButton?: boolean;
 }
 
@@ -271,7 +309,7 @@ function getTemplateIcon(icon: WidgetTemplate['icon'], color: string) {
   }
 }
 
-function DraggableChannel({ channel, onClick, isLive, isSaved, onSave, onRemove, showSaveButton }: DraggableChannelProps) {
+function DraggableChannel({ channel, onClick, isLive, isSaved, isBlocked, onSave, onRemove, onBlock, onUnblock, showSaveButton }: DraggableChannelProps) {
   const [logoError, setLogoError] = useState(false);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `channel-${channel.id}`,
@@ -297,6 +335,16 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, onSave, onRemove,
       onRemove();
     } else if (onSave) {
       onSave();
+    }
+  };
+
+  const handleBlockClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (isBlocked && onUnblock) {
+      onUnblock();
+    } else if (onBlock) {
+      onBlock();
     }
   };
 
@@ -428,6 +476,21 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, onSave, onRemove,
           <Star className={`w-[1.4rem] h-[1.4rem] ${isSaved ? 'fill-amber-400' : ''}`} />
         </button>
       )}
+      {showSaveButton && (
+        <button
+          onClick={handleBlockClick}
+          onPointerDown={(e) => e.stopPropagation()}
+          className={`p-[0.6rem] rounded-lg transition-colors ${
+            isBlocked 
+              ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400' 
+              : 'hover:bg-slate-700 text-slate-500 hover:text-red-400'
+          }`}
+          title={isBlocked ? 'Unblock channel' : 'Block channel'}
+          data-testid={`block-channel-${channel.id}`}
+        >
+          <Trash2 className={`w-[1.4rem] h-[1.4rem] ${isBlocked ? 'fill-red-400' : ''}`} />
+        </button>
+      )}
       <Grip className="w-[1.6rem] h-[1.6rem] text-slate-500" />
     </div>
   );
@@ -513,6 +576,7 @@ export function WidgetSidebar({
   const [activeCategory, setActiveCategory] = useState<ContentCategory>('all');
   const [liveStatuses, setLiveStatuses] = useState<Record<string, LiveStatus>>({});
   const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
+  const [blockedChannels, setBlockedChannels] = useState<BlockedChannel[]>(() => loadBlockedChannels());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Listen for personal library updates from dashboard (block star button)
@@ -523,6 +587,16 @@ export function WidgetSidebar({
     
     window.addEventListener('personalLibraryUpdated', handleLibraryUpdate);
     return () => window.removeEventListener('personalLibraryUpdated', handleLibraryUpdate);
+  }, []);
+
+  // Listen for blocked channels updates
+  useEffect(() => {
+    const handleBlockedUpdate = () => {
+      setBlockedChannels(loadBlockedChannels());
+    };
+    
+    window.addEventListener('blockedChannelsUpdated', handleBlockedUpdate);
+    return () => window.removeEventListener('blockedChannelsUpdated', handleBlockedUpdate);
   }, []);
 
   // Save to Personal Library
@@ -566,6 +640,46 @@ export function WidgetSidebar({
   const isInPersonalLibrary = useCallback((channelId: string) => {
     return personalLibrary.some(c => c.id === channelId);
   }, [personalLibrary]);
+
+  // Block a channel - preserves all channel data including logo info
+  const blockChannel = useCallback((channel: TrendingChannel) => {
+    setBlockedChannels(prev => {
+      const exists = prev.some(c => c.id === channel.id);
+      if (exists) return prev;
+      
+      const blockedChannel: BlockedChannel = {
+        id: channel.id,
+        name: channel.name,
+        url: channel.url,
+        iconType: channel.iconType,
+        category: channel.category,
+        platform: channel.platform,
+        channelId: channel.channelId,
+        videoId: channel.videoId,
+        blockedAt: Date.now()
+      };
+      
+      const updated = [...prev, blockedChannel];
+      saveBlockedChannels(updated);
+      window.dispatchEvent(new CustomEvent('blockedChannelsUpdated'));
+      return updated;
+    });
+  }, []);
+
+  // Unblock a channel
+  const unblockChannel = useCallback((channelId: string) => {
+    setBlockedChannels(prev => {
+      const updated = prev.filter(c => c.id !== channelId);
+      saveBlockedChannels(updated);
+      window.dispatchEvent(new CustomEvent('blockedChannelsUpdated'));
+      return updated;
+    });
+  }, []);
+
+  // Check if channel is blocked
+  const isChannelBlocked = useCallback((channelId: string) => {
+    return blockedChannels.some(c => c.id === channelId);
+  }, [blockedChannels]);
 
   // Fetch live channels from API (self-healing video library)
   const { data: linksData, isLoading: isLoadingLinks, refetch: refetchLinks } = useQuery<LinksApiResponse>({
@@ -639,7 +753,7 @@ export function WidgetSidebar({
     }
   };
 
-  // Filter channels by search query and category
+  // Filter channels by search query and category - also filters out blocked channels from main views
   const filteredChannels = useMemo(() => {
     let filtered: TrendingChannel[] = channels;
     
@@ -650,12 +764,17 @@ export function WidgetSidebar({
       c.category !== 'Music'
     );
     
+    // Filter out blocked channels from main view (except when viewing blocked category)
+    if (activeCategory !== 'blocked') {
+      filtered = filtered.filter(c => !isChannelBlocked(c.id));
+    }
+    
     if (activeCategory === 'news') {
       filtered = filtered.filter(c => c.category === 'Global News' || c.category === 'Science');
     } else if (activeCategory === 'gaming') {
       filtered = filtered.filter(c => c.category === 'Gaming' || c.category === 'Esports');
     }
-    // 'all' shows everything (except music), 'personal' is handled separately
+    // 'all' shows everything (except music and blocked), 'personal' and 'blocked' are handled separately
     
     // Filter by search query
     if (searchQuery.trim()) {
@@ -669,7 +788,7 @@ export function WidgetSidebar({
     }
     
     return filtered;
-  }, [searchQuery, channels, activeCategory]);
+  }, [searchQuery, channels, activeCategory, isChannelBlocked]);
 
   // Filter personal library by search
   const filteredPersonalLibrary = useMemo(() => {
@@ -682,6 +801,18 @@ export function WidgetSidebar({
         channel.platform.toLowerCase().includes(query)
     );
   }, [searchQuery, personalLibrary]);
+
+  // Filter blocked channels by search - logos are preserved because BlockedChannel stores all data
+  const filteredBlockedChannels = useMemo(() => {
+    if (!searchQuery.trim()) return blockedChannels;
+    const query = searchQuery.toLowerCase();
+    return blockedChannels.filter(
+      (channel: BlockedChannel) => 
+        channel.name.toLowerCase().includes(query) ||
+        channel.category.toLowerCase().includes(query) ||
+        channel.platform.toLowerCase().includes(query)
+    );
+  }, [searchQuery, blockedChannels]);
 
   return (
     <>
@@ -915,9 +1046,26 @@ export function WidgetSidebar({
                     </span>
                   )}
                 </button>
+                <button
+                  onClick={() => setActiveCategory('blocked')}
+                  className={`flex items-center gap-[0.4rem] px-[1rem] py-[0.5rem] rounded-full text-[1.1rem] font-medium transition-all ${
+                    activeCategory === 'blocked'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                  }`}
+                  data-testid="category-blocked"
+                >
+                  <Trash2 className="w-[1.2rem] h-[1.2rem]" />
+                  Blocked
+                  {blockedChannels.length > 0 && (
+                    <span className="ml-[0.2rem] px-[0.5rem] py-[0.1rem] bg-red-500/30 rounded-full text-[0.9rem]">
+                      {blockedChannels.length}
+                    </span>
+                  )}
+                </button>
               </div>
               
-              {activeCategory !== 'personal' ? (
+              {activeCategory !== 'personal' && activeCategory !== 'blocked' ? (
                 <div>
                   <div className="flex items-center justify-between mb-[1rem]">
                     <h3 className="text-[1.4rem] font-semibold text-cyan-400 flex items-center gap-[0.6rem]">
@@ -952,8 +1100,11 @@ export function WidgetSidebar({
                         isLive={liveStatuses[channel.id]?.isLive}
                         showSaveButton={true}
                         isSaved={isInPersonalLibrary(channel.id)}
+                        isBlocked={isChannelBlocked(channel.id)}
                         onSave={() => saveToPersonalLibrary(channel)}
                         onRemove={() => removeFromPersonalLibrary(channel.id)}
+                        onBlock={() => blockChannel(channel)}
+                        onUnblock={() => unblockChannel(channel.id)}
                       />
                     ))}
                     {filteredChannels.length === 0 && (
@@ -963,7 +1114,7 @@ export function WidgetSidebar({
                     )}
                   </div>
                 </div>
-              ) : (
+              ) : activeCategory === 'personal' ? (
                 <div>
                   <div className="flex items-center justify-between mb-[1rem]">
                     <h3 className="text-[1.4rem] font-semibold text-amber-400 flex items-center gap-[0.6rem]">
@@ -999,6 +1150,47 @@ export function WidgetSidebar({
                       </p>
                       <p className="text-[1.1rem] text-slate-600">
                         Click the star icon on any stream to save it here
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-[1rem]">
+                    <h3 className="text-[1.4rem] font-semibold text-red-400 flex items-center gap-[0.6rem]">
+                      <Trash2 className="w-[1.6rem] h-[1.6rem]" />
+                      Blocked Channels
+                      <span className="text-[1.1rem] text-slate-500 font-normal ml-[0.4rem]">
+                        ({filteredBlockedChannels.length})
+                      </span>
+                    </h3>
+                  </div>
+                  <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
+                    Hidden from stream library • Click trash to unblock
+                  </p>
+                  {filteredBlockedChannels.length > 0 ? (
+                    <div className="space-y-[0.8rem]">
+                      {filteredBlockedChannels.map((channel) => (
+                        <DraggableChannel 
+                          key={channel.id} 
+                          channel={channel} 
+                          onClick={() => onChannelClick?.(channel as TrendingChannel)}
+                          isLive={false}
+                          showSaveButton={true}
+                          isSaved={false}
+                          isBlocked={true}
+                          onUnblock={() => unblockChannel(channel.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-[3rem]">
+                      <Trash2 className="w-[3rem] h-[3rem] text-slate-600 mx-auto mb-[1rem]" />
+                      <p className="text-[1.2rem] text-slate-500 mb-[0.5rem]">
+                        No blocked channels
+                      </p>
+                      <p className="text-[1.1rem] text-slate-600">
+                        Click the trash icon on any stream to hide it
                       </p>
                     </div>
                   )}

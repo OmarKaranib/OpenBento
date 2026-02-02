@@ -85,6 +85,16 @@ The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to 
 - **Login Button:** Small, non-prominent slate-600 button on far right of menu bar
 - **Login Modal:** Non-blocking popup with close (X) button, supports Email/Password and Google OAuth
 
+**Blocked Channels Feature (2026-02-02):**
+- **Block Button:** Trash icon (Trash2) on each channel card in stream library
+- **Block Action:** Click trash to hide channel from main library views (All, News, Gaming categories)
+- **Blocked Category:** Red "Blocked" tab button shows list of all blocked channels
+- **Logo Persistence:** BlockedChannel interface stores all channel data (url, iconType, platform, channelId) to preserve logo display
+- **Unblock Action:** Click trash again in Blocked view to restore channel to main library
+- **Persistence:** Blocked channels saved to localStorage key 'openBentoBlockedChannels'
+- **Count Badge:** Red badge shows number of blocked channels on the Blocked button
+- **Event Sync:** 'blockedChannelsUpdated' custom event syncs state across components
+
 **Supabase Backend (2026-02-02):**
 - **Authentication:** Supabase Auth with Email/Password and Google OAuth
 - **Database:** PostgreSQL for user dashboards and layouts
