@@ -1200,23 +1200,23 @@ const MasterControlDashboard = ({
               {isDarkMode ? 'Dark' : 'Light'}
             </button>
 
-            {/* Login Button - Small, non-blocking - shown when NOT logged in */}
+            {/* Login Button - Consistent height with other menu buttons - shown when NOT logged in */}
             {!isAuthenticated && (
               <button
                 onClick={() => openLoginModal()}
-                className="menu-btn px-[1rem] py-[0.5rem] bg-slate-600 hover:bg-slate-500 slot-button font-medium flex items-center gap-[0.4rem] transition-all duration-300 transform hover:scale-105 text-[1.1rem] shadow-md text-white"
+                className="menu-btn px-[1.2rem] py-[0.6rem] bg-slate-600 hover:bg-slate-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] shadow-lg shadow-slate-900/50 text-white"
                 data-testid="button-login"
               >
-                <User className="w-[1.2rem] h-[1.2rem]" />
+                <User className="w-[1.4rem] h-[1.4rem]" />
                 Login
               </button>
             )}
             
-            {/* User Avatar/Logout - Small, shown when logged in */}
+            {/* User Avatar/Logout - Consistent height with other menu buttons - shown when logged in */}
             {isAuthenticated && user && (
               <button
                 onClick={onLogout}
-                className="menu-btn px-[1rem] py-[0.5rem] bg-slate-600 hover:bg-slate-500 slot-button font-medium flex items-center gap-[0.4rem] transition-all duration-300 transform hover:scale-105 text-[1.1rem] shadow-md text-white"
+                className="menu-btn px-[1.2rem] py-[0.6rem] bg-slate-600 hover:bg-slate-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] shadow-lg shadow-slate-900/50 text-white"
                 data-testid="button-logout"
                 title={`Logged in as ${user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'User'} - Click to logout`}
               >

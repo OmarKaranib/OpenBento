@@ -294,8 +294,9 @@ function AppContent() {
   }, [findSmartPosition]);
 
   const addVideoWidget = useCallback((channel: TrendingChannel, w = 3, h = 2) => {
-    const videoId = extractYouTubeId(channel.url);
-    const youtubeChannelId = extractYouTubeChannelId(channel.url);
+    // Prefer channel.videoId directly from API, fallback to URL extraction
+    const videoId = channel.videoId || extractYouTubeId(channel.url);
+    const youtubeChannelId = channel.channelId || extractYouTubeChannelId(channel.url);
     const twitchChannel = extractTwitchChannel(channel.url);
     const kickChannel = extractKickChannel(channel.url);
     
@@ -304,12 +305,12 @@ function AppContent() {
 
     addWidget('video', w, h, {
       url: channel.url,
-      isYouTube: !!videoId || !!youtubeChannelId,
+      isYouTube: channel.platform === 'youtube',
       videoId,
       youtubeChannelId,
-      isTwitch: !!twitchChannel,
+      isTwitch: channel.platform === 'twitch',
       twitchChannel,
-      isKick: !!kickChannel,
+      isKick: channel.platform === 'kick',
       kickChannel,
       isLive: isLiveStream,
       lastRefresh: Date.now()
@@ -717,8 +718,9 @@ function AppContent() {
   }, [addVideoWidget, addWidget, setWidgets, findCollidingWidgets, findNextAvailableSlot]);
 
   const handleChannelClick = useCallback((channel: TrendingChannel) => {
-    const videoId = extractYouTubeId(channel.url);
-    const youtubeChannelId = extractYouTubeChannelId(channel.url);
+    // Prefer channel.videoId directly from API, fallback to URL extraction
+    const videoId = channel.videoId || extractYouTubeId(channel.url);
+    const youtubeChannelId = channel.channelId || extractYouTubeChannelId(channel.url);
     const twitchChannel = extractTwitchChannel(channel.url);
     const kickChannel = extractKickChannel(channel.url);
     const currentActiveWidgetId = activeWidgetIdRef.current;
@@ -732,12 +734,12 @@ function AppContent() {
           ...w,
           type: 'video',
           url: channel.url,
-          isYouTube: !!videoId || !!youtubeChannelId,
+          isYouTube: channel.platform === 'youtube',
           videoId,
           youtubeChannelId,
-          isTwitch: !!twitchChannel,
+          isTwitch: channel.platform === 'twitch',
           twitchChannel,
-          isKick: !!kickChannel,
+          isKick: channel.platform === 'kick',
           kickChannel,
           isLive: isLiveStream,
           error: null,
