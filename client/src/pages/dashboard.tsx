@@ -168,11 +168,8 @@ const MasterControlDashboard = ({
   
   const { triggerHeal, getHealingState, registerChannel } = useStreamHealing();
   
-  // Theme Mode (dark/light)
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem('openBentoTheme');
-    return saved !== 'light'; // Default to dark mode
-  });
+  // Theme Mode - LOCKED TO LIGHT MODE (#F8F9FA background, #1A1A1A text)
+  const isDarkMode = false; // Design locked to light mode
   
   const clearHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clearHoldStartRef = useRef<number | null>(null);
@@ -977,15 +974,18 @@ const MasterControlDashboard = ({
 
   return (
     <div 
-      className={`h-screen overflow-hidden text-slate-100 font-mono flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} 
+      className={`h-screen overflow-hidden font-sans flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} 
       style={{ 
-        padding: isFullscreen && !headerVisible ? '0' : '1.6rem'
+        padding: isFullscreen && !headerVisible ? '0' : '1.6rem',
+        background: '#F8F9FA',
+        color: '#1A1A1A'
       }}
       data-testid="main-dashboard"
     >
-      <div className="fixed inset-0 opacity-30 pointer-events-none z-0">
-        <div className="absolute top-[8rem] left-[8rem] w-[38rem] h-[38rem] bg-cyan-500 rounded-full blur-[120px] animate-pulse"></div>
-        <div className="absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] bg-purple-500 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+      {/* Subtle decorative gradients for light mode */}
+      <div className="fixed inset-0 opacity-10 pointer-events-none z-0">
+        <div className="absolute top-[8rem] left-[8rem] w-[38rem] h-[38rem] bg-cyan-400 rounded-full blur-[120px]"></div>
+        <div className="absolute bottom-[8rem] right-[8rem] w-[38rem] h-[38rem] bg-purple-400 rounded-full blur-[120px]"></div>
       </div>
 
       {/* 40px hover zone at top-center - reveals exit button when hovering (only when header hidden) */}
@@ -1170,31 +1170,6 @@ const MasterControlDashboard = ({
             >
               {masterMute ? <VolumeX className="w-[1.4rem] h-[1.4rem]" /> : <Volume2 className="w-[1.4rem] h-[1.4rem]" />}
               {masterMute ? 'MUTED' : 'LIVE'}
-            </button>
-
-            {/* Theme Toggle - Starry Night (Dark) / Yellowish Sun (Light) */}
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`menu-btn relative px-[1.2rem] py-[0.6rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] overflow-hidden ${
-                isDarkMode 
-                  ? 'bg-indigo-900 hover:bg-indigo-800 shadow-lg shadow-indigo-900/50 text-slate-100' 
-                  : 'bg-amber-400 hover:bg-amber-300 shadow-lg shadow-amber-500/50 text-amber-900'
-              }`}
-              data-testid="button-theme-toggle"
-              title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            >
-              {/* Starry Night decorations for dark mode */}
-              {isDarkMode && (
-                <>
-                  <span className="absolute top-[0.3rem] left-[0.5rem] w-[0.2rem] h-[0.2rem] bg-white rounded-full opacity-80" />
-                  <span className="absolute top-[0.8rem] left-[1rem] w-[0.15rem] h-[0.15rem] bg-white rounded-full opacity-60" />
-                  <span className="absolute bottom-[0.4rem] left-[0.7rem] w-[0.18rem] h-[0.18rem] bg-white rounded-full opacity-70" />
-                  <span className="absolute top-[0.5rem] right-[2rem] w-[0.2rem] h-[0.2rem] bg-white rounded-full opacity-75" />
-                  <span className="absolute bottom-[0.3rem] right-[1.5rem] w-[0.15rem] h-[0.15rem] bg-white rounded-full opacity-65" />
-                </>
-              )}
-              {isDarkMode ? <Moon className="w-[1.4rem] h-[1.4rem] relative z-10" /> : <Sun className="w-[1.4rem] h-[1.4rem] relative z-10" />}
-              <span className="relative z-10">{isDarkMode ? 'Dark' : 'Light'}</span>
             </button>
 
             {/* Login Button - Only shown when NOT logged in */}
