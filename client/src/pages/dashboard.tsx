@@ -165,15 +165,15 @@ const MasterControlDashboard = ({
   const [clearHoldProgress, setClearHoldProgress] = useState(0);
   const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
   const [colorPickerWidget, setColorPickerWidget] = useState<string | null>(null);
-  
+
   const { triggerHeal, getHealingState, registerChannel } = useStreamHealing();
-  
+
   // Theme Mode (dark/light) - User toggleable
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('openBentoTheme');
     return saved !== 'light'; // Default to dark mode
   });
-  
+
   const clearHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clearHoldStartRef = useRef<number | null>(null);
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
@@ -183,7 +183,7 @@ const MasterControlDashboard = ({
     const handleLibraryUpdate = () => {
       setPersonalLibrary(loadPersonalLibrary());
     };
-    
+
     window.addEventListener('personalLibraryUpdated', handleLibraryUpdate);
     return () => window.removeEventListener('personalLibraryUpdated', handleLibraryUpdate);
   }, []);
@@ -191,7 +191,7 @@ const MasterControlDashboard = ({
   // Theme toggle effect - apply dark/light mode using class on document element
   useEffect(() => {
     localStorage.setItem('openBentoTheme', isDarkMode ? 'dark' : 'light');
-    
+
     // Toggle dark class on document element (standard Tailwind dark mode approach)
     const root = document.documentElement;
     if (isDarkMode) {
@@ -230,7 +230,7 @@ const MasterControlDashboard = ({
   // Save widget to Personal Library
   const saveWidgetToLibrary = useCallback((widget: Widget) => {
     if (widget.type !== 'video') return;
-    
+
     // Generate descriptive name based on platform and channel
     let name = 'Saved Stream';
     if (widget.isYouTube) {
@@ -244,7 +244,7 @@ const MasterControlDashboard = ({
     } else if (widget.isKick && widget.kickChannel) {
       name = `Kick: ${widget.kickChannel}`;
     }
-    
+
     const savedChannel: SavedChannel = {
       id: `saved-${Date.now()}-${widget.videoId || widget.twitchChannel || widget.kickChannel || 'stream'}`,
       name,
@@ -256,14 +256,14 @@ const MasterControlDashboard = ({
       videoId: widget.videoId,
       savedAt: Date.now()
     };
-    
+
     setPersonalLibrary(prev => {
       const exists = prev.some(c => 
         (savedChannel.videoId && c.videoId === savedChannel.videoId) || 
         (savedChannel.channelId && c.channelId === savedChannel.channelId)
       );
       if (exists) return prev;
-      
+
       const updated = [...prev, savedChannel];
       savePersonalLibrary(updated);
       // Dispatch event to sync sidebar
@@ -301,24 +301,22 @@ const MasterControlDashboard = ({
 
   const handleVideoError = useCallback(async (widget: Widget) => {
     console.log(`[Self-Healing] Error detected for widget: ${widget.id}`);
-    
+
     setWidgets(prev => prev.map(w => 
       w.id === widget.id ? { ...w, isOffline: true } : w
     ));
-    
+
     if (widget.isYouTube && widget.youtubeChannelId) {
       const channelName = widget.channelName || widget.youtubeChannelId;
-      
-      // Clear cache on error - force fresh fetch (Robot Copy-Paste re-fetch on error)
+
+      // Clear cache on error - force fresh fetch
       const { clearCachedVideoId, fetchFreshVideoId } = await import('@/lib/video-cache');
       clearCachedVideoId(widget.youtubeChannelId);
-      console.log(`[RobotPaste] Cleared cache for ${widget.youtubeChannelId}, fetching fresh...`);
-      
-      // Try to fetch fresh videoId directly (Robot Copy-Paste style)
+
+      // Try to fetch fresh videoId directly
       const freshVideoId = await fetchFreshVideoId(widget.youtubeChannelId);
-      
+
       if (freshVideoId) {
-        console.log(`[RobotPaste] Got fresh videoId: ${freshVideoId} for ${widget.id}`);
         setWidgets(prev => prev.map(w => 
           w.id === widget.id 
             ? { ...w, videoId: freshVideoId, isOffline: false, lastRefresh: Date.now() } 
@@ -332,7 +330,6 @@ const MasterControlDashboard = ({
           channelName,
           widget.videoId || undefined,
           (newVideoId) => {
-            console.log(`[Self-Healing] Healed ${widget.id} with new videoId: ${newVideoId}`);
             setWidgets(prev => prev.map(w => 
               w.id === widget.id 
                 ? { ...w, videoId: newVideoId, isOffline: false, lastRefresh: Date.now() } 
@@ -372,10 +369,6 @@ const MasterControlDashboard = ({
     return () => document.removeEventListener('mousemove', handleMouseMove);
   }, [isFullscreen, headerVisible]);
 
-  // NUCLEAR LOCKDOWN: 10-minute live widget refresh interval disabled
-  // Players only rebuild when videoId actually changes or user clicks manual refresh button
-  // This prevents unexpected stream interruptions and preserves playback state
-
   // Helper function to exit fullscreen and restore header
   const exitFullscreenAndRestoreHeader = () => {
     if (document.fullscreenElement) {
@@ -413,10 +406,6 @@ const MasterControlDashboard = ({
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [setIsFullscreen]);
-
-  // NUCLEAR LOCKDOWN: Automatic watchdog disabled to prevent iframe refresh
-  // Players only rebuild when videoId actually changes or user clicks manual refresh
-  // The refresh button still works for manual refresh when needed
 
   // Toggle seek mode for a specific widget
   const toggleSeekMode = (widgetId: string) => {
@@ -519,7 +508,7 @@ const MasterControlDashboard = ({
 
         // Push logic: Try to move each colliding widget to next available slot
         let updatedWidgets = [...prev];
-        
+
         // First, update the resizing widget
         updatedWidgets = updatedWidgets.map(w => 
           w.id === resizing.widgetId ? { ...w, w: newW, h: newH } : w
@@ -527,7 +516,7 @@ const MasterControlDashboard = ({
 
         for (const collidingWidget of collidingWidgets) {
           const newSlot = findNextAvailableSlot(collidingWidget, updatedWidgets, collidingWidget.id);
-          
+
           if (newSlot === null) {
             // No room to push - block the resize entirely
             return prev;
@@ -1047,7 +1036,7 @@ const MasterControlDashboard = ({
             : 'relative'
         }`}
         style={{ 
-          height: isFullscreen ? 'auto' : 'var(--header-height)',
+          height: 'auto',
           transform: isFullscreen && !headerVisible ? 'translateY(-100%)' : 'translateY(0)',
           transition: 'transform 0.3s ease-in-out',
           zIndex: 10001
@@ -1055,7 +1044,7 @@ const MasterControlDashboard = ({
         onMouseLeave={() => isFullscreen && setHeaderVisible(false)}
         data-testid="header-container"
       >
-        <div className="flex items-center justify-between mb-[0.8rem] flex-wrap gap-[0.8rem]">
+        <div className="flex items-center justify-between gap-[0.8rem] h-[3.2rem]">
           <div className="flex items-center gap-[1.2rem] h-[3.2rem]">
             <button
               onClick={() => {
@@ -1091,7 +1080,7 @@ const MasterControlDashboard = ({
             <span className={`h-[3.2rem] flex items-center text-[0.9rem] px-[0.6rem] rounded-full border ${isDarkMode ? 'text-cyan-400/70 bg-cyan-900/30 border-cyan-500/30' : 'text-cyan-600 bg-cyan-100 border-cyan-300'}`}>
               {GRID_COLS}-col grid
             </span>
-            
+
           </div>
 
           <div className="flex gap-[0.8rem] items-center h-[3.2rem]">
@@ -1105,7 +1094,7 @@ const MasterControlDashboard = ({
                     const elapsed = Date.now() - clearHoldStartRef.current;
                     const progress = Math.min((elapsed / 2000) * 100, 100);
                     setClearHoldProgress(progress);
-                    
+
                     if (progress >= 100) {
                       setWidgets([]);
                       setClearHoldProgress(0);
@@ -1229,7 +1218,7 @@ const MasterControlDashboard = ({
                 Login
               </button>
             )}
-            
+
             {/* User Avatar/Logout - Consistent height with other menu buttons - shown when logged in */}
             {isAuthenticated && user && (
               <button
@@ -1253,8 +1242,9 @@ const MasterControlDashboard = ({
           </div>
         </div>
 
-        <div className="h-[0.2rem] bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full"></div>
+        <div className="h-[0.2rem] bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full mt-[0.8rem]"></div>
       </div>
+
 
       <div 
         className={`canvas-container p-[1rem] transition-all duration-300 ${
@@ -1454,21 +1444,6 @@ const MasterControlDashboard = ({
                 >
                   <Palette className="w-[2rem] h-[2rem]" />
                 </button>
-                {/* Widget edit button - Hidden for dashboard-only view */}
-                {/* 
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    handleOpenSidebar(widget.id);
-                  }}
-                  className="w-[4rem] h-[4rem] rounded-full bg-cyan-600/90 hover:bg-cyan-500 transition-all duration-300 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30"
-                  title="Edit widget content"
-                  data-testid={`button-edit-${widget.id}`}
-                >
-                  <Settings className="w-[2rem] h-[2rem]" />
-                </button>
-                */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

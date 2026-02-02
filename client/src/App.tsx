@@ -717,10 +717,8 @@ function AppContent() {
     }
   }, [addVideoWidget, addWidget, setWidgets, findCollidingWidgets, findNextAvailableSlot]);
 
-  const handleChannelClick = useCallback(async (channel: TrendingChannel) => {
-    // Robot Copy-Paste: Use 24-hour cache for videoIds
-    const { getCachedVideoId, fetchFreshVideoId } = await import('@/lib/video-cache');
-    
+  const handleChannelClick = useCallback((channel: TrendingChannel) => {
+    // Mirror the manual paste behavior exactly - just process the URL
     // Capture active widget BEFORE clearing (same as manual paste behavior)
     const currentActiveWidgetId = activeWidgetIdRef.current;
     
@@ -729,87 +727,14 @@ function AppContent() {
     activeWidgetIdRef.current = null;
     setActiveWidgetId(null);
     
-    // Extract channelId from URL for cache lookup
-    const channelIdMatch = channel.url.match(/youtube\.com\/@([a-zA-Z0-9_-]+)/);
-    const youtubeChannelId = channelIdMatch ? channelIdMatch[1] : channel.channelId;
-    
-    // For non-YouTube platforms (Twitch/Kick), use direct URL processing (same as manual paste)
-    if (channel.platform !== 'youtube') {
-      // Restore activeWidgetIdRef temporarily for handleSubmitUrl
-      if (currentActiveWidgetId) {
-        activeWidgetIdRef.current = currentActiveWidgetId;
-      }
-      handleSubmitUrl(channel.url);
-      return;
+    // Restore activeWidgetIdRef temporarily for handleSubmitUrl (if editing existing widget)
+    if (currentActiveWidgetId) {
+      activeWidgetIdRef.current = currentActiveWidgetId;
     }
     
-    // Check 24-hour cache first
-    const cachedVideoId = getCachedVideoId(youtubeChannelId || channel.name);
-    
-    // Helper to create or update widget (mirrors handleSubmitUrl behavior)
-    const applyVideoToWidget = (videoId: string | null) => {
-      if (currentActiveWidgetId) {
-        // Update existing widget (same as manual paste with active widget)
-        setWidgets(prev => prev.map(w => 
-          w.id === currentActiveWidgetId ? {
-            ...w,
-            type: 'video',
-            url: channel.url,
-            isYouTube: true,
-            videoId,
-            youtubeChannelId,
-            channelName: channel.name,
-            isLive: true,
-            error: null,
-            embedBlocked: false,
-            isPaused: false,
-            isMuted: true,
-            volume: 0,
-            isOffline: false,
-            lastRefresh: Date.now()
-          } : w
-        ));
-        return currentActiveWidgetId;
-      } else {
-        // Add new widget (same as manual paste without active widget)
-        return addWidget('video', 3, 2, {
-          url: channel.url,
-          isYouTube: true,
-          videoId,
-          youtubeChannelId,
-          channelName: channel.name,
-          isLive: true,
-          lastRefresh: Date.now()
-        });
-      }
-    };
-    
-    if (cachedVideoId) {
-      // Use cached videoId - apply directly (fast path)
-      console.log(`[RobotPaste] Using cached videoId: ${cachedVideoId}`);
-      applyVideoToWidget(cachedVideoId);
-    } else {
-      // No cache or expired - fetch fresh via API (Robot Copy-Paste)
-      console.log(`[RobotPaste] Fetching fresh videoId for: ${youtubeChannelId}`);
-      
-      // Create/update widget immediately with channelId (will use iframe fallback)
-      const widgetId = applyVideoToWidget(null);
-      
-      // Fetch fresh videoId in background
-      const freshVideoId = await fetchFreshVideoId(youtubeChannelId || channel.name);
-      
-      if (freshVideoId && widgetId) {
-        // Update widget with fresh videoId
-        setWidgets(prev => prev.map(w => 
-          w.id === widgetId ? {
-            ...w,
-            videoId: freshVideoId,
-            lastRefresh: Date.now()
-          } : w
-        ));
-      }
-    }
-  }, [handleSubmitUrl, addWidget, setWidgets]);
+    // Pass the URL directly to handleSubmitUrl - same as manual paste
+    handleSubmitUrl(channel.url);
+  }, [handleSubmitUrl]);
 
   // Dashboard-only mode flag - set to false to allow sidebar with filtered content
   const dashboardOnlyMode = false;

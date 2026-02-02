@@ -33,17 +33,14 @@ export function getCachedVideoId(channelId: string): string | null {
   const entry = cache[channelId];
   
   if (!entry) {
-    console.log(`[VideoCache] No cache for channel: ${channelId}`);
     return null;
   }
   
   const age = Date.now() - entry.timestamp;
   if (age > CACHE_EXPIRY_MS) {
-    console.log(`[VideoCache] Cache expired for channel: ${channelId} (age: ${Math.round(age / 3600000)}h)`);
     return null;
   }
   
-  console.log(`[VideoCache] Using cached videoId for ${channelId}: ${entry.videoId} (age: ${Math.round(age / 60000)}min)`);
   return entry.videoId;
 }
 
@@ -55,7 +52,6 @@ export function setCachedVideoId(channelId: string, videoId: string): void {
     timestamp: Date.now()
   };
   saveCache(cache);
-  console.log(`[VideoCache] Cached videoId for ${channelId}: ${videoId}`);
 }
 
 export function clearCachedVideoId(channelId: string): void {
@@ -63,22 +59,18 @@ export function clearCachedVideoId(channelId: string): void {
   if (cache[channelId]) {
     delete cache[channelId];
     saveCache(cache);
-    console.log(`[VideoCache] Cleared cache for channel: ${channelId}`);
   }
 }
 
 export function clearAllCache(): void {
   localStorage.removeItem(CACHE_KEY);
-  console.log('[VideoCache] Cleared all cached videoIds');
 }
 
 export async function fetchFreshVideoId(channelId: string): Promise<string | null> {
   try {
-    console.log(`[VideoCache] Fetching fresh videoId for channel: ${channelId}`);
     const response = await fetch(`/api/live-video?channelId=${encodeURIComponent(channelId)}`);
     
     if (!response.ok) {
-      console.error(`[VideoCache] Failed to fetch: ${response.status}`);
       return null;
     }
     
@@ -89,10 +81,8 @@ export async function fetchFreshVideoId(channelId: string): Promise<string | nul
       return data.videoId;
     }
     
-    console.log(`[VideoCache] No live video found for channel: ${channelId}`);
     return null;
-  } catch (e) {
-    console.error('[VideoCache] Fetch error:', e);
+  } catch {
     return null;
   }
 }

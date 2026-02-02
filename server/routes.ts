@@ -137,18 +137,15 @@ export async function registerRoutes(
     }
     
     try {
-      console.log(`[LiveVideo] Fetching fresh videoId for channel: ${channelId}`);
       const result = await healStream(channelId, channelId, apiKey);
       
       if (result.success && result.newVideoId) {
-        console.log(`[LiveVideo] Found videoId: ${result.newVideoId} for channel: ${channelId}`);
         res.json({ 
           videoId: result.newVideoId,
           channelId,
           isLive: true
         });
       } else {
-        console.log(`[LiveVideo] No live stream found for channel: ${channelId} - ${result.reason}`);
         res.json({ 
           videoId: null,
           channelId,
@@ -156,7 +153,6 @@ export async function registerRoutes(
         });
       }
     } catch (error) {
-      console.error(`[LiveVideo] Error fetching videoId for ${channelId}:`, error);
       res.status(500).json({ 
         error: String(error),
         videoId: null 
