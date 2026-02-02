@@ -1,9 +1,9 @@
-// Firebase Authentication Hook for OpenBento Dashboard
 import { useState, useEffect } from 'react';
-import { auth, onAuthChange, signOutUser, type User } from '@/lib/firebase';
+import { supabase, onAuthChange, signOutUser, getSession, type User, type Session } from '@/lib/supabase';
 
 interface AuthState {
   user: User | null;
+  session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
 }
@@ -11,22 +11,31 @@ interface AuthState {
 export function useAuth() {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
+    session: null,
     isLoading: true,
     isAuthenticated: false,
   });
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
-    // Subscribe to auth state changes - Firebase handles persistence automatically
-    const unsubscribe = onAuthChange((user) => {
+    getSession().then(({ user, session }) => {
       setAuthState({
         user,
+        session,
         isLoading: false,
         isAuthenticated: !!user,
       });
     });
 
-    // Cleanup subscription on unmount
+    const unsubscribe = onAuthChange((user, session) => {
+      setAuthState({
+        user,
+        session,
+        isLoading: false,
+        isAuthenticated: !!user,
+      });
+    });
+
     return () => unsubscribe();
   }, []);
 
@@ -41,6 +50,7 @@ export function useAuth() {
 
   return {
     user: authState.user,
+    session: authState.session,
     isLoading: authState.isLoading,
     isAuthenticated: authState.isAuthenticated,
     logout,
@@ -48,5 +58,4 @@ export function useAuth() {
   };
 }
 
-// Export User type for use in components
-export type { User };
+export type { User, Session };

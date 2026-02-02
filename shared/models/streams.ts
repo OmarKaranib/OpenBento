@@ -3,6 +3,47 @@ import { pgTable, varchar, text, timestamp, boolean, integer, jsonb, index } fro
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const dashboards = pgTable("dashboards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  name: varchar("name").notNull().default("My Dashboard"),
+  widgets: jsonb("widgets").notNull().default([]),
+  bgColor: varchar("bg_color"),
+  bgImage: text("bg_image"),
+  isDefault: boolean("is_default").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_dashboards_user_id").on(table.userId),
+]);
+
+export const insertDashboardSchema = createInsertSchema(dashboards).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Dashboard = typeof dashboards.$inferSelect;
+export type InsertDashboard = z.infer<typeof insertDashboardSchema>;
+
+export interface DashboardWidget {
+  id: string;
+  type: 'video' | 'note' | 'spacer' | 'image';
+  col: number;
+  row: number;
+  colSpan: number;
+  rowSpan: number;
+  url?: string;
+  content?: string;
+  platform?: string;
+  channelId?: string;
+  videoId?: string;
+  isLive?: boolean;
+  customColor?: string;
+  logoUrl?: string;
+  name?: string;
+}
+
 export const userLibrary = pgTable("user_library", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
