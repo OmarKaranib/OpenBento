@@ -7,9 +7,9 @@
       "platform": "youtube",
       "iconType": "science",
       "category": "Science",
-      "videoId": "SGP6Y0Pnhe4",
+      "videoId": "xCrPD7tfcr0",
       "isLive": true,
-      "lastUpdated": 1769971253189
+      "lastUpdated": 1769997005483
     },
     {
       "id": "sky-news",
@@ -18,9 +18,9 @@
       "platform": "youtube",
       "iconType": "news",
       "category": "News",
-      "videoId": "fs4IsNIW7HE",
+      "videoId": "YDvsBbKfLPA",
       "isLive": true,
-      "lastUpdated": 1769971253189
+      "lastUpdated": 1769997005483
     },
     {
       "id": "abc-news",
@@ -31,14 +31,14 @@
       "category": "News",
       "videoId": "iipR5yUp36o",
       "isLive": true,
-      "lastUpdated": 1769971253189
+      "lastUpdated": 1769997005483
     },
     {
       "id": "twitch-esl",
       "name": "ESL CS:GO",
       "channelHandle": "esl_csgo",
       "videoId": null,
-      "lastUpdated": 1769971253189,
+      "lastUpdated": 1769997005483,
       "platform": "twitch",
       "iconType": "gaming",
       "category": "Esports",
@@ -49,7 +49,7 @@
       "name": "Rocket League",
       "channelHandle": "rocketleague",
       "videoId": null,
-      "lastUpdated": 1769971253189,
+      "lastUpdated": 1769997005483,
       "platform": "twitch",
       "iconType": "gaming",
       "category": "Esports",
@@ -60,7 +60,7 @@
       "name": "Gaules",
       "channelHandle": "gaules",
       "videoId": null,
-      "lastUpdated": 1769971253189,
+      "lastUpdated": 1769997005483,
       "platform": "twitch",
       "iconType": "gaming",
       "category": "Gaming",
@@ -71,7 +71,7 @@
       "name": "xQc",
       "channelHandle": "xqc",
       "videoId": null,
-      "lastUpdated": 1769971253189,
+      "lastUpdated": 1769997005483,
       "platform": "kick",
       "iconType": "gaming",
       "category": "Gaming",
@@ -82,12 +82,12 @@
       "name": "Adin Ross",
       "channelHandle": "adinross",
       "videoId": null,
-      "lastUpdated": 1769971253189,
+      "lastUpdated": 1769997005483,
       "platform": "kick",
       "iconType": "gaming",
       "category": "Gaming",
       "isLive": true
     }
   ],
-  "lastRefresh": 1769971253189
+  "lastRefresh": 1769997005483
 }
