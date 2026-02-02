@@ -2,28 +2,117 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, RefreshCw, Star, Trash2, Globe, Heart, DollarSign, Zap } from 'lucide-react';
 
 // Channel logo URLs - Using Google Favicon API for reliable high-quality logos
+// Maps channel ID to official website domain for best logo quality
 const CHANNEL_LOGOS: Record<string, string> = {
-  // News channels - using Google Favicon API
-  'nasa-live': 'https://www.google.com/s2/favicons?domain=nasa.gov&sz=128',
+  // News channels - Official website domains for high-quality favicons
   'sky-news': 'https://www.google.com/s2/favicons?domain=news.sky.com&sz=128',
   'abc-news': 'https://www.google.com/s2/favicons?domain=abcnews.go.com&sz=128',
-  'bbc-news': 'https://www.google.com/s2/favicons?domain=bbc.com&sz=128',
-  'cnn-live': 'https://www.google.com/s2/favicons?domain=cnn.com&sz=128',
-  'fox-news': 'https://www.google.com/s2/favicons?domain=foxnews.com&sz=128',
+  'nasa-live': 'https://www.google.com/s2/favicons?domain=nasa.gov&sz=128',
+  'reuters-live': 'https://www.google.com/s2/favicons?domain=reuters.com&sz=128',
   'al-jazeera': 'https://www.google.com/s2/favicons?domain=aljazeera.com&sz=128',
+  'france-24': 'https://www.google.com/s2/favicons?domain=france24.com&sz=128',
+  'cnn-live': 'https://www.google.com/s2/favicons?domain=cnn.com&sz=128',
+  'bbc-news': 'https://www.google.com/s2/favicons?domain=bbc.com&sz=128',
   'dw-news': 'https://www.google.com/s2/favicons?domain=dw.com&sz=128',
-  'france24': 'https://www.google.com/s2/favicons?domain=france24.com&sz=128',
   'euronews': 'https://www.google.com/s2/favicons?domain=euronews.com&sz=128',
+  'nbc-news': 'https://www.google.com/s2/favicons?domain=nbcnews.com&sz=128',
+  'cbs-news': 'https://www.google.com/s2/favicons?domain=cbsnews.com&sz=128',
+  'fox-news': 'https://www.google.com/s2/favicons?domain=foxnews.com&sz=128',
+  'msnbc-live': 'https://www.google.com/s2/favicons?domain=msnbc.com&sz=128',
   'nhk-world': 'https://www.google.com/s2/favicons?domain=nhk.or.jp&sz=128',
-  'reuters': 'https://www.google.com/s2/favicons?domain=reuters.com&sz=128',
-  'bloomberg': 'https://www.google.com/s2/favicons?domain=bloomberg.com&sz=128',
-  'cnbc': 'https://www.google.com/s2/favicons?domain=cnbc.com&sz=128',
-  // Gaming/Streaming platforms
-  'twitch-esl': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
-  'twitch-rocket': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'cgtn-news': 'https://www.google.com/s2/favicons?domain=cgtn.com&sz=128',
+  'arirang-news': 'https://www.google.com/s2/favicons?domain=arirang.com&sz=128',
+  'abc-australia': 'https://www.google.com/s2/favicons?domain=abc.net.au&sz=128',
+  'wion-news': 'https://www.google.com/s2/favicons?domain=wionews.com&sz=128',
+  'india-today': 'https://www.google.com/s2/favicons?domain=indiatoday.in&sz=128',
+  'ndtv-news': 'https://www.google.com/s2/favicons?domain=ndtv.com&sz=128',
+  'times-now': 'https://www.google.com/s2/favicons?domain=timesnownews.com&sz=128',
+  'trt-world': 'https://www.google.com/s2/favicons?domain=trtworld.com&sz=128',
+  'cna-news': 'https://www.google.com/s2/favicons?domain=channelnewsasia.com&sz=128',
+  'abc7-la': 'https://www.google.com/s2/favicons?domain=abc7.com&sz=128',
+  'fox11-la': 'https://www.google.com/s2/favicons?domain=foxla.com&sz=128',
+  'pbs-newshour': 'https://www.google.com/s2/favicons?domain=pbs.org&sz=128',
+  'cbsn-live': 'https://www.google.com/s2/favicons?domain=cbsnews.com&sz=128',
+  'newsy-live': 'https://www.google.com/s2/favicons?domain=newsy.com&sz=128',
+  'livennow-fox': 'https://www.google.com/s2/favicons?domain=foxnews.com&sz=128',
+  'court-tv': 'https://www.google.com/s2/favicons?domain=courttv.com&sz=128',
+  'law-crime': 'https://www.google.com/s2/favicons?domain=lawandcrime.com&sz=128',
+  'c-span': 'https://www.google.com/s2/favicons?domain=c-span.org&sz=128',
+  'un-webtv': 'https://www.google.com/s2/favicons?domain=webtv.un.org&sz=128',
+  'global-news': 'https://www.google.com/s2/favicons?domain=globalnews.ca&sz=128',
+  'cp24-live': 'https://www.google.com/s2/favicons?domain=cp24.com&sz=128',
+  'ctv-news': 'https://www.google.com/s2/favicons?domain=ctvnews.ca&sz=128',
+  'cbc-news': 'https://www.google.com/s2/favicons?domain=cbc.ca&sz=128',
+  'weather-channel': 'https://www.google.com/s2/favicons?domain=weather.com&sz=128',
+  
+  // Finance channels
+  'bloomberg-live': 'https://www.google.com/s2/favicons?domain=bloomberg.com&sz=128',
+  'cnbc-live': 'https://www.google.com/s2/favicons?domain=cnbc.com&sz=128',
+  'yahoo-finance': 'https://www.google.com/s2/favicons?domain=finance.yahoo.com&sz=128',
+  'cheddar-news': 'https://www.google.com/s2/favicons?domain=cheddar.com&sz=128',
+  
+  // Science & Space channels
+  'iss-hd-earth': 'https://www.google.com/s2/favicons?domain=nasa.gov&sz=128',
+  'space-videos': 'https://www.google.com/s2/favicons?domain=space.com&sz=128',
+  'nasa-tv': 'https://www.google.com/s2/favicons?domain=nasa.gov&sz=128',
+  'aquarium-live': 'https://www.google.com/s2/favicons?domain=montereybayaquarium.org&sz=128',
+  'explore-africa': 'https://www.google.com/s2/favicons?domain=explore.org&sz=128',
+  'explore-bears': 'https://www.google.com/s2/favicons?domain=explore.org&sz=128',
+  'sea-otter-cam': 'https://www.google.com/s2/favicons?domain=montereybayaquarium.org&sz=128',
+  'jellyfish-cam': 'https://www.google.com/s2/favicons?domain=montereybayaquarium.org&sz=128',
+  'spacex-live': 'https://www.google.com/s2/favicons?domain=spacex.com&sz=128',
+  
+  // Live Cams
+  'earth-cam-nyc': 'https://www.google.com/s2/favicons?domain=earthcam.com&sz=128',
+  'earth-cam-tokyo': 'https://www.google.com/s2/favicons?domain=earthcam.com&sz=128',
+  'earth-cam-paris': 'https://www.google.com/s2/favicons?domain=earthcam.com&sz=128',
+  'earth-cam-london': 'https://www.google.com/s2/favicons?domain=earthcam.com&sz=128',
+  'earth-cam-dubai': 'https://www.google.com/s2/favicons?domain=earthcam.com&sz=128',
+  
+  // Sports
+  'nfl-network': 'https://www.google.com/s2/favicons?domain=nfl.com&sz=128',
+  'nba-tv': 'https://www.google.com/s2/favicons?domain=nba.com&sz=128',
+  'espn-live': 'https://www.google.com/s2/favicons?domain=espn.com&sz=128',
+  'free-sports-tv': 'https://www.google.com/s2/favicons?domain=freesports.tv&sz=128',
+  
+  // Twitch - Esports & Gaming
+  'twitch-esl': 'https://www.google.com/s2/favicons?domain=esl.com&sz=128',
+  'twitch-rocketleague': 'https://www.google.com/s2/favicons?domain=rocketleague.com&sz=128',
+  'twitch-valorant': 'https://www.google.com/s2/favicons?domain=playvalorant.com&sz=128',
+  'twitch-lol': 'https://www.google.com/s2/favicons?domain=leagueoflegends.com&sz=128',
+  'twitch-dota2': 'https://www.google.com/s2/favicons?domain=dota2.com&sz=128',
+  'twitch-fortnite': 'https://www.google.com/s2/favicons?domain=fortnite.com&sz=128',
+  'twitch-overwatch': 'https://www.google.com/s2/favicons?domain=overwatch.blizzard.com&sz=128',
+  'twitch-cdl': 'https://www.google.com/s2/favicons?domain=callofdutyleague.com&sz=128',
+  'twitch-pgl': 'https://www.google.com/s2/favicons?domain=pgl.gg&sz=128',
+  'twitch-blast': 'https://www.google.com/s2/favicons?domain=blastpremier.com&sz=128',
+  'twitch-chess': 'https://www.google.com/s2/favicons?domain=chess.com&sz=128',
+  
+  // Twitch - Streamers (use Twitch favicon)
   'twitch-gaules': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-pokimane': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-shroud': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-summit1g': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-timthetatman': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-nickmercs': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-drlupo': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-lirik': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-myth': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-xqc': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-hasanabi': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-ludwig': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-mizkif': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  'twitch-nmplol': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
+  
+  // Kick - Streamers
   'kick-xqc': 'https://www.google.com/s2/favicons?domain=kick.com&sz=128',
-  'kick-adin': 'https://www.google.com/s2/favicons?domain=kick.com&sz=128',
+  'kick-adinross': 'https://www.google.com/s2/favicons?domain=kick.com&sz=128',
+  'kick-trainwreckstv': 'https://www.google.com/s2/favicons?domain=kick.com&sz=128',
+  'kick-amouranth': 'https://www.google.com/s2/favicons?domain=kick.com&sz=128',
+  'kick-roshtein': 'https://www.google.com/s2/favicons?domain=kick.com&sz=128',
+  'kick-destiny': 'https://www.google.com/s2/favicons?domain=kick.com&sz=128',
+  'kick-nickeh30': 'https://www.google.com/s2/favicons?domain=kick.com&sz=128',
+  'kick-ice': 'https://www.google.com/s2/favicons?domain=kick.com&sz=128',
 };
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
