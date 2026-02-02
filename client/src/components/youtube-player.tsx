@@ -228,8 +228,13 @@ function YouTubePlayerInner({
           },
           onError: (event) => {
             console.log('[YouTube] Player error:', event.data, 'for widget:', widgetId);
-            // Only mark offline for critical errors (not found)
-            if (event.data === 100) {
+            // Trigger re-fetch for various video errors:
+            // 100 = Video not found
+            // 101/150 = Video not allowed for embedded playback
+            // 2 = Invalid video ID
+            // 5 = HTML5 player error
+            if ([2, 5, 100, 101, 150].includes(event.data)) {
+              console.log('[YouTube] Triggering onError callback for re-fetch');
               onErrorRef.current?.();
             }
           },

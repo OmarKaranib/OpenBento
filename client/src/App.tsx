@@ -717,13 +717,94 @@ function AppContent() {
     }
   }, [addVideoWidget, addWidget, setWidgets, findCollidingWidgets, findNextAvailableSlot]);
 
-  const handleChannelClick = useCallback((channel: TrendingChannel) => {
-    // Use the exact same logic as manual URL paste - just pass the URL
-    handleSubmitUrl(channel.url);
+  const handleChannelClick = useCallback(async (channel: TrendingChannel) => {
+    // Robot Copy-Paste: Use 24-hour cache for videoIds
+    const { getCachedVideoId, fetchFreshVideoId } = await import('@/lib/video-cache');
+    
+    // Close sidebar immediately for responsive feel
     setSidebarOpen(false);
     activeWidgetIdRef.current = null;
     setActiveWidgetId(null);
-  }, [handleSubmitUrl]);
+    
+    // Extract channelId from URL for cache lookup
+    const channelIdMatch = channel.url.match(/youtube\.com\/@([a-zA-Z0-9_-]+)/);
+    const youtubeChannelId = channelIdMatch ? channelIdMatch[1] : channel.channelId;
+    
+    // For non-YouTube platforms (Twitch/Kick), use direct URL processing
+    if (channel.platform !== 'youtube') {
+      handleSubmitUrl(channel.url);
+      return;
+    }
+    
+    // Check 24-hour cache first
+    const cachedVideoId = getCachedVideoId(youtubeChannelId || channel.name);
+    
+    if (cachedVideoId) {
+      // Use cached videoId - create widget directly
+      console.log(`[RobotPaste] Using cached videoId: ${cachedVideoId}`);
+      const currentActiveWidgetId = activeWidgetIdRef.current;
+      
+      if (currentActiveWidgetId) {
+        setWidgets(prev => prev.map(w => 
+          w.id === currentActiveWidgetId ? {
+            ...w,
+            type: 'video',
+            url: channel.url,
+            isYouTube: true,
+            videoId: cachedVideoId,
+            youtubeChannelId,
+            channelName: channel.name,
+            isLive: true,
+            error: null,
+            embedBlocked: false,
+            isPaused: false,
+            isMuted: true,
+            volume: 0,
+            isOffline: false,
+            lastRefresh: Date.now()
+          } : w
+        ));
+      } else {
+        addWidget('video', 3, 2, {
+          url: channel.url,
+          isYouTube: true,
+          videoId: cachedVideoId,
+          youtubeChannelId,
+          channelName: channel.name,
+          isLive: true,
+          lastRefresh: Date.now()
+        });
+      }
+    } else {
+      // No cache or expired - fetch fresh via API (Robot Copy-Paste)
+      console.log(`[RobotPaste] Fetching fresh videoId for: ${youtubeChannelId}`);
+      
+      // Create widget immediately with channelId (will use iframe fallback)
+      const widgetId = addWidget('video', 3, 2, {
+        url: channel.url,
+        isYouTube: true,
+        videoId: null, // Will trigger fetch
+        youtubeChannelId,
+        channelName: channel.name,
+        isLive: true,
+        lastRefresh: Date.now()
+      });
+      
+      // Fetch fresh videoId in background
+      const freshVideoId = await fetchFreshVideoId(youtubeChannelId || channel.name);
+      
+      if (freshVideoId && widgetId) {
+        // Update widget with fresh videoId
+        setWidgets(prev => prev.map(w => 
+          w.id === widgetId ? {
+            ...w,
+            videoId: freshVideoId,
+            lastRefresh: Date.now()
+          } : w
+        ));
+      }
+    }
+  }, [handleSubmitUrl, addWidget, setWidgets]);
 
   // Dashboard-only mode flag - set to false to allow sidebar with filtered content
   const dashboardOnlyMode = false;

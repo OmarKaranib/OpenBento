@@ -299,7 +299,7 @@ const MasterControlDashboard = ({
     });
   }, []);
 
-  const handleVideoError = useCallback((widget: Widget) => {
+  const handleVideoError = useCallback(async (widget: Widget) => {
     console.log(`[Self-Healing] Error detected for widget: ${widget.id}`);
     
     setWidgets(prev => prev.map(w => 
@@ -309,20 +309,38 @@ const MasterControlDashboard = ({
     if (widget.isYouTube && widget.youtubeChannelId) {
       const channelName = widget.channelName || widget.youtubeChannelId;
       
-      triggerHeal(
-        widget.id,
-        widget.youtubeChannelId,
-        channelName,
-        widget.videoId || undefined,
-        (newVideoId) => {
-          console.log(`[Self-Healing] Healed ${widget.id} with new videoId: ${newVideoId}`);
-          setWidgets(prev => prev.map(w => 
-            w.id === widget.id 
-              ? { ...w, videoId: newVideoId, isOffline: false, lastRefresh: Date.now() } 
-              : w
-          ));
-        }
-      );
+      // Clear cache on error - force fresh fetch (Robot Copy-Paste re-fetch on error)
+      const { clearCachedVideoId, fetchFreshVideoId } = await import('@/lib/video-cache');
+      clearCachedVideoId(widget.youtubeChannelId);
+      console.log(`[RobotPaste] Cleared cache for ${widget.youtubeChannelId}, fetching fresh...`);
+      
+      // Try to fetch fresh videoId directly (Robot Copy-Paste style)
+      const freshVideoId = await fetchFreshVideoId(widget.youtubeChannelId);
+      
+      if (freshVideoId) {
+        console.log(`[RobotPaste] Got fresh videoId: ${freshVideoId} for ${widget.id}`);
+        setWidgets(prev => prev.map(w => 
+          w.id === widget.id 
+            ? { ...w, videoId: freshVideoId, isOffline: false, lastRefresh: Date.now() } 
+            : w
+        ));
+      } else {
+        // Fall back to triggerHeal if direct fetch fails
+        triggerHeal(
+          widget.id,
+          widget.youtubeChannelId,
+          channelName,
+          widget.videoId || undefined,
+          (newVideoId) => {
+            console.log(`[Self-Healing] Healed ${widget.id} with new videoId: ${newVideoId}`);
+            setWidgets(prev => prev.map(w => 
+              w.id === widget.id 
+                ? { ...w, videoId: newVideoId, isOffline: false, lastRefresh: Date.now() } 
+                : w
+            ));
+          }
+        );
+      }
     }
   }, [triggerHeal, setWidgets]);
 

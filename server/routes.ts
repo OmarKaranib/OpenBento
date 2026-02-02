@@ -121,6 +121,49 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/live-video", async (req, res) => {
+    const { channelId } = req.query;
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    
+    if (!channelId || typeof channelId !== 'string') {
+      return res.status(400).json({ error: "Missing channelId parameter" });
+    }
+    
+    if (!apiKey) {
+      return res.status(503).json({ 
+        error: "YouTube API key not configured",
+        videoId: null 
+      });
+    }
+    
+    try {
+      console.log(`[LiveVideo] Fetching fresh videoId for channel: ${channelId}`);
+      const result = await healStream(channelId, channelId, apiKey);
+      
+      if (result.success && result.newVideoId) {
+        console.log(`[LiveVideo] Found videoId: ${result.newVideoId} for channel: ${channelId}`);
+        res.json({ 
+          videoId: result.newVideoId,
+          channelId,
+          isLive: true
+        });
+      } else {
+        console.log(`[LiveVideo] No live stream found for channel: ${channelId} - ${result.reason}`);
+        res.json({ 
+          videoId: null,
+          channelId,
+          reason: result.reason || "No live stream found"
+        });
+      }
+    } catch (error) {
+      console.error(`[LiveVideo] Error fetching videoId for ${channelId}:`, error);
+      res.status(500).json({ 
+        error: String(error),
+        videoId: null 
+      });
+    }
+  });
+
   app.post("/api/stream/validate", async (req, res) => {
     const { videoId } = req.body;
     const apiKey = process.env.YOUTUBE_API_KEY;
