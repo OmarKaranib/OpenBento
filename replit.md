@@ -71,25 +71,31 @@ The dashboard employs a 12-column magnetic grid with `grid-auto-flow: dense` to 
 - **Text colors:** White text with text-shadow for colored buttons; amber and indicator buttons get dark text for contrast
 - **LIVE Badge Lockdown:** `.live-badge` class preserves vibrant red in light mode for channel LIVE indicators
 
+**Default News Streams (2026-02-02):**
+- **Auto-Load:** When localStorage is empty, 6 default news streams load automatically
+- **Default Channels:** Sky News Live, ABC News Live, NASA Live, Reuters Live, Al Jazeera, France 24
+- **Grid Layout:** 2x3 arrangement (3 streams top row, 3 bottom row), each 4 columns × 3 rows
+- **Widget Format:** Uses url, videoId, channelName, isYouTube, isLive properties for proper healing/refresh
+- **Embed URLs:** Uses youtube-nocookie.com with autoplay=1, mute=1, and proper origin/parent parameters
+
+**Guest Access Model (2026-02-02):**
+- **Full Access:** All users can view, edit, and save dashboard without login
+- **Edit/Save:** No login restrictions - Edit and Save buttons work for all users
+- **Optional Login:** Login button available for users who want to sync across devices
+- **Login Button:** Small, non-prominent slate-600 button on far right of menu bar
+- **Login Modal:** Non-blocking popup with close (X) button, supports Email/Password and Google OAuth
+
+**Supabase Backend (2026-02-02):**
+- **Authentication:** Supabase Auth with Email/Password and Google OAuth
+- **Database:** PostgreSQL for user dashboards and layouts
+- **Credentials:** VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables
+- **Client Library:** @supabase/supabase-js in client/src/lib/supabase.ts
+
 **Authentication & Paywall System (2026-02-01):**
-- **Replit Auth Integration:** Uses Replit's OIDC authentication via `server/replit_integrations/auth/`
-- **User Tiers:**
-  - **Free Tier:** 4 blocks maximum, no background images, shows Upgrade button
-  - **Pro Tier:** Unlimited blocks + custom background images (requires login)
-- **Auth Endpoints:**
-  - `GET /api/login` - Redirects to Replit Auth
-  - `GET /api/logout` - Logs out user and redirects to home
-  - `GET /api/auth/user` - Returns current user data or 401 if not authenticated
-- **Menu Bar Auth Buttons:**
-  - **Upgrade Button:** Gold gradient (amber-500 to amber-600), visible only for Free tier, opens UpgradePopup
-  - **Login Button:** Cyan background (cyan-700), visible when not logged in
-  - **User Avatar/Logout:** Shows user avatar + name when logged in, clicks to logout
-- **UpgradePopup Component:** Bento-styled modal showing Pro features, triggered by:
-  - Clicking Upgrade button in menu bar
-  - Attempting to add more than 4 blocks (Free tier limit)
-  - Attempting to use background image feature (Free tier restriction)
-- **Background Image Restriction:** Pro-only feature - Free users see disabled input with "Pro feature" placeholder
-- **Architecture:** QueryClientProvider wraps AppContent component to enable useAuth hook usage
+- **Supabase Auth Integration:** Uses Supabase authentication for Email/Password and Google OAuth
+- **Public-First Model:** Full dashboard access without login
+- **Login Button:** Small slate-600 button, visible when not logged in
+- **User Avatar/Logout:** Shows user avatar + name when logged in, clicks to logout
 
 **Core Features:**
 - **Dynamic Widget System:** Supports Video, Note, Spacer, and Image widget types, each with unique functionalities. Widgets are added, removed, and content swapped dynamically.
