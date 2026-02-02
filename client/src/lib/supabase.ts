@@ -3,16 +3,27 @@ import { createClient, SupabaseClient, User, Session, AuthError } from '@supabas
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase credentials not configured. Auth features will be disabled.');
+const isConfigured = supabaseUrl && 
+  supabaseAnonKey && 
+  supabaseUrl.startsWith('https://') && 
+  !supabaseUrl.includes('${');
+
+if (!isConfigured) {
+  console.warn('Supabase credentials not configured. Auth features will be disabled. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
 }
 
-export const supabase: SupabaseClient = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
-);
+let supabase: SupabaseClient | null = null;
+
+if (isConfigured) {
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
+}
+
+export { supabase };
 
 export async function signInWithEmail(email: string, password: string): Promise<{ user: User | null; error: AuthError | null }> {
+  if (!supabase) {
+    return { user: null, error: { name: 'ConfigError', message: 'Supabase not configured' } as AuthError };
+  }
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -21,6 +32,9 @@ export async function signInWithEmail(email: string, password: string): Promise<
 }
 
 export async function signUpWithEmail(email: string, password: string): Promise<{ user: User | null; error: AuthError | null }> {
+  if (!supabase) {
+    return { user: null, error: { name: 'ConfigError', message: 'Supabase not configured' } as AuthError };
+  }
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -29,6 +43,9 @@ export async function signUpWithEmail(email: string, password: string): Promise<
 }
 
 export async function signInWithGoogle(): Promise<{ error: AuthError | null }> {
+  if (!supabase) {
+    return { error: { name: 'ConfigError', message: 'Supabase not configured' } as AuthError };
+  }
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
@@ -39,10 +56,14 @@ export async function signInWithGoogle(): Promise<{ error: AuthError | null }> {
 }
 
 export async function signOutUser(): Promise<void> {
+  if (!supabase) return;
   await supabase.auth.signOut();
 }
 
 export function onAuthChange(callback: (user: User | null, session: Session | null) => void): () => void {
+  if (!supabase) {
+    return () => {};
+  }
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     callback(session?.user ?? null, session);
   });
@@ -50,15 +71,25 @@ export function onAuthChange(callback: (user: User | null, session: Session | nu
 }
 
 export async function getSession(): Promise<{ user: User | null; session: Session | null }> {
+  if (!supabase) {
+    return { user: null, session: null };
+  }
   const { data: { session } } = await supabase.auth.getSession();
   return { user: session?.user ?? null, session };
 }
 
 export async function resetPassword(email: string): Promise<{ error: AuthError | null }> {
+  if (!supabase) {
+    return { error: { name: 'ConfigError', message: 'Supabase not configured' } as AuthError };
+  }
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/auth/reset-password`,
   });
   return { error };
+}
+
+export function isSupabaseConfigured(): boolean {
+  return supabase !== null;
 }
 
 export type { User, Session, AuthError };
