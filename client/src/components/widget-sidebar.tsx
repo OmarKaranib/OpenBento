@@ -770,9 +770,9 @@ export function WidgetSidebar({
     }
     
     if (activeCategory === 'news') {
-      filtered = filtered.filter(c => c.category === 'Global News' || c.category === 'Science');
+      filtered = filtered.filter(c => c.category === 'News' || c.category === 'Finance' || c.category === 'Science' || c.category === 'Live Cams');
     } else if (activeCategory === 'gaming') {
-      filtered = filtered.filter(c => c.category === 'Gaming' || c.category === 'Esports');
+      filtered = filtered.filter(c => c.category === 'Gaming' || c.category === 'Esports' || c.category === 'Sports');
     }
     // 'all' shows everything (except music and blocked), 'personal' and 'blocked' are handled separately
     
