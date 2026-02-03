@@ -51,7 +51,7 @@ export async function signInWithGoogle(): Promise<{ error: AuthError | null }> {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
+      redirectTo: 'https://openbento.tv/',
     },
   });
   return { error };
