@@ -184,7 +184,11 @@ export function getChannelUrl(channel: LiveChannel, origin: string): string {
   }
 
   if (channel.platform === 'youtube') {
-    // Return channel live URL - let the frontend extract the current live videoId dynamically
+    // If we have a videoId, use it directly in a watch URL (this allows extractYouTubeId to work)
+    if (channel.videoId) {
+      return `https://www.youtube.com/watch?v=${channel.videoId}`;
+    }
+    // Fallback to channel live URL
     return `https://www.youtube.com/@${channel.channelHandle}/live`;
   } else if (channel.platform === 'twitch') {
     return `https://www.twitch.tv/${channel.channelHandle}`;

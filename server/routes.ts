@@ -160,6 +160,40 @@ export async function registerRoutes(
     }
   });
 
+  // Kick API proxy (browser CORS blocked)
+  app.get("/api/kick/channel/:channelId", async (req, res) => {
+    const { channelId } = req.params;
+    
+    if (!channelId) {
+      return res.status(400).json({ error: "Missing channelId" });
+    }
+    
+    try {
+      const response = await fetch(`https://kick.com/api/v2/channels/${channelId}`, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      
+      if (!response.ok) {
+        return res.status(response.status).json({ 
+          error: `Kick API error: ${response.status}`,
+          isLive: false 
+        });
+      }
+      
+      const data = await response.json();
+      res.json({
+        isLive: data?.livestream !== null,
+        viewerCount: data?.livestream?.viewer_count || 0,
+        channelId: data?.slug || channelId
+      });
+    } catch (error) {
+      res.status(500).json({ error: String(error), isLive: false });
+    }
+  });
+
   app.post("/api/stream/validate", async (req, res) => {
     const { videoId } = req.body;
     const apiKey = process.env.YOUTUBE_API_KEY;

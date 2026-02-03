@@ -693,13 +693,13 @@ export function WidgetSidebar({
     ? linksData.channels 
     : FALLBACK_CHANNELS;
 
-  // Check live status for Kick channels
+  // Check live status for Kick channels (via server proxy to bypass CORS)
   const checkKickLiveStatus = useCallback(async (channelId: string): Promise<boolean> => {
     try {
-      const response = await fetch(`https://kick.com/api/v2/channels/${channelId}`);
+      const response = await fetch(`/api/kick/channel/${channelId}`);
       if (response.ok) {
         const data = await response.json();
-        return data?.livestream !== null;
+        return data?.isLive === true;
       }
       return false;
     } catch {
