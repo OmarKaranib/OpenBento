@@ -43,7 +43,11 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Blocked Channels Feature:** Allows users to hide channels from library views. Blocked channels are moved to a dedicated "Blocked" tab and can be unblocked. Persistence via `localStorage`.
 - **Master Volume Sync:** A global "MUTED/LIVE" toggle in the menu bar mutes/unmutes all video widgets. Individual widget controls remain.
 - **Authentication & Paywall System:** Leverages Supabase Auth for Email/Password and Google OAuth. The dashboard is public-first, with login being optional for cross-device synchronization.
-- **Admin Dashboard:** `/admin` route with client-side and server-side authorization for a single admin (`legionofoogabooga@gmail.com`). Provides CRUD operations for channels and displays system statistics.
+- **Profiles Table (Paywall Foundation):** A `profiles` table stores user-specific data linked to Supabase auth.users by ID. Includes `is_premium` boolean field for future paywall implementation.
+- **Admin Dashboard:** `/admin` route with client-side and server-side authorization for a single admin (`legionofoogabooga@gmail.com`). Features:
+  - **User List:** Fetches all registered users from Supabase Admin API using SERVICE_ROLE_KEY. Displays email, auth provider (Google/Email), admin badge, premium badge, verification status, and last sign-in date.
+  - **Channel Manager:** Full CRUD operations for channels stored in PostgreSQL `channels` table.
+  - **System Stats:** Live counts from database - total channels, live channels, YouTube/other platform breakdown.
 
 **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core`, `lucide-react`.
 
