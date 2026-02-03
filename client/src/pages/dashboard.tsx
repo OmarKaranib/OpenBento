@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, Crown, LogIn, LogOut, User, Loader2 } from 'lucide-react';
+import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, Crown, LogIn, LogOut, User, Loader2, Shield } from 'lucide-react';
+import { Link } from 'wouter';
+import { ADMIN_EMAIL } from '@/pages/admin';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -1273,25 +1275,48 @@ const MasterControlDashboard = ({
               </button>
             )}
 
-            {/* User Avatar/Logout - Consistent height with other menu buttons - shown when logged in */}
+            {/* User Avatar/Menu - Consistent height with other menu buttons - shown when logged in */}
             {isAuthenticated && user && (
-              <button
-                onClick={onLogout}
-                className="menu-btn h-[3.2rem] px-[1.2rem] bg-slate-600 hover:bg-slate-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-lg shadow-slate-900/50 text-white"
-                data-testid="button-logout"
-                title={`Logged in as ${user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'User'} - Click to logout`}
-              >
-                {(user.user_metadata?.avatar_url || user.user_metadata?.picture) ? (
-                  <img 
-                    src={user.user_metadata?.avatar_url || user.user_metadata?.picture} 
-                    alt="User" 
-                    className="w-[1.8rem] h-[1.8rem] rounded-full object-cover"
-                  />
-                ) : (
-                  <User className="w-[1.4rem] h-[1.4rem]" />
-                )}
-                <span className="max-w-[8rem] truncate">{(user.user_metadata?.full_name || user.user_metadata?.name || user.email)?.split(' ')[0] || 'User'}</span>
-              </button>
+              <div className="relative group">
+                <button
+                  className="menu-btn h-[3.2rem] px-[1.2rem] bg-slate-600 hover:bg-slate-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-lg shadow-slate-900/50 text-white"
+                  data-testid="button-user-menu"
+                  title={`Logged in as ${user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'User'}`}
+                >
+                  {(user.user_metadata?.avatar_url || user.user_metadata?.picture) ? (
+                    <img 
+                      src={user.user_metadata?.avatar_url || user.user_metadata?.picture} 
+                      alt="User" 
+                      className="w-[1.8rem] h-[1.8rem] rounded-full object-cover"
+                    />
+                  ) : (
+                    <User className="w-[1.4rem] h-[1.4rem]" />
+                  )}
+                  <span className="max-w-[8rem] truncate">{(user.user_metadata?.full_name || user.user_metadata?.name || user.email)?.split(' ')[0] || 'User'}</span>
+                  <ChevronDown className="w-[1.2rem] h-[1.2rem]" />
+                </button>
+                <div className="absolute right-0 top-full mt-[0.4rem] w-[16rem] bg-slate-800 border border-slate-600 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  {user.email === ADMIN_EMAIL && (
+                    <Link href="/admin">
+                      <a
+                        className="flex items-center gap-[0.8rem] px-[1.2rem] py-[1rem] text-[1.2rem] text-cyan-400 hover:bg-slate-700 transition-colors rounded-t-lg"
+                        data-testid="link-admin-dashboard"
+                      >
+                        <Shield className="w-[1.4rem] h-[1.4rem]" />
+                        Admin Dashboard
+                      </a>
+                    </Link>
+                  )}
+                  <button
+                    onClick={onLogout}
+                    className="w-full flex items-center gap-[0.8rem] px-[1.2rem] py-[1rem] text-[1.2rem] text-red-400 hover:bg-slate-700 transition-colors rounded-b-lg"
+                    data-testid="button-logout"
+                  >
+                    <LogOut className="w-[1.4rem] h-[1.4rem]" />
+                    Logout
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>

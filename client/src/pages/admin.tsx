@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
 import { Shield, Users, Tv, BarChart3, Loader2 } from 'lucide-react';
 
-const ADMIN_EMAIL = 'legionofoogaboo@gmail.com';
+export const ADMIN_EMAIL = 'legionofoogabooga@gmail.com';
 
 export default function Admin() {
   const { user, isLoading, isAuthenticated } = useAuth();
