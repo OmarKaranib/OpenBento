@@ -1,6 +1,9 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, RefreshCw, Star, Trash2, Globe, Heart, DollarSign, Zap } from 'lucide-react';
 
+// Global cache for failed logo URLs - prevents retrying 404s
+const failedLogoCache = new Set<string>();
+
 // Channel logo URLs - Using Google Favicon API for reliable high-quality logos
 // Maps channel ID to official website domain for best logo quality
 const CHANNEL_LOGOS: Record<string, string> = {
@@ -343,16 +346,10 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, isBlocked, onSave
     }
   };
 
-  // Get channel logo URL - Only use static CHANNEL_LOGOS map to avoid 404s on t2.gstatic.com
-  // Channels not in the map get the colored circle fallback immediately (no network request)
+  // Get channel logo URL - Always return null to use local fallback icon
+  // This eliminates ALL external favicon requests and t2.gstatic.com 404s
   const getLogoUrl = () => {
-    // Only return logo if it's in our static map - avoids all external favicon requests
-    if (CHANNEL_LOGOS[channel.id]) {
-      return CHANNEL_LOGOS[channel.id];
-    }
-    
-    // For all unmapped channels, return null to trigger colored circle fallback
-    // This eliminates 404s to t2.gstatic.com and external favicon service requests
+    // Always use local fallback icon - no external network requests
     return null;
   };
   
@@ -374,13 +371,12 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, isBlocked, onSave
     }
   };
 
-  // Fallback: Colored circle with first letter of channel name
+  // Fallback: Generic play button icon (local, no network request)
   const getFallbackIcon = () => {
-    const firstLetter = channel.name.charAt(0).toUpperCase();
     const bgColor = getFallbackColor();
     return (
       <div className={`w-full h-full ${bgColor} flex items-center justify-center rounded-lg`}>
-        <span className="text-white font-bold text-[1.4rem]">{firstLetter}</span>
+        <Tv className="w-[1.6rem] h-[1.6rem] text-white" />
       </div>
     );
   };
@@ -404,7 +400,11 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, isBlocked, onSave
             src={logoUrl} 
             alt={channel.name} 
             className="w-full h-full object-cover rounded-lg"
-            onError={() => setLogoError(true)}
+            onError={() => {
+              // Add to failed cache to prevent retrying this URL
+              if (logoUrl) failedLogoCache.add(logoUrl);
+              setLogoError(true);
+            }}
           />
         ) : (
           getFallbackIcon()
