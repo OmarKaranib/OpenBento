@@ -5,7 +5,7 @@ import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from ".
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerChannel } from "./services/pulse-cache";
 import { healStream, getVideoDetails, isMusicCategory } from "./services/youtube-api";
-import { insertUserLibrarySchema, insertDashboardSchema } from "@shared/schema";
+import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -370,6 +370,98 @@ export async function registerRoutes(
       }
       
       res.json({ dashboard });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  // Admin Channel Management Routes
+  const ADMIN_EMAIL = 'legionofoogabooga@gmail.com';
+  
+  const isAdmin = (req: Request): boolean => {
+    const user = (req as any).user;
+    return user?.email === ADMIN_EMAIL;
+  };
+
+  app.get("/api/admin/channels", async (req: Request, res: Response) => {
+    try {
+      const channels = await storage.getAllChannels();
+      res.json({ channels });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.post("/api/admin/channels", async (req: Request, res: Response) => {
+    try {
+      const validation = insertChannelSchema.safeParse(req.body);
+      
+      if (!validation.success) {
+        return res.status(400).json({ error: validation.error.message });
+      }
+      
+      const channel = await storage.createChannel(validation.data);
+      res.json({ channel });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.patch("/api/admin/channels/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const channel = await storage.updateChannel(id, req.body);
+      
+      if (!channel) {
+        return res.status(404).json({ error: "Channel not found" });
+      }
+      
+      res.json({ channel });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.delete("/api/admin/channels/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteChannel(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Channel not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  // Migration endpoint - import channels from links.json to database
+  app.post("/api/admin/migrate-channels", async (req: Request, res: Response) => {
+    try {
+      const linksData = loadLinks();
+      let imported = 0;
+      
+      for (const channel of linksData.channels) {
+        const existing = await storage.getChannel(channel.id);
+        if (!existing) {
+          await storage.createChannel({
+            id: channel.id,
+            name: channel.name,
+            channelHandle: channel.channelHandle,
+            platform: channel.platform,
+            iconType: channel.iconType,
+            category: channel.category,
+            videoId: channel.videoId,
+            isLive: channel.isLive,
+            lastUpdated: channel.lastUpdated ? new Date(channel.lastUpdated) : new Date(),
+          });
+          imported++;
+        }
+      }
+      
+      res.json({ success: true, imported, total: linksData.channels.length });
     } catch (error) {
       res.status(500).json({ error: String(error) });
     }

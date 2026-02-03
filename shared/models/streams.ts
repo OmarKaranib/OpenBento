@@ -108,3 +108,29 @@ export type InsertUserLibraryItem = z.infer<typeof insertUserLibrarySchema>;
 export type StreamStatus = typeof streamStatusCache.$inferSelect;
 export type InsertStreamStatus = z.infer<typeof insertStreamStatusSchema>;
 export type HealingLogEntry = typeof healingLog.$inferSelect;
+
+export const channels = pgTable("channels", {
+  id: varchar("id").primaryKey(),
+  name: varchar("name").notNull(),
+  channelHandle: varchar("channel_handle"),
+  platform: varchar("platform").notNull().default("youtube"),
+  iconType: varchar("icon_type"),
+  category: varchar("category"),
+  videoId: varchar("video_id"),
+  url: text("url"),
+  isLive: boolean("is_live").default(true),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_channels_platform").on(table.platform),
+  index("idx_channels_category").on(table.category),
+]);
+
+export const insertChannelSchema = createInsertSchema(channels).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Channel = typeof channels.$inferSelect;
+export type InsertChannel = z.infer<typeof insertChannelSchema>;

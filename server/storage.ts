@@ -4,11 +4,14 @@ import {
   streamStatusCache, 
   healingLog,
   dashboards,
+  channels,
   type UserLibraryItem,
   type InsertUserLibraryItem,
   type StreamStatus,
   type Dashboard,
   type InsertDashboard,
+  type Channel,
+  type InsertChannel,
 } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
@@ -27,6 +30,12 @@ export interface IStorage {
   getDashboard(userId: string): Promise<Dashboard | null>;
   saveDashboard(data: InsertDashboard): Promise<Dashboard>;
   updateDashboard(userId: string, updates: Partial<InsertDashboard>): Promise<Dashboard | null>;
+  
+  getAllChannels(): Promise<Channel[]>;
+  getChannel(id: string): Promise<Channel | null>;
+  createChannel(data: InsertChannel): Promise<Channel>;
+  updateChannel(id: string, updates: Partial<InsertChannel>): Promise<Channel | null>;
+  deleteChannel(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -125,6 +134,40 @@ export class DatabaseStorage implements IStorage {
       .where(eq(dashboards.userId, userId))
       .returning();
     return updated || null;
+  }
+
+  async getAllChannels(): Promise<Channel[]> {
+    return await db.select().from(channels);
+  }
+
+  async getChannel(id: string): Promise<Channel | null> {
+    const [channel] = await db.select()
+      .from(channels)
+      .where(eq(channels.id, id))
+      .limit(1);
+    return channel || null;
+  }
+
+  async createChannel(data: InsertChannel): Promise<Channel> {
+    const [inserted] = await db.insert(channels)
+      .values(data)
+      .returning();
+    return inserted;
+  }
+
+  async updateChannel(id: string, updates: Partial<InsertChannel>): Promise<Channel | null> {
+    const [updated] = await db.update(channels)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(channels.id, id))
+      .returning();
+    return updated || null;
+  }
+
+  async deleteChannel(id: string): Promise<boolean> {
+    const result = await db.delete(channels)
+      .where(eq(channels.id, id))
+      .returning();
+    return result.length > 0;
   }
 }
 
