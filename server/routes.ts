@@ -409,7 +409,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/channels/:id", async (req: Request, res: Response) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const channel = await storage.updateChannel(id, req.body);
       
       if (!channel) {
@@ -424,7 +424,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/channels/:id", async (req: Request, res: Response) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const deleted = await storage.deleteChannel(id);
       
       if (!deleted) {
