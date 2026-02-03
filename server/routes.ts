@@ -380,10 +380,15 @@ export async function registerRoutes(
   
   const isAdmin = (req: Request): boolean => {
     const user = (req as any).user;
-    return user?.email === ADMIN_EMAIL;
+    // Replit Auth stores email in claims.email, Supabase stores directly on user
+    const email = user?.claims?.email || user?.email;
+    return email === ADMIN_EMAIL;
   };
 
   app.get("/api/admin/channels", async (req: Request, res: Response) => {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
     try {
       const channels = await storage.getAllChannels();
       res.json({ channels });
@@ -393,6 +398,9 @@ export async function registerRoutes(
   });
 
   app.post("/api/admin/channels", async (req: Request, res: Response) => {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
     try {
       const validation = insertChannelSchema.safeParse(req.body);
       
@@ -408,6 +416,9 @@ export async function registerRoutes(
   });
 
   app.patch("/api/admin/channels/:id", async (req: Request, res: Response) => {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
     try {
       const id = req.params.id as string;
       const channel = await storage.updateChannel(id, req.body);
@@ -423,6 +434,9 @@ export async function registerRoutes(
   });
 
   app.delete("/api/admin/channels/:id", async (req: Request, res: Response) => {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
     try {
       const id = req.params.id as string;
       const deleted = await storage.deleteChannel(id);
@@ -439,6 +453,9 @@ export async function registerRoutes(
 
   // Migration endpoint - import channels from links.json to database
   app.post("/api/admin/migrate-channels", async (req: Request, res: Response) => {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
     try {
       const linksData = loadLinks();
       let imported = 0;
