@@ -24,6 +24,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import MasterControlDashboard from "@/pages/dashboard";
 import Admin from "@/pages/admin";
+import Checkout from "@/pages/checkout";
 import { WidgetSidebar, TrendingChannel, WidgetTemplate, WIDGET_TEMPLATES } from '@/components/widget-sidebar';
 import { 
   DndContext, 
@@ -845,6 +846,7 @@ function AppContent() {
               )}
             </Route>
             <Route path="/admin" component={Admin} />
+            <Route path="/checkout" component={Checkout} />
             <Route component={NotFound} />
           </Switch>
         </SortableContext>
