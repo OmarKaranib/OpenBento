@@ -382,7 +382,9 @@ export async function registerRoutes(
     const user = (req as any).user;
     // Replit Auth stores email in claims.email, Supabase stores directly on user
     const email = user?.claims?.email || user?.email;
-    return email === ADMIN_EMAIL;
+    const isAdminUser = email === ADMIN_EMAIL;
+    console.log('[Admin] Auth check - user:', user?.claims?.sub, 'email:', email, 'isAdmin:', isAdminUser);
+    return isAdminUser;
   };
 
   app.get("/api/admin/channels", async (req: Request, res: Response) => {
@@ -538,6 +540,75 @@ export async function registerRoutes(
       res.status(500).json({ error: String(error) });
     }
   });
+
+  // Admin endpoint to toggle user premium status
+  app.patch("/api/admin/users/:id/premium", async (req: Request, res: Response) => {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    
+    try {
+      const userId = req.params.id as string;
+      const { isPremium } = req.body;
+      
+      if (typeof isPremium !== 'boolean') {
+        return res.status(400).json({ error: "isPremium must be a boolean" });
+      }
+      
+      // Upsert profile with the premium status
+      const profile = await storage.upsertProfile({
+        id: userId,
+        email: '', // Will be updated with actual email if available
+        isPremium,
+      });
+      
+      console.log('[Admin] Updated premium status for user:', userId, 'isPremium:', isPremium);
+      res.json({ success: true, profile });
+    } catch (error) {
+      console.error('[Admin] Error updating premium status:', error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  // Auto-import channels on startup (runs once)
+  async function autoImportChannels() {
+    try {
+      const existingChannels = await storage.getAllChannels();
+      if (existingChannels.length === 0) {
+        console.log('[Startup] No channels found in database, auto-importing from links.json...');
+        const linksData = loadLinks();
+        let imported = 0;
+        
+        for (const channel of linksData.channels) {
+          try {
+            await storage.createChannel({
+              id: channel.id,
+              name: channel.name,
+              channelHandle: channel.channelHandle,
+              platform: channel.platform,
+              iconType: channel.iconType,
+              category: channel.category,
+              videoId: channel.videoId,
+              isLive: channel.isLive,
+              lastUpdated: channel.lastUpdated ? new Date(channel.lastUpdated) : new Date(),
+            });
+            imported++;
+          } catch (err) {
+            // Skip duplicates silently
+          }
+        }
+        
+        console.log(`[Startup] Auto-imported ${imported} channels from links.json`);
+      } else {
+        console.log(`[Startup] Found ${existingChannels.length} channels in database, skipping auto-import`);
+      }
+    } catch (error) {
+      console.error('[Startup] Error during auto-import:', error);
+    }
+  }
+  
+  // Run auto-import
+  autoImportChannels();
 
   return httpServer;
 }

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useLocation, Link } from 'wouter';
-import { useAuth } from '@/hooks/use-auth';
+import { useReplitAuth } from '@/hooks/use-replit-auth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle } from 'lucide-react';
+import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
 export const ADMIN_EMAIL = 'legionofoogabooga@gmail.com';
@@ -21,7 +21,7 @@ interface Channel {
 }
 
 export default function Admin() {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated, login } = useReplitAuth();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
@@ -37,17 +37,17 @@ export default function Admin() {
     isLive: true
   });
 
+  const isAdmin = isAuthenticated && user?.email === ADMIN_EMAIL;
+
   useEffect(() => {
-    if (!isLoading) {
-      if (!isAuthenticated || user?.email !== ADMIN_EMAIL) {
-        setLocation('/');
-      }
+    if (!isLoading && isAuthenticated && !isAdmin) {
+      setLocation('/');
     }
-  }, [isLoading, isAuthenticated, user, setLocation]);
+  }, [isLoading, isAuthenticated, isAdmin, setLocation]);
 
   const { data: channelsData, isLoading: channelsLoading, error: channelsError } = useQuery<{ channels: Channel[] }>({
     queryKey: ['/api/admin/channels'],
-    enabled: isAuthenticated && user?.email === ADMIN_EMAIL,
+    enabled: isAdmin,
   });
 
   interface AdminUser {
@@ -62,13 +62,21 @@ export default function Admin() {
 
   const { data: usersData, isLoading: usersLoading } = useQuery<{ users: AdminUser[], total: number }>({
     queryKey: ['/api/admin/users'],
-    enabled: isAuthenticated && user?.email === ADMIN_EMAIL,
+    enabled: isAdmin,
   });
 
   const migrateMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/admin/migrate-channels'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
+    },
+  });
+
+  const togglePremiumMutation = useMutation({
+    mutationFn: ({ userId, isPremium }: { userId: string; isPremium: boolean }) => 
+      apiRequest('PATCH', `/api/admin/users/${userId}/premium`, { isPremium }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
     },
   });
 
@@ -115,13 +123,43 @@ export default function Admin() {
     );
   }
 
-  if (!isAuthenticated || user?.email !== ADMIN_EMAIL) {
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <Shield className="w-16 h-16 text-cyan-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white mb-2">Admin Login Required</h1>
+          <p className="text-slate-400 mb-6">Please log in with your admin account to access this page.</p>
+          <button
+            onClick={login}
+            className="flex items-center gap-2 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white font-medium transition-colors mx-auto"
+            data-testid="button-admin-login"
+          >
+            <LogIn className="w-5 h-5" />
+            Login with Replit
+          </button>
+          <Link href="/">
+            <a className="text-slate-400 hover:text-slate-300 text-sm mt-4 inline-block">
+              Back to Dashboard
+            </a>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-center">
           <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
-          <p className="text-slate-400">Redirecting to home...</p>
+          <p className="text-slate-400">You don't have admin privileges.</p>
+          <Link href="/">
+            <a className="text-cyan-400 hover:text-cyan-300 text-sm mt-4 inline-block">
+              Back to Dashboard
+            </a>
+          </Link>
         </div>
       </div>
     );
@@ -193,10 +231,26 @@ export default function Admin() {
                           )}
                         </div>
                       </div>
-                      <div className="text-right text-xs text-slate-500">
-                        {u.lastSignIn && (
-                          <p>Last: {new Date(u.lastSignIn).toLocaleDateString()}</p>
-                        )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => togglePremiumMutation.mutate({ userId: u.id, isPremium: !u.isPremium })}
+                          disabled={togglePremiumMutation.isPending}
+                          className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                            u.isPremium
+                              ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+                              : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                          }`}
+                          data-testid={`button-toggle-premium-${u.id}`}
+                          title={u.isPremium ? 'Remove Premium' : 'Make Premium'}
+                        >
+                          <Crown className="w-3 h-3" />
+                          {u.isPremium ? 'Premium' : 'Free'}
+                        </button>
+                        <div className="text-right text-xs text-slate-500">
+                          {u.lastSignIn && (
+                            <p>Last: {new Date(u.lastSignIn).toLocaleDateString()}</p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
