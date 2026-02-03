@@ -156,19 +156,14 @@ function AppContent() {
     return (match && match[6] && match[6].length === 11) ? match[6] : null;
   };
 
-  // Extract YouTube channel ID from permanent live stream URLs
+  // Extract YouTube channel ID from channel URLs only (live_stream format removed)
   const extractYouTubeChannelId = (url: string): string | null => {
-    // Support both youtube.com and youtube-nocookie.com (Pro format)
-    const channelRegex = /youtube(-nocookie)?\.com\/embed\/live_stream\?channel=([a-zA-Z0-9_-]+)/;
     const channelRegex2 = /youtube\.com\/@([a-zA-Z0-9_-]+)/;
     const channelRegex3 = /youtube\.com\/channel\/([a-zA-Z0-9_-]+)/;
     const channelRegex4 = /youtube\.com\/c\/([a-zA-Z0-9_-]+)/;
-
-    const match1 = url.match(channelRegex);
-    if (match1) return match1[2]; // Group 2 for youtube-nocookie regex
     
-    const match2 = url.match(channelRegex2) || url.match(channelRegex3) || url.match(channelRegex4);
-    return match2 ? match2[1] : null;
+    const match = url.match(channelRegex2) || url.match(channelRegex3) || url.match(channelRegex4);
+    return match ? match[1] : null;
   };
 
   const extractTwitchChannel = (url: string): string | null => {
