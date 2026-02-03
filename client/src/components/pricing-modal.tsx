@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { X, Crown, Check, X as XIcon } from 'lucide-react';
-import { useLocation } from 'wouter';
+import { X, Crown, Check, X as XIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useMutation } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 
 interface PricingModalProps {
   isOpen: boolean;
@@ -13,11 +14,28 @@ export const YEARLY_PRICE_ID = 'price_1SwkV3PKTwXMfvTH085lq6tA';
 
 export function PricingModal({ isOpen, onClose }: PricingModalProps) {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('yearly');
-  const [, setLocation] = useLocation();
+
+  const checkoutMutation = useMutation({
+    mutationFn: async (priceId: string) => {
+      const response = await apiRequest('POST', '/api/stripe/create-checkout-session', {
+        priceId,
+        billingPeriod,
+      });
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: (error) => {
+      console.error('Checkout error:', error);
+    }
+  });
 
   const handleContinue = () => {
-    onClose();
-    setLocation(`/checkout?plan=${billingPeriod}`);
+    const priceId = billingPeriod === 'monthly' ? MONTHLY_PRICE_ID : YEARLY_PRICE_ID;
+    checkoutMutation.mutate(priceId);
   };
 
   if (!isOpen) return null;
@@ -38,13 +56,13 @@ export function PricingModal({ isOpen, onClose }: PricingModalProps) {
         data-testid="pricing-modal"
       >
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 text-slate-400"
+          className="absolute top-4 right-4 z-10 bg-slate-800 border-slate-600 text-white hover:bg-slate-700 hover:text-white w-10 h-10"
           data-testid="button-close-pricing"
         >
-          <X className="w-5 h-5" />
+          <X className="w-6 h-6" />
         </Button>
 
         <div className="p-8">
@@ -66,18 +84,17 @@ export function PricingModal({ isOpen, onClose }: PricingModalProps) {
               >
                 Monthly
               </Button>
-              <div className="relative">
-                <Button
-                  variant={billingPeriod === 'yearly' ? 'secondary' : 'ghost'}
-                  onClick={() => setBillingPeriod('yearly')}
-                  data-testid="button-yearly-plan"
-                >
-                  Yearly
-                </Button>
-                <span className="absolute -top-2 -right-2 bg-cyan-500 text-xs font-bold px-2 py-0.5 rounded-full text-white pointer-events-none">
+              <Button
+                variant={billingPeriod === 'yearly' ? 'secondary' : 'ghost'}
+                onClick={() => setBillingPeriod('yearly')}
+                className="gap-2"
+                data-testid="button-yearly-plan"
+              >
+                Yearly
+                <span className="bg-cyan-500 text-xs font-bold px-2 py-0.5 rounded-full text-white">
                   Up to 20% off
                 </span>
-              </div>
+              </Button>
             </div>
           </div>
 
@@ -159,11 +176,21 @@ export function PricingModal({ isOpen, onClose }: PricingModalProps) {
 
               <Button
                 onClick={handleContinue}
+                disabled={checkoutMutation.isPending}
                 className="w-full mt-6 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-900 font-bold"
                 data-testid="button-continue-pro"
               >
-                <Crown className="w-5 h-5 mr-2" />
-                Continue with Pro
+                {checkoutMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Redirecting to Stripe...
+                  </>
+                ) : (
+                  <>
+                    <Crown className="w-5 h-5 mr-2" />
+                    Continue with Pro
+                  </>
+                )}
               </Button>
             </div>
           </div>
