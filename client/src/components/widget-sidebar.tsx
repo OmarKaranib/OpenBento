@@ -343,47 +343,25 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, isBlocked, onSave
     }
   };
 
-  // Get channel logo URL - Try static map first, then platform-specific fallbacks
+  // Get channel logo URL - Only use static CHANNEL_LOGOS map to avoid 404s on t2.gstatic.com
+  // Channels not in the map get the colored circle fallback immediately (no network request)
   const getLogoUrl = () => {
-    // First check static CHANNEL_LOGOS map
+    // Only return logo if it's in our static map - avoids 404s to t2.gstatic.com
     if (CHANNEL_LOGOS[channel.id]) {
       return CHANNEL_LOGOS[channel.id];
     }
     
-    // Platform-specific logo fallbacks
+    // For platforms without mapped logos, use simple platform favicon (no dynamic URL params)
+    // This avoids Google favicon redirects to t2.gstatic.com for unknown domains
     if (channel.platform === 'youtube') {
-      // YouTube: Use Google favicon API with channel URL for best results
-      if (channel.url) {
-        return `https://www.google.com/s2/favicons?domain=youtube.com&sz=128&url=${encodeURIComponent(channel.url)}`;
-      }
       return 'https://www.google.com/s2/favicons?domain=youtube.com&sz=128';
     } else if (channel.platform === 'twitch') {
-      // Twitch: Use high-quality favicon service with channel URL
-      // The jtvnw.net preview URLs are unreliable (404 when offline)
-      // Instead use favicon service which works more reliably
-      if (channel.url) {
-        return `https://www.google.com/s2/favicons?domain=twitch.tv&sz=128&url=${encodeURIComponent(channel.url)}`;
-      }
       return 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128';
     } else if (channel.platform === 'kick') {
-      // Kick: Use favicon service with channel URL for profile approximation
-      if (channel.url) {
-        return `https://www.google.com/s2/favicons?domain=kick.com&sz=128&url=${encodeURIComponent(channel.url)}`;
-      }
       return 'https://www.google.com/s2/favicons?domain=kick.com&sz=128';
     }
     
-    // Generic fallback: Try to extract domain from channel URL
-    if (channel.url) {
-      try {
-        const urlObj = new URL(channel.url);
-        return `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
-      } catch {
-        // Invalid URL
-      }
-    }
-    
-    // No logo available - will trigger colored circle fallback
+    // For unmapped channels without platform, use colored circle fallback (no network request)
     return null;
   };
   

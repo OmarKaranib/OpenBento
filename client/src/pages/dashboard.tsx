@@ -580,6 +580,26 @@ const MasterControlDashboard = ({
     }
   }, []);
 
+  // Twitch Interactive Frames API - Volume sync via postMessage
+  // Docs: https://dev.twitch.tv/docs/embed/video-and-clips/#interactive-frames-for-live-streams
+  const sendTwitchCommand = useCallback((widgetId: string, command: 'setMuted' | 'setVolume', value: boolean | number) => {
+    const iframe = iframeRefs.current[widgetId];
+    if (iframe && iframe.contentWindow) {
+      const message = { eventName: command, params: { value } };
+      iframe.contentWindow.postMessage(message, 'https://player.twitch.tv');
+    }
+  }, []);
+
+  // Kick Player Messaging - Volume sync via postMessage
+  // Kick uses a similar postMessage API for embedded players
+  const sendKickCommand = useCallback((widgetId: string, command: 'setMuted' | 'setVolume', value: boolean | number) => {
+    const iframe = iframeRefs.current[widgetId];
+    if (iframe && iframe.contentWindow) {
+      const message = { event: command, data: value };
+      iframe.contentWindow.postMessage(message, 'https://player.kick.com');
+    }
+  }, []);
+
   const handleRemoveWidget = (widgetId: string) => {
     setWidgets(prev => prev.filter(w => w.id !== widgetId));
   };
@@ -588,8 +608,23 @@ const MasterControlDashboard = ({
     setWidgets(prev => prev.map(w => {
       if (w.id === widgetId) {
         const newMuted = !w.isMuted;
+        // Send mute command to appropriate platform
         if (w.isYouTube) {
           sendYouTubeCommand(widgetId, newMuted ? 'mute' : 'unMute');
+        } else if (w.isTwitch) {
+          sendTwitchCommand(widgetId, 'setMuted', newMuted);
+          if (!newMuted) {
+            // When unmuting Twitch, also set volume
+            const restoreVolume = w.previousVolume || 50;
+            sendTwitchCommand(widgetId, 'setVolume', restoreVolume / 100);
+          }
+        } else if (w.isKick) {
+          sendKickCommand(widgetId, 'setMuted', newMuted);
+          if (!newMuted) {
+            // When unmuting Kick, also set volume
+            const restoreVolume = w.previousVolume || 50;
+            sendKickCommand(widgetId, 'setVolume', restoreVolume / 100);
+          }
         }
         if (newMuted) {
           // When muting, store current volume for later restore
@@ -613,6 +648,16 @@ const MasterControlDashboard = ({
         const newMuted = clampedVolume === 0;
         // Update previousVolume when setting non-zero volume so mute/unmute restores correctly
         const newPreviousVolume = clampedVolume > 0 ? clampedVolume : w.previousVolume;
+        
+        // Send volume command to appropriate platform
+        if (w.isTwitch) {
+          sendTwitchCommand(widgetId, 'setVolume', clampedVolume / 100);
+          sendTwitchCommand(widgetId, 'setMuted', newMuted);
+        } else if (w.isKick) {
+          sendKickCommand(widgetId, 'setVolume', clampedVolume / 100);
+          sendKickCommand(widgetId, 'setMuted', newMuted);
+        }
+        
         return { ...w, volume: clampedVolume, isMuted: newMuted, previousVolume: newPreviousVolume };
       }
       return w;
@@ -707,8 +752,21 @@ const MasterControlDashboard = ({
     setMasterMute(newMute);
 
     setWidgets(prev => prev.map(w => {
-      if (w.type === 'video' && w.isYouTube) {
-        sendYouTubeCommand(w.id, newMute ? 'mute' : 'unMute');
+      if (w.type === 'video') {
+        // Send mute command to appropriate platform
+        if (w.isYouTube) {
+          sendYouTubeCommand(w.id, newMute ? 'mute' : 'unMute');
+        } else if (w.isTwitch) {
+          sendTwitchCommand(w.id, 'setMuted', newMute);
+          if (!newMute) {
+            sendTwitchCommand(w.id, 'setVolume', (w.previousVolume || 50) / 100);
+          }
+        } else if (w.isKick) {
+          sendKickCommand(w.id, 'setMuted', newMute);
+          if (!newMute) {
+            sendKickCommand(w.id, 'setVolume', (w.previousVolume || 50) / 100);
+          }
+        }
       }
       return { ...w, isMuted: newMute };
     }));
