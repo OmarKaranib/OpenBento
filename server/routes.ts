@@ -484,5 +484,54 @@ export async function registerRoutes(
     }
   });
 
+  // Admin Users API - Fetch all users from Supabase
+  app.get("/api/admin/users", async (req: Request, res: Response) => {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    
+    try {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      
+      if (!supabaseUrl || !serviceRoleKey) {
+        return res.status(500).json({ error: "Supabase credentials not configured" });
+      }
+      
+      // Use Supabase Admin API to fetch users
+      const response = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${serviceRoleKey}`,
+          'apikey': serviceRoleKey,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Admin] Supabase user fetch error:', errorText);
+        return res.status(response.status).json({ error: 'Failed to fetch users from Supabase' });
+      }
+      
+      const data = await response.json();
+      
+      // Map to simplified user objects for the admin panel
+      const users = (data.users || []).map((user: any) => ({
+        id: user.id,
+        email: user.email,
+        createdAt: user.created_at,
+        lastSignIn: user.last_sign_in_at,
+        emailConfirmed: user.email_confirmed_at ? true : false,
+        provider: user.app_metadata?.provider || 'email'
+      }));
+      
+      res.json({ users, total: users.length });
+    } catch (error) {
+      console.error('[Admin] Error fetching users:', error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
   return httpServer;
 }

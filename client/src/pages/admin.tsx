@@ -50,6 +50,20 @@ export default function Admin() {
     enabled: isAuthenticated && user?.email === ADMIN_EMAIL,
   });
 
+  interface AdminUser {
+    id: string;
+    email: string;
+    createdAt: string;
+    lastSignIn: string | null;
+    emailConfirmed: boolean;
+    provider: string;
+  }
+
+  const { data: usersData, isLoading: usersLoading } = useQuery<{ users: AdminUser[], total: number }>({
+    queryKey: ['/api/admin/users'],
+    enabled: isAuthenticated && user?.email === ADMIN_EMAIL,
+  });
+
   const migrateMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/admin/migrate-channels'),
     onSuccess: () => {
@@ -141,21 +155,64 @@ export default function Admin() {
               <div className="p-2 bg-blue-500/20 rounded-lg">
                 <Users className="w-6 h-6 text-blue-400" />
               </div>
-              <h2 className="text-xl font-semibold text-white">User List</h2>
+              <h2 className="text-xl font-semibold text-white">
+                User List {usersData?.total ? `(${usersData.total})` : ''}
+              </h2>
             </div>
-            <div className="bg-slate-900/50 rounded-lg p-4">
-              <div className="flex items-center gap-3 p-3 bg-slate-800 rounded-lg">
-                <div className="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center">
-                  <Users className="w-5 h-5 text-cyan-400" />
+            <div className="bg-slate-900/50 rounded-lg p-4 max-h-[400px] overflow-y-auto">
+              {usersLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />
                 </div>
-                <div>
-                  <p className="text-white font-medium">{user?.email}</p>
-                  <p className="text-slate-400 text-sm">Admin (You)</p>
+              ) : usersData?.users && usersData.users.length > 0 ? (
+                <div className="space-y-2">
+                  {usersData.users.map((u) => (
+                    <div key={u.id} className="flex items-center gap-3 p-3 bg-slate-800 rounded-lg">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        u.email === ADMIN_EMAIL ? 'bg-cyan-500/20' : 'bg-slate-700'
+                      }`}>
+                        <Users className={`w-5 h-5 ${u.email === ADMIN_EMAIL ? 'text-cyan-400' : 'text-slate-400'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium truncate">{u.email}</p>
+                        <div className="flex items-center gap-2 text-slate-400 text-sm">
+                          <span className={`px-2 py-0.5 rounded text-xs ${
+                            u.provider === 'google' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+                          }`}>
+                            {u.provider}
+                          </span>
+                          {u.email === ADMIN_EMAIL && (
+                            <span className="px-2 py-0.5 rounded text-xs bg-cyan-500/20 text-cyan-400">Admin</span>
+                          )}
+                          {u.emailConfirmed && (
+                            <span className="text-emerald-400 text-xs">Verified</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right text-xs text-slate-500">
+                        {u.lastSignIn && (
+                          <p>Last: {new Date(u.lastSignIn).toLocaleDateString()}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-              <p className="text-slate-500 text-sm mt-4 text-center">
-                Full user list requires Supabase service role key
-              </p>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 p-3 bg-slate-800 rounded-lg">
+                    <div className="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center">
+                      <Users className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">{user?.email}</p>
+                      <p className="text-slate-400 text-sm">Admin (You)</p>
+                    </div>
+                  </div>
+                  <p className="text-slate-500 text-sm mt-4 text-center">
+                    No additional users found
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
