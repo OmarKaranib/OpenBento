@@ -346,22 +346,13 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, isBlocked, onSave
   // Get channel logo URL - Only use static CHANNEL_LOGOS map to avoid 404s on t2.gstatic.com
   // Channels not in the map get the colored circle fallback immediately (no network request)
   const getLogoUrl = () => {
-    // Only return logo if it's in our static map - avoids 404s to t2.gstatic.com
+    // Only return logo if it's in our static map - avoids all external favicon requests
     if (CHANNEL_LOGOS[channel.id]) {
       return CHANNEL_LOGOS[channel.id];
     }
     
-    // For platforms without mapped logos, use simple platform favicon (no dynamic URL params)
-    // This avoids Google favicon redirects to t2.gstatic.com for unknown domains
-    if (channel.platform === 'youtube') {
-      return 'https://www.google.com/s2/favicons?domain=youtube.com&sz=128';
-    } else if (channel.platform === 'twitch') {
-      return 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128';
-    } else if (channel.platform === 'kick') {
-      return 'https://www.google.com/s2/favicons?domain=kick.com&sz=128';
-    }
-    
-    // For unmapped channels without platform, use colored circle fallback (no network request)
+    // For all unmapped channels, return null to trigger colored circle fallback
+    // This eliminates 404s to t2.gstatic.com and external favicon service requests
     return null;
   };
   
