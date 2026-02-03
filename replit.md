@@ -50,6 +50,11 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
   - **Security:** Server-side price ID allowlist validation prevents tampering - only valid price IDs are accepted.
   - **Stripe Price IDs:** Monthly: `price_1SwkV2PKTwXMfvTHKCHfRDud`, Yearly: `price_1SwkV3PKTwXMfvTH085lq6tA`
   - **Webhook Handling:** Stripe webhooks configured via Replit managed webhook setup for subscription sync.
+  - **Free vs Pro Enforcement:** Strict feature gating enforced on frontend and backend:
+    - **6-Block Limit:** FREE_BLOCK_LIMIT = 6, free users blocked from adding 7th widget. Add Block button shows "Limit" with Lock icon at capacity, clicks auto-trigger pricing modal.
+    - **Locked Save Layout:** Free users see Lock + Crown icons on disabled Save button. Clicking opens pricing modal. Backend returns 403 for non-premium POST/PATCH /api/dashboard.
+    - **Pro Unlock:** Premium users have unlimited blocks, full Save Layout functionality, hidden Pro crown button (already unlocked).
+    - **Premium Status:** Fetched via /api/user/premium-status endpoint using usePremium hook, passed as prop to dashboard.
 - **Admin Dashboard:** `/admin` route with client-side and server-side authorization for a single admin (`legionofoogabooga@gmail.com`). Features:
   - **User List:** Fetches all registered users from Supabase Admin API using SERVICE_ROLE_KEY. Displays email, auth provider (Google/Email), admin badge, premium badge, verification status, and last sign-in date.
   - **Premium Toggle:** Crown button next to each user allows admin to manually toggle premium status via `PATCH /api/admin/users/:id/premium`. Implements manual paywall control.
