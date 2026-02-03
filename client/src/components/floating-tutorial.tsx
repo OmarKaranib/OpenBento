@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { HelpCircle, X, ArrowRight, ArrowDown, ArrowUp } from 'lucide-react';
+import { HelpCircle, X, ArrowUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface TutorialStep {
@@ -7,7 +7,7 @@ interface TutorialStep {
   targetSelector: string;
   title: string;
   description: string;
-  arrowDirection: 'right' | 'down' | 'up' | 'left';
+  verticalOffset: number;
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
@@ -16,88 +16,92 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     targetSelector: '[data-testid="button-master-mute"]',
     title: 'Master Mute',
     description: 'Silence all streams instantly.',
-    arrowDirection: 'up',
+    verticalOffset: 0,
   },
   {
     id: 'edit-mode',
     targetSelector: '[data-testid="button-edit-layout"]',
     title: 'Edit Mode',
     description: 'Arrange your Bento grid.',
-    arrowDirection: 'up',
+    verticalOffset: 80,
   },
   {
     id: 'pro-crown',
     targetSelector: '[data-testid="button-pro-crown"]',
     title: 'Pro Crown',
-    description: 'Unlimited power & saved layouts.',
-    arrowDirection: 'up',
+    description: 'Unlock unlimited power.',
+    verticalOffset: 160,
   },
 ];
 
-export function FloatingTutorial({ isPremium, isDarkMode = true }: { isPremium: boolean; isDarkMode?: boolean }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [positions, setPositions] = useState<Record<string, { top: number; left: number } | null>>({});
-  const overlayRef = useRef<HTMLDivElement>(null);
+interface TutorialTipProps {
+  step: typeof TUTORIAL_STEPS[0];
+  isPremium: boolean;
+}
+
+function TutorialTip({ step, isPremium }: TutorialTipProps) {
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    const calculatePosition = () => {
+      if (step.id === 'pro-crown' && isPremium) {
+        setPosition(null);
+        return;
+      }
 
-    const calculatePositions = () => {
-      const newPositions: Record<string, { top: number; left: number } | null> = {};
-      
-      // Stagger vertical offsets to prevent overlap
-      const verticalOffsets: Record<string, number> = {
-        'master-mute': 0,
-        'edit-mode': 90,
-        'pro-crown': 180,
-      };
-      
-      TUTORIAL_STEPS.forEach((step) => {
-        if (step.id === 'pro-crown' && isPremium) {
-          newPositions[step.id] = null;
-          return;
-        }
-        
-        const element = document.querySelector(step.targetSelector);
-        if (element) {
-          const rect = element.getBoundingClientRect();
-          newPositions[step.id] = {
-            top: rect.bottom + 10 + (verticalOffsets[step.id] || 0),
-            left: rect.left + rect.width / 2,
-          };
-        } else {
-          newPositions[step.id] = null;
-        }
-      });
-      
-      setPositions(newPositions);
+      const element = document.querySelector(step.targetSelector);
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        setPosition({
+          top: rect.bottom + 8 + step.verticalOffset,
+          left: rect.left + rect.width / 2,
+        });
+      } else {
+        setPosition(null);
+      }
     };
 
-    calculatePositions();
-    window.addEventListener('resize', calculatePositions);
-    window.addEventListener('scroll', calculatePositions);
+    calculatePosition();
+    window.addEventListener('resize', calculatePosition);
+    window.addEventListener('scroll', calculatePosition);
 
     return () => {
-      window.removeEventListener('resize', calculatePositions);
-      window.removeEventListener('scroll', calculatePositions);
+      window.removeEventListener('resize', calculatePosition);
+      window.removeEventListener('scroll', calculatePosition);
     };
-  }, [isOpen, isPremium]);
+  }, [step, isPremium]);
+
+  if (step.id === 'pro-crown' && isPremium) return null;
+  if (!position) return null;
+
+  return (
+    <div
+      ref={tipRef}
+      className="fixed z-[9999] pointer-events-none"
+      style={{
+        top: position.top,
+        left: position.left,
+        transform: 'translateX(-50%)',
+      }}
+      data-testid={`tutorial-tip-${step.id}`}
+    >
+      <div className="flex flex-col items-center">
+        <ArrowUp className="w-5 h-5 text-cyan-400 animate-bounce" />
+        <div className="mt-2 bg-slate-800 border border-cyan-500/50 rounded-xl px-4 py-3 shadow-xl shadow-cyan-500/10 whitespace-nowrap text-center">
+          <h3 className="text-cyan-400 font-bold text-sm mb-1" data-testid={`text-tutorial-tip-title-${step.id}`}>{step.title}</h3>
+          <p className="text-slate-300 text-xs" data-testid={`text-tutorial-tip-desc-${step.id}`}>{step.description}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function FloatingTutorial({ isPremium, isDarkMode = true }: { isPremium: boolean; isDarkMode?: boolean }) {
+  const [isOpen, setIsOpen] = useState(false);
 
   const handleClose = () => {
     setIsOpen(false);
-  };
-
-  const ArrowIcon = ({ direction }: { direction: string }) => {
-    switch (direction) {
-      case 'up':
-        return <ArrowUp className="w-5 h-5 text-cyan-400 animate-bounce" />;
-      case 'down':
-        return <ArrowDown className="w-5 h-5 text-cyan-400 animate-bounce" />;
-      case 'right':
-        return <ArrowRight className="w-5 h-5 text-cyan-400 animate-bounce" />;
-      default:
-        return <ArrowUp className="w-5 h-5 text-cyan-400 animate-bounce" />;
-    }
   };
 
   return (
@@ -116,55 +120,32 @@ export function FloatingTutorial({ isPremium, isDarkMode = true }: { isPremium: 
       </button>
 
       {isOpen && (
-        <div 
-          ref={overlayRef}
-          className="fixed inset-0 z-[9998] bg-black/60"
-          onClick={handleClose}
-          data-testid="tutorial-overlay"
-        >
+        <>
+          <div 
+            className="fixed inset-0 z-[9998] bg-black/60"
+            onClick={handleClose}
+            data-testid="tutorial-overlay"
+          />
+          
           <Button
             onClick={handleClose}
             size="icon"
             variant="outline"
-            className="absolute top-4 right-4 z-[9999] bg-slate-700 border-slate-500"
+            className="fixed top-4 right-4 z-[9999] bg-slate-700 border-slate-500"
             data-testid="button-close-tutorial"
           >
             <X className="w-6 h-6" />
           </Button>
 
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 text-center">
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 text-center z-[9999]">
             <h2 className="text-2xl font-bold text-white mb-2" data-testid="text-tutorial-title">Quick Tutorial</h2>
             <p className="text-slate-400" data-testid="text-tutorial-subtitle">Click anywhere to close</p>
           </div>
 
-          {TUTORIAL_STEPS.map((step) => {
-            if (step.id === 'pro-crown' && isPremium) return null;
-            
-            const position = positions[step.id];
-            if (!position) return null;
-
-            return (
-              <div
-                key={step.id}
-                className="absolute z-[9999] pointer-events-none"
-                style={{
-                  top: position.top,
-                  left: position.left,
-                  transform: 'translateX(-50%)',
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex flex-col items-center">
-                  <ArrowIcon direction={step.arrowDirection} />
-                  <div className="mt-3 bg-slate-800 border border-cyan-500/50 rounded-xl px-4 py-3 shadow-xl shadow-cyan-500/10 w-[160px] text-center" data-testid={`tutorial-tip-${step.id}`}>
-                    <h3 className="text-cyan-400 font-bold text-sm mb-1" data-testid={`text-tutorial-tip-title-${step.id}`}>{step.title}</h3>
-                    <p className="text-slate-300 text-xs leading-tight" data-testid={`text-tutorial-tip-desc-${step.id}`}>{step.description}</p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          {TUTORIAL_STEPS.map((step) => (
+            <TutorialTip key={step.id} step={step} isPremium={isPremium} />
+          ))}
+        </>
       )}
     </>
   );
