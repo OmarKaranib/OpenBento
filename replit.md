@@ -46,8 +46,11 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Profiles Table (Paywall Foundation):** A `profiles` table stores user-specific data linked to Supabase auth.users by ID. Includes `is_premium` boolean field for future paywall implementation.
 - **Admin Dashboard:** `/admin` route with client-side and server-side authorization for a single admin (`legionofoogabooga@gmail.com`). Features:
   - **User List:** Fetches all registered users from Supabase Admin API using SERVICE_ROLE_KEY. Displays email, auth provider (Google/Email), admin badge, premium badge, verification status, and last sign-in date.
+  - **Premium Toggle:** Crown button next to each user allows admin to manually toggle premium status via `PATCH /api/admin/users/:id/premium`. Implements manual paywall control.
   - **Channel Manager:** Full CRUD operations for channels stored in PostgreSQL `channels` table.
+  - **Channel Auto-Import:** On startup, channels from `links.json` are automatically imported to the database if not already present (94 channels).
   - **System Stats:** Live counts from database - total channels, live channels, YouTube/other platform breakdown.
+  - **Auth:** Admin page uses Replit Auth (`/api/auth/user`) via `useReplitAuth` hook to match server-side session validation, while regular users use Supabase Auth. This dual-auth architecture is intentional.
 
 **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core`, `lucide-react`.
 
