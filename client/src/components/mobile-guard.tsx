@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Monitor, Mail, Smartphone } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 const MOBILE_BREAKPOINT = 1024;
 
@@ -42,10 +44,10 @@ export function MobileGuard({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="space-y-4">
-          <h1 className="text-3xl font-bold text-white">
+          <h1 className="text-3xl font-bold text-white" data-testid="text-mobile-guard-title">
             Desktop Experience Only
           </h1>
-          <p className="text-lg text-slate-300 leading-relaxed">
+          <p className="text-lg text-slate-300 leading-relaxed" data-testid="text-mobile-guard-message">
             OpenBento is optimized for Desktop. Please sign up here to get notified when our mobile version launches.
           </p>
         </div>
@@ -53,28 +55,29 @@ export function MobileGuard({ children }: { children: React.ReactNode }) {
         {!submitted ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <input
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 z-10" />
+              <Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                className="w-full pl-12 pr-4 py-4 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"
+                className="w-full pl-12 bg-slate-800 border-slate-600 text-white placeholder-slate-400 focus:border-cyan-500"
                 required
                 data-testid="input-mobile-email"
               />
             </div>
-            <button
+            <Button
               type="submit"
-              className="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] shadow-lg shadow-cyan-500/25"
+              size="lg"
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold"
               data-testid="button-mobile-notify"
             >
               Notify Me When Ready
-            </button>
+            </Button>
           </form>
         ) : (
-          <div className="bg-emerald-900/30 border border-emerald-500/30 rounded-xl p-6">
-            <p className="text-emerald-400 font-medium">
+          <div className="bg-emerald-900/30 border border-emerald-500/30 rounded-xl p-6" data-testid="mobile-guard-success">
+            <p className="text-emerald-400 font-medium" data-testid="text-mobile-guard-success">
               Thanks! We'll notify you at {email} when mobile is ready.
             </p>
           </div>

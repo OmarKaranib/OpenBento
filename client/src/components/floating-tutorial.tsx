@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { HelpCircle, X, ArrowRight, ArrowDown, ArrowUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface TutorialStep {
   id: string;
@@ -110,17 +111,19 @@ export function FloatingTutorial({ isPremium }: { isPremium: boolean }) {
           onClick={handleClose}
           data-testid="tutorial-overlay"
         >
-          <button
+          <Button
             onClick={handleClose}
-            className="absolute top-4 right-4 w-12 h-12 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center border-2 border-slate-500 transition-all z-[9999]"
+            size="icon"
+            variant="outline"
+            className="absolute top-4 right-4 z-[9999] bg-slate-700 border-slate-500"
             data-testid="button-close-tutorial"
           >
-            <X className="w-6 h-6 text-white" />
-          </button>
+            <X className="w-6 h-6" />
+          </Button>
 
           <div className="absolute top-6 left-1/2 -translate-x-1/2 text-center">
-            <h2 className="text-2xl font-bold text-white mb-2">Quick Tutorial</h2>
-            <p className="text-slate-400">Click anywhere to close</p>
+            <h2 className="text-2xl font-bold text-white mb-2" data-testid="text-tutorial-title">Quick Tutorial</h2>
+            <p className="text-slate-400" data-testid="text-tutorial-subtitle">Click anywhere to close</p>
           </div>
 
           {TUTORIAL_STEPS.map((step) => {
@@ -142,9 +145,9 @@ export function FloatingTutorial({ isPremium }: { isPremium: boolean }) {
               >
                 <div className="flex flex-col items-center">
                   <ArrowIcon direction={step.arrowDirection} />
-                  <div className="mt-2 bg-slate-800 border border-cyan-500/50 rounded-xl px-4 py-3 shadow-xl shadow-cyan-500/10 min-w-[180px] text-center">
-                    <h3 className="text-cyan-400 font-bold text-sm mb-1">{step.title}</h3>
-                    <p className="text-slate-300 text-xs">{step.description}</p>
+                  <div className="mt-2 bg-slate-800 border border-cyan-500/50 rounded-xl px-4 py-3 shadow-xl shadow-cyan-500/10 min-w-[180px] text-center" data-testid={`tutorial-tip-${step.id}`}>
+                    <h3 className="text-cyan-400 font-bold text-sm mb-1" data-testid={`text-tutorial-tip-title-${step.id}`}>{step.title}</h3>
+                    <p className="text-slate-300 text-xs" data-testid={`text-tutorial-tip-desc-${step.id}`}>{step.description}</p>
                   </div>
                 </div>
               </div>
