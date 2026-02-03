@@ -45,7 +45,8 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Authentication & Paywall System:** Leverages Supabase Auth for Email/Password and Google OAuth. The dashboard is public-first, with login being optional for cross-device synchronization.
 - **Profiles Table (Paywall Foundation):** A `profiles` table stores user-specific data linked to Supabase auth.users by ID. Includes `is_premium` boolean field for future paywall implementation.
 - **Stripe Pro Subscription:** Integrated Stripe for recurring subscriptions via the Replit Stripe connector.
-  - **Pricing Modal:** Crown button in header opens modal with Monthly ($8/mo) and Yearly ($80/year) billing toggle.
+  - **Pricing Modal:** Crown button in header opens side-by-side comparison modal (Replit-style) with Free vs Pro columns. Free: $0/forever, Up to 6 streams, Ads included, ❌ Save Layout, ❌ Early Access. Pro: $8/mo or $80/year, Unlimited streams, No ads, ✅ Save Layout, ✅ Early Access.
+  - **Checkout Page:** Dedicated `/checkout` route with order summary, plan toggle, and Stripe integration.
   - **Promo Codes:** `allow_promotion_codes: true` enabled for Stripe checkout sessions.
   - **Security:** Server-side price ID allowlist validation prevents tampering - only valid price IDs are accepted.
   - **Stripe Price IDs:** Monthly: `price_1SwkV2PKTwXMfvTHKCHfRDud`, Yearly: `price_1SwkV3PKTwXMfvTH085lq6tA`
