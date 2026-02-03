@@ -769,7 +769,21 @@ const MasterControlDashboard = ({
             sendKickCommand(w.id, 'setVolume', (w.previousVolume || 50) / 100);
           }
         }
+        
+        // Update state: When muting, store volume and set to 0. When unmuting, restore volume.
+        if (newMute) {
+          return { 
+            ...w, 
+            isMuted: true, 
+            previousVolume: w.volume > 0 ? w.volume : (w.previousVolume || 50),
+            volume: 0 
+          };
+        } else {
+          const restoreVolume = w.previousVolume || 50;
+          return { ...w, isMuted: false, volume: restoreVolume };
+        }
       }
+      // Non-video widgets just get muted state updated
       return { ...w, isMuted: newMute };
     }));
   };
