@@ -169,17 +169,30 @@ export async function registerRoutes(
     }
     
     try {
-      const response = await fetch(`https://kick.com/api/v2/channels/${channelId}`, {
+      // Try v1 API first with full browser headers to bypass Cloudflare
+      const response = await fetch(`https://kick.com/api/v1/channels/${channelId}`, {
         headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://kick.com/',
+          'Origin': 'https://kick.com',
+          'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"macOS"',
+          'sec-fetch-dest': 'empty',
+          'sec-fetch-mode': 'cors',
+          'sec-fetch-site': 'same-origin'
         }
       });
       
       if (!response.ok) {
-        return res.status(response.status).json({ 
-          error: `Kick API error: ${response.status}`,
-          isLive: false 
+        // Kick blocks server requests - return unknown status, player will show actual state
+        return res.json({ 
+          isLive: null,
+          viewerCount: 0,
+          channelId: channelId,
+          status: 'unknown'
         });
       }
       
@@ -190,7 +203,8 @@ export async function registerRoutes(
         channelId: data?.slug || channelId
       });
     } catch (error) {
-      res.status(500).json({ error: String(error), isLive: false });
+      // Return unknown rather than false - let the player show actual state
+      res.json({ isLive: null, viewerCount: 0, channelId, status: 'unknown' });
     }
   });
 

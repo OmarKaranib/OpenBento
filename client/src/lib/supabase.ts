@@ -1,7 +1,9 @@
 import { createClient, SupabaseClient, User, Session, AuthError } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const rawKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+const supabaseAnonKey = typeof rawKey === 'string' ? rawKey.trim() : '';
 
 const isConfigured = supabaseUrl && 
   supabaseAnonKey && 
