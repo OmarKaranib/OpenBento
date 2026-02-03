@@ -23,6 +23,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import MasterControlDashboard from "@/pages/dashboard";
+import Admin from "@/pages/admin";
 import { WidgetSidebar, TrendingChannel, WidgetTemplate, WIDGET_TEMPLATES } from '@/components/widget-sidebar';
 import { 
   DndContext, 
@@ -843,6 +844,7 @@ function AppContent() {
                 />
               )}
             </Route>
+            <Route path="/admin" component={Admin} />
             <Route component={NotFound} />
           </Switch>
         </SortableContext>
