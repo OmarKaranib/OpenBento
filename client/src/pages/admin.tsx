@@ -57,6 +57,7 @@ export default function Admin() {
     lastSignIn: string | null;
     emailConfirmed: boolean;
     provider: string;
+    isPremium: boolean;
   }
 
   const { data: usersData, isLoading: usersLoading } = useQuery<{ users: AdminUser[], total: number }>({
@@ -183,6 +184,9 @@ export default function Admin() {
                           </span>
                           {u.email === ADMIN_EMAIL && (
                             <span className="px-2 py-0.5 rounded text-xs bg-cyan-500/20 text-cyan-400">Admin</span>
+                          )}
+                          {u.isPremium && (
+                            <span className="px-2 py-0.5 rounded text-xs bg-yellow-500/20 text-yellow-400">Premium</span>
                           )}
                           {u.emailConfirmed && (
                             <span className="text-emerald-400 text-xs">Verified</span>

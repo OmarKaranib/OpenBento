@@ -5,6 +5,7 @@ import {
   healingLog,
   dashboards,
   channels,
+  profiles,
   type UserLibraryItem,
   type InsertUserLibraryItem,
   type StreamStatus,
@@ -12,8 +13,10 @@ import {
   type InsertDashboard,
   type Channel,
   type InsertChannel,
+  type Profile,
+  type InsertProfile,
 } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 export interface IStorage {
   getUserLibrary(userId: string): Promise<UserLibraryItem[]>;
@@ -36,6 +39,12 @@ export interface IStorage {
   createChannel(data: InsertChannel): Promise<Channel>;
   updateChannel(id: string, updates: Partial<InsertChannel>): Promise<Channel | null>;
   deleteChannel(id: string): Promise<boolean>;
+  
+  // Profile methods for premium/paywall
+  getProfile(id: string): Promise<Profile | null>;
+  getProfilesByIds(ids: string[]): Promise<Profile[]>;
+  upsertProfile(data: InsertProfile): Promise<Profile>;
+  updateProfilePremium(id: string, isPremium: boolean): Promise<Profile | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -168,6 +177,41 @@ export class DatabaseStorage implements IStorage {
       .where(eq(channels.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  // Profile methods for premium/paywall
+  async getProfile(id: string): Promise<Profile | null> {
+    const [profile] = await db.select()
+      .from(profiles)
+      .where(eq(profiles.id, id))
+      .limit(1);
+    return profile || null;
+  }
+
+  async getProfilesByIds(ids: string[]): Promise<Profile[]> {
+    if (ids.length === 0) return [];
+    return await db.select()
+      .from(profiles)
+      .where(inArray(profiles.id, ids));
+  }
+
+  async upsertProfile(data: InsertProfile): Promise<Profile> {
+    const [inserted] = await db.insert(profiles)
+      .values(data)
+      .onConflictDoUpdate({
+        target: profiles.id,
+        set: { email: data.email, isPremium: data.isPremium, updatedAt: new Date() }
+      })
+      .returning();
+    return inserted;
+  }
+
+  async updateProfilePremium(id: string, isPremium: boolean): Promise<Profile | null> {
+    const [updated] = await db.update(profiles)
+      .set({ isPremium, updatedAt: new Date() })
+      .where(eq(profiles.id, id))
+      .returning();
+    return updated || null;
   }
 }
 

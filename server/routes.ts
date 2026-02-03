@@ -516,6 +516,11 @@ export async function registerRoutes(
       
       const data = await response.json();
       
+      // Get user IDs to fetch premium status from profiles
+      const userIds = (data.users || []).map((u: any) => u.id);
+      const profilesData = await storage.getProfilesByIds(userIds);
+      const profilesMap = new Map(profilesData.map(p => [p.id, p]));
+      
       // Map to simplified user objects for the admin panel
       const users = (data.users || []).map((user: any) => ({
         id: user.id,
@@ -523,7 +528,8 @@ export async function registerRoutes(
         createdAt: user.created_at,
         lastSignIn: user.last_sign_in_at,
         emailConfirmed: user.email_confirmed_at ? true : false,
-        provider: user.app_metadata?.provider || 'email'
+        provider: user.app_metadata?.provider || 'email',
+        isPremium: profilesMap.get(user.id)?.isPremium || false
       }));
       
       res.json({ users, total: users.length });

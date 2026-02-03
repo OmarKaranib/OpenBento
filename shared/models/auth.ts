@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 
 // Session storage table.
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
@@ -27,3 +27,16 @@ export const users = pgTable("users", {
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// Profiles table for additional user data (is_premium for paywall)
+// Links to Supabase auth.users via id
+export const profiles = pgTable("profiles", {
+  id: varchar("id").primaryKey(), // Matches Supabase auth.users.id
+  email: varchar("email"),
+  isPremium: boolean("is_premium").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type InsertProfile = typeof profiles.$inferInsert;
+export type Profile = typeof profiles.$inferSelect;
