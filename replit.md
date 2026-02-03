@@ -44,6 +44,12 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Master Volume Sync:** A global "MUTED/LIVE" toggle in the menu bar mutes/unmutes all video widgets. Individual widget controls remain.
 - **Authentication & Paywall System:** Leverages Supabase Auth for Email/Password and Google OAuth. The dashboard is public-first, with login being optional for cross-device synchronization.
 - **Profiles Table (Paywall Foundation):** A `profiles` table stores user-specific data linked to Supabase auth.users by ID. Includes `is_premium` boolean field for future paywall implementation.
+- **Stripe Pro Subscription:** Integrated Stripe for recurring subscriptions via the Replit Stripe connector.
+  - **Pricing Modal:** Crown button in header opens modal with Monthly ($8/mo) and Yearly ($80/year) billing toggle.
+  - **Promo Codes:** `allow_promotion_codes: true` enabled for Stripe checkout sessions.
+  - **Security:** Server-side price ID allowlist validation prevents tampering - only valid price IDs are accepted.
+  - **Stripe Price IDs:** Monthly: `price_1SwkV2PKTwXMfvTHKCHfRDud`, Yearly: `price_1SwkV3PKTwXMfvTH085lq6tA`
+  - **Webhook Handling:** Stripe webhooks configured via Replit managed webhook setup for subscription sync.
 - **Admin Dashboard:** `/admin` route with client-side and server-side authorization for a single admin (`legionofoogabooga@gmail.com`). Features:
   - **User List:** Fetches all registered users from Supabase Admin API using SERVICE_ROLE_KEY. Displays email, auth provider (Google/Email), admin badge, premium badge, verification status, and last sign-in date.
   - **Premium Toggle:** Crown button next to each user allows admin to manually toggle premium status via `PATCH /api/admin/users/:id/premium`. Implements manual paywall control.
