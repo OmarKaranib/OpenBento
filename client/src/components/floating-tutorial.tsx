@@ -1,67 +1,56 @@
-import { useState, useEffect, useRef } from 'react';
-import { HelpCircle, X, ArrowUp } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { HelpCircle, X } from 'lucide-react';
 
-interface TutorialStep {
+interface TutorialLabel {
   id: string;
   targetSelector: string;
-  title: string;
-  description: string;
-  verticalOffset: number;
+  label: string;
 }
 
-const TUTORIAL_STEPS: TutorialStep[] = [
-  {
-    id: 'master-mute',
-    targetSelector: '[data-testid="button-master-mute"]',
-    title: 'Master Mute',
-    description: 'Silence all streams instantly.',
-    verticalOffset: 0,
-  },
-  {
-    id: 'edit-mode',
-    targetSelector: '[data-testid="button-edit-layout"]',
-    title: 'Edit Mode',
-    description: 'Arrange your Bento grid.',
-    verticalOffset: 80,
-  },
-  {
-    id: 'pro-crown',
-    targetSelector: '[data-testid="button-pro-crown"]',
-    title: 'Pro Crown',
-    description: 'Unlock unlimited power.',
-    verticalOffset: 160,
-  },
+const ALL_TUTORIAL_LABELS: TutorialLabel[] = [
+  { id: 'fullscreen', targetSelector: '[data-testid="button-toggle-fullscreen"]', label: 'Full Screen' },
+  { id: 'tutorial', targetSelector: '[data-testid="button-help-tutorial"]', label: 'Tutorial' },
+  { id: 'logo', targetSelector: '[data-testid="img-logo"]', label: 'Logo' },
+  { id: 'title', targetSelector: '[data-testid="text-title"]', label: 'Title' },
+  { id: 'clear', targetSelector: '[data-testid="button-clear-all"]', label: 'Clear' },
+  { id: 'add-block', targetSelector: '[data-testid="button-add-block"]', label: 'Add Block' },
+  { id: 'refresh', targetSelector: '[data-testid="button-refresh-all"]', label: 'Refresh' },
+  { id: 'edit', targetSelector: '[data-testid="button-edit-layout"]', label: 'Edit' },
+  { id: 'mute', targetSelector: '[data-testid="button-master-mute"]', label: 'Mute' },
+  { id: 'theme', targetSelector: '[data-testid="button-theme-toggle"]', label: 'Dark Mode' },
+  { id: 'crown', targetSelector: '[data-testid="button-pro-crown"]', label: 'Crown' },
+  { id: 'profile', targetSelector: '[data-testid="button-user-menu"], [data-testid="button-login"]', label: 'Profile' },
 ];
 
-interface TutorialTipProps {
-  step: typeof TUTORIAL_STEPS[0];
-  isPremium: boolean;
+interface AnchoredLabelProps {
+  item: TutorialLabel;
 }
 
-function TutorialTip({ step, isPremium }: TutorialTipProps) {
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
-  const tipRef = useRef<HTMLDivElement>(null);
+function AnchoredLabel({ item }: AnchoredLabelProps) {
+  const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const labelRef = useRef<HTMLDivElement>(null);
+
+  const calculatePosition = useCallback(() => {
+    const selectors = item.targetSelector.split(', ');
+    let element: Element | null = null;
+    for (const selector of selectors) {
+      element = document.querySelector(selector.trim());
+      if (element) break;
+    }
+    
+    if (element) {
+      const rect = element.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + 6,
+        left: rect.left + rect.width / 2,
+        width: rect.width,
+      });
+    } else {
+      setPosition(null);
+    }
+  }, [item.targetSelector]);
 
   useEffect(() => {
-    const calculatePosition = () => {
-      if (step.id === 'pro-crown' && isPremium) {
-        setPosition(null);
-        return;
-      }
-
-      const element = document.querySelector(step.targetSelector);
-      if (element) {
-        const rect = element.getBoundingClientRect();
-        setPosition({
-          top: rect.bottom + 8 + step.verticalOffset,
-          left: rect.left + rect.width / 2,
-        });
-      } else {
-        setPosition(null);
-      }
-    };
-
     calculatePosition();
     window.addEventListener('resize', calculatePosition);
     window.addEventListener('scroll', calculatePosition);
@@ -70,27 +59,25 @@ function TutorialTip({ step, isPremium }: TutorialTipProps) {
       window.removeEventListener('resize', calculatePosition);
       window.removeEventListener('scroll', calculatePosition);
     };
-  }, [step, isPremium]);
+  }, [calculatePosition]);
 
-  if (step.id === 'pro-crown' && isPremium) return null;
   if (!position) return null;
 
   return (
     <div
-      ref={tipRef}
-      className="fixed z-[9999] pointer-events-none"
+      ref={labelRef}
+      className="fixed z-[10000] pointer-events-none"
       style={{
         top: position.top,
         left: position.left,
         transform: 'translateX(-50%)',
       }}
-      data-testid={`tutorial-tip-${step.id}`}
+      data-testid={`tutorial-label-${item.id}`}
     >
       <div className="flex flex-col items-center">
-        <ArrowUp className="w-5 h-5 text-cyan-400 animate-bounce" />
-        <div className="mt-2 bg-slate-800 border border-cyan-500/50 rounded-xl px-4 py-3 shadow-xl shadow-cyan-500/10 whitespace-nowrap text-center">
-          <h3 className="text-cyan-400 font-bold text-sm mb-1" data-testid={`text-tutorial-tip-title-${step.id}`}>{step.title}</h3>
-          <p className="text-slate-300 text-xs" data-testid={`text-tutorial-tip-desc-${step.id}`}>{step.description}</p>
+        <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-b-[6px] border-l-transparent border-r-transparent border-b-cyan-500/80" />
+        <div className="bg-slate-900/95 border border-cyan-500/60 rounded-md px-2 py-1 shadow-lg whitespace-nowrap text-center">
+          <span className="text-cyan-400 font-semibold text-xs">{item.label}</span>
         </div>
       </div>
     </div>
@@ -103,6 +90,11 @@ export function FloatingTutorial({ isPremium, isDarkMode = true }: { isPremium: 
   const handleClose = () => {
     setIsOpen(false);
   };
+
+  const visibleLabels = ALL_TUTORIAL_LABELS.filter(item => {
+    if (item.id === 'crown' && isPremium) return false;
+    return true;
+  });
 
   return (
     <>
@@ -127,23 +119,22 @@ export function FloatingTutorial({ isPremium, isDarkMode = true }: { isPremium: 
             data-testid="tutorial-overlay"
           />
           
-          <Button
+          <button
             onClick={handleClose}
-            size="icon"
-            variant="outline"
-            className="fixed top-4 right-4 z-[9999] bg-slate-700 border-slate-500"
+            className="fixed z-[10001] flex items-center justify-center w-10 h-10 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg transition-colors"
+            style={{ top: '1rem', right: '1rem' }}
             data-testid="button-close-tutorial"
           >
-            <X className="w-6 h-6" />
-          </Button>
+            <X className="w-5 h-5 text-white" />
+          </button>
 
-          <div className="fixed top-6 left-1/2 -translate-x-1/2 text-center z-[9999]">
-            <h2 className="text-2xl font-bold text-white mb-2" data-testid="text-tutorial-title">Quick Tutorial</h2>
-            <p className="text-slate-400" data-testid="text-tutorial-subtitle">Click anywhere to close</p>
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 text-center z-[10000]">
+            <h2 className="text-xl font-bold text-white mb-1" data-testid="text-tutorial-title">Menu Bar Guide</h2>
+            <p className="text-slate-400 text-sm" data-testid="text-tutorial-subtitle">Click anywhere to close</p>
           </div>
 
-          {TUTORIAL_STEPS.map((step) => (
-            <TutorialTip key={step.id} step={step} isPremium={isPremium} />
+          {visibleLabels.map((item) => (
+            <AnchoredLabel key={item.id} item={item} />
           ))}
         </>
       )}

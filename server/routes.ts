@@ -8,6 +8,16 @@ import { healStream, getVideoDetails, isMusicCategory } from "./services/youtube
 import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema } from "@shared/schema";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
+// Admin email list - used for admin access and auto-premium
+const ADMIN_EMAILS = [
+  'legionofoogabooga@gmail.com',
+  'omar.karanib@anculabs.com',
+];
+
+const isAdminEmail = (email: string): boolean => {
+  return ADMIN_EMAILS.includes(email?.toLowerCase() || '');
+};
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -323,20 +333,28 @@ export async function registerRoutes(
   // Premium status endpoint
   app.get("/api/user/premium-status", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
+    const user = (req as any).user;
+    const email = user?.claims?.email || user?.email;
     
     if (!userId) {
-      return res.json({ isPremium: false, userId: null });
+      return res.json({ isPremium: false, userId: null, isAdmin: false });
     }
     
     try {
+      // Admin users automatically get premium
+      const userIsAdmin = isAdminEmail(email || '');
+      
       const profile = await storage.getProfile(userId);
+      const isPremium = userIsAdmin || (profile?.isPremium ?? false);
+      
       res.json({ 
-        isPremium: profile?.isPremium ?? false, 
-        userId 
+        isPremium, 
+        userId,
+        isAdmin: userIsAdmin
       });
     } catch (error) {
       console.error('[Premium] Error checking status:', error);
-      res.json({ isPremium: false, userId });
+      res.json({ isPremium: false, userId, isAdmin: false });
     }
   });
 
@@ -415,13 +433,11 @@ export async function registerRoutes(
   });
 
   // Admin Channel Management Routes
-  const ADMIN_EMAIL = 'legionofoogabooga@gmail.com';
-  
   const isAdmin = (req: Request): boolean => {
     const user = (req as any).user;
     // Replit Auth stores email in claims.email, Supabase stores directly on user
     const email = user?.claims?.email || user?.email;
-    const isAdminUser = email === ADMIN_EMAIL;
+    const isAdminUser = isAdminEmail(email || '');
     console.log('[Admin] Auth check - user:', user?.claims?.sub, 'email:', email, 'isAdmin:', isAdminUser);
     return isAdminUser;
   };
@@ -645,7 +661,11 @@ export async function registerRoutes(
       
       const stripe = await getUncachableStripeClient();
       
-      const origin = req.headers.origin || `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+      // Use production domain if available, otherwise fallback to request origin
+      const productionDomain = 'https://openbento.tv';
+      const origin = process.env.NODE_ENV === 'production' 
+        ? productionDomain 
+        : (req.headers.origin || `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`);
       
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',

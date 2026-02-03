@@ -5,7 +5,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
-export const ADMIN_EMAIL = 'legionofoogabooga@gmail.com';
+export const ADMIN_EMAILS = [
+  'legionofoogabooga@gmail.com',
+  'omar.karanib@anculabs.com',
+];
+
+export const ADMIN_EMAIL = ADMIN_EMAILS[0]; // For backwards compatibility
 
 interface Channel {
   id: string;
@@ -37,7 +42,7 @@ export default function Admin() {
     isLive: true
   });
 
-  const isAdmin = isAuthenticated && user?.email === ADMIN_EMAIL;
+  const isAdmin = isAuthenticated && ADMIN_EMAILS.includes(user?.email?.toLowerCase() || '');
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && !isAdmin) {
@@ -208,9 +213,9 @@ export default function Admin() {
                   {usersData.users.map((u) => (
                     <div key={u.id} className="flex items-center gap-3 p-3 bg-slate-800 rounded-lg">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        u.email === ADMIN_EMAIL ? 'bg-cyan-500/20' : 'bg-slate-700'
+                        ADMIN_EMAILS.includes(u.email?.toLowerCase() || '') ? 'bg-cyan-500/20' : 'bg-slate-700'
                       }`}>
-                        <Users className={`w-5 h-5 ${u.email === ADMIN_EMAIL ? 'text-cyan-400' : 'text-slate-400'}`} />
+                        <Users className={`w-5 h-5 ${ADMIN_EMAILS.includes(u.email?.toLowerCase() || '') ? 'text-cyan-400' : 'text-slate-400'}`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-medium truncate">{u.email}</p>
@@ -220,7 +225,7 @@ export default function Admin() {
                           }`}>
                             {u.provider}
                           </span>
-                          {u.email === ADMIN_EMAIL && (
+                          {ADMIN_EMAILS.includes(u.email?.toLowerCase() || '') && (
                             <span className="px-2 py-0.5 rounded text-xs bg-cyan-500/20 text-cyan-400">Admin</span>
                           )}
                           {u.isPremium && (
