@@ -10,6 +10,7 @@ import { YouTubePlayer } from '@/components/youtube-player';
 import { SavedChannel, loadPersonalLibrary, savePersonalLibrary } from '@/components/widget-sidebar';
 import { useStreamHealing } from '@/hooks/use-stream-healing';
 import { useToast } from '@/hooks/use-toast';
+import { FloatingTutorial } from '@/components/floating-tutorial';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -1143,10 +1144,12 @@ const MasterControlDashboard = ({
             >
               {isFullscreen ? <Minimize2 className="w-[1.6rem] h-[1.6rem] text-white" /> : <Maximize2 className={`w-[1.6rem] h-[1.6rem] ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`} />}
             </button>
-            <div className="relative flex items-center h-[3.2rem]">
-              <Power className="w-[2rem] h-[2rem] text-cyan-400 animate-pulse" data-testid="icon-power" />
-              <div className="absolute inset-0 bg-cyan-400 blur-xl opacity-50 pointer-events-none"></div>
-            </div>
+            <img 
+              src="/openbento-logo.png" 
+              alt="OpenBento Logo" 
+              className="h-[2.4rem] w-auto object-contain"
+              data-testid="img-logo"
+            />
             <h1 className={`text-[1.8rem] font-bold tracking-wider leading-[3.2rem] h-[3.2rem] flex items-center ${isDarkMode ? 'bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent' : 'text-gray-900'}`} data-testid="text-title" style={{ fontFamily: 'Inter, sans-serif' }}>
               OpenBento
             </h1>
@@ -1339,6 +1342,9 @@ const MasterControlDashboard = ({
                 Pro
               </button>
             )}
+
+            {/* Help/Tutorial Button */}
+            <FloatingTutorial isPremium={isPremium} />
 
             {/* Login Button - Consistent height with other menu buttons - shown when NOT logged in */}
             {!isAuthenticated && (

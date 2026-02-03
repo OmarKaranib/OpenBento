@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { usePremium } from '@/hooks/use-premium';
 import { LoginModal } from '@/components/login-modal';
 import { PricingModal } from '@/components/pricing-modal';
+import { MobileGuard } from '@/components/mobile-guard';
 
 // Static background - High-contrast light mode
 const StaticBackground = () => {
@@ -901,7 +902,9 @@ function AppContent() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppContent />
+      <MobileGuard>
+        <AppContent />
+      </MobileGuard>
     </QueryClientProvider>
   );
 }
