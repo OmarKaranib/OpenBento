@@ -9,7 +9,6 @@ import { Widget, WidgetType } from '@/App';
 import { YouTubePlayer } from '@/components/youtube-player';
 import { SavedChannel, loadPersonalLibrary, savePersonalLibrary } from '@/components/widget-sidebar';
 import { useStreamHealing } from '@/hooks/use-stream-healing';
-import { PricingModal } from '@/components/pricing-modal';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -126,6 +125,8 @@ interface MasterControlDashboardProps {
   onLogout: () => void;
   isAuthenticated: boolean;
   openLoginModal: (reason?: string) => void;
+  isPremium: boolean;
+  onOpenPricingModal: () => void;
 }
 
 interface ResizeState {
@@ -155,7 +156,9 @@ const MasterControlDashboard = ({
   user,
   onLogout,
   isAuthenticated,
-  openLoginModal
+  openLoginModal,
+  isPremium,
+  onOpenPricingModal
 }: MasterControlDashboardProps) => {
   const [masterMute, setMasterMute] = useState(true);
   const [resizing, setResizing] = useState<ResizeState | null>(null);
@@ -168,7 +171,6 @@ const MasterControlDashboard = ({
   const [clearHoldProgress, setClearHoldProgress] = useState(0);
   const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
   const [colorPickerWidget, setColorPickerWidget] = useState<string | null>(null);
-  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
 
   const { triggerHeal, getHealingState, registerChannel } = useStreamHealing();
 
@@ -1209,20 +1211,39 @@ const MasterControlDashboard = ({
             )}
 
             {/* Block button - Opens Stream Library sidebar */}
-            <button
-              onClick={handleOpenSidebarToContent}
-              disabled={isGridFull}
-              className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform shadow-lg text-[1.2rem] leading-[3.2rem] ${
-                isGridFull 
-                  ? 'bg-slate-600 cursor-not-allowed opacity-60 shadow-slate-900/50' 
-                  : 'bg-emerald-600 hover:bg-emerald-500 hover:scale-105 shadow-emerald-900/50'
-              }`}
-              title={isGridFull ? 'Grid Full - No space available' : 'Add a new block'}
-              data-testid="button-add-block"
-            >
-              <Plus className="w-[1.4rem] h-[1.4rem]" />
-              {isGridFull ? 'Full' : 'Block'}
-            </button>
+            {(() => {
+              const FREE_BLOCK_LIMIT = 6;
+              const currentBlockCount = widgets.length;
+              const isAtFreeLimit = !isPremium && currentBlockCount >= FREE_BLOCK_LIMIT;
+              const isDisabled = isGridFull || isAtFreeLimit;
+              
+              const handleBlockClick = () => {
+                if (isAtFreeLimit) {
+                  onOpenPricingModal();
+                } else {
+                  handleOpenSidebarToContent();
+                }
+              };
+              
+              return (
+                <button
+                  onClick={handleBlockClick}
+                  disabled={isGridFull}
+                  className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform shadow-lg text-[1.2rem] leading-[3.2rem] ${
+                    isDisabled
+                      ? isAtFreeLimit 
+                        ? 'bg-amber-600 hover:bg-amber-500 hover:scale-105 shadow-amber-900/50'
+                        : 'bg-slate-600 cursor-not-allowed opacity-60 shadow-slate-900/50'
+                      : 'bg-emerald-600 hover:bg-emerald-500 hover:scale-105 shadow-emerald-900/50'
+                  }`}
+                  title={isGridFull ? 'Grid Full - No space available' : isAtFreeLimit ? `Free limit (${FREE_BLOCK_LIMIT}) reached - Upgrade to Pro` : 'Add a new block'}
+                  data-testid="button-add-block"
+                >
+                  {isAtFreeLimit ? <Lock className="w-[1.4rem] h-[1.4rem]" /> : <Plus className="w-[1.4rem] h-[1.4rem]" />}
+                  {isGridFull ? 'Full' : isAtFreeLimit ? 'Limit' : 'Block'}
+                </button>
+              );
+            })()}
 
             <button
               onClick={handleRefreshAllWidgets}
@@ -1233,23 +1254,37 @@ const MasterControlDashboard = ({
               Refresh
             </button>
 
-            <button
-              onClick={() => {
-                if (isEditMode) {
-                  handleSaveLayout();
-                }
-                setIsEditMode(!isEditMode);
-              }}
-              className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] ${
-                isEditMode 
-                  ? 'bg-teal-600 hover:bg-teal-500 shadow-lg shadow-teal-900/50 ring-2 ring-teal-400' 
-                  : 'bg-orange-600 hover:bg-orange-500 shadow-lg shadow-orange-900/50'
-              }`}
-              data-testid="button-edit-layout"
-            >
-              {isEditMode ? <Save className="w-[1.4rem] h-[1.4rem]" /> : <Edit3 className="w-[1.4rem] h-[1.4rem]" />}
-              {isEditMode ? 'Save' : 'Edit'}
-            </button>
+            {/* Edit/Save button - Locked for free users */}
+            {isPremium ? (
+              <button
+                onClick={() => {
+                  if (isEditMode) {
+                    handleSaveLayout();
+                  }
+                  setIsEditMode(!isEditMode);
+                }}
+                className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] ${
+                  isEditMode 
+                    ? 'bg-teal-600 hover:bg-teal-500 shadow-lg shadow-teal-900/50 ring-2 ring-teal-400' 
+                    : 'bg-orange-600 hover:bg-orange-500 shadow-lg shadow-orange-900/50'
+                }`}
+                data-testid="button-edit-layout"
+              >
+                {isEditMode ? <Save className="w-[1.4rem] h-[1.4rem]" /> : <Edit3 className="w-[1.4rem] h-[1.4rem]" />}
+                {isEditMode ? 'Save' : 'Edit'}
+              </button>
+            ) : (
+              <button
+                onClick={onOpenPricingModal}
+                className="menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] bg-slate-600 hover:bg-slate-500 shadow-lg shadow-slate-900/50 opacity-80"
+                title="Save Layout is a Pro feature - Upgrade to unlock"
+                data-testid="button-edit-layout-locked"
+              >
+                <Lock className="w-[1.4rem] h-[1.4rem]" />
+                Save
+                <Crown className="w-[1.2rem] h-[1.2rem] text-amber-400" />
+              </button>
+            )}
 
             <button
               onClick={handleMasterMute}
@@ -1279,16 +1314,18 @@ const MasterControlDashboard = ({
               {isDarkMode ? 'Dark' : 'Light'}
             </button>
 
-            {/* Pro Crown Button */}
-            <button
-              onClick={() => setIsPricingModalOpen(true)}
-              className="menu-btn h-[3.2rem] px-[1.2rem] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-lg shadow-amber-500/30 text-slate-900"
-              data-testid="button-pro-crown"
-              title="Upgrade to Pro"
-            >
-              <Crown className="w-[1.4rem] h-[1.4rem]" />
-              Pro
-            </button>
+            {/* Pro Crown Button - Only show for free users */}
+            {!isPremium && (
+              <button
+                onClick={onOpenPricingModal}
+                className="menu-btn h-[3.2rem] px-[1.2rem] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-lg shadow-amber-500/30 text-slate-900"
+                data-testid="button-pro-crown"
+                title="Upgrade to Pro"
+              >
+                <Crown className="w-[1.4rem] h-[1.4rem]" />
+                Pro
+              </button>
+            )}
 
             {/* Login Button - Consistent height with other menu buttons - shown when NOT logged in */}
             {!isAuthenticated && (
@@ -1694,10 +1731,6 @@ const MasterControlDashboard = ({
         </div>
       </div>
 
-      <PricingModal 
-        isOpen={isPricingModalOpen} 
-        onClose={() => setIsPricingModalOpen(false)} 
-      />
     </div>
   );
 };

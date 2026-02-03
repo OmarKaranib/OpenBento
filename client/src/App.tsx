@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
+import { usePremium } from '@/hooks/use-premium';
 import { LoginModal } from '@/components/login-modal';
+import { PricingModal } from '@/components/pricing-modal';
 
 // Static background - High-contrast light mode
 const StaticBackground = () => {
@@ -92,10 +94,21 @@ function AppContent() {
   // Auth state - must be inside QueryClientProvider
   const { user, isAuthenticated, logout } = useAuth();
   
+  // Premium status
+  const { isPremium } = usePremium();
+  
+  // Pricing modal state
+  const [pricingModalOpen, setPricingModalOpen] = useState(false);
+  
   // Open login modal with optional reason
   const openLoginModal = useCallback((reason?: string) => {
     setLoginTriggerReason(reason);
     setLoginModalOpen(true);
+  }, []);
+  
+  // Open pricing modal
+  const openPricingModal = useCallback(() => {
+    setPricingModalOpen(true);
   }, []);
 
   const activeWidgetIdRef = useRef<string | null>(null);
@@ -841,6 +854,8 @@ function AppContent() {
                   onLogout={logout}
                   isAuthenticated={isAuthenticated}
                   openLoginModal={openLoginModal}
+                  isPremium={isPremium}
+                  onOpenPricingModal={openPricingModal}
                 />
               )}
             </Route>
@@ -874,6 +889,10 @@ function AppContent() {
         </DragOverlay>
       </DndContext>
       <Toaster />
+      <PricingModal 
+        isOpen={pricingModalOpen} 
+        onClose={() => setPricingModalOpen(false)} 
+      />
     </TooltipProvider>
   );
 }

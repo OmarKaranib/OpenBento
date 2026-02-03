@@ -320,6 +320,26 @@ export async function registerRoutes(
     }
   });
 
+  // Premium status endpoint
+  app.get("/api/user/premium-status", async (req: Request, res: Response) => {
+    const userId = (req as any).userId || (req as any).user?.id;
+    
+    if (!userId) {
+      return res.json({ isPremium: false, userId: null });
+    }
+    
+    try {
+      const profile = await storage.getProfile(userId);
+      res.json({ 
+        isPremium: profile?.isPremium ?? false, 
+        userId 
+      });
+    } catch (error) {
+      console.error('[Premium] Error checking status:', error);
+      res.json({ isPremium: false, userId });
+    }
+  });
+
   app.get("/api/dashboard", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
     
@@ -343,6 +363,15 @@ export async function registerRoutes(
     }
     
     try {
+      // Check premium status before saving
+      const profile = await storage.getProfile(userId);
+      if (!profile?.isPremium) {
+        return res.status(403).json({ 
+          error: "Premium required", 
+          message: "Save Layout is a Pro feature. Upgrade to save your dashboard." 
+        });
+      }
+      
       const validation = insertDashboardSchema.safeParse({ ...req.body, userId });
       
       if (!validation.success) {
@@ -364,6 +393,15 @@ export async function registerRoutes(
     }
     
     try {
+      // Check premium status before updating
+      const profile = await storage.getProfile(userId);
+      if (!profile?.isPremium) {
+        return res.status(403).json({ 
+          error: "Premium required", 
+          message: "Save Layout is a Pro feature. Upgrade to save your dashboard." 
+        });
+      }
+      
       const dashboard = await storage.updateDashboard(userId, req.body);
       
       if (!dashboard) {

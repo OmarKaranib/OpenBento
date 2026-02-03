@@ -55,15 +55,13 @@ export function PricingModal({ isOpen, onClose }: PricingModalProps) {
         onClick={(e) => e.stopPropagation()}
         data-testid="pricing-modal"
       >
-        <Button
-          variant="outline"
-          size="icon"
+        <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 bg-slate-800 border-slate-600 text-white hover:bg-slate-700 hover:text-white w-10 h-10"
+          className="absolute top-3 right-3 z-10 w-12 h-12 flex items-center justify-center rounded-xl bg-slate-700 border-2 border-slate-500 text-white hover:bg-slate-600 hover:border-slate-400 transition-all duration-200 shadow-lg"
           data-testid="button-close-pricing"
         >
-          <X className="w-6 h-6" />
-        </Button>
+          <X className="w-7 h-7" />
+        </button>
 
         <div className="p-8">
           <div className="flex items-center justify-center gap-3 mb-2">
