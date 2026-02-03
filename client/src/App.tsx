@@ -150,11 +150,7 @@ function AppContent() {
   });
 
   const extractYouTubeId = (url: string): string | null => {
-    // Don't extract ID from channel-based live stream URLs (they use channel= parameter)
-    if (url.includes('live_stream?channel=') || url.includes('live_stream&channel=')) {
-      return null;
-    }
-    // Updated regex to handle youtube-nocookie.com URLs (Pro format)
+    // Updated regex to handle youtube-nocookie.com URLs (Pro format) and watch?v= URLs
     const regExp = /^.*((youtu\.be\/)|(youtube(-nocookie)?\.com\/(v\/|u\/\w\/|embed\/|watch\?)))\??v?=?([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[6] && match[6].length === 11) ? match[6] : null;

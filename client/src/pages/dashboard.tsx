@@ -554,10 +554,7 @@ const MasterControlDashboard = ({
     return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
   };
 
-  // Generate embed URL for YouTube channel-based live streams (permanent, never expires)
-  const getYouTubeChannelEmbedUrl = (channelId: string): string => {
-    return `https://www.youtube-nocookie.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
-  };
+  // NOTE: live_stream?channel= format is deprecated - we now require real videoIds
 
   // CRITICAL FIX: Dynamic Twitch Parent Detection
   const getTwitchEmbedUrl = (channel: string): string => {
@@ -666,9 +663,7 @@ const MasterControlDashboard = ({
           const twitchChannel = widget.twitchChannel;
           return prev.map(w => {
             if (w.id === widgetId) {
-              if (w.isYouTube && youtubeChannelId) {
-                return { ...w, url: `https://www.youtube.com/embed/live_stream?channel=${youtubeChannelId}` };
-              } else if (w.isYouTube && videoId) {
+              if (w.isYouTube && videoId) {
                 return { ...w, url: `https://www.youtube.com/watch?v=${videoId}` };
               } else if (w.isTwitch && twitchChannel) {
                 return { ...w, url: `https://www.twitch.tv/${twitchChannel}` };
@@ -696,9 +691,7 @@ const MasterControlDashboard = ({
     setTimeout(() => {
       setWidgets(prev => prev.map(w => {
         if (w.type === 'video') {
-          if (w.isYouTube && w.youtubeChannelId) {
-            return { ...w, url: `https://www.youtube.com/embed/live_stream?channel=${w.youtubeChannelId}` };
-          } else if (w.isYouTube && w.videoId) {
+          if (w.isYouTube && w.videoId) {
             return { ...w, url: `https://www.youtube.com/watch?v=${w.videoId}` };
           } else if (w.isTwitch && w.twitchChannel) {
             return { ...w, url: `https://www.twitch.tv/${w.twitchChannel}` };

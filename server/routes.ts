@@ -169,17 +169,17 @@ export async function registerRoutes(
     }
     
     try {
-      // Try v1 API first with full browser headers to bypass Cloudflare
-      const response = await fetch(`https://kick.com/api/v1/channels/${channelId}`, {
+      // Try v2 API with full browser headers
+      const response = await fetch(`https://kick.com/api/v2/channels/${channelId}`, {
         headers: {
           'Accept': 'application/json, text/plain, */*',
           'Accept-Language': 'en-US,en;q=0.9',
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Referer': 'https://kick.com/',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Referer': `https://kick.com/${channelId}`,
           'Origin': 'https://kick.com',
-          'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+          'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
           'sec-ch-ua-mobile': '?0',
-          'sec-ch-ua-platform': '"macOS"',
+          'sec-ch-ua-platform': '"Windows"',
           'sec-fetch-dest': 'empty',
           'sec-fetch-mode': 'cors',
           'sec-fetch-site': 'same-origin'
@@ -198,9 +198,10 @@ export async function registerRoutes(
       
       const data = await response.json();
       res.json({
-        isLive: data?.livestream !== null,
+        isLive: data?.livestream !== null && data?.livestream !== undefined,
         viewerCount: data?.livestream?.viewer_count || 0,
-        channelId: data?.slug || channelId
+        channelId: data?.slug || channelId,
+        status: 'ok'
       });
     } catch (error) {
       // Return unknown rather than false - let the player show actual state

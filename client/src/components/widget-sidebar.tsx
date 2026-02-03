@@ -226,12 +226,7 @@ const getProYouTubeEmbedUrl = (videoId: string): string => {
   return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&origin=${encodeURIComponent(origin)}&parent=${encodeURIComponent(hostname)}`;
 };
 
-// Helper to generate Pro YouTube channel live stream URL
-const getProYouTubeChannelUrl = (channelId: string): string => {
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://localhost';
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-  return `https://www.youtube-nocookie.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&origin=${encodeURIComponent(origin)}&parent=${encodeURIComponent(hostname)}`;
-};
+// NOTE: live_stream?channel= format is deprecated - we now require real videoIds from /api/links
 
 // Fallback channels (used when API is not available) - Music/Lofi content removed
 const FALLBACK_CHANNELS: TrendingChannel[] = [

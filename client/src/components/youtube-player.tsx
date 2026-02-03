@@ -171,10 +171,8 @@ function YouTubePlayerInner({
     };
 
     try {
-      // If we have a channelId but no videoId, use channel live stream format
-      const effectiveVideoId = stableVideoId || (stableChannelId ? `live_stream?channel=${stableChannelId}` : undefined);
-      
-      console.log('[YouTube] Initializing player for widget:', widgetId, 'videoId:', effectiveVideoId);
+      // Only use real videoId - live_stream?channel= format is deprecated
+      console.log('[YouTube] Initializing player for widget:', widgetId, 'videoId:', stableVideoId);
       
       playerRef.current = new window.YT.Player(playerId, {
         videoId: stableVideoId || undefined,
@@ -347,24 +345,18 @@ function YouTubePlayerInner({
     }
   }, [volume]);
 
-  // For channel-based live streams (no videoId, but has channelId), use direct iframe
-  if (!stableVideoId && stableChannelId) {
-    const channelLiveUrl = `https://www.youtube-nocookie.com/embed/live_stream?channel=${stableChannelId}&autoplay=1&mute=1&origin=${encodeURIComponent(origin)}&enablejsapi=1`;
-    console.log('[YouTube] Using channel live stream iframe for:', stableChannelId);
-    
+  // If no videoId, show offline state - live_stream?channel= format is deprecated
+  if (!stableVideoId) {
+    console.log('[YouTube] No videoId available for widget:', widgetId, 'channelId:', stableChannelId);
     return (
       <div
         ref={containerRef}
-        className="w-full h-full"
-        style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
+        className="w-full h-full flex items-center justify-center bg-slate-900/50"
       >
-        <iframe
-          src={channelLiveUrl}
-          className="w-full h-full border-0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          referrerPolicy="strict-origin-when-cross-origin"
-        />
+        <div className="text-center text-slate-400">
+          <p className="text-sm">No active stream</p>
+          <p className="text-xs mt-1">Check back later</p>
+        </div>
       </div>
     );
   }
