@@ -9,6 +9,7 @@ import { Widget, WidgetType } from '@/App';
 import { YouTubePlayer } from '@/components/youtube-player';
 import { SavedChannel, loadPersonalLibrary, savePersonalLibrary } from '@/components/widget-sidebar';
 import { useStreamHealing } from '@/hooks/use-stream-healing';
+import { PricingModal } from '@/components/pricing-modal';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -167,6 +168,7 @@ const MasterControlDashboard = ({
   const [clearHoldProgress, setClearHoldProgress] = useState(0);
   const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
   const [colorPickerWidget, setColorPickerWidget] = useState<string | null>(null);
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
 
   const { triggerHeal, getHealingState, registerChannel } = useStreamHealing();
 
@@ -1277,6 +1279,17 @@ const MasterControlDashboard = ({
               {isDarkMode ? 'Dark' : 'Light'}
             </button>
 
+            {/* Pro Crown Button */}
+            <button
+              onClick={() => setIsPricingModalOpen(true)}
+              className="menu-btn h-[3.2rem] px-[1.2rem] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-lg shadow-amber-500/30 text-slate-900"
+              data-testid="button-pro-crown"
+              title="Upgrade to Pro"
+            >
+              <Crown className="w-[1.4rem] h-[1.4rem]" />
+              Pro
+            </button>
+
             {/* Login Button - Consistent height with other menu buttons - shown when NOT logged in */}
             {!isAuthenticated && (
               <button
@@ -1680,6 +1693,11 @@ const MasterControlDashboard = ({
         )}
         </div>
       </div>
+
+      <PricingModal 
+        isOpen={isPricingModalOpen} 
+        onClose={() => setIsPricingModalOpen(false)} 
+      />
     </div>
   );
 };

@@ -6,6 +6,7 @@ import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerChannel } from "./services/pulse-cache";
 import { healStream, getVideoDetails, isMusicCategory } from "./services/youtube-api";
 import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema } from "@shared/schema";
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -567,6 +568,65 @@ export async function registerRoutes(
     } catch (error) {
       console.error('[Admin] Error updating premium status:', error);
       res.status(500).json({ error: String(error) });
+    }
+  });
+
+  // Stripe Publishable Key
+  app.get("/api/stripe/publishable-key", async (req, res) => {
+    try {
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      console.error('[Stripe] Error getting publishable key:', error);
+      res.status(500).json({ error: 'Failed to get Stripe config' });
+    }
+  });
+
+  // Valid Stripe price IDs for OpenBento Pro subscription
+  const VALID_PRICE_IDS: Record<string, string> = {
+    monthly: 'price_1SwkV2PKTwXMfvTHKCHfRDud',
+    yearly: 'price_1SwkV3PKTwXMfvTH085lq6tA',
+  };
+
+  // Create Stripe Checkout Session for Pro subscription
+  app.post("/api/stripe/create-checkout-session", async (req, res) => {
+    try {
+      const { priceId, billingPeriod } = req.body;
+      
+      // Validate billingPeriod
+      if (!billingPeriod || !['monthly', 'yearly'].includes(billingPeriod)) {
+        return res.status(400).json({ error: 'Invalid billing period. Must be "monthly" or "yearly".' });
+      }
+      
+      // Validate priceId against allowlist
+      const expectedPriceId = VALID_PRICE_IDS[billingPeriod];
+      if (!priceId || priceId !== expectedPriceId) {
+        console.warn('[Stripe] Invalid priceId attempted:', priceId, 'expected:', expectedPriceId);
+        return res.status(400).json({ error: 'Invalid price configuration.' });
+      }
+      
+      const stripe = await getUncachableStripeClient();
+      
+      const origin = req.headers.origin || `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+      
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        allow_promotion_codes: true,
+        success_url: `${origin}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/?canceled=true`,
+      });
+      
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error('[Stripe] Checkout error:', error);
+      res.status(500).json({ error: error.message || 'Failed to create checkout session' });
     }
   });
 
