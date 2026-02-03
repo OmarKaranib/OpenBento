@@ -346,10 +346,17 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, isBlocked, onSave
     }
   };
 
-  // Get channel logo URL - Always return null to use local fallback icon
-  // This eliminates ALL external favicon requests and t2.gstatic.com 404s
+  // Get channel logo URL from CHANNEL_LOGOS map with fallback caching
+  // If a URL fails once (404/error), it's cached and won't be retried
   const getLogoUrl = () => {
-    // Always use local fallback icon - no external network requests
+    const mappedUrl = CHANNEL_LOGOS[channel.id];
+    
+    // If we have a mapped URL and it hasn't failed before, use it
+    if (mappedUrl && !failedLogoCache.has(mappedUrl)) {
+      return mappedUrl;
+    }
+    
+    // No mapped URL or it already failed - return null for local fallback
     return null;
   };
   
