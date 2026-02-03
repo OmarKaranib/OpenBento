@@ -52,7 +52,9 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
   - **Webhook Handling:** Stripe webhooks configured via Replit managed webhook setup for subscription sync.
   - **Free vs Pro Enforcement:** Strict feature gating enforced on frontend and backend:
     - **6-Block Limit:** FREE_BLOCK_LIMIT = 6, free users blocked from adding 7th widget. Add Block button shows "Limit" with Lock icon at capacity, clicks auto-trigger pricing modal.
-    - **Locked Save Layout:** Free users see Lock + Crown icons on disabled Save button. Clicking opens pricing modal. Backend returns 403 for non-premium POST/PATCH /api/dashboard.
+    - **Edit Mode Unlocked:** Free users can enter Edit mode freely - drag, resize, and move their 6 blocks around.
+    - **Save Layout Gated:** When free user clicks Save, shows toast notification ("Layout editing is temporary for Free users. Upgrade to Pro to save your custom dashboard forever!") and triggers pricing modal. Layout changes are not persisted. Lock icon appears next to Save text for free users.
+    - **Backend Validation:** POST/PATCH /api/dashboard returns 403 for non-premium users attempting to save.
     - **Pro Unlock:** Premium users have unlimited blocks, full Save Layout functionality, hidden Pro crown button (already unlocked).
     - **Premium Status:** Fetched via /api/user/premium-status endpoint using usePremium hook, passed as prop to dashboard.
 - **Admin Dashboard:** `/admin` route with client-side and server-side authorization for a single admin (`legionofoogabooga@gmail.com`). Features:

@@ -9,6 +9,7 @@ import { Widget, WidgetType } from '@/App';
 import { YouTubePlayer } from '@/components/youtube-player';
 import { SavedChannel, loadPersonalLibrary, savePersonalLibrary } from '@/components/widget-sidebar';
 import { useStreamHealing } from '@/hooks/use-stream-healing';
+import { useToast } from '@/hooks/use-toast';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -173,6 +174,7 @@ const MasterControlDashboard = ({
   const [colorPickerWidget, setColorPickerWidget] = useState<string | null>(null);
 
   const { triggerHeal, getHealingState, registerChannel } = useStreamHealing();
+  const { toast } = useToast();
 
   // Theme Mode (dark/light) - User toggleable
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -1254,37 +1256,48 @@ const MasterControlDashboard = ({
               Refresh
             </button>
 
-            {/* Edit/Save button - Locked for free users */}
-            {isPremium ? (
-              <button
-                onClick={() => {
-                  if (isEditMode) {
+            {/* Edit/Save button - Edit allowed for all, Save gated for free users */}
+            <button
+              onClick={() => {
+                if (isEditMode) {
+                  // Exiting edit mode - check if user can save
+                  if (isPremium) {
                     handleSaveLayout();
+                    setIsEditMode(false);
+                  } else {
+                    // Free user trying to save - show notification and pricing modal
+                    toast({
+                      title: "Save Layout is a Pro Feature",
+                      description: "Layout editing is temporary for Free users. Upgrade to Pro to save your custom dashboard forever!",
+                      variant: "default",
+                    });
+                    onOpenPricingModal();
+                    // Exit edit mode without saving
+                    setIsEditMode(false);
                   }
-                  setIsEditMode(!isEditMode);
-                }}
-                className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] ${
-                  isEditMode 
-                    ? 'bg-teal-600 hover:bg-teal-500 shadow-lg shadow-teal-900/50 ring-2 ring-teal-400' 
-                    : 'bg-orange-600 hover:bg-orange-500 shadow-lg shadow-orange-900/50'
-                }`}
-                data-testid="button-edit-layout"
-              >
-                {isEditMode ? <Save className="w-[1.4rem] h-[1.4rem]" /> : <Edit3 className="w-[1.4rem] h-[1.4rem]" />}
-                {isEditMode ? 'Save' : 'Edit'}
-              </button>
-            ) : (
-              <button
-                onClick={onOpenPricingModal}
-                className="menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] bg-slate-600 hover:bg-slate-500 shadow-lg shadow-slate-900/50 opacity-80"
-                title="Save Layout is a Pro feature - Upgrade to unlock"
-                data-testid="button-edit-layout-locked"
-              >
-                <Lock className="w-[1.4rem] h-[1.4rem]" />
-                Save
-                <Crown className="w-[1.2rem] h-[1.2rem] text-amber-400" />
-              </button>
-            )}
+                } else {
+                  // Entering edit mode - allowed for everyone
+                  setIsEditMode(true);
+                }
+              }}
+              className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] ${
+                isEditMode 
+                  ? 'bg-teal-600 hover:bg-teal-500 shadow-lg shadow-teal-900/50 ring-2 ring-teal-400' 
+                  : 'bg-orange-600 hover:bg-orange-500 shadow-lg shadow-orange-900/50'
+              }`}
+              data-testid="button-edit-layout"
+              title={isEditMode && !isPremium ? "Save Layout requires Pro - Click to see upgrade options" : undefined}
+            >
+              {isEditMode ? (
+                <>
+                  {!isPremium && <Lock className="w-[1.2rem] h-[1.2rem]" />}
+                  <Save className="w-[1.4rem] h-[1.4rem]" />
+                </>
+              ) : (
+                <Edit3 className="w-[1.4rem] h-[1.4rem]" />
+              )}
+              {isEditMode ? 'Save' : 'Edit'}
+            </button>
 
             <button
               onClick={handleMasterMute}
