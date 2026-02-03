@@ -1144,6 +1144,8 @@ const MasterControlDashboard = ({
             >
               {isFullscreen ? <Minimize2 className="w-[1.6rem] h-[1.6rem] text-white" /> : <Maximize2 className={`w-[1.6rem] h-[1.6rem] ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`} />}
             </button>
+            {/* Help/Tutorial Button - Right beside Fullscreen */}
+            <FloatingTutorial isPremium={isPremium} isDarkMode={isDarkMode} />
             <img 
               src="/openbento-logo.png" 
               alt="OpenBento Logo" 
@@ -1343,8 +1345,6 @@ const MasterControlDashboard = ({
               </button>
             )}
 
-            {/* Help/Tutorial Button */}
-            <FloatingTutorial isPremium={isPremium} />
 
             {/* Login Button - Consistent height with other menu buttons - shown when NOT logged in */}
             {!isAuthenticated && (

@@ -34,7 +34,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   },
 ];
 
-export function FloatingTutorial({ isPremium }: { isPremium: boolean }) {
+export function FloatingTutorial({ isPremium, isDarkMode = true }: { isPremium: boolean; isDarkMode?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [positions, setPositions] = useState<Record<string, { top: number; left: number } | null>>({});
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -44,6 +44,13 @@ export function FloatingTutorial({ isPremium }: { isPremium: boolean }) {
 
     const calculatePositions = () => {
       const newPositions: Record<string, { top: number; left: number } | null> = {};
+      
+      // Stagger vertical offsets to prevent overlap
+      const verticalOffsets: Record<string, number> = {
+        'master-mute': 0,
+        'edit-mode': 90,
+        'pro-crown': 180,
+      };
       
       TUTORIAL_STEPS.forEach((step) => {
         if (step.id === 'pro-crown' && isPremium) {
@@ -55,7 +62,7 @@ export function FloatingTutorial({ isPremium }: { isPremium: boolean }) {
         if (element) {
           const rect = element.getBoundingClientRect();
           newPositions[step.id] = {
-            top: rect.bottom + 10,
+            top: rect.bottom + 10 + (verticalOffsets[step.id] || 0),
             left: rect.left + rect.width / 2,
           };
         } else {
@@ -97,17 +104,21 @@ export function FloatingTutorial({ isPremium }: { isPremium: boolean }) {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="menu-btn h-[3.2rem] w-[3.2rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold flex items-center justify-center transition-all duration-300 transform hover:scale-105 shadow-lg shadow-slate-900/50 border border-slate-500"
+        className={`menu-btn h-[3.2rem] w-[3.2rem] slot-button font-semibold flex items-center justify-center transition-all duration-300 border ${
+          isDarkMode 
+            ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-600/50 hover:border-cyan-500/50'
+            : 'bg-gray-200 hover:bg-gray-300 border-gray-300 hover:border-cyan-500/50'
+        }`}
         data-testid="button-help-tutorial"
         title="Quick Tutorial"
       >
-        <HelpCircle className="w-[1.4rem] h-[1.4rem] text-cyan-400" />
+        <HelpCircle className={`w-[1.4rem] h-[1.4rem] ${isDarkMode ? 'text-cyan-400' : 'text-cyan-600'}`} />
       </button>
 
       {isOpen && (
         <div 
           ref={overlayRef}
-          className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[9998] bg-black/60"
           onClick={handleClose}
           data-testid="tutorial-overlay"
         >
@@ -145,9 +156,9 @@ export function FloatingTutorial({ isPremium }: { isPremium: boolean }) {
               >
                 <div className="flex flex-col items-center">
                   <ArrowIcon direction={step.arrowDirection} />
-                  <div className="mt-2 bg-slate-800 border border-cyan-500/50 rounded-xl px-4 py-3 shadow-xl shadow-cyan-500/10 min-w-[180px] text-center" data-testid={`tutorial-tip-${step.id}`}>
+                  <div className="mt-3 bg-slate-800 border border-cyan-500/50 rounded-xl px-4 py-3 shadow-xl shadow-cyan-500/10 w-[160px] text-center" data-testid={`tutorial-tip-${step.id}`}>
                     <h3 className="text-cyan-400 font-bold text-sm mb-1" data-testid={`text-tutorial-tip-title-${step.id}`}>{step.title}</h3>
-                    <p className="text-slate-300 text-xs" data-testid={`text-tutorial-tip-desc-${step.id}`}>{step.description}</p>
+                    <p className="text-slate-300 text-xs leading-tight" data-testid={`text-tutorial-tip-desc-${step.id}`}>{step.description}</p>
                   </div>
                 </div>
               </div>
