@@ -46,6 +46,12 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Responsive Scaling:** Uses `rem` units for consistent scaling.
 - **Persistence:** Widget layouts and content are saved to `localStorage` under 'openBentoWidgets'.
 - **Video Widget:** Integrates YouTube, Twitch, and Kick. Features custom TV-style controls (Mute/Unmute, Play/Pause, Refresh, Delete, Seek). Auto-detects IDs and channels. Live streams (YouTube `isLive: true`, all Twitch/Kick) refresh every 10 minutes to check for new video IDs. Non-live videos do not auto-refresh.
+- **True Live Filter:** YouTube streams are verified using YouTube API to check if they're actually live:
+  - Backend endpoints: `/api/youtube/video-live/:videoId` and `/api/youtube/channel-live/:channelId` use YouTube Data API v3 to check `liveBroadcastContent` field
+  - Proactive checking: 2 seconds after widgets load, their live status is verified via API
+  - Periodic revalidation: Every 5 minutes, offline widgets are rechecked to detect if they've gone live again (automatic recovery)
+  - Offline badge: Non-live streams display a prominent "OFFLINE" badge in top-left corner
+  - Pulse cache: Background system tracks isLive status for cached channels
 - **Note Widget:** Editable text area.
 - **Spacer Widget:** Empty placeholder.
 - **Image Widget:** Displays images, supporting local file uploads.
