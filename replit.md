@@ -23,7 +23,14 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Channel Library Logos:** Stores official channel profile images, with platform-specific fallbacks (Google favicon API for YouTube, Twitch, Kick) and a generic favicon lookup. A final fallback provides a colored circle with the first letter of the channel name.
 - **Stream Library Mode:** A `dashboardOnlyMode` flag allows filtering the sidebar to only show "News / Stream Library" when adding blocks, hiding builder tools.
 - **Menu Button Color Persistence:** Consistent styling for menu buttons across themes, with specific handling for high-contrast elements like the "LIVE" badge.
-- **Guest Access Model:** Full view, edit, and save access without login. Optional login via Email/Password or Google OAuth for cross-device syncing.
+- **Guest Access Model:** View and edit access without login. Optional login via Email/Password or Google OAuth for cross-device syncing.
+- **Library Auth Lock:** Guest users (not logged in) cannot save channels to their personal library. Clicking save shows a "Sign Up Required" modal prompting authentication.
+- **Viral Ad Mechanic (Free Users Only):** Non-premium users experience viral ad blocks that spawn and expand on the dashboard:
+  - **Spawn Logic:** First ad spawns 15 seconds after page load, then every 45 seconds. Ads spawn only on outer perimeter grid positions (edges), never center.
+  - **Expansion Logic:** Every 5 seconds, ads attempt to expand into adjacent empty cells. If a widget occupies the target cell, the system attempts to shrink or move the widget (collision-safe validation ensures widgets never overlap).
+  - **Widget Protection:** Widgets are never deleted, only shrunk or moved. If no safe move exists, expansion is skipped for that position.
+  - **Skip Button:** Each ad shows a 5-second countdown, after which a "Skip Ad" button appears to dismiss the ad.
+  - **Pro Immunity:** Premium users never see ads - all spawning is blocked and existing ads are cleared on premium status change.
 
 **Technical Implementations & Feature Specifications:**
 - **Dynamic Widget System:** Supports Video, Note, Spacer, and Image widget types.
