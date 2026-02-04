@@ -803,7 +803,8 @@ function AppContent() {
       console.log(`[ChannelClick] Searching for live stream from @${channel.channelId}`);
       
       try {
-        const result = await searchChannelLiveStream(channel.channelId);
+        // Use cached API call (will use localStorage cache if fresh, otherwise fetch)
+        const result = await searchChannelLiveStream(channel.channelId, false);
         
         // Determine the video ID to use - prefer dynamic, fallback to static
         const videoId = result.isLive && result.liveVideoId 

@@ -61,8 +61,15 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
   - Live streams (isLive === true) are pinned to top of library list
   - Offline streams (isLive === false) are moved to bottom of library list
   - Unknown status channels appear in the middle
-  - Hourly revalidation (every 60 minutes) triggers YouTube eventType=live search
+  - Hourly revalidation (every 60 minutes) triggers YouTube eventType=live search with forceRefresh=true
   - Automatic promotion: offline streams that return live immediately jump to top
+- **30-Minute localStorage Cache:**
+  - YouTube API responses cached in localStorage with 30-minute TTL
+  - Cache key: `openbento_live_status_cache`
+  - `checkChannelLiveStatus(channelId, forceRefresh)` - forceRefresh bypasses cache
+  - `searchChannelLiveStream(channelHandle, forceRefresh)` - same caching pattern
+  - "Check Again" button uses forceRefresh=true to bypass cache for fresh data
+  - On API errors, caches as offline to prevent hammering the API
 - **Corporate Footer:** Professional footer displayed on dashboard and legal pages:
   - Copyright: "© 2026 ANCU LABS FZC LLC. All rights reserved."
   - Links to /terms and /privacy placeholder pages

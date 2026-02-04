@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, TrendingUp, Layers, Layout, FileText, Square, Image as ImageIcon, Video, Upload, Gamepad2, RefreshCw, Star, Trash2, Globe, Heart, DollarSign, Zap } from 'lucide-react';
+import { checkChannelLiveStatus as checkChannelLiveStatusAPI, searchChannelLiveStream as searchChannelLiveStreamAPI } from '@/lib/stream-api';
 
 // Global cache for failed logo URLs - prevents retrying 404s
 const failedLogoCache = new Set<string>();
@@ -208,6 +209,7 @@ export interface TrendingChannel {
 export interface LiveStatus {
   channelId: string;
   isLive: boolean;
+  isOffline?: boolean;
   viewerCount?: number;
   lastChecked: number;
 }
@@ -740,9 +742,10 @@ export function WidgetSidebar({
   // HOURLY REVALIDATION: Deep YouTube API check every 60 minutes
   // This triggers YouTube eventType=live search to detect newly live streams
   // AUTOMATIC PROMOTION: When offline stream returns live, status flips and it jumps to top
+  // Uses forceRefresh=true to bypass 30-min localStorage cache for fresh API data
   useEffect(() => {
     const hourlyRevalidation = async () => {
-      console.log('[HourlyRevalidation] Starting deep YouTube API live check...');
+      console.log('[HourlyRevalidation] Starting deep YouTube API live check (forceRefresh=true)...');
       const now = Date.now();
       const currentStatuses = liveStatusesRef.current;
       const updatedStatuses: Record<string, LiveStatus> = { ...currentStatuses };
@@ -751,27 +754,33 @@ export function WidgetSidebar({
       for (const channel of channels) {
         if (channel.platform === 'youtube' && channel.channelId) {
           try {
-            // Call YouTube Search API endpoint to check for current live streams (uses eventType=live)
-            const response = await fetch(`/api/youtube/channel-live/${channel.channelId}`);
-            if (response.ok) {
-              const data = await response.json();
-              const wasOffline = currentStatuses[channel.id]?.isLive === false;
-              const isNowLive = data.isLive === true;
-              
-              // AUTOMATIC PROMOTION: Track when offline becomes live
-              if (wasOffline && isNowLive) {
-                console.log(`[HourlyRevalidation] PROMOTED: ${channel.name} is now LIVE!`);
-                promotedCount++;
-              }
-              
-              updatedStatuses[channel.id] = {
-                channelId: channel.channelId,
-                isLive: isNowLive,
-                lastChecked: now
-              };
+            // Use cached API function with forceRefresh=true to bypass localStorage cache
+            const data = await checkChannelLiveStatusAPI(channel.channelId, true);
+            const wasOffline = currentStatuses[channel.id]?.isLive === false;
+            const isNowLive = data.isLive === true;
+            
+            // AUTOMATIC PROMOTION: Track when offline becomes live
+            if (wasOffline && isNowLive) {
+              console.log(`[HourlyRevalidation] PROMOTED: ${channel.name} is now LIVE!`);
+              promotedCount++;
             }
+            
+            // THE "LIAR" FIX: If no live results, explicitly set isLive=false and status=offline
+            updatedStatuses[channel.id] = {
+              channelId: channel.channelId,
+              isLive: isNowLive,
+              isOffline: !isNowLive,
+              lastChecked: now
+            };
           } catch (error) {
             console.error(`[HourlyRevalidation] Error checking ${channel.name}:`, error);
+            // Mark as offline on error
+            updatedStatuses[channel.id] = {
+              channelId: channel.channelId,
+              isLive: false,
+              isOffline: true,
+              lastChecked: now
+            };
           }
         }
       }

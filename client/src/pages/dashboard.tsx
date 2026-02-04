@@ -830,10 +830,11 @@ const MasterControlDashboard = ({
 
     // For YouTube widgets with channelHandle, search for NEW live stream ID via YouTube Search API
     if (widget.isYouTube && widget.channelHandle) {
-      console.log(`[CheckAgain] Searching for new live stream from @${widget.channelHandle}`);
+      console.log(`[CheckAgain] Searching for new live stream from @${widget.channelHandle} (forceRefresh=true)`);
       
       try {
-        const result = await searchChannelLiveStream(widget.channelHandle);
+        // Use forceRefresh=true to bypass localStorage cache - user wants fresh data
+        const result = await searchChannelLiveStream(widget.channelHandle, true);
         
         if (result.isLive && result.liveVideoId) {
           console.log(`[CheckAgain] Found live stream: ${result.liveVideoId} for @${widget.channelHandle}`);
