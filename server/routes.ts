@@ -648,8 +648,8 @@ export async function registerRoutes(
 
   // Valid Stripe price IDs for OpenBento Pro subscription
   const VALID_PRICE_IDS: Record<string, string> = {
-    monthly: 'price_1SwkV2PKTwXMfvTHKCHfRDud',
-    yearly: 'price_1SwkV3PKTwXMfvTH085lq6tA',
+    monthly: 'price_1Sx7AnC4mj6LbUjWpXwTb7Gi',
+    yearly: 'price_1Sx7B5C4mj6LbUjWnIFhehZl',
   };
 
   // Create Stripe Checkout Session for Pro subscription

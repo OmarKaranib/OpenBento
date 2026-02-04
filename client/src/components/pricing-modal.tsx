@@ -9,8 +9,8 @@ interface PricingModalProps {
   onClose: () => void;
 }
 
-export const MONTHLY_PRICE_ID = 'price_1SwkV2PKTwXMfvTHKCHfRDud';
-export const YEARLY_PRICE_ID = 'price_1SwkV3PKTwXMfvTH085lq6tA';
+export const MONTHLY_PRICE_ID = 'price_1Sx7AnC4mj6LbUjWpXwTb7Gi';
+export const YEARLY_PRICE_ID = 'price_1Sx7B5C4mj6LbUjWnIFhehZl';
 
 export function PricingModal({ isOpen, onClose }: PricingModalProps) {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('yearly');
