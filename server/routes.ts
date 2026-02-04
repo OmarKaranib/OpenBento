@@ -375,15 +375,20 @@ export async function registerRoutes(
 
   app.post("/api/dashboard", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
+    const user = (req as any).user;
+    const email = user?.claims?.email || user?.email;
     
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
     }
     
     try {
-      // Check premium status before saving
+      // Check premium status before saving (admins are automatically premium)
+      const userIsAdmin = isAdminEmail(email || '');
       const profile = await storage.getProfile(userId);
-      if (!profile?.isPremium) {
+      const hasPremiumAccess = userIsAdmin || (profile?.isPremium ?? false);
+      
+      if (!hasPremiumAccess) {
         return res.status(403).json({ 
           error: "Premium required", 
           message: "Save Layout is a Pro feature. Upgrade to save your dashboard." 
@@ -405,15 +410,20 @@ export async function registerRoutes(
 
   app.patch("/api/dashboard", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
+    const user = (req as any).user;
+    const email = user?.claims?.email || user?.email;
     
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
     }
     
     try {
-      // Check premium status before updating
+      // Check premium status before updating (admins are automatically premium)
+      const userIsAdmin = isAdminEmail(email || '');
       const profile = await storage.getProfile(userId);
-      if (!profile?.isPremium) {
+      const hasPremiumAccess = userIsAdmin || (profile?.isPremium ?? false);
+      
+      if (!hasPremiumAccess) {
         return res.status(403).json({ 
           error: "Premium required", 
           message: "Save Layout is a Pro feature. Upgrade to save your dashboard." 

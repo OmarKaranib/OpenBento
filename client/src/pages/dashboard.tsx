@@ -827,6 +827,37 @@ const MasterControlDashboard = ({
 
   // Offline Placeholder Component
   const OfflinePlaceholder = ({ widget }: { widget: Widget }) => {
+    // Check if this is a sports channel that's "Live during Games"
+    const sportsChannelIds = ['nfl-network', 'nba-tv', 'espn-live', 'NFL', 'NBA', 'espn'];
+    const widgetUrl = widget.url?.toLowerCase() || '';
+    const widgetChannelId = widget.youtubeChannelId?.toLowerCase() || '';
+    const isSportsChannel = sportsChannelIds.some(id => 
+      widgetUrl.includes(id.toLowerCase()) || 
+      widgetChannelId.includes(id.toLowerCase()) ||
+      widget.id?.includes(id.toLowerCase())
+    );
+    
+    if (isSportsChannel) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/50 p-[1.5rem]">
+          <div className="w-[3rem] h-[3rem] rounded-full bg-blue-500/20 flex items-center justify-center mb-[1rem]">
+            <div className="w-[1.5rem] h-[1.5rem] rounded-full bg-blue-500 animate-pulse" />
+          </div>
+          <h3 className="text-[1.3rem] font-semibold text-blue-400 mb-[0.5rem]">Live During Games</h3>
+          <p className="text-slate-400 text-center text-[1rem] mb-[1rem]">
+            This channel streams live when games are scheduled
+          </p>
+          <button
+            onClick={() => handleRefreshWidget(widget.id)}
+            className="px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300"
+          >
+            <RefreshCw className="w-[1.2rem] h-[1.2rem]" />
+            Check Now
+          </button>
+        </div>
+      );
+    }
+    
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/50 p-[1.5rem]">
         <AlertCircle className="w-[3rem] h-[3rem] text-orange-400 mb-[1rem]" />
