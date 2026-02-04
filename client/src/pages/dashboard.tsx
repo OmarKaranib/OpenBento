@@ -217,13 +217,13 @@ const MasterControlDashboard = ({
   }, [isDarkMode]);
 
   // Auto-save widgets to localStorage with debounce to avoid excessive writes
-  // GUEST SESSION RESET: Only persist widgets for authenticated users
-  // Guests lose all widgets on refresh (hard reset behavior)
+  // REFRESH = RESET: Only persist widgets for PRO users
+  // All non-Pro users (guests + free logged-in) lose widgets on refresh
   const widgetsJsonRef = useRef<string>('');
   useEffect(() => {
-    // Only save to localStorage if user is authenticated
-    if (!isAuthenticated) {
-      // Guest mode: Clear any existing data from localStorage
+    // Only save to localStorage if user is Pro
+    if (!isPremium) {
+      // Non-Pro mode: Clear any existing data from localStorage
       localStorage.removeItem('openBentoWidgets');
       localStorage.removeItem('openBentoPersonalLibrary');
       return;
@@ -235,7 +235,7 @@ const MasterControlDashboard = ({
       widgetsJsonRef.current = widgetsJson;
       localStorage.setItem('openBentoWidgets', widgetsJson);
     }
-  }, [widgets, isAuthenticated]);
+  }, [widgets, isPremium]);
 
   // Set custom color for a specific widget (Bento.me Color Droplet)
   const setWidgetColor = useCallback((widgetId: string, color: string | undefined) => {
@@ -250,9 +250,9 @@ const MasterControlDashboard = ({
   const saveWidgetToLibrary = useCallback((widget: Widget) => {
     if (widget.type !== 'video') return;
     
-    // Guest users cannot add to library - prompt login
+    // Guest users cannot add to library - prompt login with required message
     if (!isAuthenticated) {
-      openLoginModal('Sign in to save streams to your personal library');
+      openLoginModal('Authentication Required: Please log in or sign up to save channels to your library.');
       return;
     }
 

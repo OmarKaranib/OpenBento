@@ -87,9 +87,28 @@ function AnchoredLabel({ item }: AnchoredLabelProps) {
 export function FloatingTutorial({ isPremium, isDarkMode = true }: { isPremium: boolean; isDarkMode?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsOpen(false);
-  };
+  }, []);
+
+  // Global click listener - closes tutorial on ANY click anywhere on the screen
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleGlobalClick = (e: MouseEvent | TouchEvent) => {
+      // Close on any click - the entire screen is clickable to close
+      handleClose();
+    };
+    
+    // Use capture phase to catch clicks before they reach other elements
+    document.addEventListener('click', handleGlobalClick, true);
+    document.addEventListener('touchend', handleGlobalClick, true);
+    
+    return () => {
+      document.removeEventListener('click', handleGlobalClick, true);
+      document.removeEventListener('touchend', handleGlobalClick, true);
+    };
+  }, [isOpen, handleClose]);
 
   const visibleLabels = ALL_TUTORIAL_LABELS.filter(item => {
     if (item.id === 'crown' && isPremium) return false;
@@ -99,7 +118,10 @@ export function FloatingTutorial({ isPremium, isDarkMode = true }: { isPremium: 
   return (
     <>
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={(e) => {
+          e.stopPropagation(); // Prevent global listener from immediately closing
+          setIsOpen(true);
+        }}
         className={`menu-btn h-[3.2rem] w-[3.2rem] slot-button font-semibold flex items-center justify-center transition-all duration-300 border ${
           isDarkMode 
             ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-600/50 hover:border-cyan-500/50'
