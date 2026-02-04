@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from "./link-refresher";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerChannel } from "./services/pulse-cache";
-import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, verifyVideoIsLive } from "./services/youtube-api";
+import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, verifyVideoIsLive, searchChannelLiveStream } from "./services/youtube-api";
 import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema } from "@shared/schema";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
@@ -135,6 +135,37 @@ export async function registerRoutes(
       res.status(500).json({ 
         videoId,
         isLive: null,
+        error: String(error) 
+      });
+    }
+  });
+
+  // Search for current live stream by channel handle - returns new live video ID
+  app.get("/api/youtube/search-live/:channelHandle", async (req, res) => {
+    const { channelHandle } = req.params;
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    
+    if (!apiKey) {
+      return res.status(503).json({ 
+        isLive: false,
+        error: "YouTube API key not configured" 
+      });
+    }
+    
+    try {
+      const result = await searchChannelLiveStream(channelHandle, apiKey);
+      res.json({
+        channelHandle,
+        channelId: result.channelId,
+        isLive: result.isLive,
+        liveVideoId: result.liveVideoId,
+        title: result.title,
+      });
+    } catch (error) {
+      console.error('[YouTube Search Live] Error:', error);
+      res.status(500).json({ 
+        channelHandle,
+        isLive: false,
         error: String(error) 
       });
     }

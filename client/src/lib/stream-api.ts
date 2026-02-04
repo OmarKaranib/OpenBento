@@ -239,3 +239,28 @@ export async function checkChannelLiveStatus(channelId: string): Promise<{
     return { isLive: false, liveVideoId: null, title: null };
   }
 }
+
+// Search for current live stream by channel handle - returns new live video ID
+export async function searchChannelLiveStream(channelHandle: string): Promise<{
+  isLive: boolean;
+  liveVideoId: string | null;
+  channelId: string | null;
+  title: string | null;
+}> {
+  try {
+    const response = await fetch(`${API_BASE}/api/youtube/search-live/${encodeURIComponent(channelHandle)}`);
+    if (!response.ok) {
+      return { isLive: false, liveVideoId: null, channelId: null, title: null };
+    }
+    const data = await response.json();
+    return {
+      isLive: data.isLive ?? false,
+      liveVideoId: data.liveVideoId ?? null,
+      channelId: data.channelId ?? null,
+      title: data.title ?? null,
+    };
+  } catch (error) {
+    console.error('[StreamAPI] Search channel live stream failed:', error);
+    return { isLive: false, liveVideoId: null, channelId: null, title: null };
+  }
+}

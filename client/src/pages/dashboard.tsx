@@ -12,7 +12,7 @@ import { useStreamHealing } from '@/hooks/use-stream-healing';
 import { useToast } from '@/hooks/use-toast';
 import { FloatingTutorial } from '@/components/floating-tutorial';
 import { AdBlock, AdBlockData } from '@/components/ad-block';
-import { checkVideoLiveStatus } from '@/lib/stream-api';
+import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -186,6 +186,7 @@ const MasterControlDashboard = ({
   const [clearHoldProgress, setClearHoldProgress] = useState(0);
   const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
   const [colorPickerWidget, setColorPickerWidget] = useState<string | null>(null);
+  const [hasStartedBuilding, setHasStartedBuilding] = useState(false); // Track if user clicked "Start Building"
 
   const { triggerHeal, getHealingState, registerChannel } = useStreamHealing();
   const { toast } = useToast();
@@ -826,27 +827,97 @@ const MasterControlDashboard = ({
     const widget = widgets.find(w => w.id === widgetId);
     if (!widget) return;
 
-    setWidgets(prev => prev.map(w => 
-      w.id === widgetId && w.type === 'video' 
-        ? { ...w, url: '', lastRefresh: Date.now(), isOffline: false } 
-        : w
-    ));
-
-    // For YouTube widgets, check live status using YouTube API
-    if (widget.isYouTube && widget.videoId) {
+    // For YouTube widgets with channelHandle, search for NEW live stream ID via YouTube Search API
+    if (widget.isYouTube && widget.channelHandle) {
+      console.log(`[CheckAgain] Searching for new live stream from @${widget.channelHandle}`);
+      
       try {
-        const liveStatus = await checkVideoLiveStatus(widget.videoId);
-        if (!liveStatus.isLive) {
-          console.log(`[TrueLiveFilter] Video ${widget.videoId} is not live (${liveStatus.liveBroadcastContent})`);
+        const result = await searchChannelLiveStream(widget.channelHandle);
+        
+        if (result.isLive && result.liveVideoId) {
+          console.log(`[CheckAgain] Found live stream: ${result.liveVideoId} for @${widget.channelHandle}`);
+          // Update widget with new live video ID - consistent state updates
           setWidgets(prev => prev.map(w => 
-            w.id === widgetId ? { ...w, isOffline: true } : w
+            w.id === widgetId 
+              ? { 
+                  ...w, 
+                  videoId: result.liveVideoId, 
+                  youtubeChannelId: result.channelId,
+                  url: '', 
+                  lastRefresh: Date.now(), 
+                  isOffline: false,
+                  isLive: true,
+                  error: null,
+                  embedBlocked: false,
+                } 
+              : w
+          ));
+          // Remove from checkedVideoIds so it will be re-checked
+          checkedVideoIds.current.delete(widget.videoId || '');
+          return;
+        } else {
+          console.log(`[CheckAgain] Channel @${widget.channelHandle} is not currently live`);
+          // Consistent state updates for offline
+          setWidgets(prev => prev.map(w => 
+            w.id === widgetId ? { 
+              ...w, 
+              isOffline: true, 
+              isLive: false,
+              error: null,
+              embedBlocked: false,
+            } : w
           ));
           return;
         }
       } catch (error) {
-        console.error('[TrueLiveFilter] Error checking live status:', error);
+        console.error('[CheckAgain] Error searching for live stream:', error);
+        setWidgets(prev => prev.map(w => 
+          w.id === widgetId ? { 
+            ...w, 
+            isOffline: true, 
+            isLive: false,
+            error: null,
+          } : w
+        ));
+        return;
       }
     }
+
+    // For YouTube widgets without channelHandle, just check current videoId
+    if (widget.isYouTube && widget.videoId && !widget.channelHandle) {
+      setWidgets(prev => prev.map(w => 
+        w.id === widgetId && w.type === 'video' 
+          ? { ...w, url: '', lastRefresh: Date.now(), isOffline: false, error: null, embedBlocked: false } 
+          : w
+      ));
+
+      try {
+        const liveStatus = await checkVideoLiveStatus(widget.videoId);
+        if (liveStatus.isLive) {
+          // Video is live - ensure consistent state
+          console.log(`[TrueLiveFilter] Video ${widget.videoId} is LIVE`);
+          setWidgets(prev => prev.map(w => 
+            w.id === widgetId ? { ...w, isOffline: false, isLive: true, error: null, embedBlocked: false } : w
+          ));
+        } else {
+          console.log(`[TrueLiveFilter] Video ${widget.videoId} is not live (${liveStatus.liveBroadcastContent})`);
+          setWidgets(prev => prev.map(w => 
+            w.id === widgetId ? { ...w, isOffline: true, isLive: false, error: null, embedBlocked: false } : w
+          ));
+        }
+        return;
+      } catch (error) {
+        console.error('[TrueLiveFilter] Error checking live status:', error);
+      }
+      return;
+    }
+
+    // For non-YouTube widgets (Twitch/Kick), just refresh
+    setWidgets(prev => prev.map(w => 
+      w.id === widgetId && w.type === 'video' 
+        ? { ...w, url: '', lastRefresh: Date.now(), isOffline: false, error: null, embedBlocked: false } 
+        : w
+    ));
 
     setTimeout(() => {
       setWidgets(prev => {
@@ -1954,7 +2025,7 @@ const MasterControlDashboard = ({
           </div>
         )}
 
-        {widgets.length === 0 && !isEditMode && (
+        {widgets.length === 0 && !isEditMode && !hasStartedBuilding && (
           <div 
             className="flex flex-col items-center justify-center text-slate-400 col-span-12"
             data-testid="empty-state"
@@ -1964,6 +2035,7 @@ const MasterControlDashboard = ({
             <p className="text-[1.2rem] mb-[1.5rem]">Click "Add Block" to add blocks to your dashboard</p>
             <button
               onClick={() => {
+                setHasStartedBuilding(true); // Remove this button from DOM after click
                 setIsEditMode(true);
                 // Automatically open the library sidebar so users can add blocks
                 handleOpenSidebarToContent();

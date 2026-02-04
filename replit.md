@@ -52,6 +52,11 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
   - Periodic revalidation: Every 5 minutes, offline widgets are rechecked to detect if they've gone live again (automatic recovery)
   - Offline badge: Non-live streams display a prominent "OFFLINE" badge in top-left corner
   - Pulse cache: Background system tracks isLive status for cached channels
+- **Dynamic Channel Resolution:** YouTube channels now use Search API to get current live video IDs:
+  - When adding a channel from the library, `searchChannelLiveStream()` is called to find the current live stream
+  - Channel handles are stored in `channelHandle` field for future searches
+  - "Check Again" button re-triggers YouTube Search API to find NEW live video IDs when channels go live
+  - Consistent state updates: isLive/isOffline/error/embedBlocked are always set together
 - **Note Widget:** Editable text area.
 - **Spacer Widget:** Empty placeholder.
 - **Image Widget:** Displays images, supporting local file uploads.

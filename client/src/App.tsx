@@ -5,6 +5,7 @@ import { LoginModal } from '@/components/login-modal';
 import { PricingModal } from '@/components/pricing-modal';
 import { MobileGuard } from '@/components/mobile-guard';
 import { useViralAds, AdBlockData } from '@/components/ad-block';
+import { searchChannelLiveStream } from '@/lib/stream-api';
 
 // Static background - High-contrast light mode
 const StaticBackground = () => {
@@ -57,6 +58,7 @@ export interface Widget {
   videoId?: string | null;
   youtubeChannelId?: string | null;
   channelName?: string;
+  channelHandle?: string | null; // YouTube channel handle for searching live streams
   isTwitch?: boolean;
   twitchChannel?: string | null;
   isKick?: boolean;
@@ -784,24 +786,80 @@ function AppContent() {
     }
   }, [addVideoWidget, addWidget, setWidgets, findCollidingWidgets, findNextAvailableSlot, ad]);
 
-  const handleChannelClick = useCallback((channel: TrendingChannel) => {
-    // Mirror the manual paste behavior exactly - just process the URL
-    // Capture active widget BEFORE clearing (same as manual paste behavior)
+  const handleChannelClick = useCallback(async (channel: TrendingChannel) => {
+    // Capture active widget BEFORE clearing
     const currentActiveWidgetId = activeWidgetIdRef.current;
     
     // Close sidebar immediately for responsive feel
     setSidebarOpen(false);
     activeWidgetIdRef.current = null;
     setActiveWidgetId(null);
+    setUrlInputValue('');
     
-    // Restore activeWidgetIdRef temporarily for handleSubmitUrl (if editing existing widget)
+    // For YouTube channels, dynamically search for current live stream using YouTube Search API
+    if (channel.platform === 'youtube' && channel.channelId) {
+      console.log(`[ChannelClick] Searching for live stream from @${channel.channelId}`);
+      
+      try {
+        const result = await searchChannelLiveStream(channel.channelId);
+        
+        // Determine the video ID to use - prefer dynamic, fallback to static
+        const videoId = result.isLive && result.liveVideoId 
+          ? result.liveVideoId 
+          : (channel.videoId || null);
+        
+        const isOffline = !result.isLive;
+        
+        console.log(`[ChannelClick] @${channel.channelId}: ${result.isLive ? 'LIVE' : 'OFFLINE'}, videoId: ${videoId}`);
+        
+        // Build the widget data with channelHandle for future "Check Again"
+        const widgetData: Partial<Widget> = {
+          url: videoId ? `https://www.youtube.com/watch?v=${videoId}` : '',
+          isYouTube: true,
+          videoId: videoId,
+          youtubeChannelId: result.channelId || channel.channelId,
+          channelHandle: channel.channelId, // Store for "Check Again" searches
+          channelName: channel.name,
+          isTwitch: false,
+          twitchChannel: null,
+          isKick: false,
+          kickChannel: null,
+          isLive: result.isLive,
+          isOffline: isOffline,
+          error: null,
+          embedBlocked: false,
+          lastRefresh: Date.now(),
+        };
+        
+        if (currentActiveWidgetId) {
+          // Update existing widget
+          setWidgets(prev => prev.map(w => 
+            w.id === currentActiveWidgetId ? {
+              ...w,
+              type: 'video',
+              ...widgetData,
+              isPaused: false,
+              isMuted: true,
+              volume: 0,
+            } : w
+          ));
+        } else {
+          // Add new widget
+          addWidget('video', 3, 2, widgetData);
+        }
+        return;
+      } catch (error) {
+        console.error('[ChannelClick] Error searching for live stream:', error);
+        // Fall through to use static URL
+      }
+    }
+    
+    // For non-YouTube (Twitch/Kick) or if YouTube search failed, use handleSubmitUrl
     if (currentActiveWidgetId) {
       activeWidgetIdRef.current = currentActiveWidgetId;
     }
-    
-    // Pass the URL directly to handleSubmitUrl - same as manual paste
     handleSubmitUrl(channel.url);
-  }, [handleSubmitUrl]);
+  }, [handleSubmitUrl, addWidget, setWidgets]);
 
   // Dashboard-only mode flag - set to false to allow sidebar with filtered content
   const dashboardOnlyMode = false;

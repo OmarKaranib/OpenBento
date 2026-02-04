@@ -196,3 +196,59 @@ export async function verifyVideoIsLive(
     liveBroadcastContent: details.liveBroadcastContent,
   };
 }
+
+// Resolve YouTube channel handle/username to channel ID
+export async function resolveChannelHandle(
+  handle: string,
+  apiKey: string
+): Promise<string | null> {
+  // Try with @ prefix first (handle format)
+  let searchHandle = handle.startsWith('@') ? handle : `@${handle}`;
+  const url = `${YOUTUBE_API_BASE}/search?part=snippet&q=${encodeURIComponent(searchHandle)}&type=channel&maxResults=1&key=${apiKey}`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error('[YouTube API] Channel handle resolution failed:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    const items = data.items || [];
+    
+    if (items.length === 0) {
+      return null;
+    }
+    
+    return items[0].snippet.channelId;
+  } catch (error) {
+    console.error('[YouTube API] Channel handle resolution error:', error);
+    return null;
+  }
+}
+
+// Search for current live stream by channel handle/username - returns new live video ID
+export async function searchChannelLiveStream(
+  channelHandle: string,
+  apiKey: string
+): Promise<{ isLive: boolean; liveVideoId: string | null; channelId: string | null; title: string | null }> {
+  console.log(`[YouTube API] Searching live stream for channel handle: ${channelHandle}`);
+  
+  // First resolve the channel handle to a channel ID
+  const channelId = await resolveChannelHandle(channelHandle, apiKey);
+  
+  if (!channelId) {
+    console.log(`[YouTube API] Could not resolve channel handle: ${channelHandle}`);
+    return { isLive: false, liveVideoId: null, channelId: null, title: null };
+  }
+  
+  console.log(`[YouTube API] Resolved ${channelHandle} -> channelId: ${channelId}`);
+  
+  // Now search for live streams from this channel
+  const liveResult = await checkChannelLiveStatus(channelId, apiKey);
+  
+  return {
+    ...liveResult,
+    channelId,
+  };
+}
