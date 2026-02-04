@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FloatingTutorial } from '@/components/floating-tutorial';
 import { AdBlock, AdBlockData } from '@/components/ad-block';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
+import { Footer } from '@/components/footer';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -2055,6 +2056,7 @@ const MasterControlDashboard = ({
         </div>
       </div>
 
+      <Footer />
     </div>
   );
 };

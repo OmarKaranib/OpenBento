@@ -57,6 +57,13 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
   - Channel handles are stored in `channelHandle` field for future searches
   - "Check Again" button re-triggers YouTube Search API to find NEW live video IDs when channels go live
   - Consistent state updates: isLive/isOffline/error/embedBlocked are always set together
+- **Live-Only Library Filter:** Channel library only displays confirmed live streams:
+  - Channels are hidden until their live status is verified via API
+  - Offline channels (isLive === false) are automatically hidden from library
+  - Only channels with confirmed isLive === true appear in the library
+- **Corporate Footer:** Professional footer displayed on dashboard and legal pages:
+  - Copyright: "© 2026 ANCU LABS FZC LLC. All rights reserved."
+  - Links to /terms and /privacy placeholder pages
 - **Note Widget:** Editable text area.
 - **Spacer Widget:** Empty placeholder.
 - **Image Widget:** Displays images, supporting local file uploads.

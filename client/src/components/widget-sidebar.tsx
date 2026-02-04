@@ -751,6 +751,15 @@ export function WidgetSidebar({
       c.category !== 'Music'
     );
     
+    // LIVE-ONLY FILTER: Only show channels that are confirmed live
+    // Hide offline channels AND unverified channels until status is confirmed
+    filtered = filtered.filter(c => {
+      const status = liveStatuses[c.id];
+      // Only include channels with confirmed live status
+      // Hide both offline AND unknown/unchecked channels
+      return status?.isLive === true;
+    });
+    
     // Filter out blocked channels from main view (except when viewing blocked category)
     if (activeCategory !== 'blocked') {
       filtered = filtered.filter(c => !isChannelBlocked(c.id));
@@ -775,7 +784,7 @@ export function WidgetSidebar({
     }
     
     return filtered;
-  }, [searchQuery, channels, activeCategory, isChannelBlocked]);
+  }, [searchQuery, channels, activeCategory, isChannelBlocked, liveStatuses]);
 
   // Filter personal library by search
   const filteredPersonalLibrary = useMemo(() => {
