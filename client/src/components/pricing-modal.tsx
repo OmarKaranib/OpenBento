@@ -97,7 +97,7 @@ export function PricingModal({ isOpen, onClose }: PricingModalProps) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
+            <div className="bg-slate-800 rounded-xl p-6 border border-slate-700/50">
               <div className="text-center mb-6">
                 <h3 className="text-xl font-bold text-slate-300 mb-2">Free</h3>
                 <div className="flex items-baseline justify-center gap-1">
@@ -134,7 +134,7 @@ export function PricingModal({ isOpen, onClose }: PricingModalProps) {
               </Button>
             </div>
 
-            <div className="relative bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl p-6 border-2 border-amber-500/50 ring-2 ring-amber-500/20">
+            <div className="relative bg-slate-800 rounded-xl p-6 border-2 border-amber-500/50 ring-2 ring-amber-500/20">
               <div className="absolute -top-3 right-4 bg-amber-500 text-slate-900 text-xs font-bold px-3 py-1 rounded-full">
                 RECOMMENDED
               </div>

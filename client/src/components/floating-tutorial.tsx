@@ -114,8 +114,12 @@ export function FloatingTutorial({ isPremium, isDarkMode = true }: { isPremium: 
       {isOpen && (
         <>
           <div 
-            className="fixed inset-0 z-[9998] bg-black/60"
+            className="fixed inset-0 z-[9998] bg-black/60 cursor-pointer"
             onClick={handleClose}
+            onTouchEnd={handleClose}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Escape' && handleClose()}
             data-testid="tutorial-overlay"
           />
           
@@ -128,7 +132,7 @@ export function FloatingTutorial({ isPremium, isDarkMode = true }: { isPremium: 
             <X className="w-5 h-5 text-white" />
           </button>
 
-          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 text-center z-[10000]">
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 text-center z-[10000] pointer-events-none">
             <h2 className="text-xl font-bold text-white mb-1" data-testid="text-tutorial-title">Menu Bar Guide</h2>
             <p className="text-slate-400 text-sm" data-testid="text-tutorial-subtitle">Click anywhere to close</p>
           </div>

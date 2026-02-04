@@ -217,16 +217,25 @@ const MasterControlDashboard = ({
   }, [isDarkMode]);
 
   // Auto-save widgets to localStorage with debounce to avoid excessive writes
-  // This ensures media control states (volume) persist across sessions
+  // GUEST SESSION RESET: Only persist widgets for authenticated users
+  // Guests lose all widgets on refresh (hard reset behavior)
   const widgetsJsonRef = useRef<string>('');
   useEffect(() => {
+    // Only save to localStorage if user is authenticated
+    if (!isAuthenticated) {
+      // Guest mode: Clear any existing data from localStorage
+      localStorage.removeItem('openBentoWidgets');
+      localStorage.removeItem('openBentoPersonalLibrary');
+      return;
+    }
+    
     const widgetsJson = JSON.stringify(widgets);
     // Only save if actual content changed (not just reference)
     if (widgetsJson !== widgetsJsonRef.current) {
       widgetsJsonRef.current = widgetsJson;
       localStorage.setItem('openBentoWidgets', widgetsJson);
     }
-  }, [widgets]);
+  }, [widgets, isAuthenticated]);
 
   // Set custom color for a specific widget (Bento.me Color Droplet)
   const setWidgetColor = useCallback((widgetId: string, color: string | undefined) => {
@@ -237,8 +246,15 @@ const MasterControlDashboard = ({
   }, [setWidgets]);
 
   // Save widget to Personal Library
+  // LIBRARY PERMISSIONS: Only logged-in users can add to personal library
   const saveWidgetToLibrary = useCallback((widget: Widget) => {
     if (widget.type !== 'video') return;
+    
+    // Guest users cannot add to library - prompt login
+    if (!isAuthenticated) {
+      openLoginModal('Sign in to save streams to your personal library');
+      return;
+    }
 
     // Generate descriptive name based on platform and channel
     let name = 'Saved Stream';
@@ -279,7 +295,7 @@ const MasterControlDashboard = ({
       window.dispatchEvent(new CustomEvent('personalLibraryUpdated'));
       return updated;
     });
-  }, []);
+  }, [isAuthenticated, openLoginModal]);
 
   // Check if widget is saved in Personal Library
   const isWidgetSaved = useCallback((widget: Widget) => {
@@ -796,6 +812,23 @@ const MasterControlDashboard = ({
   };
 
   const handleSaveLayout = () => {
+    // LIBRARY PERMISSIONS: Only Pro users can save layouts
+    if (!isPremium) {
+      toast({
+        title: "Pro Feature",
+        description: "Layout saving is a Pro feature. Upgrade to save your custom dashboard forever!",
+        variant: "default"
+      });
+      onOpenPricingModal();
+      return;
+    }
+    
+    // Only authenticated Pro users can save
+    if (!isAuthenticated) {
+      openLoginModal('Sign in to save your layout');
+      return;
+    }
+    
     localStorage.setItem('openBentoWidgets', JSON.stringify(widgets));
 
     const saveButton = document.getElementById('save-button');
@@ -1662,10 +1695,12 @@ const MasterControlDashboard = ({
                   <span className="text-[1rem] font-semibold text-white/80 mb-[0.4rem]">Block Color</span>
                   <div className="grid grid-cols-5 gap-[0.6rem]">
                     {[
-                      '#1e293b', '#0f172a', '#18181b', '#1c1917', '#0c0a09',
-                      '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6',
-                      '#3b82f6', '#8b5cf6', '#ec4899', '#f43f5e', '#6366f1',
-                      '#06b6d4', '#0ea5e9', '#a855f7', '#d946ef', '#84cc16'
+                      // Row 1: Dark/neutral tones (more visible in light mode)
+                      '#374151', '#1f2937', '#27272a', '#292524', '#44403c',
+                      // Row 2-4: Vibrant, saturated colors (high visibility)
+                      '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#0d9488',
+                      '#2563eb', '#7c3aed', '#db2777', '#e11d48', '#4f46e5',
+                      '#0891b2', '#0284c7', '#9333ea', '#c026d3', '#65a30d'
                     ].map((color) => (
                       <button
                         key={color}
