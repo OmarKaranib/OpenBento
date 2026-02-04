@@ -77,6 +77,7 @@ export interface Widget {
   isOffline?: boolean;
   isLive?: boolean;
   customColor?: string;
+  apiError?: boolean; // True if YouTube API returned 403/error - show "System Maintenance" instead of "Offline"
 }
 
 const GRID_COLS = 12;
@@ -812,8 +813,9 @@ function AppContent() {
           : (channel.videoId || null);
         
         const isOffline = !result.isLive;
+        const hasApiError = result.apiError === true;
         
-        console.log(`[ChannelClick] @${channel.channelId}: ${result.isLive ? 'LIVE' : 'OFFLINE'}, videoId: ${videoId}`);
+        console.log(`[ChannelClick] @${channel.channelId}: ${result.isLive ? 'LIVE' : 'OFFLINE'}, apiError: ${hasApiError}, videoId: ${videoId}`);
         
         // Build the widget data with channelHandle for future "Check Again"
         const widgetData: Partial<Widget> = {
@@ -829,6 +831,7 @@ function AppContent() {
           kickChannel: null,
           isLive: result.isLive,
           isOffline: isOffline,
+          apiError: hasApiError, // Track if this was an API error vs genuine offline
           error: null,
           embedBlocked: false,
           lastRefresh: Date.now(),

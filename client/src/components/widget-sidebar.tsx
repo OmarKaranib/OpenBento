@@ -212,6 +212,7 @@ export interface LiveStatus {
   isOffline?: boolean;
   viewerCount?: number;
   lastChecked: number;
+  apiError?: boolean; // True if YouTube API returned 403/error - don't lie, show "System Maintenance"
 }
 
 export interface WidgetTemplate {
@@ -766,19 +767,22 @@ export function WidgetSidebar({
             }
             
             // THE "LIAR" FIX: If no live results, explicitly set isLive=false and status=offline
+            // Track apiError separately so UI can show "System Maintenance" instead of "Offline"
             updatedStatuses[channel.id] = {
               channelId: channel.channelId,
               isLive: isNowLive,
               isOffline: !isNowLive,
+              apiError: data.apiError === true, // Track if this was an API error vs genuine offline
               lastChecked: now
             };
           } catch (error) {
             console.error(`[HourlyRevalidation] Error checking ${channel.name}:`, error);
-            // Mark as offline on error
+            // Exception = API error, not genuine offline
             updatedStatuses[channel.id] = {
               channelId: channel.channelId,
               isLive: false,
               isOffline: true,
+              apiError: true, // Exception means API error
               lastChecked: now
             };
           }
