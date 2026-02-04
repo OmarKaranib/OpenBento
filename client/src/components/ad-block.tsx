@@ -188,111 +188,177 @@ export function useViralAds(
     return false;
   }, []);
 
-  const pushWidgetAway = useCallback((
-    widget: Widget, 
-    adPosition: { x: number; y: number },
-    allWidgets: Widget[],
-    currentAd: AdBlockData | null
-  ): { newWidget: Widget; success: boolean } => {
-    const isValidMove = (candidate: Widget): boolean => {
+  // Check if a widget overlaps with the ad's proposed new bounds
+  const widgetOverlapsAdBounds = useCallback((widget: Widget, adBounds: { x: number; y: number; w: number; h: number }): boolean => {
+    const overlapsX = widget.x < adBounds.x + adBounds.w && widget.x + widget.w > adBounds.x;
+    const overlapsY = widget.y < adBounds.y + adBounds.h && widget.y + widget.h > adBounds.y;
+    return overlapsX && overlapsY;
+  }, []);
+
+  // Find a new safe position for a widget, pushing it away from the ad
+  const findSafePosition = useCallback((
+    widget: Widget,
+    adBounds: { x: number; y: number; w: number; h: number },
+    otherWidgets: Widget[],
+    excludeWidgetId: string
+  ): Widget | null => {
+    const isValidPosition = (candidate: Widget): boolean => {
+      // Check grid bounds
       if (candidate.x < 0 || candidate.x + candidate.w > GRID_COLS) return false;
       if (candidate.y < 0 || candidate.y + candidate.h > GRID_ROWS) return false;
-      
-      const adRect = { x: adPosition.x, y: adPosition.y, w: 1, h: 1 };
-      const overlapsAd = candidate.x < adRect.x + adRect.w && candidate.x + candidate.w > adRect.x &&
-                         candidate.y < adRect.y + adRect.h && candidate.y + candidate.h > adRect.y;
-      if (overlapsAd) return false;
-      
-      return !checkWidgetOverlap(candidate, allWidgets, currentAd, widget.id);
+      // Check ad overlap
+      if (widgetOverlapsAdBounds(candidate, adBounds)) return false;
+      // Check widget overlap
+      for (const other of otherWidgets) {
+        if (other.id === excludeWidgetId) continue;
+        const overlapsX = candidate.x < other.x + other.w && candidate.x + candidate.w > other.x;
+        const overlapsY = candidate.y < other.y + other.h && candidate.y + candidate.h > other.y;
+        if (overlapsX && overlapsY) return false;
+      }
+      return true;
     };
+
+    // Calculate push direction based on ad center
+    const adCenterX = adBounds.x + adBounds.w / 2;
+    const adCenterY = adBounds.y + adBounds.h / 2;
+    const widgetCenterX = widget.x + widget.w / 2;
+    const widgetCenterY = widget.y + widget.h / 2;
     
-    const dx = adPosition.x - widget.x;
-    const dy = adPosition.y - widget.y;
-    
-    const moveDirections = [];
-    if (dx <= 0) moveDirections.push({ dx: 1, dy: 0 });
-    if (dx >= 0) moveDirections.push({ dx: -1, dy: 0 });
-    if (dy <= 0) moveDirections.push({ dx: 0, dy: 1 });
-    if (dy >= 0) moveDirections.push({ dx: 0, dy: -1 });
+    // Try moving in the direction away from ad (increasing distance)
+    const moveDirections: { dx: number; dy: number }[] = [];
+    if (widgetCenterX < adCenterX) moveDirections.push({ dx: -1, dy: 0 }); // Move left
+    else moveDirections.push({ dx: 1, dy: 0 }); // Move right
+    if (widgetCenterY < adCenterY) moveDirections.push({ dx: 0, dy: -1 }); // Move up
+    else moveDirections.push({ dx: 0, dy: 1 }); // Move down
+    // Add all directions for fallback
     moveDirections.push({ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 });
-    
+    moveDirections.push({ dx: 1, dy: 1 }, { dx: -1, dy: 1 }, { dx: 1, dy: -1 }, { dx: -1, dy: -1 });
+
+    // Try pushing widget 1-5 cells in each direction
     const tried = new Set<string>();
-    for (const dir of moveDirections) {
-      const key = `${dir.dx},${dir.dy}`;
-      if (tried.has(key)) continue;
-      tried.add(key);
-      
-      const candidate = { ...widget, x: widget.x + dir.dx, y: widget.y + dir.dy };
-      if (isValidMove(candidate)) {
-        return { newWidget: candidate, success: true };
+    for (let distance = 1; distance <= 5; distance++) {
+      for (const dir of moveDirections) {
+        const newX = widget.x + dir.dx * distance;
+        const newY = widget.y + dir.dy * distance;
+        const key = `${newX},${newY}`;
+        if (tried.has(key)) continue;
+        tried.add(key);
+        
+        const candidate = { ...widget, x: newX, y: newY };
+        if (isValidPosition(candidate)) {
+          return candidate;
+        }
       }
     }
-    
+
+    // Try shrinking the widget if moving doesn't work
+    const shrinkOptions: Widget[] = [];
     if (widget.w > 1) {
-      const shrinkLeft = { ...widget, w: widget.w - 1, x: widget.x + 1 };
-      const shrinkRight = { ...widget, w: widget.w - 1 };
-      if (isValidMove(shrinkLeft)) return { newWidget: shrinkLeft, success: true };
-      if (isValidMove(shrinkRight)) return { newWidget: shrinkRight, success: true };
+      shrinkOptions.push({ ...widget, w: widget.w - 1, x: widget.x + 1 }); // Shrink from left
+      shrinkOptions.push({ ...widget, w: widget.w - 1 }); // Shrink from right
     }
-    
     if (widget.h > 1) {
-      const shrinkTop = { ...widget, h: widget.h - 1, y: widget.y + 1 };
-      const shrinkBottom = { ...widget, h: widget.h - 1 };
-      if (isValidMove(shrinkTop)) return { newWidget: shrinkTop, success: true };
-      if (isValidMove(shrinkBottom)) return { newWidget: shrinkBottom, success: true };
+      shrinkOptions.push({ ...widget, h: widget.h - 1, y: widget.y + 1 }); // Shrink from top
+      shrinkOptions.push({ ...widget, h: widget.h - 1 }); // Shrink from bottom
+    }
+
+    for (const shrunk of shrinkOptions) {
+      if (isValidPosition(shrunk)) {
+        return shrunk;
+      }
+      // Also try moving the shrunk widget
+      for (let distance = 1; distance <= 3; distance++) {
+        for (const dir of moveDirections) {
+          const candidate = { ...shrunk, x: shrunk.x + dir.dx * distance, y: shrunk.y + dir.dy * distance };
+          if (isValidPosition(candidate)) {
+            return candidate;
+          }
+        }
+      }
+    }
+
+    return null; // Cannot find safe position
+  }, [widgetOverlapsAdBounds]);
+
+  // Perform grid reflow - move all affected widgets when ad expands
+  const performGridReflow = useCallback((
+    newAdBounds: { x: number; y: number; w: number; h: number },
+    currentWidgets: Widget[]
+  ): { success: boolean; newWidgets: Widget[] } => {
+    // Find all widgets that overlap with the new ad bounds
+    const overlappingWidgets = currentWidgets.filter(w => widgetOverlapsAdBounds(w, newAdBounds));
+    
+    if (overlappingWidgets.length === 0) {
+      return { success: true, newWidgets: currentWidgets };
+    }
+
+    // Create a working copy of widgets
+    let workingWidgets = [...currentWidgets];
+    
+    // Process each overlapping widget
+    for (const widget of overlappingWidgets) {
+      // Get current state of other widgets (excluding the one being processed)
+      const otherWidgets = workingWidgets.filter(w => w.id !== widget.id);
+      
+      // Find a new safe position
+      const newPosition = findSafePosition(widget, newAdBounds, otherWidgets, widget.id);
+      
+      if (!newPosition) {
+        // Cannot relocate this widget - expansion fails
+        return { success: false, newWidgets: currentWidgets };
+      }
+      
+      // Update working widgets with new position
+      workingWidgets = workingWidgets.map(w => w.id === widget.id ? newPosition : w);
     }
     
-    return { newWidget: widget, success: false };
-  }, [checkWidgetOverlap]);
+    return { success: true, newWidgets: workingWidgets };
+  }, [widgetOverlapsAdBounds, findSafePosition]);
 
   const expandAd = useCallback(() => {
-    setAd(currentAd => {
-      if (!currentAd) return null;
+    const currentAd = ad;
+    if (!currentAd) return;
+    
+    const currentWidgets = widgetsRef.current;
+    
+    // Define possible expansion directions
+    const expansionOptions: { x: number; y: number; w: number; h: number }[] = [];
+    
+    // Expand left (if possible)
+    if (currentAd.x > 0) {
+      expansionOptions.push({ x: currentAd.x - 1, y: currentAd.y, w: currentAd.w + 1, h: currentAd.h });
+    }
+    // Expand right
+    if (currentAd.x + currentAd.w < GRID_COLS) {
+      expansionOptions.push({ x: currentAd.x, y: currentAd.y, w: currentAd.w + 1, h: currentAd.h });
+    }
+    // Expand up
+    if (currentAd.y > 0) {
+      expansionOptions.push({ x: currentAd.x, y: currentAd.y - 1, w: currentAd.w, h: currentAd.h + 1 });
+    }
+    // Expand down
+    if (currentAd.y + currentAd.h < GRID_ROWS) {
+      expansionOptions.push({ x: currentAd.x, y: currentAd.y, w: currentAd.w, h: currentAd.h + 1 });
+    }
+    
+    // Shuffle expansion options for randomness
+    const shuffled = [...expansionOptions].sort(() => Math.random() - 0.5);
+    
+    for (const newBounds of shuffled) {
+      // Try to perform grid reflow for this expansion
+      const { success, newWidgets } = performGridReflow(newBounds, currentWidgets);
       
-      const currentWidgets = widgetsRef.current;
-      const adjacentPositions = getAdjacentPositions(currentAd);
-      const shuffled = [...adjacentPositions].sort(() => Math.random() - 0.5);
-      
-      for (const pos of shuffled) {
-        const occupation = isPositionOccupied(pos.x, pos.y, currentAd, currentWidgets);
-        
-        if (!occupation.occupied) {
-          if (pos.x === currentAd.x - 1 && pos.y >= currentAd.y && pos.y < currentAd.y + currentAd.h) {
-            return { ...currentAd, x: currentAd.x - 1, w: currentAd.w + 1 };
-          } else if (pos.x === currentAd.x + currentAd.w && pos.y >= currentAd.y && pos.y < currentAd.y + currentAd.h) {
-            return { ...currentAd, w: currentAd.w + 1 };
-          } else if (pos.y === currentAd.y - 1 && pos.x >= currentAd.x && pos.x < currentAd.x + currentAd.w) {
-            return { ...currentAd, y: currentAd.y - 1, h: currentAd.h + 1 };
-          } else if (pos.y === currentAd.y + currentAd.h && pos.x >= currentAd.x && pos.x < currentAd.x + currentAd.w) {
-            return { ...currentAd, h: currentAd.h + 1 };
-          }
-        }
-        
-        if (occupation.type === 'widget' && occupation.item) {
-          const widget = occupation.item as Widget;
-          const { newWidget, success } = pushWidgetAway(widget, pos, currentWidgets, currentAd);
-          
-          if (success) {
-            setWidgets(widgets => 
-              widgets.map(w => w.id === widget.id ? newWidget : w)
-            );
-            
-            if (pos.x === currentAd.x - 1 && pos.y >= currentAd.y && pos.y < currentAd.y + currentAd.h) {
-              return { ...currentAd, x: currentAd.x - 1, w: currentAd.w + 1 };
-            } else if (pos.x === currentAd.x + currentAd.w && pos.y >= currentAd.y && pos.y < currentAd.y + currentAd.h) {
-              return { ...currentAd, w: currentAd.w + 1 };
-            } else if (pos.y === currentAd.y - 1 && pos.x >= currentAd.x && pos.x < currentAd.x + currentAd.w) {
-              return { ...currentAd, y: currentAd.y - 1, h: currentAd.h + 1 };
-            } else if (pos.y === currentAd.y + currentAd.h && pos.x >= currentAd.x && pos.x < currentAd.x + currentAd.w) {
-              return { ...currentAd, h: currentAd.h + 1 };
-            }
-          }
-        }
+      if (success) {
+        // Update widgets with new positions
+        setWidgets(newWidgets);
+        // Update ad with new bounds
+        setAd({ ...currentAd, ...newBounds });
+        return;
       }
-      
-      return currentAd;
-    });
-  }, [isPositionOccupied, pushWidgetAway, setWidgets]);
+    }
+    
+    // No valid expansion found - ad stays the same
+  }, [ad, performGridReflow, setWidgets]);
 
   const triggerAd = useCallback(() => {
     if (isPremium) return;
@@ -303,9 +369,13 @@ export function useViralAds(
     const shuffled = [...perimeterPositions].sort(() => Math.random() - 0.5);
     
     for (const pos of shuffled) {
+      const newAdBounds = { x: pos.x, y: pos.y, w: 1, h: 1 };
+      
+      // Check if position is empty (no overlap with existing widgets)
       const occupation = isPositionOccupied(pos.x, pos.y, null, currentWidgets);
       
       if (!occupation.occupied) {
+        // Position is free - spawn ad directly
         const newAd: AdBlockData = {
           id: `ad-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           x: pos.x,
@@ -318,29 +388,24 @@ export function useViralAds(
         return;
       }
       
-      if (occupation.type === 'widget' && occupation.item) {
-        const widget = occupation.item as Widget;
-        const { newWidget, success } = pushWidgetAway(widget, pos, currentWidgets, null);
-        
-        if (success) {
-          setWidgets(widgets => 
-            widgets.map(w => w.id === widget.id ? newWidget : w)
-          );
-          
-          const newAd: AdBlockData = {
-            id: `ad-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-            x: pos.x,
-            y: pos.y,
-            w: 1,
-            h: 1,
-            createdAt: Date.now()
-          };
-          setAd(newAd);
-          return;
-        }
+      // Position is occupied - try grid reflow to make space
+      const { success, newWidgets } = performGridReflow(newAdBounds, currentWidgets);
+      
+      if (success) {
+        setWidgets(newWidgets);
+        const newAd: AdBlockData = {
+          id: `ad-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          x: pos.x,
+          y: pos.y,
+          w: 1,
+          h: 1,
+          createdAt: Date.now()
+        };
+        setAd(newAd);
+        return;
       }
     }
-  }, [isPremium, ad, isPositionOccupied, pushWidgetAway, setWidgets]);
+  }, [isPremium, ad, isPositionOccupied, performGridReflow, setWidgets]);
 
   const skipAd = useCallback(() => {
     if (expansionTimerRef.current) {

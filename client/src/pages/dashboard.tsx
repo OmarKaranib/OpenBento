@@ -1864,6 +1864,8 @@ const MasterControlDashboard = ({
             <button
               onClick={() => {
                 setIsEditMode(true);
+                // Automatically open the library sidebar so users can add blocks
+                handleOpenSidebarToContent();
                 // Trigger viral ad on Start Building click (free users only)
                 if (!isPremium && !isAdActive) {
                   triggerAd();
