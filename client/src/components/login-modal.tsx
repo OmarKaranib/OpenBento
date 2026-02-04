@@ -113,12 +113,12 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason }: L
 
   return (
     <div 
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[99999] flex items-center justify-center pt-[5rem] bg-black/60 backdrop-blur-sm"
       onClick={handleBackdropClick}
       data-testid="login-modal-backdrop"
     >
       <div 
-        className="relative w-full max-w-[40rem] mx-[2rem] bg-white border border-gray-200 rounded-[1.6rem] shadow-2xl"
+        className="relative w-full max-w-[40rem] mx-[2rem] mb-auto mt-[2rem] bg-white border border-gray-200 rounded-[1.6rem] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <button

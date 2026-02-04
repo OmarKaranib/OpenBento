@@ -52,10 +52,10 @@ const SortableWidget = ({ widget, isEditMode, onColorPickerOpen, children }: Sor
     <div
       ref={setNodeRef}
       style={style}
-      className={`dashboard-slot relative border group shadow-xl overflow-hidden ${
+      className={`dashboard-slot relative border-2 group shadow-xl overflow-hidden ${
         isEditMode
-          ? 'border-purple-500/70 ring-1 ring-purple-400/30 animate-jiggle is-editing'
-          : 'border-slate-700/50'
+          ? 'border-purple-500/80 ring-1 ring-purple-400/40 animate-jiggle is-editing'
+          : 'border-slate-600/70'
       } ${isDragging ? 'z-[9999] is-dragging' : 'z-10'}`}
       data-testid={`widget-${widget.id}`}
     >
@@ -1235,7 +1235,7 @@ const MasterControlDashboard = ({
                   clearHoldStartRef.current = null;
                   setClearHoldProgress(0);
                 }}
-                className="relative h-[3.2rem] px-[1.2rem] bg-slate-700 hover:bg-slate-600 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 shadow-lg shadow-slate-900/50 text-[1.2rem] leading-[3.2rem] overflow-hidden border border-slate-600"
+                className="relative h-[3.2rem] px-[1.2rem] bg-slate-600/60 hover:bg-slate-500/70 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 shadow-md text-[1.2rem] leading-[3.2rem] overflow-hidden border border-slate-500/40"
                 title="Hold for 2 seconds to clear all widgets"
                 data-testid="button-clear-all"
               >
@@ -1267,12 +1267,12 @@ const MasterControlDashboard = ({
                 <button
                   onClick={handleBlockClick}
                   disabled={isGridFull}
-                  className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform shadow-lg text-[1.2rem] leading-[3.2rem] ${
+                  className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform shadow-md text-[1.2rem] leading-[3.2rem] ${
                     isDisabled
                       ? isAtFreeLimit 
-                        ? 'bg-amber-600 hover:bg-amber-500 hover:scale-105 shadow-amber-900/50'
-                        : 'bg-slate-600 cursor-not-allowed opacity-60 shadow-slate-900/50'
-                      : 'bg-emerald-600 hover:bg-emerald-500 hover:scale-105 shadow-emerald-900/50'
+                        ? 'bg-amber-600/70 hover:bg-amber-500/80 hover:scale-105'
+                        : 'bg-slate-600/60 cursor-not-allowed opacity-60'
+                      : 'bg-emerald-600/70 hover:bg-emerald-500/80 hover:scale-105'
                   }`}
                   title={isGridFull ? 'Grid Full - No space available' : isAtFreeLimit ? `Free limit (${FREE_BLOCK_LIMIT}) reached - Upgrade to Pro` : 'Add a new block'}
                   data-testid="button-add-block"
@@ -1285,7 +1285,7 @@ const MasterControlDashboard = ({
 
             <button
               onClick={handleRefreshAllWidgets}
-              className="menu-btn h-[3.2rem] px-[1.2rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-900/50 text-[1.2rem] leading-[3.2rem]"
+              className="menu-btn h-[3.2rem] px-[1.2rem] bg-cyan-600/70 hover:bg-cyan-500/80 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 shadow-md text-[1.2rem] leading-[3.2rem]"
               data-testid="button-refresh-all"
             >
               <RefreshCw className="w-[1.4rem] h-[1.4rem]" />
@@ -1318,8 +1318,8 @@ const MasterControlDashboard = ({
               }}
               className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] ${
                 isEditMode 
-                  ? 'bg-teal-600 hover:bg-teal-500 shadow-lg shadow-teal-900/50 ring-2 ring-teal-400' 
-                  : 'bg-orange-600 hover:bg-orange-500 shadow-lg shadow-orange-900/50'
+                  ? 'bg-teal-600/70 hover:bg-teal-500/80 shadow-md ring-2 ring-teal-400/60' 
+                  : 'bg-orange-600/70 hover:bg-orange-500/80 shadow-md'
               }`}
               data-testid="button-edit-layout"
               title={isEditMode && !isPremium ? "Save Layout requires Pro - Click to see upgrade options" : undefined}
@@ -1339,8 +1339,8 @@ const MasterControlDashboard = ({
               onClick={handleMasterMute}
               className={`menu-btn indicator-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] ${
                 masterMute 
-                  ? 'bg-red-600 hover:bg-red-500 shadow-lg shadow-red-900/50' 
-                  : 'bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-900/50'
+                  ? 'bg-red-600/70 hover:bg-red-500/80 shadow-md' 
+                  : 'bg-emerald-600/70 hover:bg-emerald-500/80 shadow-md'
               }`}
               data-testid="button-master-mute"
             >
@@ -1353,8 +1353,8 @@ const MasterControlDashboard = ({
               onClick={() => setIsDarkMode(!isDarkMode)}
               className={`menu-btn relative h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] overflow-hidden ${
                 isDarkMode 
-                  ? 'bg-indigo-900 hover:bg-indigo-800 shadow-lg shadow-indigo-900/50 text-slate-100' 
-                  : 'bg-amber-400 hover:bg-amber-300 shadow-lg shadow-amber-500/50 text-amber-900'
+                  ? 'bg-indigo-700/60 hover:bg-indigo-600/70 shadow-md text-slate-100' 
+                  : 'bg-amber-400/80 hover:bg-amber-300/90 shadow-md text-amber-900'
               }`}
               data-testid="button-theme-toggle"
               title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
@@ -1367,7 +1367,7 @@ const MasterControlDashboard = ({
             {!isPremium && (
               <button
                 onClick={onOpenPricingModal}
-                className="menu-btn h-[3.2rem] px-[1.2rem] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-lg shadow-amber-500/30 text-slate-900"
+                className="menu-btn h-[3.2rem] px-[1.2rem] bg-gradient-to-r from-amber-500/80 to-amber-600/80 hover:from-amber-400/90 hover:to-amber-500/90 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-md text-slate-900"
                 data-testid="button-pro-crown"
                 title="Upgrade to Pro"
               >
@@ -1381,7 +1381,7 @@ const MasterControlDashboard = ({
             {!isAuthenticated && (
               <button
                 onClick={() => openLoginModal()}
-                className="menu-btn h-[3.2rem] px-[1.2rem] bg-slate-600 hover:bg-slate-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-lg shadow-slate-900/50 text-white"
+                className="menu-btn h-[3.2rem] px-[1.2rem] bg-slate-600/60 hover:bg-slate-500/70 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-md text-white"
                 data-testid="button-login"
               >
                 <User className="w-[1.4rem] h-[1.4rem]" />
@@ -1393,7 +1393,7 @@ const MasterControlDashboard = ({
             {isAuthenticated && user && (
               <div className="relative group">
                 <button
-                  className="menu-btn h-[3.2rem] px-[1.2rem] bg-slate-600 hover:bg-slate-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-lg shadow-slate-900/50 text-white"
+                  className="menu-btn h-[3.2rem] px-[1.2rem] bg-slate-600/60 hover:bg-slate-500/70 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-md text-white"
                   data-testid="button-user-menu"
                   title={`Logged in as ${user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'User'}`}
                 >

@@ -69,10 +69,10 @@ html.light {
   --elevate-2: rgba(0,0,0, .10);
 }
 
-/* Light mode - Dashboard slots with soft shadows instead of borders */
+/* Light mode - Dashboard slots with visible borders and soft shadows */
 body.light-theme .dashboard-slot {
   background: rgba(255, 255, 255, 0.98);
-  border-color: transparent;
+  border: 2px solid rgba(0, 0, 0, 0.12) !important;
   box-shadow: 
     0 2px 8px rgba(0, 0, 0, 0.08),
     0 4px 16px rgba(0, 0, 0, 0.04);
@@ -170,6 +170,34 @@ body.light-theme [class*="text-slate-400"] {
 
 body.light-theme [class*="text-slate-500"] {
   color: #6b7280 !important;
+}
+
+/* Light mode - White text must flip to dark charcoal */
+body.light-theme [class*="text-white"]:not(.menu-btn):not(.live-badge) {
+  color: #1f2937 !important;
+}
+
+body.light-theme .text-white:not(.menu-btn):not(.live-badge) {
+  color: #1f2937 !important;
+}
+
+/* Light mode - Gray/neutral text colors for better contrast */
+body.light-theme [class*="text-gray-100"],
+body.light-theme [class*="text-gray-200"],
+body.light-theme [class*="text-gray-300"] {
+  color: #1f2937 !important;
+}
+
+body.light-theme [class*="text-zinc-100"],
+body.light-theme [class*="text-zinc-200"],
+body.light-theme [class*="text-zinc-300"] {
+  color: #1f2937 !important;
+}
+
+body.light-theme [class*="text-neutral-100"],
+body.light-theme [class*="text-neutral-200"],
+body.light-theme [class*="text-neutral-300"] {
+  color: #1f2937 !important;
 }
 
 /* Light mode - Header bar */
@@ -623,11 +651,11 @@ body {
   position: relative;
   overflow: hidden;
   min-height: 0;
-  /* Semi-transparent default background to show global canvas */
+  /* Semi-transparent default background to show global canvas - increased opacity for visibility */
   --slot-bg-rgb: 15, 23, 42;
-  background: rgba(var(--slot-bg-rgb), 0.15);
-  /* Border is a lighter version - derived from mixing background base with white */
-  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(var(--slot-bg-rgb), 0.35);
+  /* Border is more visible - thicker and higher contrast */
+  border: 2px solid rgba(148, 163, 184, 0.55);
   box-shadow: 
     0 4px 30px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);

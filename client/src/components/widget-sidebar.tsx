@@ -689,10 +689,15 @@ export function WidgetSidebar({
           let isLive = false;
           
           if (channel.platform === 'youtube') {
-            isLive = true;
+            // YouTube: use isLive from API if defined, otherwise assume live (for fallback channels)
+            const hasApiData = 'isLive' in channel;
+            isLive = hasApiData ? (channel as any).isLive === true : true;
           } else if (channel.platform === 'twitch') {
-            isLive = true;
+            // Twitch: use isLive from API if defined, otherwise check with fallback
+            const hasApiData = 'isLive' in channel;
+            isLive = hasApiData ? (channel as any).isLive === true : false;
           } else if (channel.platform === 'kick') {
+            // Kick uses server proxy for live status check
             isLive = await checkKickLiveStatus(channel.channelId);
           }
 

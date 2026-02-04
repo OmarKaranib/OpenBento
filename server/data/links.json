@@ -945,50 +945,6 @@
       "videoId": "WMJxkkncAWM",
       "isLive": true,
       "lastUpdated": 1770203052514
-    },
-    {
-      "id": "nfl-network",
-      "name": "NFL Network",
-      "channelHandle": "NFL",
-      "platform": "youtube",
-      "iconType": "default",
-      "category": "Sports",
-      "videoId": null,
-      "isLive": false,
-      "lastUpdated": 1770203052514
-    },
-    {
-      "id": "nba-tv",
-      "name": "NBA TV",
-      "channelHandle": "NBA",
-      "platform": "youtube",
-      "iconType": "default",
-      "category": "Sports",
-      "videoId": null,
-      "isLive": false,
-      "lastUpdated": 1770203052514
-    },
-    {
-      "id": "espn-live",
-      "name": "ESPN Live",
-      "channelHandle": "espn",
-      "platform": "youtube",
-      "iconType": "default",
-      "category": "Sports",
-      "videoId": null,
-      "isLive": false,
-      "lastUpdated": 1770203052514
-    },
-    {
-      "id": "spacex-live",
-      "name": "SpaceX",
-      "channelHandle": "SpaceX",
-      "platform": "youtube",
-      "iconType": "science",
-      "category": "Science",
-      "videoId": null,
-      "isLive": false,
-      "lastUpdated": 1770203052514
     }
   ],
   "lastRefresh": 1770203052514
