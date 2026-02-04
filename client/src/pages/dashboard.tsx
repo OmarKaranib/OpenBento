@@ -19,11 +19,12 @@ const GRID_ROWS = 6;
 interface SortableWidgetProps {
   widget: Widget;
   isEditMode: boolean;
+  isDarkMode: boolean;
   onColorPickerOpen?: () => void;
   children: React.ReactNode;
 }
 
-const SortableWidget = ({ widget, isEditMode, onColorPickerOpen, children }: SortableWidgetProps) => {
+const SortableWidget = ({ widget, isEditMode, isDarkMode, onColorPickerOpen, children }: SortableWidgetProps) => {
   const {
     attributes,
     listeners,
@@ -56,7 +57,9 @@ const SortableWidget = ({ widget, isEditMode, onColorPickerOpen, children }: Sor
       className={`dashboard-slot relative border-2 group shadow-xl overflow-hidden ${
         isEditMode
           ? 'border-purple-500/80 ring-1 ring-purple-400/40 animate-jiggle is-editing'
-          : 'border-slate-600/70'
+          : isDarkMode 
+            ? 'border-slate-600/70' 
+            : 'border-slate-400 shadow-lg'
       } ${isDragging ? 'z-[9999] is-dragging' : 'z-10'}`}
       data-testid={`widget-${widget.id}`}
     >
@@ -1568,6 +1571,7 @@ const MasterControlDashboard = ({
             key={widget.id} 
             widget={widget} 
             isEditMode={isEditMode}
+            isDarkMode={isDarkMode}
             onColorPickerOpen={() => setColorPickerWidget(colorPickerWidget === widget.id ? null : widget.id)}
           >
             {widget.type === 'video' && (widget.url || widget.videoId || widget.youtubeChannelId || widget.twitchChannel || widget.kickChannel) && !isEditMode && !widget.isOffline && (

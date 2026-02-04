@@ -44,13 +44,14 @@ export function AdBlock({ ad, onSkip, isDarkMode = true }: AdBlockProps) {
     <div
       className={`relative w-full h-full flex flex-col items-center justify-center overflow-hidden rounded-[12px] ${
         isDarkMode 
-          ? 'bg-gradient-to-br from-red-900 via-orange-900 to-yellow-900 border-2 border-red-500/60' 
-          : 'bg-gradient-to-br from-red-200 via-orange-200 to-yellow-200 border-2 border-red-400/60'
+          ? 'bg-gradient-to-br from-red-900 via-orange-900 to-yellow-900 border-2 border-red-500/60 shadow-lg shadow-red-900/50' 
+          : 'bg-gradient-to-br from-red-400 via-orange-400 to-yellow-400 border-3 border-red-600 shadow-xl shadow-red-500/40'
       }`}
       style={{
         gridColumn: `${ad.x + 1} / span ${ad.w}`,
         gridRow: `${ad.y + 1} / span ${ad.h}`,
-        animation: 'pulse 2s ease-in-out infinite'
+        animation: 'pulse 2s ease-in-out infinite',
+        zIndex: 100
       }}
       data-testid={`ad-block-${ad.id}`}
     >
@@ -65,11 +66,11 @@ export function AdBlock({ ad, onSkip, isDarkMode = true }: AdBlockProps) {
       </div>
 
       <div className="relative z-10 text-center p-4">
-        <AlertTriangle className={`w-8 h-8 mx-auto mb-2 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'} animate-bounce`} />
-        <h3 className={`font-bold text-lg mb-1 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+        <AlertTriangle className={`w-8 h-8 mx-auto mb-2 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-900'} animate-bounce`} />
+        <h3 className={`font-bold text-lg mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
           Support OpenBento
         </h3>
-        <p className={`text-sm ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+        <p className={`text-sm ${isDarkMode ? 'text-slate-300' : 'text-slate-800'}`}>
           Upgrade to Pro to remove ads
         </p>
       </div>
