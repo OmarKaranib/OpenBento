@@ -4,6 +4,7 @@ import { usePremium } from '@/hooks/use-premium';
 import { LoginModal } from '@/components/login-modal';
 import { PricingModal } from '@/components/pricing-modal';
 import { MobileGuard } from '@/components/mobile-guard';
+import { useViralAds, AdBlockData } from '@/components/ad-block';
 
 // Static background - High-contrast light mode
 const StaticBackground = () => {
@@ -164,6 +165,10 @@ function AppContent() {
     return getDefaultWidgets();
   });
 
+  // VIRAL AD MECHANIC: Lifted to App.tsx for drag collision checking
+  // Premium users are immune, ads triggered on user action only
+  const { ad, skipAd, triggerAd, isAdActive } = useViralAds(isPremium, widgets, setWidgets);
+
   const extractYouTubeId = (url: string): string | null => {
     // Updated regex to handle youtube-nocookie.com URLs (Pro format) and watch?v= URLs
     const regExp = /^.*((youtu\.be\/)|(youtube(-nocookie)?\.com\/(v\/|u\/\w\/|embed\/|watch\?)))\??v?=?([^#&?]*).*/;
@@ -204,6 +209,7 @@ function AppContent() {
     const isPositionFree = (x: number, y: number, w: number, h: number): boolean => {
       if (x + w > GRID_COLS || y + h > GRID_ROWS) return false;
       
+      // Check against widgets
       for (const widget of currentWidgets) {
         const widgetRight = widget.x + widget.w;
         const widgetBottom = widget.y + widget.h;
@@ -214,6 +220,19 @@ function AppContent() {
           return false;
         }
       }
+      
+      // Check against ad block (treat as solid grid item)
+      if (ad) {
+        const adRight = ad.x + ad.w;
+        const adBottom = ad.y + ad.h;
+        const newRight = x + w;
+        const newBottom = y + h;
+        
+        if (x < adRight && newRight > ad.x && y < adBottom && newBottom > ad.y) {
+          return false;
+        }
+      }
+      
       return true;
     };
     
@@ -244,7 +263,7 @@ function AppContent() {
     
     // Grid is 100% full - return null to indicate no space
     return null;
-  }, []);
+  }, [ad]);
 
   // Check if any space is available for a 1x1 minimum widget
   const isGridFull = useMemo(() => {
@@ -254,6 +273,8 @@ function AppContent() {
     for (let y = 0; y < GRID_ROWS; y++) {
       for (let x = 0; x < GRID_COLS; x++) {
         let cellFree = true;
+        
+        // Check against widgets
         for (const widget of widgets) {
           const widgetRight = widget.x + widget.w;
           const widgetBottom = widget.y + widget.h;
@@ -263,11 +284,22 @@ function AppContent() {
             break;
           }
         }
+        
+        // Check against ad block (treat as solid grid item)
+        if (cellFree && ad) {
+          const adRight = ad.x + ad.w;
+          const adBottom = ad.y + ad.h;
+          
+          if (x < adRight && x + 1 > ad.x && y < adBottom && y + 1 > ad.y) {
+            cellFree = false;
+          }
+        }
+        
         if (cellFree) return false; // Found a free cell, grid is NOT full
       }
     }
     return true; // No free cells found
-  }, [widgets]);
+  }, [widgets, ad]);
 
   const addWidget = useCallback((type: WidgetType, w = 3, h = 2, extraData?: Partial<Widget>) => {
     const widgetId = generateWidgetId();
@@ -628,11 +660,14 @@ function AppContent() {
   }, []);
 
   // Find next available slot for a pushed widget (row by row scan)
+  // Also checks ad collision to ensure widgets don't get pushed into ad space
   const findNextAvailableSlot = useCallback((widget: Widget, allWidgets: Widget[], excludeIds: string[]): { x: number; y: number } | null => {
     const GRID_ROWS = 6;
     for (let y = 0; y <= GRID_ROWS - widget.h; y++) {
       for (let x = 0; x <= GRID_COLS - widget.w; x++) {
         let collision = false;
+        
+        // Check collision with other widgets
         for (const other of allWidgets) {
           if (excludeIds.includes(other.id)) continue;
           const widgetRight = other.x + other.w;
@@ -644,13 +679,25 @@ function AppContent() {
             break;
           }
         }
+        
+        // AD-BLOCK SOLIDIFICATION: Check collision with ad
+        if (!collision && ad) {
+          const adRight = ad.x + ad.w;
+          const adBottom = ad.y + ad.h;
+          const newRight = x + widget.w;
+          const newBottom = y + widget.h;
+          if (x < adRight && newRight > ad.x && y < adBottom && newBottom > ad.y) {
+            collision = true;
+          }
+        }
+        
         if (!collision) {
           return { x, y };
         }
       }
     }
     return null; // No available slot
-  }, []);
+  }, [ad]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active } = event;
@@ -687,6 +734,20 @@ function AppContent() {
         const targetX = finalGhostPosition.x;
         const targetY = finalGhostPosition.y;
 
+        // AD-BLOCK SOLIDIFICATION: Check if drop would collide with ad
+        // Widgets cannot be dropped on top of the ad
+        if (ad) {
+          const adRight = ad.x + ad.w;
+          const adBottom = ad.y + ad.h;
+          const widgetRight = targetX + widget.w;
+          const widgetBottom = targetY + widget.h;
+          const collidesWithAd = targetX < adRight && widgetRight > ad.x && targetY < adBottom && widgetBottom > ad.y;
+          if (collidesWithAd) {
+            // Block the drop - cannot drop onto ad space
+            return currentWidgets;
+          }
+        }
+
         // Check for collisions at the target position
         const collidingWidgets = findCollidingWidgets(targetX, targetY, widget.w, widget.h, widgetId, currentWidgets);
 
@@ -721,7 +782,7 @@ function AppContent() {
         return updatedWidgets;
       });
     }
-  }, [addVideoWidget, addWidget, setWidgets, findCollidingWidgets, findNextAvailableSlot]);
+  }, [addVideoWidget, addWidget, setWidgets, findCollidingWidgets, findNextAvailableSlot, ad]);
 
   const handleChannelClick = useCallback((channel: TrendingChannel) => {
     // Mirror the manual paste behavior exactly - just process the URL
@@ -858,6 +919,10 @@ function AppContent() {
                   isAuthenticated={isAuthenticated}
                   openLoginModal={openLoginModal}
                   isPremium={isPremium}
+                  ad={ad}
+                  skipAd={skipAd}
+                  triggerAd={triggerAd}
+                  isAdActive={isAdActive}
                   onOpenPricingModal={openPricingModal}
                 />
               )}

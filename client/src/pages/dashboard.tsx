@@ -11,7 +11,7 @@ import { SavedChannel, loadPersonalLibrary, savePersonalLibrary } from '@/compon
 import { useStreamHealing } from '@/hooks/use-stream-healing';
 import { useToast } from '@/hooks/use-toast';
 import { FloatingTutorial } from '@/components/floating-tutorial';
-import { AdBlock, useViralAds } from '@/components/ad-block';
+import { AdBlock, AdBlockData } from '@/components/ad-block';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -130,6 +130,10 @@ interface MasterControlDashboardProps {
   openLoginModal: (reason?: string) => void;
   isPremium: boolean;
   onOpenPricingModal: () => void;
+  ad: AdBlockData | null;
+  skipAd: () => void;
+  triggerAd: () => void;
+  isAdActive: boolean;
 }
 
 interface ResizeState {
@@ -161,7 +165,11 @@ const MasterControlDashboard = ({
   isAuthenticated,
   openLoginModal,
   isPremium,
-  onOpenPricingModal
+  onOpenPricingModal,
+  ad,
+  skipAd,
+  triggerAd,
+  isAdActive
 }: MasterControlDashboardProps) => {
   const [masterMute, setMasterMute] = useState(true);
   const [resizing, setResizing] = useState<ResizeState | null>(null);
@@ -187,11 +195,6 @@ const MasterControlDashboard = ({
   const clearHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clearHoldStartRef = useRef<number | null>(null);
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
-
-  // VIRAL AD MECHANIC: Free users only (Pro users are immune)
-  // Single ad limit: only one ad (with expansions) can exist at a time
-  // Triggered on user action (Add Block / Start Building), not passive viewing
-  const { ad, skipAd, triggerAd, isAdActive } = useViralAds(isPremium, widgets, setWidgets);
 
   // Listen for personal library updates from sidebar
   useEffect(() => {
@@ -463,6 +466,7 @@ const MasterControlDashboard = ({
   };
 
   // Helper: Find next available slot for a pushed widget
+  // Also checks ad collision to ensure widgets don't get pushed into ad space
   const findNextAvailableSlot = (
     widget: Widget,
     allWidgets: Widget[],
@@ -472,6 +476,8 @@ const MasterControlDashboard = ({
     for (let y = 0; y <= GRID_ROWS - widget.h; y++) {
       for (let x = 0; x <= GRID_COLS - widget.w; x++) {
         let collision = false;
+        
+        // Check collision with other widgets
         for (const other of allWidgets) {
           if (other.id === widget.id || other.id === excludeId) continue;
           if (checkCollision(x, y, widget.w, widget.h, other.x, other.y, other.w, other.h)) {
@@ -479,6 +485,14 @@ const MasterControlDashboard = ({
             break;
           }
         }
+        
+        // AD-BLOCK SOLIDIFICATION: Check collision with ad
+        if (!collision && ad) {
+          if (checkCollision(x, y, widget.w, widget.h, ad.x, ad.y, ad.w, ad.h)) {
+            collision = true;
+          }
+        }
+        
         if (!collision) {
           return { x, y };
         }
@@ -522,6 +536,19 @@ const MasterControlDashboard = ({
         if (newBounds.x + newW > GRID_COLS || newBounds.y + newH > GRID_ROWS) {
           // Block resize - exceeds grid
           return prev;
+        }
+
+        // AD-BLOCK SOLIDIFICATION: Block resize if it would collide with the ad
+        // The ad is a solid grid item that widgets cannot resize into
+        if (ad) {
+          const collidesWithAd = checkCollision(
+            newBounds.x, newBounds.y, newW, newH,
+            ad.x, ad.y, ad.w, ad.h
+          );
+          if (collidesWithAd) {
+            // Block resize - cannot resize into ad space
+            return prev;
+          }
         }
 
         // Find all widgets that would collide with the new size
@@ -577,7 +604,7 @@ const MasterControlDashboard = ({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizing, setWidgets]);
+  }, [resizing, setWidgets, ad]);
 
   // Privacy-enhanced YouTube embed using no-cookie domain with proper Referer handling
   // referrerPolicy="strict-origin-when-cross-origin" is set on iframes for valid Referer header
