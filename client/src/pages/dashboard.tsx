@@ -11,6 +11,7 @@ import { SavedChannel, loadPersonalLibrary, savePersonalLibrary } from '@/compon
 import { useStreamHealing } from '@/hooks/use-stream-healing';
 import { useToast } from '@/hooks/use-toast';
 import { FloatingTutorial } from '@/components/floating-tutorial';
+import { AdBlock, useViralAds } from '@/components/ad-block';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -186,6 +187,9 @@ const MasterControlDashboard = ({
   const clearHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clearHoldStartRef = useRef<number | null>(null);
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
+
+  // VIRAL AD MECHANIC: Free users only (Pro users are immune)
+  const { ads, skipAd } = useViralAds(isPremium, widgets, setWidgets);
 
   // Listen for personal library updates from sidebar
   useEffect(() => {
@@ -1794,6 +1798,23 @@ const MasterControlDashboard = ({
           </SortableWidget>
         ))}
 
+        {/* VIRAL AD BLOCKS - Only for non-Premium users */}
+        {ads.map((ad) => (
+          <div
+            key={ad.id}
+            style={{
+              gridColumn: `${ad.x + 1} / span ${ad.w}`,
+              gridRow: `${ad.y + 1} / span ${ad.h}`,
+            }}
+            className="z-20"
+          >
+            <AdBlock
+              ad={ad}
+              onSkip={skipAd}
+              isDarkMode={isDarkMode}
+            />
+          </div>
+        ))}
 
         {widgets.length === 0 && !isEditMode && (
           <div 

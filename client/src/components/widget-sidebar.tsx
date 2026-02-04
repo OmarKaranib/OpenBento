@@ -529,6 +529,8 @@ interface WidgetSidebarProps {
   onUrlSubmit?: (url: string) => void;
   activeWidgetId?: string | null;
   onImageUpload?: (imageUrl: string) => void;
+  isAuthenticated?: boolean;
+  openLoginModal?: (reason?: string) => void;
 }
 
 export function WidgetSidebar({ 
@@ -540,7 +542,9 @@ export function WidgetSidebar({
   onUrlChange,
   onUrlSubmit,
   activeWidgetId,
-  onImageUpload
+  onImageUpload,
+  isAuthenticated = false,
+  openLoginModal
 }: WidgetSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<SidebarTab>('content');
@@ -571,7 +575,14 @@ export function WidgetSidebar({
   }, []);
 
   // Save to Personal Library
+  // AUTH GATE: Block guests from saving to library
   const saveToPersonalLibrary = useCallback((channel: TrendingChannel) => {
+    // Guest users cannot save - show Sign Up Required popup
+    if (!isAuthenticated) {
+      openLoginModal?.('Sign Up Required: Please log in or sign up to save channels to your library.');
+      return;
+    }
+    
     setPersonalLibrary(prev => {
       const exists = prev.some(c => c.id === channel.id);
       if (exists) return prev;
@@ -594,7 +605,7 @@ export function WidgetSidebar({
       window.dispatchEvent(new CustomEvent('personalLibraryUpdated'));
       return updated;
     });
-  }, []);
+  }, [isAuthenticated, openLoginModal]);
 
   // Remove from Personal Library
   const removeFromPersonalLibrary = useCallback((channelId: string) => {

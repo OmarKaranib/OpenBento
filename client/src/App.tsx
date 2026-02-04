@@ -830,6 +830,8 @@ function AppContent() {
               onUrlSubmit={handleSubmitUrl}
               activeWidgetId={activeWidgetId}
               onImageUpload={handleImageUpload}
+              isAuthenticated={isAuthenticated}
+              openLoginModal={openLoginModal}
             />
           )}
           <Switch>
