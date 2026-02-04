@@ -25,9 +25,12 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Menu Button Color Persistence:** Consistent styling for menu buttons across themes, with specific handling for high-contrast elements like the "LIVE" badge.
 - **Guest Access Model:** View and edit access without login. Optional login via Email/Password or Google OAuth for cross-device syncing.
 - **Library Auth Lock:** Guest users (not logged in) cannot save channels to their personal library. Clicking save shows a "Sign Up Required" modal prompting authentication.
-- **Viral Ad Mechanic (Free Users Only):** Non-premium users experience viral ad blocks that spawn and expand on the dashboard:
-  - **Spawn Logic:** First ad spawns 15 seconds after page load, then every 45 seconds. Ads spawn only on outer perimeter grid positions (edges), never center.
-  - **Expansion Logic:** Every 5 seconds, ads attempt to expand into adjacent empty cells. If a widget occupies the target cell, the system attempts to shrink or move the widget (collision-safe validation ensures widgets never overlap).
+- **Viral Ad Mechanic (Free Users Only):** Non-premium users experience a single viral ad block that spawns and expands on the dashboard:
+  - **Single Ad Limit:** Only one ad instance (including its viral expansions) can exist at any given time. `isAdActive` flag tracks this.
+  - **Trigger Logic:** Ad only spawns when user clicks "Start Building" or "Add Block" buttons. No passive spawning during viewing.
+  - **Spawn Logic:** Ads spawn only on outer perimeter grid positions (edges), never center.
+  - **Expansion Logic:** Every 5 seconds, the ad attempts to expand into adjacent empty cells. If a widget occupies the target cell, the system pushes it aside (shrink or move).
+  - **No Overlap Rule:** Ad follows same collision logic as streams - occupies its own grid cells and pushes other blocks aside rather than overlapping.
   - **Widget Protection:** Widgets are never deleted, only shrunk or moved. If no safe move exists, expansion is skipped for that position.
   - **Skip Button:** Each ad shows a 5-second countdown, after which a "Skip Ad" button appears to dismiss the ad.
   - **Pro Immunity:** Premium users never see ads - all spawning is blocked and existing ads are cleared on premium status change.
