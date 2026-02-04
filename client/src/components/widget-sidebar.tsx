@@ -250,8 +250,10 @@ interface LinksApiResponse {
   origin: string;
 }
 
-// Live status polling interval (5 minutes)
+// Live status polling interval (5 minutes for initial checks)
 const LIVE_STATUS_POLL_INTERVAL = 5 * 60 * 1000;
+// Hourly revalidation interval (60 minutes) for deep YouTube API checks
+const HOURLY_REVALIDATION_INTERVAL = 60 * 60 * 1000;
 
 export const WIDGET_TEMPLATES: WidgetTemplate[] = [
   { id: 'template-video', name: 'Video', widgetType: 'video', w: 3, h: 2, icon: 'video', color: 'cyan' },
@@ -689,7 +691,7 @@ export function WidgetSidebar({
     }
   }, []);
 
-  // Poll live status every 5 minutes
+  // Poll live status every 5 minutes (fast check using cached data)
   useEffect(() => {
     const checkAllStatuses = async () => {
       const now = Date.now();
@@ -729,6 +731,68 @@ export function WidgetSidebar({
     return () => clearInterval(interval);
   }, [checkKickLiveStatus, channels]);
 
+  // Ref to track current liveStatuses for hourly revalidation without causing re-renders
+  const liveStatusesRef = useRef<Record<string, LiveStatus>>({});
+  useEffect(() => {
+    liveStatusesRef.current = liveStatuses;
+  }, [liveStatuses]);
+
+  // HOURLY REVALIDATION: Deep YouTube API check every 60 minutes
+  // This triggers YouTube eventType=live search to detect newly live streams
+  // AUTOMATIC PROMOTION: When offline stream returns live, status flips and it jumps to top
+  useEffect(() => {
+    const hourlyRevalidation = async () => {
+      console.log('[HourlyRevalidation] Starting deep YouTube API live check...');
+      const now = Date.now();
+      const currentStatuses = liveStatusesRef.current;
+      const updatedStatuses: Record<string, LiveStatus> = { ...currentStatuses };
+      let promotedCount = 0;
+
+      for (const channel of channels) {
+        if (channel.platform === 'youtube' && channel.channelId) {
+          try {
+            // Call YouTube Search API endpoint to check for current live streams (uses eventType=live)
+            const response = await fetch(`/api/youtube/channel-live/${channel.channelId}`);
+            if (response.ok) {
+              const data = await response.json();
+              const wasOffline = currentStatuses[channel.id]?.isLive === false;
+              const isNowLive = data.isLive === true;
+              
+              // AUTOMATIC PROMOTION: Track when offline becomes live
+              if (wasOffline && isNowLive) {
+                console.log(`[HourlyRevalidation] PROMOTED: ${channel.name} is now LIVE!`);
+                promotedCount++;
+              }
+              
+              updatedStatuses[channel.id] = {
+                channelId: channel.channelId,
+                isLive: isNowLive,
+                lastChecked: now
+              };
+            }
+          } catch (error) {
+            console.error(`[HourlyRevalidation] Error checking ${channel.name}:`, error);
+          }
+        }
+      }
+      
+      // Single state update with all results - triggers re-sort via useMemo
+      setLiveStatuses(updatedStatuses);
+      console.log(`[HourlyRevalidation] Complete. ${promotedCount} streams promoted to LIVE.`);
+    };
+
+    // Run hourly revalidation on mount (after a short delay to not conflict with initial check)
+    const initialDelay = setTimeout(hourlyRevalidation, 10000);
+
+    // Then run every 60 minutes
+    const hourlyInterval = setInterval(hourlyRevalidation, HOURLY_REVALIDATION_INTERVAL);
+
+    return () => {
+      clearTimeout(initialDelay);
+      clearInterval(hourlyInterval);
+    };
+  }, [channels]);
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
@@ -741,24 +805,15 @@ export function WidgetSidebar({
   };
 
   // Filter channels by search query and category - also filters out blocked channels from main views
+  // DYNAMIC RANK SORTING: Live streams pinned to top, offline streams at bottom
   const filteredChannels = useMemo(() => {
     let filtered: TrendingChannel[] = channels;
     
     // Filter by category - Music/Lofi content excluded from all views
-    // First, filter out any music-related categories that might come from API
     filtered = channels.filter(c => 
       c.category !== 'Lofi/Music' && 
       c.category !== 'Music'
     );
-    
-    // LIVE-ONLY FILTER: Only show channels that are confirmed live
-    // Hide offline channels AND unverified channels until status is confirmed
-    filtered = filtered.filter(c => {
-      const status = liveStatuses[c.id];
-      // Only include channels with confirmed live status
-      // Hide both offline AND unknown/unchecked channels
-      return status?.isLive === true;
-    });
     
     // Filter out blocked channels from main view (except when viewing blocked category)
     if (activeCategory !== 'blocked') {
@@ -782,6 +837,20 @@ export function WidgetSidebar({
           channel.platform.toLowerCase().includes(query)
       );
     }
+    
+    // DYNAMIC RANK SORTING: Live streams pinned to top, offline streams at bottom
+    // Sort by live status: online (true) first, then unknown (undefined), then offline (false)
+    filtered = [...filtered].sort((a, b) => {
+      const statusA = liveStatuses[a.id];
+      const statusB = liveStatuses[b.id];
+      
+      // Get live status values (true = 2, undefined = 1, false = 0)
+      const rankA = statusA?.isLive === true ? 2 : statusA?.isLive === false ? 0 : 1;
+      const rankB = statusB?.isLive === true ? 2 : statusB?.isLive === false ? 0 : 1;
+      
+      // Sort descending (live first, then unknown, then offline)
+      return rankB - rankA;
+    });
     
     return filtered;
   }, [searchQuery, channels, activeCategory, isChannelBlocked, liveStatuses]);
