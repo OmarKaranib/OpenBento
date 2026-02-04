@@ -189,7 +189,9 @@ const MasterControlDashboard = ({
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
 
   // VIRAL AD MECHANIC: Free users only (Pro users are immune)
-  const { ads, skipAd } = useViralAds(isPremium, widgets, setWidgets);
+  // Single ad limit: only one ad (with expansions) can exist at a time
+  // Triggered on user action (Add Block / Start Building), not passive viewing
+  const { ad, skipAd, triggerAd, isAdActive } = useViralAds(isPremium, widgets, setWidgets);
 
   // Listen for personal library updates from sidebar
   useEffect(() => {
@@ -1297,6 +1299,10 @@ const MasterControlDashboard = ({
                   onOpenPricingModal();
                 } else {
                   handleOpenSidebarToContent();
+                  // Trigger viral ad on Add Block click (free users only)
+                  if (!isPremium && !isAdActive) {
+                    triggerAd();
+                  }
                 }
               };
               
@@ -1798,8 +1804,8 @@ const MasterControlDashboard = ({
           </SortableWidget>
         ))}
 
-        {/* VIRAL AD BLOCKS - Only for non-Premium users */}
-        {ads.map((ad) => (
+        {/* VIRAL AD BLOCK - Single ad at a time, only for non-Premium users */}
+        {ad && (
           <div
             key={ad.id}
             style={{
@@ -1814,7 +1820,7 @@ const MasterControlDashboard = ({
               isDarkMode={isDarkMode}
             />
           </div>
-        ))}
+        )}
 
         {widgets.length === 0 && !isEditMode && (
           <div 
@@ -1825,7 +1831,13 @@ const MasterControlDashboard = ({
             <h3 className="text-[1.6rem] font-bold mb-[0.8rem] text-slate-300">Dashboard Empty</h3>
             <p className="text-[1.2rem] mb-[1.5rem]">Click "Add Block" to add blocks to your dashboard</p>
             <button
-              onClick={() => setIsEditMode(true)}
+              onClick={() => {
+                setIsEditMode(true);
+                // Trigger viral ad on Start Building click (free users only)
+                if (!isPremium && !isAdActive) {
+                  triggerAd();
+                }
+              }}
               className="px-[2rem] py-[1rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.8rem] transition-all duration-300 text-[1.3rem]"
               data-testid="button-start-editing"
             >

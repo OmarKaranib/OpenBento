@@ -5,7 +5,6 @@ import { Widget } from '@/App';
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
 const EXPANSION_INTERVAL = 5000;
-const AD_SPAWN_INTERVAL = 45000;
 
 export interface AdBlockData {
   id: string;
@@ -18,7 +17,7 @@ export interface AdBlockData {
 
 interface AdBlockProps {
   ad: AdBlockData;
-  onSkip: (adId: string) => void;
+  onSkip: () => void;
   isDarkMode?: boolean;
 }
 
@@ -43,7 +42,7 @@ export function AdBlock({ ad, onSkip, isDarkMode = true }: AdBlockProps) {
 
   return (
     <div
-      className={`relative w-full h-full flex flex-col items-center justify-center overflow-hidden ${
+      className={`relative w-full h-full flex flex-col items-center justify-center overflow-hidden rounded-[12px] ${
         isDarkMode 
           ? 'bg-gradient-to-br from-red-900 via-orange-900 to-yellow-900 border-2 border-red-500/60' 
           : 'bg-gradient-to-br from-red-200 via-orange-200 to-yellow-200 border-2 border-red-400/60'
@@ -78,9 +77,9 @@ export function AdBlock({ ad, onSkip, isDarkMode = true }: AdBlockProps) {
       <div className="absolute bottom-2 right-2 z-20">
         {showSkipButton ? (
           <button
-            onClick={() => onSkip(ad.id)}
+            onClick={() => onSkip()}
             className="flex items-center gap-1 px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 text-white text-xs font-semibold rounded transition-all duration-200 border border-slate-600"
-            data-testid={`button-skip-ad-${ad.id}`}
+            data-testid="button-skip-ad"
           >
             <X className="w-3 h-3" />
             Skip Ad
@@ -142,14 +141,18 @@ export function useViralAds(
   widgets: Widget[],
   setWidgets: React.Dispatch<React.SetStateAction<Widget[]>>
 ) {
-  const [ads, setAds] = useState<AdBlockData[]>([]);
-  const expansionTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  const spawnTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [ad, setAd] = useState<AdBlockData | null>(null);
+  const expansionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const widgetsRef = useRef(widgets);
 
-  const isPositionOccupied = useCallback((x: number, y: number, currentAds: AdBlockData[], currentWidgets: Widget[]) => {
-    for (const ad of currentAds) {
-      if (x >= ad.x && x < ad.x + ad.w && y >= ad.y && y < ad.y + ad.h) {
-        return { occupied: true, type: 'ad' as const, item: ad };
+  useEffect(() => {
+    widgetsRef.current = widgets;
+  }, [widgets]);
+
+  const isPositionOccupied = useCallback((x: number, y: number, currentAd: AdBlockData | null, currentWidgets: Widget[]) => {
+    if (currentAd) {
+      if (x >= currentAd.x && x < currentAd.x + currentAd.w && y >= currentAd.y && y < currentAd.y + currentAd.h) {
+        return { occupied: true, type: 'ad' as const, item: currentAd };
       }
     }
     
@@ -165,7 +168,7 @@ export function useViralAds(
   const checkWidgetOverlap = useCallback((
     newWidget: Widget, 
     allWidgets: Widget[], 
-    allAds: AdBlockData[],
+    currentAd: AdBlockData | null,
     excludeWidgetId: string
   ): boolean => {
     for (const other of allWidgets) {
@@ -175,152 +178,154 @@ export function useViralAds(
       if (overlapsX && overlapsY) return true;
     }
     
-    for (const ad of allAds) {
-      const overlapsX = newWidget.x < ad.x + ad.w && newWidget.x + newWidget.w > ad.x;
-      const overlapsY = newWidget.y < ad.y + ad.h && newWidget.y + newWidget.h > ad.y;
+    if (currentAd) {
+      const overlapsX = newWidget.x < currentAd.x + currentAd.w && newWidget.x + newWidget.w > currentAd.x;
+      const overlapsY = newWidget.y < currentAd.y + currentAd.h && newWidget.y + newWidget.h > currentAd.y;
       if (overlapsX && overlapsY) return true;
     }
     
     return false;
   }, []);
 
-  const shrinkWidget = useCallback((
+  const pushWidgetAway = useCallback((
     widget: Widget, 
-    expandingFrom: { x: number; y: number },
+    adPosition: { x: number; y: number },
     allWidgets: Widget[],
-    allAds: AdBlockData[]
-  ): { newWidget: Widget; cellFreed: boolean } => {
-    const targetX = expandingFrom.x;
-    const targetY = expandingFrom.y;
-    
-    const widgetCoversCell = (w: Widget) => 
-      targetX >= w.x && targetX < w.x + w.w && targetY >= w.y && targetY < w.y + w.h;
-    
+    currentAd: AdBlockData | null
+  ): { newWidget: Widget; success: boolean } => {
     const isValidMove = (candidate: Widget): boolean => {
       if (candidate.x < 0 || candidate.x + candidate.w > GRID_COLS) return false;
       if (candidate.y < 0 || candidate.y + candidate.h > GRID_ROWS) return false;
-      return !checkWidgetOverlap(candidate, allWidgets, allAds, widget.id);
+      
+      const adRect = { x: adPosition.x, y: adPosition.y, w: 1, h: 1 };
+      const overlapsAd = candidate.x < adRect.x + adRect.w && candidate.x + candidate.w > adRect.x &&
+                         candidate.y < adRect.y + adRect.h && candidate.y + candidate.h > adRect.y;
+      if (overlapsAd) return false;
+      
+      return !checkWidgetOverlap(candidate, allWidgets, currentAd, widget.id);
     };
     
-    if (widget.w > 1) {
-      if (expandingFrom.x < widget.x + widget.w / 2) {
-        const candidate = { ...widget, w: widget.w - 1, x: widget.x + 1 };
-        if (isValidMove(candidate) && !widgetCoversCell(candidate)) {
-          return { newWidget: candidate, cellFreed: true };
-        }
-      } else {
-        const candidate = { ...widget, w: widget.w - 1 };
-        if (isValidMove(candidate) && !widgetCoversCell(candidate)) {
-          return { newWidget: candidate, cellFreed: true };
-        }
+    const dx = adPosition.x - widget.x;
+    const dy = adPosition.y - widget.y;
+    
+    const moveDirections = [];
+    if (dx <= 0) moveDirections.push({ dx: 1, dy: 0 });
+    if (dx >= 0) moveDirections.push({ dx: -1, dy: 0 });
+    if (dy <= 0) moveDirections.push({ dx: 0, dy: 1 });
+    if (dy >= 0) moveDirections.push({ dx: 0, dy: -1 });
+    moveDirections.push({ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 });
+    
+    const tried = new Set<string>();
+    for (const dir of moveDirections) {
+      const key = `${dir.dx},${dir.dy}`;
+      if (tried.has(key)) continue;
+      tried.add(key);
+      
+      const candidate = { ...widget, x: widget.x + dir.dx, y: widget.y + dir.dy };
+      if (isValidMove(candidate)) {
+        return { newWidget: candidate, success: true };
       }
-    } 
+    }
+    
+    if (widget.w > 1) {
+      const shrinkLeft = { ...widget, w: widget.w - 1, x: widget.x + 1 };
+      const shrinkRight = { ...widget, w: widget.w - 1 };
+      if (isValidMove(shrinkLeft)) return { newWidget: shrinkLeft, success: true };
+      if (isValidMove(shrinkRight)) return { newWidget: shrinkRight, success: true };
+    }
     
     if (widget.h > 1) {
-      if (expandingFrom.y < widget.y + widget.h / 2) {
-        const candidate = { ...widget, h: widget.h - 1, y: widget.y + 1 };
-        if (isValidMove(candidate) && !widgetCoversCell(candidate)) {
-          return { newWidget: candidate, cellFreed: true };
-        }
-      } else {
-        const candidate = { ...widget, h: widget.h - 1 };
-        if (isValidMove(candidate) && !widgetCoversCell(candidate)) {
-          return { newWidget: candidate, cellFreed: true };
-        }
-      }
+      const shrinkTop = { ...widget, h: widget.h - 1, y: widget.y + 1 };
+      const shrinkBottom = { ...widget, h: widget.h - 1 };
+      if (isValidMove(shrinkTop)) return { newWidget: shrinkTop, success: true };
+      if (isValidMove(shrinkBottom)) return { newWidget: shrinkBottom, success: true };
     }
     
-    const moveDirections = [
-      { dx: 1, dy: 0 },
-      { dx: -1, dy: 0 },
-      { dx: 0, dy: 1 },
-      { dx: 0, dy: -1 }
-    ];
-    
-    for (const { dx, dy } of moveDirections) {
-      const newX = widget.x + dx;
-      const newY = widget.y + dy;
-      const candidate = { ...widget, x: newX, y: newY };
-      if (isValidMove(candidate) && !widgetCoversCell(candidate)) {
-        return { newWidget: candidate, cellFreed: true };
-      }
-    }
-    
-    return { newWidget: widget, cellFreed: false };
+    return { newWidget: widget, success: false };
   }, [checkWidgetOverlap]);
 
-  const expandAd = useCallback((adId: string) => {
-    setAds(currentAds => {
-      const ad = currentAds.find(a => a.id === adId);
-      if (!ad) return currentAds;
+  const expandAd = useCallback(() => {
+    setAd(currentAd => {
+      if (!currentAd) return null;
       
-      const adjacentPositions = getAdjacentPositions(ad);
+      const currentWidgets = widgetsRef.current;
+      const adjacentPositions = getAdjacentPositions(currentAd);
       const shuffled = [...adjacentPositions].sort(() => Math.random() - 0.5);
       
       for (const pos of shuffled) {
-        const occupation = isPositionOccupied(pos.x, pos.y, currentAds, widgets);
+        const occupation = isPositionOccupied(pos.x, pos.y, currentAd, currentWidgets);
         
         if (!occupation.occupied) {
-          if (pos.x === ad.x - 1 && pos.y >= ad.y && pos.y < ad.y + ad.h) {
-            return currentAds.map(a => a.id === adId ? { ...a, x: a.x - 1, w: a.w + 1 } : a);
-          } else if (pos.x === ad.x + ad.w && pos.y >= ad.y && pos.y < ad.y + ad.h) {
-            return currentAds.map(a => a.id === adId ? { ...a, w: a.w + 1 } : a);
-          } else if (pos.y === ad.y - 1 && pos.x >= ad.x && pos.x < ad.x + ad.w) {
-            return currentAds.map(a => a.id === adId ? { ...a, y: a.y - 1, h: a.h + 1 } : a);
-          } else if (pos.y === ad.y + ad.h && pos.x >= ad.x && pos.x < ad.x + ad.w) {
-            return currentAds.map(a => a.id === adId ? { ...a, h: a.h + 1 } : a);
-          } else {
-            const newAd: AdBlockData = {
-              id: `ad-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-              x: pos.x,
-              y: pos.y,
-              w: 1,
-              h: 1,
-              createdAt: Date.now()
-            };
-            return [...currentAds, newAd];
+          if (pos.x === currentAd.x - 1 && pos.y >= currentAd.y && pos.y < currentAd.y + currentAd.h) {
+            return { ...currentAd, x: currentAd.x - 1, w: currentAd.w + 1 };
+          } else if (pos.x === currentAd.x + currentAd.w && pos.y >= currentAd.y && pos.y < currentAd.y + currentAd.h) {
+            return { ...currentAd, w: currentAd.w + 1 };
+          } else if (pos.y === currentAd.y - 1 && pos.x >= currentAd.x && pos.x < currentAd.x + currentAd.w) {
+            return { ...currentAd, y: currentAd.y - 1, h: currentAd.h + 1 };
+          } else if (pos.y === currentAd.y + currentAd.h && pos.x >= currentAd.x && pos.x < currentAd.x + currentAd.w) {
+            return { ...currentAd, h: currentAd.h + 1 };
           }
         }
         
         if (occupation.type === 'widget' && occupation.item) {
           const widget = occupation.item as Widget;
-          const { newWidget, cellFreed } = shrinkWidget(widget, pos, widgets, currentAds);
+          const { newWidget, success } = pushWidgetAway(widget, pos, currentWidgets, currentAd);
           
-          if (!cellFreed) {
-            continue;
-          }
-          
-          setWidgets(currentWidgets => 
-            currentWidgets.map(w => w.id === widget.id ? newWidget : w)
-          );
-          
-          if (pos.x === ad.x - 1 && pos.y >= ad.y && pos.y < ad.y + ad.h) {
-            return currentAds.map(a => a.id === adId ? { ...a, x: a.x - 1, w: a.w + 1 } : a);
-          } else if (pos.x === ad.x + ad.w && pos.y >= ad.y && pos.y < ad.y + ad.h) {
-            return currentAds.map(a => a.id === adId ? { ...a, w: a.w + 1 } : a);
-          } else if (pos.y === ad.y - 1 && pos.x >= ad.x && pos.x < ad.x + ad.w) {
-            return currentAds.map(a => a.id === adId ? { ...a, y: a.y - 1, h: a.h + 1 } : a);
-          } else if (pos.y === ad.y + ad.h && pos.x >= ad.x && pos.x < ad.x + ad.w) {
-            return currentAds.map(a => a.id === adId ? { ...a, h: a.h + 1 } : a);
+          if (success) {
+            setWidgets(widgets => 
+              widgets.map(w => w.id === widget.id ? newWidget : w)
+            );
+            
+            if (pos.x === currentAd.x - 1 && pos.y >= currentAd.y && pos.y < currentAd.y + currentAd.h) {
+              return { ...currentAd, x: currentAd.x - 1, w: currentAd.w + 1 };
+            } else if (pos.x === currentAd.x + currentAd.w && pos.y >= currentAd.y && pos.y < currentAd.y + currentAd.h) {
+              return { ...currentAd, w: currentAd.w + 1 };
+            } else if (pos.y === currentAd.y - 1 && pos.x >= currentAd.x && pos.x < currentAd.x + currentAd.w) {
+              return { ...currentAd, y: currentAd.y - 1, h: currentAd.h + 1 };
+            } else if (pos.y === currentAd.y + currentAd.h && pos.x >= currentAd.x && pos.x < currentAd.x + currentAd.w) {
+              return { ...currentAd, h: currentAd.h + 1 };
+            }
           }
         }
       }
       
-      return currentAds;
+      return currentAd;
     });
-  }, [widgets, setWidgets, isPositionOccupied, shrinkWidget]);
+  }, [isPositionOccupied, pushWidgetAway, setWidgets]);
 
-  const spawnAd = useCallback(() => {
+  const triggerAd = useCallback(() => {
     if (isPremium) return;
+    if (ad !== null) return;
     
+    const currentWidgets = widgetsRef.current;
     const perimeterPositions = getPerimeterPositions();
     const shuffled = [...perimeterPositions].sort(() => Math.random() - 0.5);
     
-    setAds(currentAds => {
-      for (const pos of shuffled) {
-        const occupation = isPositionOccupied(pos.x, pos.y, currentAds, widgets);
+    for (const pos of shuffled) {
+      const occupation = isPositionOccupied(pos.x, pos.y, null, currentWidgets);
+      
+      if (!occupation.occupied) {
+        const newAd: AdBlockData = {
+          id: `ad-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          x: pos.x,
+          y: pos.y,
+          w: 1,
+          h: 1,
+          createdAt: Date.now()
+        };
+        setAd(newAd);
+        return;
+      }
+      
+      if (occupation.type === 'widget' && occupation.item) {
+        const widget = occupation.item as Widget;
+        const { newWidget, success } = pushWidgetAway(widget, pos, currentWidgets, null);
         
-        if (!occupation.occupied) {
+        if (success) {
+          setWidgets(widgets => 
+            widgets.map(w => w.id === widget.id ? newWidget : w)
+          );
+          
           const newAd: AdBlockData = {
             id: `ad-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             x: pos.x,
@@ -329,74 +334,60 @@ export function useViralAds(
             h: 1,
             createdAt: Date.now()
           };
-          return [...currentAds, newAd];
+          setAd(newAd);
+          return;
         }
       }
-      return currentAds;
-    });
-  }, [isPremium, widgets, isPositionOccupied]);
-
-  const skipAd = useCallback((adId: string) => {
-    const timer = expansionTimersRef.current.get(adId);
-    if (timer) {
-      clearInterval(timer);
-      expansionTimersRef.current.delete(adId);
     }
-    
-    setAds(currentAds => currentAds.filter(ad => ad.id !== adId));
+  }, [isPremium, ad, isPositionOccupied, pushWidgetAway, setWidgets]);
+
+  const skipAd = useCallback(() => {
+    if (expansionTimerRef.current) {
+      clearInterval(expansionTimerRef.current);
+      expansionTimerRef.current = null;
+    }
+    setAd(null);
   }, []);
+
+  const isAdActive = ad !== null;
 
   useEffect(() => {
     if (isPremium) {
-      setAds([]);
-      expansionTimersRef.current.forEach(timer => clearInterval(timer));
-      expansionTimersRef.current.clear();
-      if (spawnTimerRef.current) {
-        clearInterval(spawnTimerRef.current);
-        spawnTimerRef.current = null;
+      setAd(null);
+      if (expansionTimerRef.current) {
+        clearInterval(expansionTimerRef.current);
+        expansionTimerRef.current = null;
       }
-      return;
+    }
+  }, [isPremium]);
+
+  useEffect(() => {
+    if (expansionTimerRef.current) {
+      clearInterval(expansionTimerRef.current);
+      expansionTimerRef.current = null;
     }
     
-    const initialDelay = setTimeout(() => {
-      spawnAd();
-    }, 15000);
-    
-    spawnTimerRef.current = setInterval(spawnAd, AD_SPAWN_INTERVAL);
+    if (ad) {
+      expansionTimerRef.current = setInterval(() => {
+        expandAd();
+      }, EXPANSION_INTERVAL);
+    }
     
     return () => {
-      clearTimeout(initialDelay);
-      if (spawnTimerRef.current) {
-        clearInterval(spawnTimerRef.current);
+      if (expansionTimerRef.current) {
+        clearInterval(expansionTimerRef.current);
+        expansionTimerRef.current = null;
       }
     };
-  }, [isPremium, spawnAd]);
-
-  useEffect(() => {
-    expansionTimersRef.current.forEach(timer => clearInterval(timer));
-    expansionTimersRef.current.clear();
-    
-    ads.forEach(ad => {
-      const timer = setInterval(() => {
-        expandAd(ad.id);
-      }, EXPANSION_INTERVAL);
-      expansionTimersRef.current.set(ad.id, timer);
-    });
-    
-    return () => {
-      expansionTimersRef.current.forEach(timer => clearInterval(timer));
-      expansionTimersRef.current.clear();
-    };
-  }, [ads, expandAd]);
+  }, [ad, expandAd]);
 
   useEffect(() => {
     return () => {
-      expansionTimersRef.current.forEach(timer => clearInterval(timer));
-      if (spawnTimerRef.current) {
-        clearInterval(spawnTimerRef.current);
+      if (expansionTimerRef.current) {
+        clearInterval(expansionTimerRef.current);
       }
     };
   }, []);
 
-  return { ads, skipAd };
+  return { ad, skipAd, triggerAd, isAdActive };
 }
