@@ -3,6 +3,19 @@ import Stripe from 'stripe';
 let connectionSettings: any;
 
 async function getCredentials() {
+  // First, try to use STRIPE_SECRET_KEY from environment (for production sk_live keys)
+  const envSecretKey = process.env.STRIPE_SECRET_KEY;
+  const envPublishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
+  
+  if (envSecretKey) {
+    console.log('[Stripe] Using STRIPE_SECRET_KEY from environment');
+    return {
+      publishableKey: envPublishableKey || '',
+      secretKey: envSecretKey,
+    };
+  }
+
+  // Fall back to Replit connector
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? 'repl ' + process.env.REPL_IDENTITY

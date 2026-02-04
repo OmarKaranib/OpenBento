@@ -25,7 +25,7 @@ export function PricingModal({ isOpen, onClose }: PricingModalProps) {
     },
     onSuccess: (data) => {
       if (data.url) {
-        window.location.href = data.url;
+        window.location.assign(data.url);
       }
     },
     onError: (error) => {
