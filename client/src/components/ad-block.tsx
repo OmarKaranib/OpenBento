@@ -280,6 +280,42 @@ export function useViralAds(
     return null; // Cannot find safe position
   }, [widgetOverlapsAdBounds]);
 
+  // Helper to check if two widgets overlap
+  const widgetsOverlap = useCallback((a: Widget, b: Widget): boolean => {
+    const overlapsX = a.x < b.x + b.w && a.x + a.w > b.x;
+    const overlapsY = a.y < b.y + b.h && a.y + a.h > b.y;
+    return overlapsX && overlapsY;
+  }, []);
+
+  // Final validation: check entire grid for any overlaps
+  const validateGridState = useCallback((
+    widgets: Widget[],
+    adBounds: { x: number; y: number; w: number; h: number }
+  ): boolean => {
+    // Check no widget overlaps with ad
+    for (const widget of widgets) {
+      if (widgetOverlapsAdBounds(widget, adBounds)) {
+        return false;
+      }
+    }
+    // Check no widgets overlap with each other
+    for (let i = 0; i < widgets.length; i++) {
+      for (let j = i + 1; j < widgets.length; j++) {
+        if (widgetsOverlap(widgets[i], widgets[j])) {
+          return false;
+        }
+      }
+    }
+    // Check all widgets are within grid bounds
+    for (const widget of widgets) {
+      if (widget.x < 0 || widget.x + widget.w > GRID_COLS ||
+          widget.y < 0 || widget.y + widget.h > GRID_ROWS) {
+        return false;
+      }
+    }
+    return true;
+  }, [widgetOverlapsAdBounds, widgetsOverlap]);
+
   // Perform grid reflow - move all affected widgets when ad expands
   const performGridReflow = useCallback((
     newAdBounds: { x: number; y: number; w: number; h: number },
@@ -289,18 +325,29 @@ export function useViralAds(
     const overlappingWidgets = currentWidgets.filter(w => widgetOverlapsAdBounds(w, newAdBounds));
     
     if (overlappingWidgets.length === 0) {
+      // Validate grid is still clean
+      if (!validateGridState(currentWidgets, newAdBounds)) {
+        return { success: false, newWidgets: currentWidgets };
+      }
       return { success: true, newWidgets: currentWidgets };
     }
 
     // Create a working copy of widgets
     let workingWidgets = [...currentWidgets];
     
-    // Process each overlapping widget
-    for (const widget of overlappingWidgets) {
+    // Process each overlapping widget - use workingWidgets for current state
+    for (const originalWidget of overlappingWidgets) {
+      // Get the current version of this widget from working set
+      const widget = workingWidgets.find(w => w.id === originalWidget.id);
+      if (!widget) continue;
+      
+      // Skip if widget was already moved out of the way by a previous reflow
+      if (!widgetOverlapsAdBounds(widget, newAdBounds)) continue;
+      
       // Get current state of other widgets (excluding the one being processed)
       const otherWidgets = workingWidgets.filter(w => w.id !== widget.id);
       
-      // Find a new safe position
+      // Find a new safe position using current state of all other widgets
       const newPosition = findSafePosition(widget, newAdBounds, otherWidgets, widget.id);
       
       if (!newPosition) {
@@ -312,8 +359,13 @@ export function useViralAds(
       workingWidgets = workingWidgets.map(w => w.id === widget.id ? newPosition : w);
     }
     
+    // Final validation: ensure no overlaps in the resulting grid
+    if (!validateGridState(workingWidgets, newAdBounds)) {
+      return { success: false, newWidgets: currentWidgets };
+    }
+    
     return { success: true, newWidgets: workingWidgets };
-  }, [widgetOverlapsAdBounds, findSafePosition]);
+  }, [widgetOverlapsAdBounds, findSafePosition, validateGridState]);
 
   const expandAd = useCallback(() => {
     const currentAd = ad;
