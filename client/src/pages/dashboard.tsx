@@ -12,6 +12,7 @@ import { useStreamHealing } from '@/hooks/use-stream-healing';
 import { useToast } from '@/hooks/use-toast';
 import { FloatingTutorial } from '@/components/floating-tutorial';
 import { AdBlock, AdBlockData } from '@/components/ad-block';
+import { checkVideoLiveStatus } from '@/lib/stream-api';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -381,6 +382,78 @@ const MasterControlDashboard = ({
     }
   }, [triggerHeal, setWidgets]);
 
+  // Proactive True Live Filter: Check YouTube widgets' live status on load
+  const checkedVideoIds = useRef<Set<string>>(new Set());
+  const lastRevalidationRef = useRef<number>(0);
+  const REVALIDATION_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+  
+  useEffect(() => {
+    const checkYouTubeLiveStatus = async () => {
+      const now = Date.now();
+      const shouldRevalidate = now - lastRevalidationRef.current > REVALIDATION_INTERVAL_MS;
+      
+      // Find new widgets to check AND offline widgets for periodic revalidation
+      const youtubeWidgets = widgets.filter(w => 
+        w.type === 'video' && 
+        w.isYouTube && 
+        w.videoId && 
+        (!w.isOffline && !checkedVideoIds.current.has(w.videoId!)) || 
+        (w.isOffline && shouldRevalidate)
+      );
+      
+      if (youtubeWidgets.length === 0) return;
+      
+      if (shouldRevalidate) {
+        lastRevalidationRef.current = now;
+        console.log('[TrueLiveFilter] Running periodic revalidation for offline widgets');
+      }
+      
+      for (const widget of youtubeWidgets) {
+        if (!widget.videoId) continue;
+        
+        try {
+          const liveStatus = await checkVideoLiveStatus(widget.videoId);
+          
+          if (liveStatus.isLive) {
+            // Widget is now live - mark as online and update checkedVideoIds
+            if (widget.isOffline) {
+              console.log(`[TrueLiveFilter] Video ${widget.videoId} is now LIVE, marking as online`);
+              setWidgets(prev => prev.map(w => 
+                w.id === widget.id ? { ...w, isOffline: false } : w
+              ));
+            }
+            checkedVideoIds.current.add(widget.videoId);
+          } else if (!liveStatus.isLive && liveStatus.liveBroadcastContent !== null) {
+            // Widget is not live
+            if (!widget.isOffline) {
+              console.log(`[TrueLiveFilter] Video ${widget.videoId} is not live (${liveStatus.liveBroadcastContent}), marking as offline`);
+              setWidgets(prev => prev.map(w => 
+                w.id === widget.id ? { ...w, isOffline: true } : w
+              ));
+            }
+            checkedVideoIds.current.add(widget.videoId);
+          }
+        } catch (error) {
+          console.error(`[TrueLiveFilter] Error checking live status for ${widget.videoId}:`, error);
+        }
+        
+        // Rate limit API calls
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    };
+    
+    // Run initial check after a short delay to allow widgets to render
+    const timeoutId = setTimeout(checkYouTubeLiveStatus, 2000);
+    
+    // Set up periodic revalidation interval
+    const intervalId = setInterval(checkYouTubeLiveStatus, REVALIDATION_INTERVAL_MS);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(intervalId);
+    };
+  }, [widgets, setWidgets]);
+
   const minCellHeight = 80;
 
   // Hover detection for fullscreen mode - show header when mouse is in top 15px
@@ -749,23 +822,37 @@ const MasterControlDashboard = ({
     }));
   };
 
-  const handleRefreshWidget = (widgetId: string) => {
-    setWidgets(prev => {
-      const updated = prev.map(w => {
-        if (w.id === widgetId && w.type === 'video') {
-          return { ...w, url: '', lastRefresh: Date.now(), isOffline: false };
+  const handleRefreshWidget = async (widgetId: string) => {
+    const widget = widgets.find(w => w.id === widgetId);
+    if (!widget) return;
+
+    setWidgets(prev => prev.map(w => 
+      w.id === widgetId && w.type === 'video' 
+        ? { ...w, url: '', lastRefresh: Date.now(), isOffline: false } 
+        : w
+    ));
+
+    // For YouTube widgets, check live status using YouTube API
+    if (widget.isYouTube && widget.videoId) {
+      try {
+        const liveStatus = await checkVideoLiveStatus(widget.videoId);
+        if (!liveStatus.isLive) {
+          console.log(`[TrueLiveFilter] Video ${widget.videoId} is not live (${liveStatus.liveBroadcastContent})`);
+          setWidgets(prev => prev.map(w => 
+            w.id === widgetId ? { ...w, isOffline: true } : w
+          ));
+          return;
         }
-        return w;
-      });
-      return updated;
-    });
+      } catch (error) {
+        console.error('[TrueLiveFilter] Error checking live status:', error);
+      }
+    }
 
     setTimeout(() => {
       setWidgets(prev => {
         const widget = prev.find(w => w.id === widgetId);
         if (widget) {
           const videoId = widget.videoId;
-          const youtubeChannelId = widget.youtubeChannelId;
           const twitchChannel = widget.twitchChannel;
           return prev.map(w => {
             if (w.id === widgetId) {
@@ -894,7 +981,7 @@ const MasterControlDashboard = ({
     ));
   };
 
-  // Offline Placeholder Component
+  // Offline Placeholder Component with prominent OFFLINE badge
   const OfflinePlaceholder = ({ widget }: { widget: Widget }) => {
     // Check if this is a sports channel that's "Live during Games"
     const sportsChannelIds = ['nfl-network', 'nba-tv', 'espn-live', 'NFL', 'NBA', 'espn'];
@@ -908,7 +995,13 @@ const MasterControlDashboard = ({
     
     if (isSportsChannel) {
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/50 p-[1.5rem]">
+        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/50 p-[1.5rem] relative">
+          {/* OFFLINE Badge */}
+          <div className="absolute top-[0.8rem] left-[0.8rem] z-50">
+            <span className="px-[0.8rem] py-[0.3rem] bg-gray-600 text-white text-[0.9rem] font-bold tracking-wide rounded shadow-lg uppercase">
+              OFFLINE
+            </span>
+          </div>
           <div className="w-[3rem] h-[3rem] rounded-full bg-blue-500/20 flex items-center justify-center mb-[1rem]">
             <div className="w-[1.5rem] h-[1.5rem] rounded-full bg-blue-500 animate-pulse" />
           </div>
@@ -919,6 +1012,7 @@ const MasterControlDashboard = ({
           <button
             onClick={() => handleRefreshWidget(widget.id)}
             className="px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300"
+            data-testid={`button-check-now-${widget.id}`}
           >
             <RefreshCw className="w-[1.2rem] h-[1.2rem]" />
             Check Now
@@ -928,7 +1022,13 @@ const MasterControlDashboard = ({
     }
     
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/50 p-[1.5rem]">
+      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/50 p-[1.5rem] relative">
+        {/* OFFLINE Badge - prominent corner indicator */}
+        <div className="absolute top-[0.8rem] left-[0.8rem] z-50">
+          <span className="px-[0.8rem] py-[0.3rem] bg-gray-600 text-white text-[0.9rem] font-bold tracking-wide rounded shadow-lg uppercase">
+            OFFLINE
+          </span>
+        </div>
         <AlertCircle className="w-[3rem] h-[3rem] text-orange-400 mb-[1rem]" />
         <h3 className="text-[1.3rem] font-semibold text-orange-400 mb-[0.5rem]">Stream Offline</h3>
         <p className="text-slate-400 text-center text-[1rem] mb-[1rem]">
@@ -939,6 +1039,7 @@ const MasterControlDashboard = ({
         <button
           onClick={() => handleRefreshWidget(widget.id)}
           className="px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300"
+          data-testid={`button-check-again-${widget.id}`}
         >
           <RefreshCw className="w-[1.2rem] h-[1.2rem]" />
           Check Again

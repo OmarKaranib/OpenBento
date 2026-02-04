@@ -95,6 +95,9 @@ async function runPulseCheck(): Promise<void> {
     
     const health = await checkStreamHealth(status.currentVideoId, apiKey);
     
+    // True Live Filter: Check if video is actually live
+    const isVideoLive = health.isLive ?? false;
+    
     if (!health.isHealthy) {
       console.log(`[PulseCache] Unhealthy stream detected: ${status.channelName}`);
       
@@ -111,11 +114,20 @@ async function runPulseCheck(): Promise<void> {
       } else {
         await updateCacheEntry(channelId, {
           isHealthy: false,
+          isLive: false,
           errorCode: health.errorCode,
         });
       }
+    } else if (!isVideoLive) {
+      // Video exists but is not currently live
+      console.log(`[PulseCache] Stream offline: ${status.channelName} (liveBroadcastContent is not 'live')`);
+      await updateCacheEntry(channelId, { 
+        isHealthy: true, 
+        isLive: false, 
+        errorCode: 'notLive' 
+      });
     } else {
-      await updateCacheEntry(channelId, { isHealthy: true, errorCode: undefined });
+      await updateCacheEntry(channelId, { isHealthy: true, isLive: true, errorCode: undefined });
     }
     
     await new Promise(resolve => setTimeout(resolve, 200));

@@ -128,7 +128,7 @@ export async function healStream(
 export async function checkStreamHealth(
   videoId: string,
   apiKey: string
-): Promise<{ isHealthy: boolean; errorCode?: string }> {
+): Promise<{ isHealthy: boolean; errorCode?: string; isLive?: boolean }> {
   const details = await getVideoDetails(videoId, apiKey);
   
   if (!details) {
@@ -139,5 +139,60 @@ export async function checkStreamHealth(
     return { isHealthy: false, errorCode: 'notEmbeddable' };
   }
   
-  return { isHealthy: true };
+  // Check if the stream is actually live
+  const isLive = details.liveBroadcastContent === 'live';
+  
+  return { isHealthy: true, isLive };
+}
+
+// True Live Filter: Search for live streams from a specific channel using channelId
+export async function checkChannelLiveStatus(
+  channelId: string,
+  apiKey: string
+): Promise<{ isLive: boolean; liveVideoId: string | null; title: string | null }> {
+  // Use YouTube Search API with channelId and eventType=live
+  const url = `${YOUTUBE_API_BASE}/search?part=snippet&channelId=${channelId}&type=video&eventType=live&maxResults=1&key=${apiKey}`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error('[YouTube API] Channel live check failed:', response.status);
+      return { isLive: false, liveVideoId: null, title: null };
+    }
+    
+    const data = await response.json();
+    const items = data.items || [];
+    
+    if (items.length === 0) {
+      // No active live broadcasts for this channel
+      return { isLive: false, liveVideoId: null, title: null };
+    }
+    
+    const liveItem = items[0];
+    return {
+      isLive: true,
+      liveVideoId: liveItem.id.videoId,
+      title: liveItem.snippet.title,
+    };
+  } catch (error) {
+    console.error('[YouTube API] Channel live check error:', error);
+    return { isLive: false, liveVideoId: null, title: null };
+  }
+}
+
+// Verify if a specific video is currently a live broadcast
+export async function verifyVideoIsLive(
+  videoId: string,
+  apiKey: string
+): Promise<{ isLive: boolean; liveBroadcastContent: string | null }> {
+  const details = await getVideoDetails(videoId, apiKey);
+  
+  if (!details) {
+    return { isLive: false, liveBroadcastContent: null };
+  }
+  
+  return {
+    isLive: details.liveBroadcastContent === 'live',
+    liveBroadcastContent: details.liveBroadcastContent,
+  };
 }

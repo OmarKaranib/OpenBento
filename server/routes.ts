@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from "./link-refresher";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerChannel } from "./services/pulse-cache";
-import { healStream, getVideoDetails, isMusicCategory } from "./services/youtube-api";
+import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, verifyVideoIsLive } from "./services/youtube-api";
 import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema } from "@shared/schema";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
@@ -79,6 +79,65 @@ export async function registerRoutes(
     }
     
     res.json(status);
+  });
+
+  // True Live Filter: Check if a YouTube channel is currently live
+  app.get("/api/youtube/channel-live/:channelId", async (req, res) => {
+    const { channelId } = req.params;
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    
+    if (!apiKey) {
+      return res.status(503).json({ 
+        isLive: null,
+        error: "YouTube API key not configured" 
+      });
+    }
+    
+    try {
+      const result = await checkChannelLiveStatus(channelId, apiKey);
+      res.json({
+        channelId,
+        isLive: result.isLive,
+        liveVideoId: result.liveVideoId,
+        title: result.title,
+      });
+    } catch (error) {
+      console.error('[YouTube Live Check] Error:', error);
+      res.status(500).json({ 
+        channelId,
+        isLive: null,
+        error: String(error) 
+      });
+    }
+  });
+
+  // True Live Filter: Verify if a specific video is currently live
+  app.get("/api/youtube/video-live/:videoId", async (req, res) => {
+    const { videoId } = req.params;
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    
+    if (!apiKey) {
+      return res.status(503).json({ 
+        isLive: null,
+        error: "YouTube API key not configured" 
+      });
+    }
+    
+    try {
+      const result = await verifyVideoIsLive(videoId, apiKey);
+      res.json({
+        videoId,
+        isLive: result.isLive,
+        liveBroadcastContent: result.liveBroadcastContent,
+      });
+    } catch (error) {
+      console.error('[YouTube Video Live Check] Error:', error);
+      res.status(500).json({ 
+        videoId,
+        isLive: null,
+        error: String(error) 
+      });
+    }
   });
 
   app.post("/api/stream/register", async (req, res) => {

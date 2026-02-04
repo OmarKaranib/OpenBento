@@ -195,3 +195,47 @@ export async function updateLibraryItem(id: string, updates: Partial<LibraryItem
     return null;
   }
 }
+
+// True Live Filter: Check if a YouTube video is currently live
+export async function checkVideoLiveStatus(videoId: string): Promise<{
+  isLive: boolean;
+  liveBroadcastContent: string | null;
+}> {
+  try {
+    const response = await fetch(`${API_BASE}/api/youtube/video-live/${videoId}`);
+    if (!response.ok) {
+      return { isLive: false, liveBroadcastContent: null };
+    }
+    const data = await response.json();
+    return {
+      isLive: data.isLive ?? false,
+      liveBroadcastContent: data.liveBroadcastContent ?? null,
+    };
+  } catch (error) {
+    console.error('[StreamAPI] Video live check failed:', error);
+    return { isLive: false, liveBroadcastContent: null };
+  }
+}
+
+// True Live Filter: Check if a YouTube channel is currently live
+export async function checkChannelLiveStatus(channelId: string): Promise<{
+  isLive: boolean;
+  liveVideoId: string | null;
+  title: string | null;
+}> {
+  try {
+    const response = await fetch(`${API_BASE}/api/youtube/channel-live/${channelId}`);
+    if (!response.ok) {
+      return { isLive: false, liveVideoId: null, title: null };
+    }
+    const data = await response.json();
+    return {
+      isLive: data.isLive ?? false,
+      liveVideoId: data.liveVideoId ?? null,
+      title: data.title ?? null,
+    };
+  } catch (error) {
+    console.error('[StreamAPI] Channel live check failed:', error);
+    return { isLive: false, liveVideoId: null, title: null };
+  }
+}
