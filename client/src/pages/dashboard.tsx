@@ -217,13 +217,13 @@ const MasterControlDashboard = ({
   }, [isDarkMode]);
 
   // Auto-save widgets to localStorage with debounce to avoid excessive writes
-  // REFRESH = RESET: Only persist widgets for PRO users
-  // All non-Pro users (guests + free logged-in) lose widgets on refresh
+  // HARD SESSION WIPE: Only persist widgets for logged-in users
+  // Guests (user is null) lose everything on refresh - return to "Start Building"
   const widgetsJsonRef = useRef<string>('');
   useEffect(() => {
-    // Only save to localStorage if user is Pro
-    if (!isPremium) {
-      // Non-Pro mode: Clear any existing data from localStorage
+    // Only save to localStorage if user is logged in
+    if (!isAuthenticated) {
+      // Guest mode: Clear any existing data from localStorage
       localStorage.removeItem('openBentoWidgets');
       localStorage.removeItem('openBentoPersonalLibrary');
       return;
@@ -235,7 +235,7 @@ const MasterControlDashboard = ({
       widgetsJsonRef.current = widgetsJson;
       localStorage.setItem('openBentoWidgets', widgetsJson);
     }
-  }, [widgets, isPremium]);
+  }, [widgets, isAuthenticated]);
 
   // Set custom color for a specific widget (Bento.me Color Droplet)
   const setWidgetColor = useCallback((widgetId: string, color: string | undefined) => {

@@ -135,14 +135,18 @@ export function FloatingTutorial({ isPremium, isDarkMode = true }: { isPremium: 
 
       {isOpen && (
         <>
+          {/* Dark overlay with cutout for menu bar - no darkening over the header */}
           <div 
-            className="fixed inset-0 z-[9998] bg-black/60 cursor-pointer"
+            className="fixed inset-0 z-[9998] cursor-pointer"
             onClick={handleClose}
             onTouchEnd={handleClose}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Escape' && handleClose()}
             data-testid="tutorial-overlay"
+            style={{
+              background: 'linear-gradient(to bottom, transparent 0%, transparent 3.2rem, rgba(0,0,0,0.6) 3.2rem, rgba(0,0,0,0.6) 100%)'
+            }}
           />
           
           <button
