@@ -250,6 +250,8 @@ function YouTubePlayerInner({
   }, [widgetId]);
 
   const initializePlayer = useCallback(() => {
+    // OVERDRIVE GUARD: Never initialize YT.Player for manual override channels
+    if (isManualOverride) return;
     if (!containerRef.current || !window.YT?.Player) return;
     if (isInitializedRef.current && playerRef.current) return; // Already initialized
 
@@ -403,10 +405,16 @@ function YouTubePlayerInner({
       console.error('[YouTube] Failed to initialize player:', e);
       onErrorRef.current?.();
     }
-  }, [playerId, stableVideoId, stableChannelId, widgetId, setupMediaSession]); // Only re-init when video/widget/channel changes
+  }, [playerId, stableVideoId, stableChannelId, widgetId, setupMediaSession, isManualOverride]); // Only re-init when video/widget/channel changes
 
   // Initialize player only when videoId changes
   useEffect(() => {
+    // OVERDRIVE GUARD: Skip YT.Player initialization for manual override channels
+    if (isManualOverride) {
+      console.log('[YouTube] OVERDRIVE: Skipping YT.Player init for manual override channel');
+      return;
+    }
+
     // Reset initialization flag when video changes
     isInitializedRef.current = false;
 
@@ -437,10 +445,13 @@ function YouTubePlayerInner({
       playerRef.current = null;
       isInitializedRef.current = false;
     };
-  }, [stableVideoId, initializePlayer, playerId]); // Only reinitialize when videoId changes
+  }, [stableVideoId, initializePlayer, playerId, isManualOverride]); // Only reinitialize when videoId changes
 
   // Handle refreshKey changes - force reinitialize when manual refresh is triggered
   useEffect(() => {
+    // OVERDRIVE GUARD: Skip refresh for manual override channels
+    if (isManualOverride) return;
+
     if (refreshKey !== lastRefreshKeyRef.current) {
       console.log(`[YouTube] RefreshKey changed from ${lastRefreshKeyRef.current} to ${refreshKey} - reinitializing player`);
       lastRefreshKeyRef.current = refreshKey;
@@ -460,7 +471,7 @@ function YouTubePlayerInner({
         initializePlayer();
       }, 100);
     }
-  }, [refreshKey, initializePlayer, playerId]);
+  }, [refreshKey, initializePlayer, playerId, isManualOverride]);
 
   // Handle mute changes without reinitializing player
   useEffect(() => {
