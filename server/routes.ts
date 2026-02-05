@@ -100,12 +100,14 @@ export async function registerRoutes(
         isLive: result.isLive,
         liveVideoId: result.liveVideoId,
         title: result.title,
+        apiError: result.apiError || false,
       });
     } catch (error) {
       console.error('[YouTube Live Check] Error:', error);
       res.status(500).json({ 
         channelId,
         isLive: null,
+        apiError: true,
         error: String(error) 
       });
     }
@@ -129,12 +131,14 @@ export async function registerRoutes(
         videoId,
         isLive: result.isLive,
         liveBroadcastContent: result.liveBroadcastContent,
+        apiError: result.apiError || false,
       });
     } catch (error) {
       console.error('[YouTube Video Live Check] Error:', error);
       res.status(500).json({ 
         videoId,
         isLive: null,
+        apiError: true,
         error: String(error) 
       });
     }
@@ -160,12 +164,14 @@ export async function registerRoutes(
         isLive: result.isLive,
         liveVideoId: result.liveVideoId,
         title: result.title,
+        apiError: result.apiError || false,
       });
     } catch (error) {
       console.error('[YouTube Search Live] Error:', error);
       res.status(500).json({ 
         channelHandle,
         isLive: false,
+        apiError: true,
         error: String(error) 
       });
     }

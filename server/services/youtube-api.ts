@@ -139,8 +139,9 @@ export async function checkStreamHealth(
     return { isHealthy: false, errorCode: 'notEmbeddable' };
   }
   
-  // Check if the stream is actually live
-  const isLive = details.liveBroadcastContent === 'live';
+  // FALSE OFFLINE FIX: Stream is LIVE unless liveBroadcastContent is explicitly 'none'
+  // This catches 'live' and 'upcoming' as online
+  const isLive = details.liveBroadcastContent !== 'none';
   
   return { isHealthy: true, isLive };
 }
@@ -149,7 +150,7 @@ export async function checkStreamHealth(
 export async function checkChannelLiveStatus(
   channelId: string,
   apiKey: string
-): Promise<{ isLive: boolean; liveVideoId: string | null; title: string | null }> {
+): Promise<{ isLive: boolean; liveVideoId: string | null; title: string | null; apiError?: boolean }> {
   // Use YouTube Search API with channelId and eventType=live
   const url = `${YOUTUBE_API_BASE}/search?part=snippet&channelId=${channelId}&type=video&eventType=live&maxResults=1&key=${apiKey}`;
   
@@ -157,43 +158,54 @@ export async function checkChannelLiveStatus(
     const response = await fetch(url);
     if (!response.ok) {
       console.error('[YouTube API] Channel live check failed:', response.status);
-      return { isLive: false, liveVideoId: null, title: null };
+      // Return apiError=true so client knows this was an API failure, not genuinely offline
+      return { isLive: false, liveVideoId: null, title: null, apiError: true };
     }
     
     const data = await response.json();
     const items = data.items || [];
     
     if (items.length === 0) {
-      // No active live broadcasts for this channel
-      return { isLive: false, liveVideoId: null, title: null };
+      // No active live broadcasts for this channel - genuinely offline
+      return { isLive: false, liveVideoId: null, title: null, apiError: false };
     }
     
+    // eventType=live returns ONLY live streams - if we get a result, it's LIVE
     const liveItem = items[0];
     return {
       isLive: true,
       liveVideoId: liveItem.id.videoId,
       title: liveItem.snippet.title,
+      apiError: false,
     };
   } catch (error) {
     console.error('[YouTube API] Channel live check error:', error);
-    return { isLive: false, liveVideoId: null, title: null };
+    return { isLive: false, liveVideoId: null, title: null, apiError: true };
   }
 }
 
 // Verify if a specific video is currently a live broadcast
+// FALSE OFFLINE FIX: Consider stream ONLINE unless liveBroadcastContent is explicitly 'none'
+// liveBroadcastContent values: 'live' (currently live), 'upcoming' (scheduled), 'none' (not live)
 export async function verifyVideoIsLive(
   videoId: string,
   apiKey: string
-): Promise<{ isLive: boolean; liveBroadcastContent: string | null }> {
+): Promise<{ isLive: boolean; liveBroadcastContent: string | null; apiError?: boolean }> {
   const details = await getVideoDetails(videoId, apiKey);
   
   if (!details) {
-    return { isLive: false, liveBroadcastContent: null };
+    // API failed - return apiError so client shows "System Maintenance" not "Offline"
+    return { isLive: false, liveBroadcastContent: null, apiError: true };
   }
   
+  // FALSE OFFLINE FIX: Stream is LIVE unless liveBroadcastContent is explicitly 'none'
+  // This catches 'live' and 'upcoming' as online
+  const isLive = details.liveBroadcastContent !== 'none';
+  
   return {
-    isLive: details.liveBroadcastContent === 'live',
+    isLive,
     liveBroadcastContent: details.liveBroadcastContent,
+    apiError: false,
   };
 }
 
@@ -231,7 +243,7 @@ export async function resolveChannelHandle(
 export async function searchChannelLiveStream(
   channelHandle: string,
   apiKey: string
-): Promise<{ isLive: boolean; liveVideoId: string | null; channelId: string | null; title: string | null }> {
+): Promise<{ isLive: boolean; liveVideoId: string | null; channelId: string | null; title: string | null; apiError?: boolean }> {
   console.log(`[YouTube API] Searching live stream for channel handle: ${channelHandle}`);
   
   // First resolve the channel handle to a channel ID
@@ -239,7 +251,8 @@ export async function searchChannelLiveStream(
   
   if (!channelId) {
     console.log(`[YouTube API] Could not resolve channel handle: ${channelHandle}`);
-    return { isLive: false, liveVideoId: null, channelId: null, title: null };
+    // Could not resolve handle - this is an API error, not genuinely offline
+    return { isLive: false, liveVideoId: null, channelId: null, title: null, apiError: true };
   }
   
   console.log(`[YouTube API] Resolved ${channelHandle} -> channelId: ${channelId}`);

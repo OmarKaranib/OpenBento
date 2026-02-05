@@ -66,7 +66,7 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Smart Tiered localStorage Cache:**
   - YouTube API responses cached in localStorage with smart tiered TTLs
   - Cache key: `openbento_live_status_cache`, version key: `openbento_cache_version`
-  - CURRENT_CACHE_VERSION = '2.0.0' - increment to force cache flush on load
+  - CURRENT_CACHE_VERSION = '2.1.0' - increment to force cache flush on load (new API key + false offline fix)
   - ONLINE_CACHE_TTL_MS = 30 minutes (for LIVE streams - stable, no need to re-check often)
   - OFFLINE_CACHE_TTL_MS = 5 minutes (for offline streams - faster re-check to detect going live)
   - API_ERROR_CACHE_TTL_MS = 2 minutes (for API errors - retry soon)
@@ -79,6 +79,11 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
   - Clear messaging: "Live status verification is temporarily unavailable. The stream may still be live."
   - Prevents lying to users by distinguishing API errors from genuine offline streams
   - apiError field tracked in Widget and LiveStatus interfaces throughout the codebase
+- **FALSE OFFLINE FIX:**
+  - Stream is considered LIVE unless `liveBroadcastContent` is explicitly 'none'
+  - liveBroadcastContent values: 'live' (currently live), 'upcoming' (scheduled), 'none' (not live)
+  - Both 'live' and 'upcoming' are treated as ONLINE, only 'none' is treated as OFFLINE
+  - Fixes bug where videoId existed but stream was incorrectly marked offline
 - **Corporate Footer:** Professional footer displayed on dashboard and legal pages:
   - Copyright: "© 2026 ANCU LABS FZC LLC. All rights reserved."
   - Links to /terms and /privacy placeholder pages

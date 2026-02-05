@@ -39,7 +39,7 @@ const CACHE_TTL_MS = 30000;
 // Smart localStorage cache for YouTube live status with tiered TTLs
 const LIVE_STATUS_CACHE_KEY = 'openbento_live_status_cache';
 const CACHE_VERSION_KEY = 'openbento_cache_version';
-const CURRENT_CACHE_VERSION = '2.0.0'; // Increment to force cache flush
+const CURRENT_CACHE_VERSION = '2.1.0'; // Increment to force cache flush - new API key + apiError fix
 const ONLINE_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes for LIVE streams
 const OFFLINE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes for offline streams (faster re-check)
 const API_ERROR_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes for API errors (retry soon)
@@ -300,20 +300,23 @@ export async function updateLibraryItem(id: string, updates: Partial<LibraryItem
 export async function checkVideoLiveStatus(videoId: string): Promise<{
   isLive: boolean;
   liveBroadcastContent: string | null;
+  apiError?: boolean;
 }> {
   try {
     const response = await fetch(`${API_BASE}/api/youtube/video-live/${videoId}`);
     if (!response.ok) {
-      return { isLive: false, liveBroadcastContent: null };
+      // API error - return apiError so client shows "System Maintenance" not "Offline"
+      return { isLive: false, liveBroadcastContent: null, apiError: true };
     }
     const data = await response.json();
     return {
       isLive: data.isLive ?? false,
       liveBroadcastContent: data.liveBroadcastContent ?? null,
+      apiError: data.apiError === true,
     };
   } catch (error) {
     console.error('[StreamAPI] Video live check failed:', error);
-    return { isLive: false, liveBroadcastContent: null };
+    return { isLive: false, liveBroadcastContent: null, apiError: true };
   }
 }
 
@@ -351,16 +354,20 @@ export async function checkChannelLiveStatus(channelId: string, forceRefresh: bo
       return { isLive: false, liveVideoId: null, title: null, fromCache: false, apiError: true };
     }
     const data = await response.json();
+    
+    // Server now returns apiError flag to distinguish API failures from genuine offline
+    const apiError = data.apiError === true;
+    
     const result = {
       isLive: data.isLive ?? false,
       liveVideoId: data.liveVideoId ?? null,
       title: data.title ?? null,
     };
     
-    // Cache the result (no API error)
-    setCachedLiveStatus(channelId, result, false);
+    // Cache the result with correct apiError flag from server
+    setCachedLiveStatus(channelId, result, apiError);
     
-    return { ...result, fromCache: false, apiError: false };
+    return { ...result, fromCache: false, apiError };
   } catch (error) {
     console.error('[StreamAPI] Channel live check failed:', error);
     // Cache as API error on exception
@@ -406,6 +413,10 @@ export async function searchChannelLiveStream(channelHandle: string, forceRefres
       return { isLive: false, liveVideoId: null, channelId: null, title: null, fromCache: false, apiError: true };
     }
     const data = await response.json();
+    
+    // Server now returns apiError flag to distinguish API failures from genuine offline
+    const apiError = data.apiError === true;
+    
     const result = {
       isLive: data.isLive ?? false,
       liveVideoId: data.liveVideoId ?? null,
@@ -413,10 +424,10 @@ export async function searchChannelLiveStream(channelHandle: string, forceRefres
       title: data.title ?? null,
     };
     
-    // Cache the result (no API error)
-    setCachedLiveStatus(cacheKey, { isLive: result.isLive, liveVideoId: result.liveVideoId, title: result.title }, false);
+    // Cache the result with correct apiError flag from server
+    setCachedLiveStatus(cacheKey, { isLive: result.isLive, liveVideoId: result.liveVideoId, title: result.title }, apiError);
     
-    return { ...result, fromCache: false, apiError: false };
+    return { ...result, fromCache: false, apiError };
   } catch (error) {
     console.error('[StreamAPI] Search channel live stream failed:', error);
     // Cache as API error on exception
