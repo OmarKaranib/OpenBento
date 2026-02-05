@@ -63,6 +63,7 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Dashboard Badge Migration:** LIVE badges removed from dashboard widgets, kept only in ChannelLibrary/Sidebar
 - **No-Cookie Toggle:** Switched from youtube-nocookie.com to youtube.com (standard player has fewer restriction issues)
 - **Error 101/150 Loop Prevention:** Embed restriction errors (101, 150) do NOT trigger self-healing re-fetch - only recoverable errors [2, 5, 100]
+- **Visual Fallback Synchronization:** When a channel is not live, the widget automatically plays the channel's latest video. The offline overlay is hidden when latestVideoId exists. LIVE badge is strictly hidden when playing latest video (isPlayingLatestVideo flag). "Check Again" auto-splices the latest video if no live stream is found (no error shown).
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.
