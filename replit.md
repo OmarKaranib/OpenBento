@@ -58,7 +58,8 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core`, `lucide-react`.
 
 ## Production Repairs
-- **YouTube Player Origin Fix:** Hardcoded `origin: 'https://openbento.tv'` in playerVars to fix postMessage mismatch errors
+- **YouTube Player Origin Fix:** Uses `origin: window.location.origin` in playerVars for dynamic domain handshake (works in dev + production)
+- **Dashboard Badge Migration:** LIVE badges removed from dashboard widgets, kept only in ChannelLibrary/Sidebar
 - **No-Cookie Toggle:** Switched from youtube-nocookie.com to youtube.com (standard player has fewer restriction issues)
 - **Error 101/150 Loop Prevention:** Embed restriction errors (101, 150) do NOT trigger self-healing re-fetch - only recoverable errors [2, 5, 100]
 

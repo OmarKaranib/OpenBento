@@ -682,10 +682,10 @@ const MasterControlDashboard = ({
     };
   }, [resizing, setWidgets, ad]);
 
-  // Privacy-enhanced YouTube embed using no-cookie domain with proper Referer handling
+  // PRODUCTION FIX: Standard YouTube embed with origin handshake (fewer restriction issues)
   // referrerPolicy="strict-origin-when-cross-origin" is set on iframes for valid Referer header
   const getYouTubeEmbedUrl = (videoId: string): string => {
-    return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
+    return `https://www.youtube.com/embed/${videoId}?origin=${window.location.origin}&enablejsapi=1&autoplay=1&mute=1&modestbranding=1&rel=0`;
   };
 
   // NOTE: live_stream?channel= format is deprecated - we now require real videoIds
@@ -1808,16 +1808,6 @@ const MasterControlDashboard = ({
             isDarkMode={isDarkMode}
             onColorPickerOpen={() => setColorPickerWidget(colorPickerWidget === widget.id ? null : widget.id)}
           >
-            {/* LIVE Badge - Visual Confirmation for streams with videoId */}
-            {widget.type === 'video' && widget.videoId && !widget.isOffline && widget.isLive && (
-              <div className="absolute top-[0.8rem] left-[0.8rem] z-50 pointer-events-none" data-testid={`live-badge-widget-${widget.id}`}>
-                <span className="flex items-center gap-[0.4rem] px-[0.8rem] py-[0.3rem] bg-red-600 text-white text-[0.9rem] font-bold tracking-wide rounded shadow-lg uppercase">
-                  <span className="w-[0.6rem] h-[0.6rem] rounded-full bg-white animate-pulse" />
-                  LIVE
-                </span>
-              </div>
-            )}
-
             {widget.type === 'video' && (widget.url || widget.videoId || widget.youtubeChannelId || widget.twitchChannel || widget.kickChannel) && !isEditMode && !widget.isOffline && (
               <>
                 {/* Seek Mode "Done" button - always visible when seek mode is active */}

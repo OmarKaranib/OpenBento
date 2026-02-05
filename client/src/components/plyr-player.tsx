@@ -248,9 +248,10 @@ function PlyrPlayerInner({
     }
   }, [isPaused, isPlyrReady]);
 
+  // PRODUCTION FIX: Standard YouTube embed with origin handshake (fewer restriction issues)
   const youtubeUrl = useMemo(() => {
     if (!stableVideoId) return '';
-    return `https://www.youtube-nocookie.com/embed/${stableVideoId}?autoplay=1&mute=1&origin=${encodeURIComponent(origin)}&iv_load_policy=3&modestbranding=1&playsinline=1&showinfo=0&rel=0&enablejsapi=1`;
+    return `https://www.youtube.com/embed/${stableVideoId}?origin=${encodeURIComponent(origin)}&enablejsapi=1&autoplay=1&mute=1&iv_load_policy=3&modestbranding=1&playsinline=1&showinfo=0&rel=0`;
   }, [stableVideoId, origin]);
 
   if (!stableVideoId) {

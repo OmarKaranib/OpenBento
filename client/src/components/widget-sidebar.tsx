@@ -225,11 +225,10 @@ export interface WidgetTemplate {
   color: string;
 }
 
-// Helper to generate Pro YouTube embed URL with handshake parameters
+// PRODUCTION FIX: Standard YouTube embed URL with origin handshake
 const getProYouTubeEmbedUrl = (videoId: string): string => {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://localhost';
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-  return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&origin=${encodeURIComponent(origin)}&parent=${encodeURIComponent(hostname)}`;
+  return `https://www.youtube.com/embed/${videoId}?origin=${encodeURIComponent(origin)}&enablejsapi=1&autoplay=1&mute=1`;
 };
 
 // NOTE: live_stream?channel= format is deprecated - we now require real videoIds from /api/links

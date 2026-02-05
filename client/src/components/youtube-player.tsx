@@ -107,9 +107,9 @@ function YouTubePlayerInner({
   // Memoize the stable channel ID for live streams - fallback when no videoId
   const stableChannelId = useMemo(() => channelId || null, [channelId]);
 
-  // PRODUCTION FIX: Hardcoded origin for YouTube postMessage handshake
-  // Must match the production domain exactly to avoid postMessage mismatch errors
-  const origin = 'https://openbento.tv';
+  // FINAL ORIGIN FIX: Use window.location.origin for dynamic domain handshake
+  // This resolves postMessage mismatch in both Replit dev and production environments
+  const origin = window.location.origin;
 
   // MediaSession API for background play support
   const setupMediaSession = useCallback(() => {
