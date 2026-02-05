@@ -119,7 +119,7 @@ export const channels = pgTable("channels", {
   videoId: varchar("video_id"),
   url: text("url"),
   isLive: boolean("is_live").default(true),
-  isForced: boolean("is_forced").default(false),
+  isManualOverride: boolean("is_manual_override").default(false),
   lastUpdated: timestamp("last_updated").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

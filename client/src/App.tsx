@@ -110,22 +110,22 @@ function AppContent() {
   const [ghostPosition, setGhostPosition] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [loginTriggerReason, setLoginTriggerReason] = useState<string | undefined>();
-  
+
   // Auth state - must be inside QueryClientProvider
   const { user, isAuthenticated, logout } = useAuth();
-  
+
   // Premium status
   const { isPremium } = usePremium();
-  
+
   // Pricing modal state
   const [pricingModalOpen, setPricingModalOpen] = useState(false);
-  
+
   // Open login modal with optional reason
   const openLoginModal = useCallback((reason?: string) => {
     setLoginTriggerReason(reason);
     setLoginModalOpen(true);
   }, []);
-  
+
   // Open pricing modal
   const openPricingModal = useCallback(() => {
     setPricingModalOpen(true);
@@ -199,7 +199,7 @@ function AppContent() {
     const channelRegex2 = /youtube\.com\/@([a-zA-Z0-9_-]+)/;
     const channelRegex3 = /youtube\.com\/channel\/([a-zA-Z0-9_-]+)/;
     const channelRegex4 = /youtube\.com\/c\/([a-zA-Z0-9_-]+)/;
-    
+
     const match = url.match(channelRegex2) || url.match(channelRegex3) || url.match(channelRegex4);
     return match ? match[1] : null;
   };
@@ -222,38 +222,38 @@ function AppContent() {
   // Smart auto-filling grid: Find first available position and shrink to fit if needed
   const findSmartPosition = useCallback((requestedW: number, requestedH: number, currentWidgets: Widget[]): { x: number; y: number; w: number; h: number } | null => {
     const GRID_ROWS = 6;
-    
+
     // Helper to check if a position is free for given dimensions
     const isPositionFree = (x: number, y: number, w: number, h: number): boolean => {
       if (x + w > GRID_COLS || y + h > GRID_ROWS) return false;
-      
+
       // Check against widgets
       for (const widget of currentWidgets) {
         const widgetRight = widget.x + widget.w;
         const widgetBottom = widget.y + widget.h;
         const newRight = x + w;
         const newBottom = y + h;
-        
+
         if (x < widgetRight && newRight > widget.x && y < widgetBottom && newBottom > widget.y) {
           return false;
         }
       }
-      
+
       // Check against ad block (treat as solid grid item)
       if (ad) {
         const adRight = ad.x + ad.w;
         const adBottom = ad.y + ad.h;
         const newRight = x + w;
         const newBottom = y + h;
-        
+
         if (x < adRight && newRight > ad.x && y < adBottom && newBottom > ad.y) {
           return false;
         }
       }
-      
+
       return true;
     };
-    
+
     // Try original size first, scan grid left-to-right, top-to-bottom
     for (let y = 0; y <= GRID_ROWS - requestedH; y++) {
       for (let x = 0; x <= GRID_COLS - requestedW; x++) {
@@ -262,12 +262,12 @@ function AppContent() {
         }
       }
     }
-    
+
     // Shrink to fit: Try progressively smaller sizes down to 1x1
     for (let tryH = requestedH; tryH >= 1; tryH--) {
       for (let tryW = requestedW; tryW >= 1; tryW--) {
         if (tryW === requestedW && tryH === requestedH) continue; // Already tried
-        
+
         for (let y = 0; y <= GRID_ROWS - tryH; y++) {
           for (let x = 0; x <= GRID_COLS - tryW; x++) {
             if (isPositionFree(x, y, tryW, tryH)) {
@@ -278,7 +278,7 @@ function AppContent() {
         }
       }
     }
-    
+
     // Grid is 100% full - return null to indicate no space
     return null;
   }, [ad]);
@@ -286,33 +286,33 @@ function AppContent() {
   // Check if any space is available for a 1x1 minimum widget
   const isGridFull = useMemo(() => {
     const GRID_ROWS = 6;
-    
+
     // Check every cell to see if at least one 1x1 spot is free
     for (let y = 0; y < GRID_ROWS; y++) {
       for (let x = 0; x < GRID_COLS; x++) {
         let cellFree = true;
-        
+
         // Check against widgets
         for (const widget of widgets) {
           const widgetRight = widget.x + widget.w;
           const widgetBottom = widget.y + widget.h;
-          
+
           if (x < widgetRight && x + 1 > widget.x && y < widgetBottom && y + 1 > widget.y) {
             cellFree = false;
             break;
           }
         }
-        
+
         // Check against ad block (treat as solid grid item)
         if (cellFree && ad) {
           const adRight = ad.x + ad.w;
           const adBottom = ad.y + ad.h;
-          
+
           if (x < adRight && x + 1 > ad.x && y < adBottom && y + 1 > ad.y) {
             cellFree = false;
           }
         }
-        
+
         if (cellFree) return false; // Found a free cell, grid is NOT full
       }
     }
@@ -323,13 +323,13 @@ function AppContent() {
     const widgetId = generateWidgetId();
     setWidgets(prev => {
       const smartResult = findSmartPosition(Math.min(w, GRID_COLS), h, prev);
-      
+
       // If grid is full, do NOT add widget (no shifting/shrinking existing blocks)
       if (!smartResult) {
         console.log('[SmartGrid] Grid is full - cannot add widget');
         return prev; // Return unchanged state
       }
-      
+
       const newWidget: Widget = {
         id: widgetId,
         type,
@@ -355,7 +355,7 @@ function AppContent() {
     const youtubeChannelId = channel.channelId || extractYouTubeChannelId(channel.url);
     const twitchChannel = extractTwitchChannel(channel.url);
     const kickChannel = extractKickChannel(channel.url);
-    
+
     // Determine if this is a live stream - Twitch/Kick are always live, YouTube uses isLive flag
     const isLiveStream = channel.platform === 'twitch' || channel.platform === 'kick' || channel.isLive === true;
 
@@ -537,13 +537,13 @@ function AppContent() {
     // Get the dragging widget's dimensions
     const activeData = event.active.data.current;
     const draggedWidgetId = event.active.id as string;
-    
+
     if (activeData?.type === 'sortable-widget') {
       const draggedWidget = widgets.find(w => w.id === draggedWidgetId);
       if (draggedWidget) {
         const previewW = draggedWidget.w;
         const previewH = draggedWidget.h;
-        
+
         // Clamp preview position to grid bounds
         const clampedX = Math.max(0, Math.min(GRID_COLS - previewW, gridX));
         const clampedY = Math.max(0, Math.min(5 - previewH + 1, gridY));
@@ -564,7 +564,7 @@ function AppContent() {
           setWidgets(currentWidgets => {
             let updatedWidgets = [...currentWidgets];
             const GRID_ROWS = 6;
-            
+
             for (const collidingWidget of collidingWidgets) {
               // Find next available slot for the pushed widget
               const findSlot = (w: Widget, allWidgets: Widget[], excludeIds: string[]): { x: number; y: number } | null => {
@@ -684,7 +684,7 @@ function AppContent() {
     for (let y = 0; y <= GRID_ROWS - widget.h; y++) {
       for (let x = 0; x <= GRID_COLS - widget.w; x++) {
         let collision = false;
-        
+
         // Check collision with other widgets
         for (const other of allWidgets) {
           if (excludeIds.includes(other.id)) continue;
@@ -697,7 +697,7 @@ function AppContent() {
             break;
           }
         }
-        
+
         // AD-BLOCK SOLIDIFICATION: Check collision with ad
         if (!collision && ad) {
           const adRight = ad.x + ad.w;
@@ -708,7 +708,7 @@ function AppContent() {
             collision = true;
           }
         }
-        
+
         if (!collision) {
           return { x, y };
         }
@@ -778,14 +778,14 @@ function AppContent() {
 
         // Push logic: Move the dragged widget to target, push colliding widgets to next slots
         let updatedWidgets = [...currentWidgets];
-        
+
         // First, move the dragged widget to the target position
         updatedWidgets[widgetIndex] = { ...widget, x: targetX, y: targetY };
 
         // Then, push each colliding widget to the next available slot
         for (const collidingWidget of collidingWidgets) {
           const newSlot = findNextAvailableSlot(collidingWidget, updatedWidgets, [collidingWidget.id]);
-          
+
           if (newSlot === null) {
             // No room to push - block the move entirely (keep original positions)
             return currentWidgets;
@@ -805,20 +805,20 @@ function AppContent() {
   const handleChannelClick = useCallback(async (channel: TrendingChannel) => {
     // Capture active widget BEFORE clearing
     const currentActiveWidgetId = activeWidgetIdRef.current;
-    
+
     // Close sidebar immediately for responsive feel
     setSidebarOpen(false);
     activeWidgetIdRef.current = null;
     setActiveWidgetId(null);
     setUrlInputValue('');
-    
+
     // For YouTube channels: ZERO-GATE RENDERING - render immediately, no live check wait
     if (channel.platform === 'youtube' && channel.channelId) {
       // Use helper functions from shared constants (normalized lookup)
       const verifiedChannel = getVerifiedChannel(channel.channelId);
       const staticVideoId = getStaticLiveId(channel.channelId);
       const fallbackVideoId = getFallbackVideoId(channel.channelId);
-      
+
       // ZERO-GATE RENDERING PRIORITY (STRICT):
       // 1. VERIFIED_CHANNELS liveId - manually verified 24/7 streams (CANNOT be overwritten)
       // 2. channel.verifiedLiveId - stored verified ID  
@@ -827,11 +827,11 @@ function AppContent() {
       const immediateVideoId = verifiedChannel?.liveId || channel.verifiedLiveId || staticVideoId || channel.videoId || null;
       // Store fallback ID for 150/101 error recovery
       const channelFallbackId = verifiedChannel?.fallbackId || fallbackVideoId || channel.latestVideoId || null;
-      
+
       if (immediateVideoId) {
         const source = verifiedChannel?.liveId ? 'VERIFIED_MANUAL' : channel.verifiedLiveId ? 'VERIFIED' : staticVideoId ? 'STATIC' : 'SAVED';
         console.log(`[ChannelClick] ZERO-GATE RENDER (${source}): @${channel.channelId} -> ${immediateVideoId} (no wait)`);
-        
+
         // ZERO-GATE RENDERING: Render embed immediately - no API call needed
         const widgetData: Partial<Widget> = {
           url: `https://www.youtube.com/watch?v=${immediateVideoId}`,
@@ -854,7 +854,7 @@ function AppContent() {
           embedBlocked: false,
           lastRefresh: Date.now(),
         };
-        
+
         if (currentActiveWidgetId) {
           setWidgets(prev => prev.map(w => 
             w.id === currentActiveWidgetId ? {
@@ -864,61 +864,54 @@ function AppContent() {
         } else {
           addWidget('video', 3, 2, widgetData);
         }
-        
-        // ISFORCED CHECK: If channel has isForced flag, skip ALL background checks and fallbacks
-        // Admin has manually locked this channel's videoId - do not modify it
-        if (channel.isForced) {
-          console.log(`[ChannelClick] FORCED channel @${channel.channelId} - skipping background checks`);
-          return;
-        }
-        
-        // DYNAMIC LIVE-ID PRIORITY: Run API check in background for ALL channels
+
+        // FIX #4: ALWAYS RUN BACKGROUND CHECK - Remove isForced restriction
+        // Even VERIFIED_MANUAL channels need background checks to stay live (fixes Al Jazeera drift)
         // If a NEW live ID is found, update videoId immediately (not just badge)
-        // NOTE: Even VERIFIED_MANUAL channels get background checks to stay live (fixes Al Jazeera drift)
         searchChannelLiveStream(channel.channelId, false).then(result => {
-            if (result.liveVideoId && result.liveVideoId !== immediateVideoId) {
-              console.log(`[Background] NEW live ID discovered: ${result.liveVideoId} -> updating videoId immediately`);
-              // DYNAMIC PRIORITY: Update videoId immediately to swap to fresh stream
-              setWidgets(prev => prev.map(w => 
-                w.channelHandle === channel.channelId ? { 
-                  ...w, 
-                  videoId: result.liveVideoId,
-                  url: `https://www.youtube.com/watch?v=${result.liveVideoId}`,
-                  isLive: true,
-                  isOffline: false,
-                  isPlayingLatestVideo: false,
-                  lastRefresh: Date.now(),
-                } : w
-              ));
-            } else if (result.liveVideoId) {
-              // Same ID, just update badge to confirm live status
-              setWidgets(prev => prev.map(w => 
-                w.channelHandle === channel.channelId ? { ...w, isLive: true } : w
-              ));
-            }
-          }).catch(err => console.warn('[Background] Status check failed (non-blocking):', err));
+          if (result.liveVideoId && result.liveVideoId !== immediateVideoId) {
+            console.log(`[Background] NEW live ID discovered: ${result.liveVideoId} -> updating videoId immediately`);
+            // DYNAMIC PRIORITY: Update videoId immediately to swap to fresh stream
+            setWidgets(prev => prev.map(w => 
+              w.channelHandle === channel.channelId ? { 
+                ...w, 
+                videoId: result.liveVideoId,
+                url: `https://www.youtube.com/watch?v=${result.liveVideoId}`,
+                isLive: true,
+                isOffline: false,
+                isPlayingLatestVideo: false,
+                lastRefresh: Date.now(),
+              } : w
+            ));
+          } else if (result.liveVideoId) {
+            // Same ID, just update badge to confirm live status
+            setWidgets(prev => prev.map(w => 
+              w.channelHandle === channel.channelId ? { ...w, isLive: true } : w
+            ));
+          }
+        }).catch(err => console.warn('[Background] Status check failed (non-blocking):', err));
         return;
       }
-      
+
       // FALLBACK: No saved videoId - must call API to find one
       console.log(`[ChannelClick] No saved videoId, searching for @${channel.channelId}`);
-      
+
       try {
         // Use cached API call (will use localStorage cache if fresh, otherwise fetch)
         const result = await searchChannelLiveStream(channel.channelId, false);
-        
+
         // LATEST-VIDEO FALLBACK: Use liveVideoId if live, otherwise fall back to latestVideoId
         // This ensures user sees actual content instead of "Video Unavailable"
         const videoId = result.liveVideoId || result.latestVideoId || null;
         const isLive = !!result.liveVideoId; // Only LIVE if liveVideoId exists
         const isPlayingLatestVideo = !result.liveVideoId && !!result.latestVideoId; // Playing fallback latest video
-        
+
         // If we have ANY videoId (live or latest), we have content to show
         const hasVideoId = !!videoId;
         const isOffline = !hasVideoId; // Only offline if no videoId at all
-        
+
         console.log(`[ChannelClick] @${channel.channelId}: liveVideoId=${result.liveVideoId}, latestVideoId=${result.latestVideoId}, using=${videoId}, isLive=${isLive}, isPlayingLatestVideo=${isPlayingLatestVideo}`);
-        
+
         // Build the widget data with channelHandle for future "Check Again"
         const widgetData: Partial<Widget> = {
           url: videoId ? `https://www.youtube.com/watch?v=${videoId}` : '',
@@ -939,7 +932,7 @@ function AppContent() {
           embedBlocked: false,
           lastRefresh: Date.now(),
         };
-        
+
         if (currentActiveWidgetId) {
           // Update existing widget
           setWidgets(prev => prev.map(w => 
@@ -962,7 +955,7 @@ function AppContent() {
         // Fall through to use static URL
       }
     }
-    
+
     // For non-YouTube (Twitch/Kick) or if YouTube search failed, use handleSubmitUrl
     if (currentActiveWidgetId) {
       activeWidgetIdRef.current = currentActiveWidgetId;
@@ -972,11 +965,11 @@ function AppContent() {
 
   // Dashboard-only mode flag - set to false to allow sidebar with filtered content
   const dashboardOnlyMode = false;
-  
+
   const handleOpenSidebar = useCallback((widgetId?: string) => {
     // Blocked in dashboard-only mode
     if (dashboardOnlyMode) return;
-    
+
     const id = widgetId || null;
     activeWidgetIdRef.current = id;
     setActiveWidgetId(id);
@@ -986,7 +979,7 @@ function AppContent() {
   const handleOpenSidebarToContent = useCallback(() => {
     // Blocked in dashboard-only mode
     if (dashboardOnlyMode) return;
-    
+
     activeWidgetIdRef.current = null;
     setActiveWidgetId(null);
     setSidebarOpen(true);
@@ -1025,14 +1018,14 @@ function AppContent() {
     <TooltipProvider>
       {/* Static Background - High-contrast light mode */}
       <StaticBackground />
-      
+
       {/* Login Modal */}
       <LoginModal 
         isOpen={loginModalOpen}
         onClose={() => setLoginModalOpen(false)}
         triggerReason={loginTriggerReason}
       />
-      
+
       <DndContext 
         sensors={sensors} 
         collisionDetection={rectIntersection}

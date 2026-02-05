@@ -23,7 +23,7 @@ interface Channel {
   videoId: string | null;
   url: string | null;
   isLive: boolean | null;
-  isForced: boolean | null;
+  isManualOverride: boolean | null;
   lastUpdated: string | null;
 }
 
@@ -96,7 +96,7 @@ export default function Admin() {
     if (!scrapeUrl || !editingChannel) return;
     const extractedId = extractYouTubeVideoId(scrapeUrl);
     if (extractedId) {
-      setEditingChannel({ ...editingChannel, videoId: extractedId, isForced: true });
+      setEditingChannel({ ...editingChannel, videoId: extractedId, isManualOverride: true });
       setScrapeUrl('');
     }
   };
@@ -563,7 +563,7 @@ export default function Admin() {
                               <input
                                 type="text"
                                 value={editingChannel.videoId || ''}
-                                onChange={(e) => setEditingChannel({ ...editingChannel, videoId: e.target.value, isForced: true })}
+                                onChange={(e) => setEditingChannel({ ...editingChannel, videoId: e.target.value, isManualOverride: true })}
                                 className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
                                 placeholder="Video ID"
                               />
@@ -586,11 +586,11 @@ export default function Admin() {
                               <label className="flex items-center gap-1 text-xs text-slate-400">
                                 <input
                                   type="checkbox"
-                                  checked={editingChannel.isForced || false}
-                                  onChange={(e) => setEditingChannel({ ...editingChannel, isForced: e.target.checked })}
+                                  checked={editingChannel.isManualOverride || false}
+                                  onChange={(e) => setEditingChannel({ ...editingChannel, isManualOverride: e.target.checked })}
                                   className="w-3 h-3"
                                 />
-                                Forced (no background updates)
+                                Manual Override (locked)
                               </label>
                             </div>
                           </td>

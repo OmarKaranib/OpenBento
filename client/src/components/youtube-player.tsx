@@ -106,10 +106,10 @@ interface YouTubePlayerProps {
 }
 
 // DOM EXCEPTION SHIELD: Safe cleanup helper that prevents NotFoundError crashes
-// Checks parentNode before any removeChild operation and wraps in try...catch
+// FIX #2: Restore player.destroy() with proper parentNode checks and try-catch
 function safeCleanupPlayer(player: YTPlayer | null, playerId: string): void {
   if (!player) return;
-  
+
   try {
     // STRICT PARENTNODE CHECK: Find the container and iframe
     const playerElement = document.getElementById(playerId);
@@ -117,30 +117,32 @@ function safeCleanupPlayer(player: YTPlayer | null, playerId: string): void {
       // Element already removed - return early silently
       return;
     }
-    
+
     // FINAL YOUTUBE SHIELD: Only attempt cleanup if element has a valid parent
     const container = playerElement.parentNode;
     if (!container) {
       // No parent - element is orphaned, skip cleanup
       return;
     }
-    
+
     // Find any iframe within the player element
     const iframe = playerElement.tagName === 'IFRAME' 
       ? playerElement as HTMLIFrameElement 
       : playerElement.querySelector('iframe');
-    
-    // STRICT CHECK: Only call destroy() if iframe exists AND parentNode === container
-    // This kills the YouTube API process before React unmounts
-    if (iframe && iframe.parentNode === container && playerElement.parentNode) {
+
+    // FIX #2: Restore player.destroy() to kill YouTube API before React unmount
+    // Only call if iframe exists AND has valid parentNode
+    if (iframe && iframe.parentNode && playerElement.parentNode) {
       try {
         player.destroy();
       } catch (destroyError) {
-        // Silently ignore destroy errors
+        // Silently ignore destroy errors - element may be mid-unmount
+        console.debug('[YouTube] destroy() caught error (non-critical):', destroyError);
       }
     }
   } catch (e) {
     // Silently catch any DOM exception - don't log to keep console clean
+    console.debug('[YouTube] safeCleanupPlayer caught error (non-critical):', e);
   }
 }
 
@@ -162,17 +164,17 @@ function YouTubePlayerInner({
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const isInitializedRef = useRef(false);
-  
+
   // LOOP PROTECTION: Track if we've already swapped once this session
   // A widget is only allowed ONE swap per session to prevent infinite loops
   const hasSwappedRef = useRef(false);
-  
+
   // Content Restricted state - shown when both primary and fallback fail
   const [contentRestricted, setContentRestricted] = useState(false);
-  
+
   // NUCLEAR YouTube Fix: Use standard HTML iframe instead of YT.Player on error 150
   const [useNuclearIframe, setUseNuclearIframe] = useState(false);
-  
+
   // Use refs to track current state without causing re-renders
   const isMutedRef = useRef(isMuted);
   const isPausedRef = useRef(isPaused);
@@ -181,7 +183,7 @@ function YouTubePlayerInner({
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
   const onPausedChangeRef = useRef(onPausedChange);
-  
+
   // Keep refs in sync with props
   useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
@@ -190,23 +192,24 @@ function YouTubePlayerInner({
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
   useEffect(() => { onPausedChangeRef.current = onPausedChange; }, [onPausedChange]);
-  
+
   // Track refreshKey to force reinitialization when manual refresh is triggered
   const lastRefreshKeyRef = useRef(refreshKey);
 
   // Memoize the stable player ID - only changes if widgetId changes
   const playerId = useMemo(() => `yt-player-${widgetId}`, [widgetId]);
-  
-  // FINAL LOOP BREAK: Reset hasSwappedRef ONLY when widgetId changes (not videoId)
-  // This ensures "One Swap Only" rule works correctly per-widget lifecycle
+
+  // FIX #1: Reset hasSwappedRef and useNuclearIframe ONLY when widgetId changes
+  // This prevents infinite loops when videoId swaps trigger re-renders
   useEffect(() => {
     hasSwappedRef.current = false;
     setContentRestricted(false);
+    setUseNuclearIframe(false);
   }, [widgetId]);
-  
+
   // Memoize the stable video ID - only recalculate when videoId prop changes
   const stableVideoId = useMemo(() => videoId || null, [videoId]);
-  
+
   // Memoize the stable channel ID for live streams - fallback when no videoId
   const stableChannelId = useMemo(() => channelId || null, [channelId]);
 
@@ -246,7 +249,7 @@ function YouTubePlayerInner({
   const initializePlayer = useCallback(() => {
     if (!containerRef.current || !window.YT?.Player) return;
     if (isInitializedRef.current && playerRef.current) return; // Already initialized
-    
+
     // DOM EXCEPTION SHIELD: Use safe cleanup with parentNode check
     safeCleanupPlayer(playerRef.current, playerId);
     playerRef.current = null;
@@ -269,7 +272,7 @@ function YouTubePlayerInner({
     try {
       // Only use real videoId - live_stream?channel= format is deprecated
       console.log('[YouTube] Initializing player for widget:', widgetId, 'videoId:', stableVideoId);
-      
+
       playerRef.current = new window.YT.Player(playerId, {
         videoId: stableVideoId || undefined,
         host: 'https://www.youtube.com',  // PRODUCTION FIX: Standard player has fewer restriction issues
@@ -280,7 +283,7 @@ function YouTubePlayerInner({
           onReady: (event) => {
             console.log('[YouTube] Player ready for widget:', widgetId);
             isInitializedRef.current = true;
-            
+
             // Set referrerPolicy on the generated iframe
             const playerElement = document.getElementById(playerId);
             if (playerElement) {
@@ -289,10 +292,10 @@ function YouTubePlayerInner({
                 iframe.referrerPolicy = 'strict-origin-when-cross-origin';
               }
             }
-            
+
             // Setup MediaSession API for background play
             setupMediaSession();
-            
+
             // Delay player control calls to ensure API is fully ready
             setTimeout(() => {
               try {
@@ -310,7 +313,7 @@ function YouTubePlayerInner({
                 console.log('[YouTube] Player control error on ready:', e);
               }
             }, 100);
-            
+
             onReadyRef.current?.();
           },
           onStateChange: (event) => {
@@ -323,77 +326,42 @@ function YouTubePlayerInner({
           onError: (event) => {
             const errorCode = event.data;
             console.log('[YouTube] Player error:', errorCode, 'for widget:', widgetId, 'hasSwapped:', hasSwappedRef.current);
-            
+
+            // FIX #3: IMMEDIATE NUCLEAR IFRAME ON ERROR 150
+            // Stop trying to use YouTube JavaScript API - switch to standard HTML iframe
+            if (errorCode === 150) {
+              console.log('[YouTube] ERROR 150 detected - switching to NUCLEAR HTML iframe immediately');
+              setUseNuclearIframe(true);
+              onErrorRef.current?.(150);
+              return;
+            }
+
             // LOOP PROTECTION + NUCLEAR FIX: Only allow ONE swap per session
-            // If we've already swapped and still get error 150/101, switch to NUCLEAR HTML iframe
-            if ((errorCode === 150 || errorCode === 101) && hasSwappedRef.current) {
+            // If we've already swapped and still get error 101, switch to NUCLEAR HTML iframe
+            if (errorCode === 101 && hasSwappedRef.current) {
               console.log('[YouTube] NUCLEAR FIX: Already swapped once, switching to standard HTML iframe');
-              // Don't show Content Restricted - use nuclear iframe instead
               setUseNuclearIframe(true);
               return;
             }
-            
-            // BYPASS RESTRICTION ON 150: Force latestVideoId with 300ms delay
-            // Delay gives React time to finish first render before triggering second
-            if (errorCode === 150) {
-              const fallbackId = latestVideoIdRef.current;
-              
-              // SAME-ID SWAP CHECK: Abort if fallback equals current video - use nuclear iframe
-              if (fallbackId && fallbackId === stableVideoId) {
-                console.log('[YouTube] Error 150 - ABORT: fallbackId same as currentVideoId, switching to nuclear iframe:', fallbackId);
-                setUseNuclearIframe(true);
-                return;
-              }
-              
-              // BLACKLIST CHECK: If fallback is known to be restricted, don't use it
-              if (fallbackId && isVideoBlacklisted(fallbackId)) {
-                console.log('[YouTube] Error 150 - fallback video is BLACKLISTED:', fallbackId);
-                setContentRestricted(true);
-                return;
-              }
-              
-              if (fallbackId && playerRef.current) {
-                console.log('[YouTube] Error 150 - FORCING latestVideoId swap in 300ms:', fallbackId);
-                hasSwappedRef.current = true; // Mark as swapped
-                setTimeout(() => {
-                  try {
-                    if (playerRef.current) {
-                      playerRef.current.loadVideoById(fallbackId);
-                      console.log('[YouTube] Successfully swapped to latestVideoId');
-                    }
-                    onErrorRef.current?.(150);
-                  } catch (e) {
-                    console.log('[YouTube] loadVideoById failed, notifying parent:', e);
-                    onErrorRef.current?.(150);
-                  }
-                }, 300);
-                return; // Exit early - callback will fire after delay
-              } else {
-                console.log('[YouTube] Error 150 - no latestVideoId available, requesting parent to fetch');
-              }
-              // Always notify parent for error 150 so it can fetch latestVideoId if needed
-              setTimeout(() => onErrorRef.current?.(150), 300);
-              return;
-            }
-            
-            // ERROR 101 OVERRIDE: Also force latestVideoId fallback with 300ms delay
+
+            // ERROR 101 OVERRIDE: Force latestVideoId fallback with 300ms delay
             if (errorCode === 101) {
               const fallbackId = latestVideoIdRef.current;
-              
+
               // SAME-ID SWAP CHECK: Abort if fallback equals current video
               if (fallbackId && fallbackId === stableVideoId) {
                 console.log('[YouTube] Error 101 - ABORT: fallbackId same as currentVideoId:', fallbackId);
                 setContentRestricted(true);
                 return;
               }
-              
+
               // BLACKLIST CHECK: If fallback is known to be restricted, don't use it
               if (fallbackId && isVideoBlacklisted(fallbackId)) {
                 console.log('[YouTube] Error 101 - fallback video is BLACKLISTED:', fallbackId);
                 setContentRestricted(true);
                 return;
               }
-              
+
               if (fallbackId && playerRef.current) {
                 console.log('[YouTube] Error 101 - FORCING latestVideoId swap in 300ms:', fallbackId);
                 hasSwappedRef.current = true; // Mark as swapped
@@ -416,7 +384,7 @@ function YouTubePlayerInner({
               setTimeout(() => onErrorRef.current?.(101), 300);
               return;
             }
-            
+
             // PRODUCTION FIX: Only trigger re-fetch for recoverable errors
             // 100 = Video not found (re-fetch may find new video)
             // 2 = Invalid video ID (re-fetch may fix)
@@ -438,13 +406,11 @@ function YouTubePlayerInner({
   useEffect(() => {
     // Reset initialization flag when video changes
     isInitializedRef.current = false;
-    
-    // DO NOT reset hasSwappedRef here - it should only reset on widgetId change
-    // This ensures "One Swap Only" rule works correctly
+
+    // FIX #1: DO NOT reset hasSwappedRef or useNuclearIframe here
+    // They should only reset on widgetId change to prevent infinite loops
     setContentRestricted(false);
-    // Reset nuclear iframe mode on videoId change so we can try YT.Player again
-    setUseNuclearIframe(false);
-    
+
     if (window.YT?.Player) {
       initializePlayer();
     } else {
@@ -454,7 +420,7 @@ function YouTubePlayerInner({
           initializePlayer();
         }
       }, 100);
-      
+
       const timeout = setTimeout(() => clearInterval(checkYT), 10000);
       return () => {
         clearInterval(checkYT);
@@ -463,8 +429,7 @@ function YouTubePlayerInner({
     }
 
     return () => {
-      // DOM EXCEPTION SHIELD: Use safe cleanup with parentNode check
-      // CRITICAL: Do NOT call destroy() - it causes "removeChild" errors
+      // FIX #2: Use safe cleanup that properly destroys player
       safeCleanupPlayer(playerRef.current, playerId);
       playerRef.current = null;
       isInitializedRef.current = false;
@@ -476,18 +441,17 @@ function YouTubePlayerInner({
     if (refreshKey !== lastRefreshKeyRef.current) {
       console.log(`[YouTube] RefreshKey changed from ${lastRefreshKeyRef.current} to ${refreshKey} - reinitializing player`);
       lastRefreshKeyRef.current = refreshKey;
-      
+
       // Reset loop protection on manual refresh (allows retry)
       hasSwappedRef.current = false;
       setContentRestricted(false);
-      // Reset nuclear iframe mode on refresh so we can try YT.Player again
       setUseNuclearIframe(false);
-      
+
       // DOM EXCEPTION SHIELD: Use safe cleanup with parentNode check
       safeCleanupPlayer(playerRef.current, playerId);
       playerRef.current = null;
       isInitializedRef.current = false;
-      
+
       // Reinitialize after a short delay
       setTimeout(() => {
         initializePlayer();
@@ -537,8 +501,7 @@ function YouTubePlayerInner({
     }
   }, [volume]);
 
-  // NUCLEAR YouTube Fix: Use standard HTML iframe instead of YT.Player
-  // This bypasses postMessage errors and embed restrictions on error 150 twice
+  // FIX #3: NUCLEAR YouTube Fix - Use standard HTML iframe when useNuclearIframe is true
   if (useNuclearIframe && stableVideoId) {
     console.log('[YouTube] NUCLEAR FIX: Rendering standard HTML iframe for:', stableVideoId);
     return (
