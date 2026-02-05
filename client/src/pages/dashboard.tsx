@@ -928,12 +928,14 @@ const MasterControlDashboard = ({
           ));
           return;
         } else {
+          // No liveVideoId and no latestVideoId - channel has no playable content
           const hasApiError = result.apiError === true;
-          console.log(`[CheckAgain] Channel @${widget.channelHandle} is not currently live (apiError: ${hasApiError})`);
+          console.log(`[CheckAgain] Channel @${widget.channelHandle} has no playable content (apiError: ${hasApiError})`);
           setWidgets(prev => prev.map(w => 
             w.id === widgetId ? { 
               ...w, 
-              isLive: false, // Badge only - no offline overlay
+              isOffline: true, // No content available - show offline state
+              isLive: false,
               apiError: hasApiError,
               error: null,
               embedBlocked: false,
