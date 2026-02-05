@@ -89,6 +89,7 @@ export interface Widget {
   verifiedLiveId?: string | null; // Static 24/7 embed ID - use immediately for Zero-Gate Rendering
   customColor?: string;
   apiError?: boolean; // True if YouTube API returned 403/error - show "System Maintenance" instead of "Offline"
+  isDeleting?: boolean; // True when widget is being deleted - prevents YouTube cleanup errors
 }
 
 const GRID_COLS = 12;

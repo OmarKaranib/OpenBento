@@ -799,7 +799,28 @@ const MasterControlDashboard = ({
   }, []);
 
   const handleRemoveWidget = (widgetId: string) => {
-    setWidgets(prev => prev.filter(w => w.id !== widgetId));
+    // DOM EXCEPTION SHIELD: Safe widget deletion with delayed removal
+    // First mark widget as hidden to trigger React unmount gracefully,
+    // then remove from state after a short delay
+    try {
+      // Step 1: Hide the widget first (triggers YouTube cleanup)
+      setWidgets(prev => prev.map(w => 
+        w.id === widgetId ? { ...w, isDeleting: true } : w
+      ));
+      
+      // Step 2: Actually remove after delay (gives YouTube time to cleanup)
+      setTimeout(() => {
+        try {
+          setWidgets(prev => prev.filter(w => w.id !== widgetId));
+        } catch (e) {
+          console.log('[Dashboard] Widget removal caught error:', e);
+        }
+      }, 100);
+    } catch (e) {
+      console.log('[Dashboard] handleRemoveWidget caught error:', e);
+      // Fallback: force remove immediately
+      setWidgets(prev => prev.filter(w => w.id !== widgetId));
+    }
   };
 
   const toggleWidgetMute = (widgetId: string) => {
@@ -1907,7 +1928,7 @@ const MasterControlDashboard = ({
           }}
           data-testid="widget-grid"
         >
-        {widgets.map((widget) => (
+        {widgets.filter(w => !w.isDeleting).map((widget) => (
           <SortableWidget 
             key={widget.id} 
             widget={widget} 

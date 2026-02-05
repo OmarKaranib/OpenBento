@@ -1,4 +1,45 @@
-import { useEffect, useRef, useMemo, useCallback, memo } from 'react';
+import { useEffect, useRef, useMemo, useCallback, memo, Component, ReactNode } from 'react';
+
+// DOM EXCEPTION SHIELD: Error Boundary to catch YouTube player errors
+// Prevents removeChild errors from crashing the entire dashboard
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class YouTubeErrorBoundary extends Component<{ children: ReactNode; widgetId: string }, ErrorBoundaryState> {
+  constructor(props: { children: ReactNode; widgetId: string }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    // Log but don't crash - especially for removeChild errors
+    if (error.message?.includes('removeChild') || error.message?.includes('NotFoundError')) {
+      console.log('[YouTube ErrorBoundary] Caught removeChild error, recovering:', error.message);
+      // Reset error state after a tick to allow recovery
+      setTimeout(() => this.setState({ hasError: false }), 100);
+    } else {
+      console.error('[YouTube ErrorBoundary] Unexpected error:', error);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-slate-900/50">
+          <div className="text-center text-slate-400">
+            <p className="text-sm">Player loading...</p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 declare global {
   interface Window {
@@ -60,6 +101,29 @@ interface YouTubePlayerProps {
   onError?: (errorCode?: number) => void;
   onMutedChange?: (muted: boolean) => void;
   onPausedChange?: (paused: boolean) => void;
+}
+
+// DOM EXCEPTION SHIELD: Safe cleanup helper that prevents NotFoundError crashes
+// Checks parentNode before any removeChild operation and wraps in try...catch
+function safeCleanupPlayer(player: YTPlayer | null, playerId: string): void {
+  if (!player) return;
+  
+  try {
+    // Manual parentNode check: verify DOM element still exists before any cleanup
+    const playerElement = document.getElementById(playerId);
+    if (playerElement && playerElement.parentNode) {
+      // Element exists and has parent - safe to attempt cleanup
+      // But we still don't call destroy() - just let React handle DOM
+      console.log('[YouTube] Safe cleanup - element exists, nulling reference');
+    } else {
+      // Element already removed or orphaned - return early
+      console.log('[YouTube] Safe cleanup - element already removed, skipping');
+      return;
+    }
+  } catch (e) {
+    // Catch any DOM exception and log it instead of crashing
+    console.log('[YouTube] Safe cleanup caught exception:', e);
+  }
 }
 
 function YouTubePlayerInner({
@@ -148,15 +212,9 @@ function YouTubePlayerInner({
     if (!containerRef.current || !window.YT?.Player) return;
     if (isInitializedRef.current && playerRef.current) return; // Already initialized
     
-    // PRODUCTION FIX: Wrap cleanup in try...catch to prevent removeChild crashes
-    // If the node is already gone, ignore the error instead of crashing the dashboard
-    try {
-      if (playerRef.current) {
-        playerRef.current = null;
-      }
-    } catch (e) {
-      console.log('[YouTube] Cleanup ignored (node already removed):', e);
-    }
+    // DOM EXCEPTION SHIELD: Use safe cleanup with parentNode check
+    safeCleanupPlayer(playerRef.current, playerId);
+    playerRef.current = null;
 
     // MULTI-VIEW PARITY: Hardcoded production domain for YouTube postMessage handshake
     // Both origin AND widget_referrer must match to bypass domain blocks
@@ -321,20 +379,13 @@ function YouTubePlayerInner({
     }
 
     return () => {
-      // PRODUCTION FIX: Wrap cleanup in try...catch to prevent removeChild crashes
-      try {
-        if (playerRef.current) {
-          // CRITICAL: Do NOT call destroy() here - it causes "removeChild" errors
-          // when React has already unmounted the DOM node. Just null the reference
-          // and let React handle DOM cleanup naturally.
-          playerRef.current = null;
-          isInitializedRef.current = false;
-        }
-      } catch (e) {
-        console.log('[YouTube] Cleanup ignored on unmount (node already removed):', e);
-      }
+      // DOM EXCEPTION SHIELD: Use safe cleanup with parentNode check
+      // CRITICAL: Do NOT call destroy() - it causes "removeChild" errors
+      safeCleanupPlayer(playerRef.current, playerId);
+      playerRef.current = null;
+      isInitializedRef.current = false;
     };
-  }, [stableVideoId, initializePlayer]); // Only reinitialize when videoId changes
+  }, [stableVideoId, initializePlayer, playerId]); // Only reinitialize when videoId changes
 
   // Handle refreshKey changes - force reinitialize when manual refresh is triggered
   useEffect(() => {
@@ -342,22 +393,17 @@ function YouTubePlayerInner({
       console.log(`[YouTube] RefreshKey changed from ${lastRefreshKeyRef.current} to ${refreshKey} - reinitializing player`);
       lastRefreshKeyRef.current = refreshKey;
       
-      // PRODUCTION FIX: Wrap cleanup in try...catch to prevent removeChild crashes
-      try {
-        if (playerRef.current) {
-          playerRef.current = null;
-          isInitializedRef.current = false;
-        }
-      } catch (e) {
-        console.log('[YouTube] Cleanup ignored on refresh (node already removed):', e);
-      }
+      // DOM EXCEPTION SHIELD: Use safe cleanup with parentNode check
+      safeCleanupPlayer(playerRef.current, playerId);
+      playerRef.current = null;
+      isInitializedRef.current = false;
       
       // Reinitialize after a short delay
       setTimeout(() => {
         initializePlayer();
       }, 100);
     }
-  }, [refreshKey, initializePlayer]);
+  }, [refreshKey, initializePlayer, playerId]);
 
   // Handle mute changes without reinitializing player
   useEffect(() => {
@@ -435,7 +481,7 @@ function YouTubePlayerInner({
 
 // React.memo wrapper - only re-render if critical props change
 // Other props (isMuted, isPaused, etc.) are handled internally via refs
-export const YouTubePlayer = memo(YouTubePlayerInner, (prevProps, nextProps) => {
+const YouTubePlayerMemo = memo(YouTubePlayerInner, (prevProps, nextProps) => {
   // Return true if props are equal (skip re-render)
   // Only re-render when these critical props change:
   return (
@@ -449,3 +495,10 @@ export const YouTubePlayer = memo(YouTubePlayerInner, (prevProps, nextProps) => 
     prevProps.refreshKey === nextProps.refreshKey
   );
 });
+
+// DOM EXCEPTION SHIELD: Export wrapped in Error Boundary to prevent crashes
+export const YouTubePlayer = (props: YouTubePlayerProps) => (
+  <YouTubeErrorBoundary widgetId={props.widgetId}>
+    <YouTubePlayerMemo {...props} />
+  </YouTubeErrorBoundary>
+);

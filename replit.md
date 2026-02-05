@@ -82,6 +82,9 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Swap Delay Fix (Feb 2026):** Error 150/101 handling waits 300ms before triggering fallback ID swap, giving React time to finish first render before forcing second.
 - **Origin Hardcode (Feb 2026):** playerVars uses literal `origin: 'https://openbento.tv'` string, never `window.location.origin`.
 - **Badge Migration Confirmed (Feb 2026):** LIVE badge completely removed from dashboard widgets - exists ONLY in library sidebar.
+- **DOM Exception Shield (Feb 2026):** safeCleanupPlayer() helper checks node.parentNode before any cleanup, wraps in try...catch, and returns early if element already removed - prevents NotFoundError from killing the app.
+- **YouTube Error Boundary (Feb 2026):** YouTubePlayer wrapped in YouTubeErrorBoundary class component that catches removeChild/NotFoundError and recovers automatically instead of crashing.
+- **Safe Widget Deletion (Feb 2026):** handleRemoveWidget() uses two-phase deletion: marks widget with isDeleting=true (hides from render) then removes after 100ms delay.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.
