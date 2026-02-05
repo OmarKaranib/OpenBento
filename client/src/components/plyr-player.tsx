@@ -76,7 +76,8 @@ function PlyrPlayerInner({
   useEffect(() => { onPausedChangeRef.current = onPausedChange; }, [onPausedChange]);
 
   const stableVideoId = useMemo(() => videoId || null, [videoId]);
-  const origin = useMemo(() => window.location.origin, []);
+  // ORIGIN LOCKDOWN: Hardcoded production domain for YouTube postMessage handshake
+  const origin = 'https://openbento.tv';
 
   const setupMediaSession = (videoTitle: string) => {
     if ('mediaSession' in navigator) {

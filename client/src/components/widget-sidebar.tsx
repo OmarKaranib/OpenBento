@@ -139,6 +139,8 @@ export interface SavedChannel {
   platform: 'youtube' | 'twitch' | 'kick';
   channelId?: string;
   videoId?: string | null;
+  verifiedLiveId?: string | null; // Static 24/7 embed ID for Zero-Gate Rendering
+  latestVideoId?: string | null; // Fallback when live stream not available
   savedAt: number;
 }
 
@@ -152,6 +154,8 @@ export interface BlockedChannel {
   platform: 'youtube' | 'twitch' | 'kick';
   channelId?: string;
   videoId?: string | null;
+  verifiedLiveId?: string | null; // Static 24/7 embed ID for Zero-Gate Rendering
+  latestVideoId?: string | null; // Fallback when live stream not available
   blockedAt: number;
 }
 
@@ -202,6 +206,8 @@ export interface TrendingChannel {
   platform: 'youtube' | 'twitch' | 'kick';
   channelId?: string;
   videoId?: string | null;
+  verifiedLiveId?: string | null; // Static 24/7 embed ID for Zero-Gate Rendering
+  latestVideoId?: string | null; // Fallback when live stream not available
   lastUpdated?: number;
   isLive?: boolean; // True for live streams (10-min refresh), false for normal videos (no refresh)
 }
@@ -225,10 +231,10 @@ export interface WidgetTemplate {
   color: string;
 }
 
-// PRODUCTION FIX: Standard YouTube embed URL with origin handshake
+// ORIGIN LOCKDOWN: Hardcoded production domain for YouTube postMessage handshake
 const getProYouTubeEmbedUrl = (videoId: string): string => {
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://localhost';
-  return `https://www.youtube.com/embed/${videoId}?origin=${encodeURIComponent(origin)}&enablejsapi=1&autoplay=1&mute=1`;
+  const origin = 'https://openbento.tv';
+  return `https://www.youtube.com/embed/${videoId}?origin=${encodeURIComponent(origin)}&enablejsapi=1&autoplay=1&mute=1&widget_referrer=${encodeURIComponent(origin)}`;
 };
 
 // NOTE: live_stream?channel= format is deprecated - we now require real videoIds from /api/links

@@ -252,9 +252,21 @@ function YouTubePlayerInner({
               return;
             }
             
-            // Error 101: Account-level restriction - nothing we can do
+            // ERROR 101 OVERRIDE: Also force latestVideoId fallback on account restriction
             if (errorCode === 101) {
-              console.log('[YouTube] Error 101 - account restriction, no fallback available');
+              if (latestVideoIdRef.current && playerRef.current) {
+                console.log('[YouTube] Error 101 - FORCING latestVideoId swap:', latestVideoIdRef.current);
+                try {
+                  playerRef.current.loadVideoById(latestVideoIdRef.current);
+                  console.log('[YouTube] Successfully swapped to latestVideoId on error 101');
+                  onErrorRef.current?.(101);
+                  return;
+                } catch (e) {
+                  console.log('[YouTube] loadVideoById failed on error 101:', e);
+                }
+              } else {
+                console.log('[YouTube] Error 101 - no latestVideoId, requesting parent to fetch');
+              }
               onErrorRef.current?.(101);
               return;
             }

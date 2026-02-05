@@ -66,6 +66,11 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Visual Fallback Synchronization:** When a channel is not live, the widget automatically plays the channel's latest video. The offline overlay is hidden when latestVideoId exists. LIVE badge is strictly hidden when playing latest video (isPlayingLatestVideo flag). "Check Again" auto-splices the latest video if no live stream is found (no error shown).
 - **Error 150 Fallback Bypass:** On embed restriction error 150, youtube-player.tsx immediately swaps to latestVideoId using loadVideoById() instead of showing gray "Unavailable" screen. Widget state updates to isPlayingLatestVideo=true, isLive=false, isOffline=false, apiError=false. If latestVideoId not available, fetches it from API. Only error 101 (account restriction) skips self-healing.
 - **Multi-View Parity Handshake:** playerVars hardcoded with both `origin: 'https://openbento.tv'` AND `widget_referrer: 'https://openbento.tv'` to stop postMessage security warnings and bypass basic domain blocks in production.
+- **Origin Lockdown:** All YouTube embed URLs in youtube-player.tsx, widget-sidebar.tsx, plyr-player.tsx, and dashboard.tsx now use hardcoded `origin=https://openbento.tv` instead of `window.location.origin`.
+- **Mandatory ID Mapping:** Channel interfaces (SavedChannel, BlockedChannel, TrendingChannel, Widget) now include `verifiedLiveId` (static 24/7 embed) and `latestVideoId` (fallback) properties.
+- **Zero-Gate Rendering:** When clicking a channel, player renders immediately using verifiedLiveId > STATIC_LIVE_IDS > savedVideoId priority. No API live-check wait.
+- **150/101 Override:** Both Error 150 (embed restriction) and Error 101 (account restriction) now force latestVideoId fallback without showing "Unavailable" screen.
+- **Conditional Badge:** LIVE badges removed from dashboard widgets. In sidebar, LIVE badge only shows when API confirms `isLive: true`.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.

@@ -99,6 +99,7 @@ export interface Widget {
   isLive?: boolean;
   isPlayingLatestVideo?: boolean; // True when playing latestVideoId fallback (not a live stream)
   latestVideoId?: string | null; // Fallback videoId for when live stream is not available (most recent upload)
+  verifiedLiveId?: string | null; // Static 24/7 embed ID - use immediately for Zero-Gate Rendering
   customColor?: string;
   apiError?: boolean; // True if YouTube API returned 403/error - show "System Maintenance" instead of "Offline"
 }
@@ -822,19 +823,22 @@ function AppContent() {
     setActiveWidgetId(null);
     setUrlInputValue('');
     
-    // For YouTube channels: FORCE EMBED - render immediately if videoId exists
+    // For YouTube channels: ZERO-GATE RENDERING - render immediately, no live check wait
     if (channel.platform === 'youtube' && channel.channelId) {
       // STATIC HANDLE MAPPING: Check if this is a major 24/7 channel with permanent ID
       const staticVideoId = STATIC_LIVE_IDS[channel.channelId];
       
-      // FORCE EMBED: Use videoId immediately if available (static, or from channel data)
-      const immediateVideoId = staticVideoId || channel.videoId || null;
+      // ZERO-GATE RENDERING PRIORITY:
+      // 1. verifiedLiveId (static 24/7 embed) - highest priority, always live
+      // 2. Static mapping (STATIC_LIVE_IDS) - known permanent streams
+      // 3. Channel's saved videoId - from previous API calls
+      const immediateVideoId = channel.verifiedLiveId || staticVideoId || channel.videoId || null;
       
       if (immediateVideoId) {
-        const source = staticVideoId ? 'STATIC' : 'SAVED';
-        console.log(`[ChannelClick] FORCE EMBED (${source}): @${channel.channelId} -> ${immediateVideoId} (rendering immediately)`);
+        const source = channel.verifiedLiveId ? 'VERIFIED' : staticVideoId ? 'STATIC' : 'SAVED';
+        console.log(`[ChannelClick] ZERO-GATE RENDER (${source}): @${channel.channelId} -> ${immediateVideoId} (no wait)`);
         
-        // Render embed immediately - no API call needed
+        // ZERO-GATE RENDERING: Render embed immediately - no API call needed
         const widgetData: Partial<Widget> = {
           url: `https://www.youtube.com/watch?v=${immediateVideoId}`,
           isYouTube: true,
@@ -848,6 +852,9 @@ function AppContent() {
           kickChannel: null,
           isLive: true, // Force LIVE when we have a videoId
           isOffline: false,
+          verifiedLiveId: channel.verifiedLiveId || null, // Store for future reference
+          latestVideoId: channel.latestVideoId || null, // Fallback for 150/101 errors
+          isPlayingLatestVideo: false, // Not using fallback initially
           apiError: false,
           error: null,
           embedBlocked: false,

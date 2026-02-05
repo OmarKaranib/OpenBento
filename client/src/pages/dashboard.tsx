@@ -342,11 +342,14 @@ const MasterControlDashboard = ({
   const handleVideoError = useCallback(async (widget: Widget, errorCode?: number) => {
     console.log(`[Self-Healing] Error detected for widget: ${widget.id}, errorCode: ${errorCode}`);
 
-    // MANDATORY 150 FALLBACK: Force latestVideoId fallback on error 150
-    if (errorCode === 150) {
+    // THE 150/101 OVERRIDE: Force latestVideoId fallback on restriction errors
+    // Both errors swap to latestVideoId without showing "Unavailable" screen
+    if (errorCode === 150 || errorCode === 101) {
+      const errorType = errorCode === 150 ? 'EmbedRestriction' : 'AccountRestriction';
+      
       // If player already swapped to latestVideoId, just update state
       if (widget.latestVideoId) {
-        console.log(`[Error150Fallback] Widget ${widget.id} using latestVideoId: ${widget.latestVideoId}`);
+        console.log(`[${errorType}Fallback] Widget ${widget.id} using latestVideoId: ${widget.latestVideoId}`);
         setWidgets(prev => prev.map(w => 
           w.id === widget.id 
             ? { ...w, videoId: widget.latestVideoId, isLive: false, isPlayingLatestVideo: true, isOffline: false, apiError: false } 
@@ -357,12 +360,12 @@ const MasterControlDashboard = ({
       // If no latestVideoId, fetch it from the API using channel handle
       const channelHandle = widget.channelHandle || widget.youtubeChannelId;
       if (channelHandle) {
-        console.log(`[Error150Fallback] Fetching latestVideoId for ${channelHandle}...`);
+        console.log(`[${errorType}Fallback] Fetching latestVideoId for ${channelHandle}...`);
         try {
           const { searchChannelLiveStream } = await import('@/lib/stream-api');
           const status = await searchChannelLiveStream(channelHandle, true);
           if (status?.latestVideoId) {
-            console.log(`[Error150Fallback] Got latestVideoId: ${status.latestVideoId}`);
+            console.log(`[${errorType}Fallback] Got latestVideoId: ${status.latestVideoId}`);
             setWidgets(prev => prev.map(w => 
               w.id === widget.id 
                 ? { ...w, videoId: status.latestVideoId, latestVideoId: status.latestVideoId, isLive: false, isPlayingLatestVideo: true, isOffline: false, apiError: false } 
@@ -371,9 +374,14 @@ const MasterControlDashboard = ({
             return;
           }
         } catch (e) {
-          console.log(`[Error150Fallback] Failed to fetch latestVideoId:`, e);
+          console.log(`[${errorType}Fallback] Failed to fetch latestVideoId:`, e);
         }
       }
+      // If we couldn't get latestVideoId, just update badge state (no offline)
+      setWidgets(prev => prev.map(w => 
+        w.id === widget.id ? { ...w, isLive: false, apiError: false } : w
+      ));
+      return;
     }
 
     // ARCHITECTURE PIVOT: Never set isOffline=true if videoId exists
@@ -381,12 +389,6 @@ const MasterControlDashboard = ({
     setWidgets(prev => prev.map(w => 
       w.id === widget.id ? { ...w, isLive: false } : w // Badge only, not offline
     ));
-
-    // Skip self-healing only for error 101 (account-level restriction, can't fix)
-    if (errorCode === 101) {
-      console.log(`[Self-Healing] Skipping self-heal for error 101 (account restriction)`);
-      return;
-    }
 
     if (widget.isYouTube && widget.youtubeChannelId) {
       const channelName = widget.channelName || widget.youtubeChannelId;
@@ -722,10 +724,11 @@ const MasterControlDashboard = ({
     };
   }, [resizing, setWidgets, ad]);
 
-  // PRODUCTION FIX: Standard YouTube embed with origin handshake (fewer restriction issues)
+  // ORIGIN LOCKDOWN: Hardcoded production domain for YouTube postMessage handshake
   // referrerPolicy="strict-origin-when-cross-origin" is set on iframes for valid Referer header
   const getYouTubeEmbedUrl = (videoId: string): string => {
-    return `https://www.youtube.com/embed/${videoId}?origin=${window.location.origin}&enablejsapi=1&autoplay=1&mute=1&modestbranding=1&rel=0`;
+    const origin = 'https://openbento.tv';
+    return `https://www.youtube.com/embed/${videoId}?origin=${encodeURIComponent(origin)}&enablejsapi=1&autoplay=1&mute=1&modestbranding=1&rel=0&widget_referrer=${encodeURIComponent(origin)}`;
   };
 
   // NOTE: live_stream?channel= format is deprecated - we now require real videoIds
