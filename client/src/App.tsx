@@ -7,6 +7,27 @@ import { MobileGuard } from '@/components/mobile-guard';
 import { useViralAds, AdBlockData } from '@/components/ad-block';
 import { searchChannelLiveStream } from '@/lib/stream-api';
 
+// STATIC HANDLE MAPPING: Permanent Live IDs for major 24/7 channels
+// Keyed by channelHandle (as used in links.json), NOT YouTube channel IDs
+// These channels have stable live stream IDs that rarely change
+// Using static IDs saves API quota and ensures immediate playback
+const STATIC_LIVE_IDS: Record<string, string> = {
+  // News Networks - 24/7 Live (keyed by channelHandle from links.json)
+  'skynews': '9Auq9mYxFEe',           // Sky News
+  'SkyNews': '9Auq9mYxFEe',           // Sky News (alternate case)
+  'ABCNews': 'w_Ma8oQLmSM',           // ABC News Live
+  'NASA': 'tz4THVd5rdI',              // NASA TV
+  'NASAtelevision': '21X5lGlDOfg',    // NASA TV (alternate channel)
+  'NBCNews': 'sVEGHdVRIoU',           // NBC News NOW
+  'MSNBC': 'nlKwThfNggk',             // MSNBC Live
+  'LofiGirl': 'jfKfPfyJRdk',          // Lofi Girl (24/7 beats)
+  'AlJazeeraEnglish': 'kxPCFljwJws',  // Al Jazeera English
+  'France24English': 'l8PMl7tUDIE',   // France 24 English
+  'France24english': 'l8PMl7tUDIE',   // France 24 (alternate case)
+  'NDTV': 'NvqKZHpKs-g',              // NDTV 24x7
+  'Reuters': '9hBfiYUpyVo',           // Reuters
+};
+
 // Static background - High-contrast light mode
 const StaticBackground = () => {
   useEffect(() => {
@@ -799,17 +820,73 @@ function AppContent() {
     setActiveWidgetId(null);
     setUrlInputValue('');
     
-    // For YouTube channels, dynamically search for current live stream using YouTube Search API
+    // For YouTube channels: FORCE EMBED - render immediately if videoId exists
     if (channel.platform === 'youtube' && channel.channelId) {
-      console.log(`[ChannelClick] Searching for live stream from @${channel.channelId}`);
+      // STATIC HANDLE MAPPING: Check if this is a major 24/7 channel with permanent ID
+      const staticVideoId = STATIC_LIVE_IDS[channel.channelId];
+      
+      // FORCE EMBED: Use videoId immediately if available (static, or from channel data)
+      const immediateVideoId = staticVideoId || channel.videoId || null;
+      
+      if (immediateVideoId) {
+        const source = staticVideoId ? 'STATIC' : 'SAVED';
+        console.log(`[ChannelClick] FORCE EMBED (${source}): @${channel.channelId} -> ${immediateVideoId} (rendering immediately)`);
+        
+        // Render embed immediately - no API call needed
+        const widgetData: Partial<Widget> = {
+          url: `https://www.youtube.com/watch?v=${immediateVideoId}`,
+          isYouTube: true,
+          videoId: immediateVideoId,
+          youtubeChannelId: channel.channelId,
+          channelHandle: channel.channelId,
+          channelName: channel.name,
+          isTwitch: false,
+          twitchChannel: null,
+          isKick: false,
+          kickChannel: null,
+          isLive: true, // Force LIVE when we have a videoId
+          isOffline: false,
+          apiError: false,
+          error: null,
+          embedBlocked: false,
+          lastRefresh: Date.now(),
+        };
+        
+        if (currentActiveWidgetId) {
+          setWidgets(prev => prev.map(w => 
+            w.id === currentActiveWidgetId ? {
+              ...w, type: 'video', ...widgetData, isPaused: false, isMuted: true, volume: 0,
+            } : w
+          ));
+        } else {
+          addWidget('video', 3, 2, widgetData);
+        }
+        
+        // BACKGROUND-ONLY STATUS: Run API check in background to update badge color only
+        // This never blocks render or shows offline overlay
+        if (!staticVideoId) {
+          searchChannelLiveStream(channel.channelId, false).then(result => {
+            if (result.liveVideoId && result.liveVideoId !== immediateVideoId) {
+              console.log(`[Background] New live ID found: ${result.liveVideoId} (updating badge only)`);
+              // Only update badge state, not blocking render
+              setWidgets(prev => prev.map(w => 
+                w.channelHandle === channel.channelId ? { ...w, isLive: true } : w
+              ));
+            }
+          }).catch(err => console.warn('[Background] Status check failed (non-blocking):', err));
+        }
+        return;
+      }
+      
+      // FALLBACK: No saved videoId - must call API to find one
+      console.log(`[ChannelClick] No saved videoId, searching for @${channel.channelId}`);
       
       try {
         // Use cached API call (will use localStorage cache if fresh, otherwise fetch)
         const result = await searchChannelLiveStream(channel.channelId, false);
         
         // TRUST THE VIDEOID: If we have a videoId (from API or static), the stream is LIVE
-        // Prefer dynamic videoId from API, fallback to static videoId from channel data
-        const videoId = result.liveVideoId || channel.videoId || null;
+        const videoId = result.liveVideoId || null;
         
         // LINE 818 OVERRIDE: If videoId exists, force ONLINE status - no secondary checks
         const hasVideoId = !!videoId;

@@ -342,8 +342,10 @@ const MasterControlDashboard = ({
   const handleVideoError = useCallback(async (widget: Widget) => {
     console.log(`[Self-Healing] Error detected for widget: ${widget.id}`);
 
+    // ARCHITECTURE PIVOT: Never set isOffline=true if videoId exists
+    // Only update isLive for badge state - embed should always render
     setWidgets(prev => prev.map(w => 
-      w.id === widget.id ? { ...w, isOffline: true } : w
+      w.id === widget.id ? { ...w, isLive: false } : w // Badge only, not offline
     ));
 
     if (widget.isYouTube && widget.youtubeChannelId) {
@@ -426,13 +428,11 @@ const MasterControlDashboard = ({
             }
             checkedVideoIds.current.add(widget.videoId);
           } else if (!liveStatus.isLive && liveStatus.liveBroadcastContent !== null) {
-            // Widget is not live
-            if (!widget.isOffline) {
-              console.log(`[TrueLiveFilter] Video ${widget.videoId} is not live (${liveStatus.liveBroadcastContent}), marking as offline`);
-              setWidgets(prev => prev.map(w => 
-                w.id === widget.id ? { ...w, isOffline: true } : w
-              ));
-            }
+            // Widget is not live - ONLY update badge, never set offline if videoId exists
+            console.log(`[TrueLiveFilter] Video ${widget.videoId} is not live (${liveStatus.liveBroadcastContent}), updating badge only`);
+            setWidgets(prev => prev.map(w => 
+              w.id === widget.id ? { ...w, isLive: false } : w // Badge only, embed keeps rendering
+            ));
             checkedVideoIds.current.add(widget.videoId);
           }
         } catch (error) {
@@ -852,15 +852,13 @@ const MasterControlDashboard = ({
           ));
           return;
         } else {
-          // Video is no longer live - mark as offline (genuine, not API error)
-          const hasApiError = liveStatus.apiError === true;
-          console.log(`[CheckAgain] Video ${widget.videoId} is OFFLINE (apiError: ${hasApiError})`);
+          // Video is no longer live - ONLY update badge, keep embed rendering
+          // ARCHITECTURE PIVOT: Never set isOffline=true if videoId exists
+          console.log(`[CheckAgain] Video ${widget.videoId} is not live (badge update only)`);
           setWidgets(prev => prev.map(w => 
             w.id === widgetId ? { 
               ...w, 
-              isOffline: true, 
-              isLive: false,
-              apiError: hasApiError,
+              isLive: false, // Badge only - embed keeps rendering
               error: null,
               embedBlocked: false,
             } : w
@@ -869,13 +867,11 @@ const MasterControlDashboard = ({
         }
       } catch (error) {
         console.error('[CheckAgain] Error checking video status:', error);
+        // ARCHITECTURE PIVOT: Don't set offline on error - badge update only
         setWidgets(prev => prev.map(w => 
           w.id === widgetId ? { 
             ...w, 
-            isOffline: true, 
-            isLive: false,
-            apiError: true,
-            error: null,
+            isLive: false, // Badge only
           } : w
         ));
         return;
@@ -1181,8 +1177,17 @@ const MasterControlDashboard = ({
 
     switch (widget.type) {
       case 'video':
-        // Show offline placeholder if stream is offline
-        if (widget.isOffline) {
+        // ARCHITECTURE PIVOT: Force Embed - If videoId exists, render immediately
+        // Only show OfflinePlaceholder for YouTube if NO videoId exists
+        // For Twitch/Kick, show offline if their respective channels are missing
+        const shouldShowOffline = widget.isOffline && (
+          (widget.isYouTube && !widget.videoId) ||
+          (widget.isTwitch && !widget.twitchChannel) ||
+          (widget.isKick && !widget.kickChannel) ||
+          (!widget.isYouTube && !widget.isTwitch && !widget.isKick)
+        );
+        
+        if (shouldShowOffline) {
           return <OfflinePlaceholder widget={widget} />;
         }
 
