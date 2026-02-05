@@ -57,6 +57,11 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Admin Dashboard:** `/admin` route with client-side and server-side authorization. Features user list, premium toggle, channel manager (CRUD), channel auto-import, and system statistics.
 - **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core`, `lucide-react`.
 
+## Production Repairs
+- **YouTube Player Origin Fix:** Hardcoded `origin: 'https://openbento.tv'` in playerVars to fix postMessage mismatch errors
+- **No-Cookie Toggle:** Switched from youtube-nocookie.com to youtube.com (standard player has fewer restriction issues)
+- **Error 101/150 Loop Prevention:** Embed restriction errors (101, 150) do NOT trigger self-healing re-fetch - only recoverable errors [2, 5, 100]
+
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.
 - **Twitch Embeds:** For integrating Twitch streams.

@@ -107,8 +107,9 @@ function YouTubePlayerInner({
   // Memoize the stable channel ID for live streams - fallback when no videoId
   const stableChannelId = useMemo(() => channelId || null, [channelId]);
 
-  // Hardcoded origin for handshake - computed once
-  const origin = useMemo(() => window.location.origin, []);
+  // PRODUCTION FIX: Hardcoded origin for YouTube postMessage handshake
+  // Must match the production domain exactly to avoid postMessage mismatch errors
+  const origin = 'https://openbento.tv';
 
   // MediaSession API for background play support
   const setupMediaSession = useCallback(() => {
@@ -176,7 +177,7 @@ function YouTubePlayerInner({
       
       playerRef.current = new window.YT.Player(playerId, {
         videoId: stableVideoId || undefined,
-        host: 'https://www.youtube-nocookie.com',
+        host: 'https://www.youtube.com',  // PRODUCTION FIX: Standard player has fewer restriction issues
         playerVars: stableChannelId && !stableVideoId 
           ? { ...playerVars, listType: 'user_uploads', list: stableChannelId }
           : playerVars,
@@ -226,14 +227,17 @@ function YouTubePlayerInner({
           },
           onError: (event) => {
             console.log('[YouTube] Player error:', event.data, 'for widget:', widgetId);
-            // Trigger re-fetch for various video errors:
-            // 100 = Video not found
-            // 101/150 = Video not allowed for embedded playback
-            // 2 = Invalid video ID
-            // 5 = HTML5 player error
-            if ([2, 5, 100, 101, 150].includes(event.data)) {
-              console.log('[YouTube] Triggering onError callback for re-fetch');
+            // PRODUCTION FIX: Only trigger re-fetch for recoverable errors
+            // 100 = Video not found (re-fetch may find new video)
+            // 2 = Invalid video ID (re-fetch may fix)
+            // 5 = HTML5 player error (transient, re-fetch may help)
+            // DO NOT re-fetch for 101/150 - these are restriction errors, searching again won't fix them
+            if ([2, 5, 100].includes(event.data)) {
+              console.log('[YouTube] Triggering onError callback for re-fetch (recoverable error)');
               onErrorRef.current?.();
+            } else if ([101, 150].includes(event.data)) {
+              console.log('[YouTube] Embed restriction error (101/150) - NOT triggering re-fetch');
+              // These are embedding restrictions, not "offline" - don't trigger self-healing
             }
           },
         },
@@ -242,7 +246,7 @@ function YouTubePlayerInner({
       console.error('[YouTube] Failed to initialize player:', e);
       onErrorRef.current?.();
     }
-  }, [playerId, stableVideoId, stableChannelId, widgetId, origin, setupMediaSession]); // Only re-init when video/widget/channel changes
+  }, [playerId, stableVideoId, stableChannelId, widgetId, setupMediaSession]); // Only re-init when video/widget/channel changes
 
   // Initialize player only when videoId changes
   useEffect(() => {
