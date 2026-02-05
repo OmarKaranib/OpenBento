@@ -197,6 +197,13 @@ function YouTubePlayerInner({
   // Memoize the stable player ID - only changes if widgetId changes
   const playerId = useMemo(() => `yt-player-${widgetId}`, [widgetId]);
   
+  // FINAL LOOP BREAK: Reset hasSwappedRef ONLY when widgetId changes (not videoId)
+  // This ensures "One Swap Only" rule works correctly per-widget lifecycle
+  useEffect(() => {
+    hasSwappedRef.current = false;
+    setContentRestricted(false);
+  }, [widgetId]);
+  
   // Memoize the stable video ID - only recalculate when videoId prop changes
   const stableVideoId = useMemo(() => videoId || null, [videoId]);
   

@@ -141,6 +141,7 @@ export interface SavedChannel {
   videoId?: string | null;
   verifiedLiveId?: string | null; // Static 24/7 embed ID for Zero-Gate Rendering
   latestVideoId?: string | null; // Fallback when live stream not available
+  isForced?: boolean; // Admin override - skip background checks and fallbacks
   savedAt: number;
 }
 
@@ -156,6 +157,7 @@ export interface BlockedChannel {
   videoId?: string | null;
   verifiedLiveId?: string | null; // Static 24/7 embed ID for Zero-Gate Rendering
   latestVideoId?: string | null; // Fallback when live stream not available
+  isForced?: boolean; // Admin override - skip background checks and fallbacks
   blockedAt: number;
 }
 
@@ -208,6 +210,7 @@ export interface TrendingChannel {
   videoId?: string | null;
   verifiedLiveId?: string | null; // Static 24/7 embed ID for Zero-Gate Rendering
   latestVideoId?: string | null; // Fallback when live stream not available
+  isForced?: boolean; // Admin override - skip background checks and fallbacks
   lastUpdated?: number;
   isLive?: boolean; // True for live streams (10-min refresh), false for normal videos (no refresh)
 }

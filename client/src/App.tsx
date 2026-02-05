@@ -865,6 +865,13 @@ function AppContent() {
           addWidget('video', 3, 2, widgetData);
         }
         
+        // ISFORCED CHECK: If channel has isForced flag, skip ALL background checks and fallbacks
+        // Admin has manually locked this channel's videoId - do not modify it
+        if (channel.isForced) {
+          console.log(`[ChannelClick] FORCED channel @${channel.channelId} - skipping background checks`);
+          return;
+        }
+        
         // DYNAMIC LIVE-ID PRIORITY: Run API check in background for ALL channels
         // If a NEW live ID is found, update videoId immediately (not just badge)
         // NOTE: Even VERIFIED_MANUAL channels get background checks to stay live (fixes Al Jazeera drift)

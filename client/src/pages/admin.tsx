@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useReplitAuth } from '@/hooks/use-replit-auth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn } from 'lucide-react';
+import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
+import { searchChannelLiveStream } from '@/lib/stream-api';
 
 export const ADMIN_EMAILS = [
   'legionofoogabooga@gmail.com',
@@ -22,7 +23,21 @@ interface Channel {
   videoId: string | null;
   url: string | null;
   isLive: boolean | null;
+  isForced: boolean | null;
   lastUpdated: string | null;
+}
+
+function extractYouTubeVideoId(url: string): string | null {
+  if (!url) return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
 }
 
 export default function Admin() {
@@ -31,6 +46,9 @@ export default function Admin() {
   const queryClient = useQueryClient();
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [scrapeUrl, setScrapeUrl] = useState('');
+  const [isGlobalScraping, setIsGlobalScraping] = useState(false);
+  const [scrapeProgress, setScrapeProgress] = useState<{current: number; total: number; currentChannel: string} | null>(null);
   const [newChannel, setNewChannel] = useState({
     id: '',
     name: '',
@@ -41,6 +59,47 @@ export default function Admin() {
     videoId: '',
     isLive: true
   });
+
+  const handleGlobalScrape = async () => {
+    if (!channels.length) return;
+    
+    setIsGlobalScraping(true);
+    const youtubeChannels = channels.filter(c => c.platform === 'youtube' && c.channelHandle);
+    
+    for (let i = 0; i < youtubeChannels.length; i++) {
+      const channel = youtubeChannels[i];
+      setScrapeProgress({ current: i + 1, total: youtubeChannels.length, currentChannel: channel.name });
+      
+      try {
+        if (channel.channelHandle) {
+          const result = await searchChannelLiveStream(channel.channelHandle, true);
+          if (result.liveVideoId) {
+            await apiRequest('PATCH', `/api/admin/channels/${channel.id}`, { 
+              videoId: result.liveVideoId,
+              isLive: true 
+            });
+          }
+        }
+      } catch (err) {
+        console.error(`[GlobalScrape] Failed for ${channel.name}:`, err);
+      }
+      
+      await new Promise(r => setTimeout(r, 500));
+    }
+    
+    setIsGlobalScraping(false);
+    setScrapeProgress(null);
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
+  };
+
+  const handleScrapeUrl = () => {
+    if (!scrapeUrl || !editingChannel) return;
+    const extractedId = extractYouTubeVideoId(scrapeUrl);
+    if (extractedId) {
+      setEditingChannel({ ...editingChannel, videoId: extractedId, isForced: true });
+      setScrapeUrl('');
+    }
+  };
 
   const isAdmin = isAuthenticated && ADMIN_EMAILS.includes(user?.email?.toLowerCase() || '');
 
@@ -327,7 +386,25 @@ export default function Admin() {
               </div>
               <h2 className="text-xl font-semibold text-white">Channel Manager</h2>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={handleGlobalScrape}
+                disabled={isGlobalScraping}
+                className="flex items-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg text-white text-sm transition-colors disabled:opacity-50"
+                data-testid="button-global-scrape"
+              >
+                {isGlobalScraping ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {scrapeProgress ? `${scrapeProgress.current}/${scrapeProgress.total}` : 'Scraping...'}
+                  </>
+                ) : (
+                  <>
+                    <Rocket className="w-4 h-4" />
+                    Force Global Scrape
+                  </>
+                )}
+              </button>
               <button
                 onClick={() => setShowAddForm(true)}
                 className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-sm transition-colors"
@@ -346,6 +423,11 @@ export default function Admin() {
                 Import from JSON
               </button>
             </div>
+            {scrapeProgress && (
+              <div className="mt-2 text-sm text-slate-400">
+                Currently scraping: <span className="text-cyan-400">{scrapeProgress.currentChannel}</span>
+              </div>
+            )}
           </div>
 
           {showAddForm && (
@@ -477,12 +559,40 @@ export default function Admin() {
                             />
                           </td>
                           <td className="py-3 pr-4">
-                            <input
-                              type="text"
-                              value={editingChannel.videoId || ''}
-                              onChange={(e) => setEditingChannel({ ...editingChannel, videoId: e.target.value })}
-                              className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                            />
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                value={editingChannel.videoId || ''}
+                                onChange={(e) => setEditingChannel({ ...editingChannel, videoId: e.target.value, isForced: true })}
+                                className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                                placeholder="Video ID"
+                              />
+                              <div className="flex gap-1">
+                                <input
+                                  type="text"
+                                  value={scrapeUrl}
+                                  onChange={(e) => setScrapeUrl(e.target.value)}
+                                  className="flex-1 px-2 py-1 bg-slate-700 border border-slate-500 rounded text-white text-xs"
+                                  placeholder="Paste YouTube URL..."
+                                />
+                                <button
+                                  onClick={handleScrapeUrl}
+                                  className="px-2 py-1 bg-purple-600 hover:bg-purple-500 rounded text-white text-xs"
+                                  title="Extract ID from URL"
+                                >
+                                  <LinkIcon className="w-3 h-3" />
+                                </button>
+                              </div>
+                              <label className="flex items-center gap-1 text-xs text-slate-400">
+                                <input
+                                  type="checkbox"
+                                  checked={editingChannel.isForced || false}
+                                  onChange={(e) => setEditingChannel({ ...editingChannel, isForced: e.target.checked })}
+                                  className="w-3 h-3"
+                                />
+                                Forced (no background updates)
+                              </label>
+                            </div>
                           </td>
                           <td className="py-3 pr-4">
                             <select
