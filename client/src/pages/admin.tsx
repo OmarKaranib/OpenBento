@@ -49,6 +49,8 @@ export default function Admin() {
   const [scrapeUrl, setScrapeUrl] = useState('');
   const [isGlobalScraping, setIsGlobalScraping] = useState(false);
   const [scrapeProgress, setScrapeProgress] = useState<{current: number; total: number; currentChannel: string} | null>(null);
+  const [isPurging, setIsPurging] = useState(false);
+  const [purgeProgress, setPurgeProgress] = useState<{current: number; total: number; currentChannel: string; deleted: number} | null>(null);
   const [newChannel, setNewChannel] = useState({
     id: '',
     name: '',
@@ -108,6 +110,81 @@ export default function Admin() {
       setEditingChannel({ ...editingChannel, videoId: extractedId, isManualOverride: true });
       setScrapeUrl('');
     }
+  };
+
+  const handlePurgeBrokenStreams = async () => {
+    if (!channels.length) return;
+    
+    setIsPurging(true);
+    let deletedCount = 0;
+    
+    const youtubeChannels = channels.filter(c => 
+      c.platform === 'youtube' && 
+      c.videoId && 
+      !c.isManualOverride
+    );
+    
+    console.log(`[PURGE] Starting purge check for ${youtubeChannels.length} YouTube channels`);
+    
+    for (let i = 0; i < youtubeChannels.length; i++) {
+      const channel = youtubeChannels[i];
+      setPurgeProgress({ 
+        current: i + 1, 
+        total: youtubeChannels.length, 
+        currentChannel: channel.name,
+        deleted: deletedCount 
+      });
+      
+      try {
+        const response = await fetch(`/api/youtube/validate-video/${channel.videoId}`);
+        const result = await response.json();
+        
+        if (!result.valid) {
+          console.log(`[PURGE] Broken stream detected: ${channel.name} - ${result.reason}`);
+          
+          if (channel.channelHandle) {
+            const searchResponse = await fetch(`/api/youtube/search-live/${channel.channelHandle}`);
+            const searchResult = await searchResponse.json();
+            
+            if (searchResult.latestVideoId) {
+              const fallbackResponse = await fetch(`/api/youtube/validate-video/${searchResult.latestVideoId}`);
+              const fallbackResult = await fallbackResponse.json();
+              
+              if (!fallbackResult.valid) {
+                console.log(`[PURGE] Fallback also broken for ${channel.name}, deleting...`);
+                await apiRequest('DELETE', `/api/admin/channels/${channel.id}`);
+                deletedCount++;
+              } else {
+                console.log(`[PURGE] Fallback works for ${channel.name}, updating videoId`);
+                await apiRequest('PATCH', `/api/admin/channels/${channel.id}`, { 
+                  videoId: searchResult.latestVideoId,
+                  isLive: false 
+                });
+              }
+            } else {
+              console.log(`[PURGE] No fallback available for ${channel.name}, deleting...`);
+              await apiRequest('DELETE', `/api/admin/channels/${channel.id}`);
+              deletedCount++;
+            }
+          } else {
+            console.log(`[PURGE] No channel handle for ${channel.name}, deleting broken channel...`);
+            await apiRequest('DELETE', `/api/admin/channels/${channel.id}`);
+            deletedCount++;
+          }
+        }
+      } catch (err) {
+        console.error(`[PURGE] Failed to check ${channel.name}:`, err);
+      }
+      
+      await new Promise(r => setTimeout(r, 300));
+    }
+    
+    setIsPurging(false);
+    setPurgeProgress(null);
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+    
+    alert(`Purge complete! Deleted ${deletedCount} broken channels.`);
   };
 
   const isAdmin = isAuthenticated && ADMIN_EMAILS.includes(user?.email?.toLowerCase() || '');
@@ -412,7 +489,7 @@ export default function Admin() {
                 ) : (
                   <>
                     <Rocket className="w-5 h-5" />
-                    🚀 SYNC ALL STREAMS
+                    SYNC ALL STREAMS
                   </>
                 )}
               </button>
@@ -433,10 +510,33 @@ export default function Admin() {
                 <RefreshCw className={`w-4 h-4 ${migrateMutation.isPending ? 'animate-spin' : ''}`} />
                 Import from JSON
               </button>
+              <button
+                onClick={handlePurgeBrokenStreams}
+                disabled={isPurging || isGlobalScraping}
+                className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white text-sm transition-colors disabled:opacity-50"
+                data-testid="button-purge-broken"
+              >
+                {isPurging ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {purgeProgress ? `${purgeProgress.current}/${purgeProgress.total} (${purgeProgress.deleted} deleted)` : 'Purging...'}
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-5 h-5" />
+                    Purge Broken Streams
+                  </>
+                )}
+              </button>
             </div>
             {scrapeProgress && (
               <div className="mt-2 text-sm text-slate-400">
                 Currently scraping: <span className="text-cyan-400">{scrapeProgress.currentChannel}</span>
+              </div>
+            )}
+            {purgeProgress && (
+              <div className="mt-2 text-sm text-slate-400">
+                Checking: <span className="text-red-400">{purgeProgress.currentChannel}</span> | Deleted: <span className="text-red-400">{purgeProgress.deleted}</span>
               </div>
             )}
           </div>
