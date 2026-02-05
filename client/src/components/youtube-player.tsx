@@ -111,9 +111,6 @@ function YouTubePlayerInner({
   // Memoize the stable channel ID for live streams - fallback when no videoId
   const stableChannelId = useMemo(() => channelId || null, [channelId]);
 
-  // PRODUCTION ORIGIN FIX: Hardcode production domain for YouTube postMessage handshake
-  // This stops postMessage security warnings in production console
-  const origin = 'https://openbento.tv';
 
   // MediaSession API for background play support
   const setupMediaSession = useCallback(() => {
@@ -161,7 +158,8 @@ function YouTubePlayerInner({
       playerRef.current = null;
     }
 
-    // Standard 2026 YouTube IFrame API handshake parameters - hardcoded strings
+    // MULTI-VIEW PARITY: Hardcoded production domain for YouTube postMessage handshake
+    // Both origin AND widget_referrer must match to bypass domain blocks
     // rel: 0 = no related videos, iv_load_policy: 3 = hide video annotations
     const playerVars: Record<string, string | number> = {
       autoplay: 1,
@@ -170,8 +168,8 @@ function YouTubePlayerInner({
       rel: 0,
       iv_load_policy: 3,
       enablejsapi: 1,
-      origin: origin,
-      widget_referrer: window.location.href,
+      origin: 'https://openbento.tv',
+      widget_referrer: 'https://openbento.tv',
       playsinline: 1,
     };
 
@@ -233,31 +231,40 @@ function YouTubePlayerInner({
             const errorCode = event.data;
             console.log('[YouTube] Player error:', errorCode, 'for widget:', widgetId);
             
-            // ERROR 150 FALLBACK BYPASS: Immediately swap to latestVideoId on embed restriction
-            if (errorCode === 150 && latestVideoIdRef.current && playerRef.current) {
-              console.log('[YouTube] Error 150 detected - swapping to latestVideoId:', latestVideoIdRef.current);
-              try {
-                playerRef.current.loadVideoById(latestVideoIdRef.current);
-                // Notify parent to update widget state
-                onErrorRef.current?.(150);
-                return; // Don't trigger self-healing, we've already swapped
-              } catch (e) {
-                console.log('[YouTube] Failed to swap to latestVideoId:', e);
+            // BYPASS RESTRICTION ON 150: Force latestVideoId immediately without API re-check
+            if (errorCode === 150) {
+              if (latestVideoIdRef.current && playerRef.current) {
+                console.log('[YouTube] Error 150 - FORCING latestVideoId swap:', latestVideoIdRef.current);
+                try {
+                  playerRef.current.loadVideoById(latestVideoIdRef.current);
+                  console.log('[YouTube] Successfully swapped to latestVideoId');
+                  // Notify parent to update widget state (videoId, isPlayingLatestVideo, etc.)
+                  onErrorRef.current?.(150);
+                  return; // Success - don't trigger any further healing
+                } catch (e) {
+                  console.log('[YouTube] loadVideoById failed, notifying parent:', e);
+                }
+              } else {
+                console.log('[YouTube] Error 150 - no latestVideoId available, requesting parent to fetch');
               }
+              // Always notify parent for error 150 so it can fetch latestVideoId if needed
+              onErrorRef.current?.(150);
+              return;
+            }
+            
+            // Error 101: Account-level restriction - nothing we can do
+            if (errorCode === 101) {
+              console.log('[YouTube] Error 101 - account restriction, no fallback available');
+              onErrorRef.current?.(101);
+              return;
             }
             
             // PRODUCTION FIX: Only trigger re-fetch for recoverable errors
             // 100 = Video not found (re-fetch may find new video)
             // 2 = Invalid video ID (re-fetch may fix)
             // 5 = HTML5 player error (transient, re-fetch may help)
-            // DO NOT re-fetch for 101/150 - these are restriction errors, searching again won't fix them
             if ([2, 5, 100].includes(errorCode)) {
               console.log('[YouTube] Triggering onError callback for re-fetch (recoverable error)');
-              onErrorRef.current?.(errorCode);
-            } else if ([101, 150].includes(errorCode)) {
-              console.log('[YouTube] Embed restriction error (101/150) - NOT triggering re-fetch');
-              // These are embedding restrictions, not "offline" - don't trigger self-healing
-              // Pass error code to parent for badge/state updates
               onErrorRef.current?.(errorCode);
             }
           },
