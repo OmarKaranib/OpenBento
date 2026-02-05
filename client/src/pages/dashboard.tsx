@@ -1308,7 +1308,7 @@ const MasterControlDashboard = ({
             const pureIframeSrc = getYouTubeEmbedUrl(widget.videoId);
             return (
               <iframe
-                key={widget.id}
+                key={`${widget.id}-${widget.videoId}`}
                 ref={(el) => { iframeRefs.current[widget.id] = el; }}
                 src={pureIframeSrc}
                 className="w-full h-full"
