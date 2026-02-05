@@ -148,10 +148,14 @@ function YouTubePlayerInner({
     if (!containerRef.current || !window.YT?.Player) return;
     if (isInitializedRef.current && playerRef.current) return; // Already initialized
     
-    // Cleanup existing player - just null the reference, don't call destroy()
-    // Calling destroy() causes "removeChild" errors due to React/IFrame API conflicts
-    if (playerRef.current) {
-      playerRef.current = null;
+    // PRODUCTION FIX: Wrap cleanup in try...catch to prevent removeChild crashes
+    // If the node is already gone, ignore the error instead of crashing the dashboard
+    try {
+      if (playerRef.current) {
+        playerRef.current = null;
+      }
+    } catch (e) {
+      console.log('[YouTube] Cleanup ignored (node already removed):', e);
     }
 
     // MULTI-VIEW PARITY: Hardcoded production domain for YouTube postMessage handshake
@@ -227,43 +231,53 @@ function YouTubePlayerInner({
             const errorCode = event.data;
             console.log('[YouTube] Player error:', errorCode, 'for widget:', widgetId);
             
-            // BYPASS RESTRICTION ON 150: Force latestVideoId immediately without API re-check
+            // BYPASS RESTRICTION ON 150: Force latestVideoId with 300ms delay
+            // Delay gives React time to finish first render before triggering second
             if (errorCode === 150) {
               if (latestVideoIdRef.current && playerRef.current) {
-                console.log('[YouTube] Error 150 - FORCING latestVideoId swap:', latestVideoIdRef.current);
-                try {
-                  playerRef.current.loadVideoById(latestVideoIdRef.current);
-                  console.log('[YouTube] Successfully swapped to latestVideoId');
-                  // Notify parent to update widget state (videoId, isPlayingLatestVideo, etc.)
-                  onErrorRef.current?.(150);
-                  return; // Success - don't trigger any further healing
-                } catch (e) {
-                  console.log('[YouTube] loadVideoById failed, notifying parent:', e);
-                }
+                console.log('[YouTube] Error 150 - FORCING latestVideoId swap in 300ms:', latestVideoIdRef.current);
+                setTimeout(() => {
+                  try {
+                    if (playerRef.current) {
+                      playerRef.current.loadVideoById(latestVideoIdRef.current!);
+                      console.log('[YouTube] Successfully swapped to latestVideoId');
+                    }
+                    onErrorRef.current?.(150);
+                  } catch (e) {
+                    console.log('[YouTube] loadVideoById failed, notifying parent:', e);
+                    onErrorRef.current?.(150);
+                  }
+                }, 300);
+                return; // Exit early - callback will fire after delay
               } else {
                 console.log('[YouTube] Error 150 - no latestVideoId available, requesting parent to fetch');
               }
               // Always notify parent for error 150 so it can fetch latestVideoId if needed
-              onErrorRef.current?.(150);
+              setTimeout(() => onErrorRef.current?.(150), 300);
               return;
             }
             
-            // ERROR 101 OVERRIDE: Also force latestVideoId fallback on account restriction
+            // ERROR 101 OVERRIDE: Also force latestVideoId fallback with 300ms delay
             if (errorCode === 101) {
               if (latestVideoIdRef.current && playerRef.current) {
-                console.log('[YouTube] Error 101 - FORCING latestVideoId swap:', latestVideoIdRef.current);
-                try {
-                  playerRef.current.loadVideoById(latestVideoIdRef.current);
-                  console.log('[YouTube] Successfully swapped to latestVideoId on error 101');
-                  onErrorRef.current?.(101);
-                  return;
-                } catch (e) {
-                  console.log('[YouTube] loadVideoById failed on error 101:', e);
-                }
+                console.log('[YouTube] Error 101 - FORCING latestVideoId swap in 300ms:', latestVideoIdRef.current);
+                setTimeout(() => {
+                  try {
+                    if (playerRef.current) {
+                      playerRef.current.loadVideoById(latestVideoIdRef.current!);
+                      console.log('[YouTube] Successfully swapped to latestVideoId on error 101');
+                    }
+                    onErrorRef.current?.(101);
+                  } catch (e) {
+                    console.log('[YouTube] loadVideoById failed on error 101:', e);
+                    onErrorRef.current?.(101);
+                  }
+                }, 300);
+                return;
               } else {
                 console.log('[YouTube] Error 101 - no latestVideoId, requesting parent to fetch');
               }
-              onErrorRef.current?.(101);
+              setTimeout(() => onErrorRef.current?.(101), 300);
               return;
             }
             
@@ -307,13 +321,17 @@ function YouTubePlayerInner({
     }
 
     return () => {
-      if (playerRef.current) {
-        // CRITICAL: Do NOT call destroy() here - it causes "removeChild" errors
-        // when React has already unmounted the DOM node. Just null the reference
-        // and let React handle DOM cleanup naturally.
-        // The YouTube IFrame will be garbage collected along with the DOM element.
-        playerRef.current = null;
-        isInitializedRef.current = false;
+      // PRODUCTION FIX: Wrap cleanup in try...catch to prevent removeChild crashes
+      try {
+        if (playerRef.current) {
+          // CRITICAL: Do NOT call destroy() here - it causes "removeChild" errors
+          // when React has already unmounted the DOM node. Just null the reference
+          // and let React handle DOM cleanup naturally.
+          playerRef.current = null;
+          isInitializedRef.current = false;
+        }
+      } catch (e) {
+        console.log('[YouTube] Cleanup ignored on unmount (node already removed):', e);
       }
     };
   }, [stableVideoId, initializePlayer]); // Only reinitialize when videoId changes
@@ -324,10 +342,14 @@ function YouTubePlayerInner({
       console.log(`[YouTube] RefreshKey changed from ${lastRefreshKeyRef.current} to ${refreshKey} - reinitializing player`);
       lastRefreshKeyRef.current = refreshKey;
       
-      // Reset player reference for reinitialize - don't call destroy() to avoid removeChild errors
-      if (playerRef.current) {
-        playerRef.current = null;
-        isInitializedRef.current = false;
+      // PRODUCTION FIX: Wrap cleanup in try...catch to prevent removeChild crashes
+      try {
+        if (playerRef.current) {
+          playerRef.current = null;
+          isInitializedRef.current = false;
+        }
+      } catch (e) {
+        console.log('[YouTube] Cleanup ignored on refresh (node already removed):', e);
       }
       
       // Reinitialize after a short delay

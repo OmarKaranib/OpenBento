@@ -78,6 +78,10 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Shared Constants Module:** `channel-constants.ts` centralizes VERIFIED_CHANNELS, STATIC_LIVE_IDS, FALLBACK_VIDEO_IDS with normalized lowercase lookups to avoid circular imports.
 - **YouTube Player Cleanup Fix:** Player cleanup no longer calls `destroy()` - just nulls references. This prevents "removeChild" errors from React/YouTube API lifecycle conflicts.
 - **Dev Error Suppression:** Global error handler in `main.tsx` suppresses harmless YouTube removeChild errors in development mode only.
+- **Production Crash Prevention (Feb 2026):** All player cleanup/unmount logic wrapped in try...catch - if node is already gone, error is ignored instead of crashing dashboard.
+- **Swap Delay Fix (Feb 2026):** Error 150/101 handling waits 300ms before triggering fallback ID swap, giving React time to finish first render before forcing second.
+- **Origin Hardcode (Feb 2026):** playerVars uses literal `origin: 'https://openbento.tv'` string, never `window.location.origin`.
+- **Badge Migration Confirmed (Feb 2026):** LIVE badge completely removed from dashboard widgets - exists ONLY in library sidebar.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.
