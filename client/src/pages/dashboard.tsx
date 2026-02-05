@@ -1323,7 +1323,7 @@ const MasterControlDashboard = ({
           }
           return (
             <YouTubePlayer
-              key={widget.id}
+              key={`${widget.id}-${widget.videoId || ''}`}
               widgetId={widget.id}
               videoId={widget.videoId}
               channelId={widget.youtubeChannelId}

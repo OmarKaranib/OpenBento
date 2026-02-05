@@ -89,6 +89,7 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Blacklist Restricted Fallbacks (Feb 2026):** BLACKLISTED_VIDEO_IDS set in channel-constants.ts prevents using known restricted videos (e.g., siyW0GOBtbo). Shows "Content Restricted" UI immediately if fallback is blacklisted.
 - **Dynamic Live-ID Priority (Feb 2026):** Background discovery now updates videoId immediately when a new live ID is found (not just badge). Al Jazeera removed from STATIC_LIVE_IDS to use fresh API results. VERIFIED_MANUAL channels (ABC News, Reuters, Sky News) keep locked IDs. Zero-Gate still uses cached ID for initial render, then swaps if background finds better.
 - **Global Verified Sync (Feb 2026):** Updated Sky News liveId/fallbackId to 9Auq9mYxFEe, Reuters fallbackId to _Xh7Sst91yQ. Added YDvsBbKfLPA and IEmqRjrIkF0 to BLACKLISTED_VIDEO_IDS. Content Restricted UI now shows "View on YouTube" button instead of black box when 150 error occurs twice.
+- **Loop Termination Final (Feb 2026):** Same-ID swap check added - if fallbackId === currentVideoId, swap is aborted. React Safety Key: YouTubePlayer key now includes videoId (key={widget.id + videoId}) forcing clean component recreation. Static fallbacks: Sky News bPqD3p24KjI, ABC News iipR5yUp36o, Reuters IEmqRjrIkF0.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.

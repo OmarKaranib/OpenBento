@@ -311,6 +311,13 @@ function YouTubePlayerInner({
             if (errorCode === 150) {
               const fallbackId = latestVideoIdRef.current;
               
+              // SAME-ID SWAP CHECK: Abort if fallback equals current video
+              if (fallbackId && fallbackId === stableVideoId) {
+                console.log('[YouTube] Error 150 - ABORT: fallbackId same as currentVideoId:', fallbackId);
+                setContentRestricted(true);
+                return;
+              }
+              
               // BLACKLIST CHECK: If fallback is known to be restricted, don't use it
               if (fallbackId && isVideoBlacklisted(fallbackId)) {
                 console.log('[YouTube] Error 150 - fallback video is BLACKLISTED:', fallbackId);
@@ -345,6 +352,13 @@ function YouTubePlayerInner({
             // ERROR 101 OVERRIDE: Also force latestVideoId fallback with 300ms delay
             if (errorCode === 101) {
               const fallbackId = latestVideoIdRef.current;
+              
+              // SAME-ID SWAP CHECK: Abort if fallback equals current video
+              if (fallbackId && fallbackId === stableVideoId) {
+                console.log('[YouTube] Error 101 - ABORT: fallbackId same as currentVideoId:', fallbackId);
+                setContentRestricted(true);
+                return;
+              }
               
               // BLACKLIST CHECK: If fallback is known to be restricted, don't use it
               if (fallbackId && isVideoBlacklisted(fallbackId)) {
