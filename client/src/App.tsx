@@ -885,15 +885,16 @@ function AppContent() {
         // Use cached API call (will use localStorage cache if fresh, otherwise fetch)
         const result = await searchChannelLiveStream(channel.channelId, false);
         
-        // TRUST THE VIDEOID: If we have a videoId (from API or static), the stream is LIVE
-        const videoId = result.liveVideoId || null;
+        // LATEST-VIDEO FALLBACK: Use liveVideoId if live, otherwise fall back to latestVideoId
+        // This ensures user sees actual content instead of "Video Unavailable"
+        const videoId = result.liveVideoId || result.latestVideoId || null;
+        const isLive = !!result.liveVideoId; // Only LIVE if liveVideoId exists
         
-        // LINE 818 OVERRIDE: If videoId exists, force ONLINE status - no secondary checks
+        // If we have ANY videoId (live or latest), we have content to show
         const hasVideoId = !!videoId;
-        const isLive = hasVideoId; // videoId presence = LIVE, period
-        const isOffline = !hasVideoId; // Only offline if no videoId exists
+        const isOffline = !hasVideoId; // Only offline if no videoId at all
         
-        console.log(`[ChannelClick] @${channel.channelId}: videoId=${videoId}, TRUST_VIDEOID: ${hasVideoId ? 'LIVE' : 'OFFLINE'}`);
+        console.log(`[ChannelClick] @${channel.channelId}: liveVideoId=${result.liveVideoId}, latestVideoId=${result.latestVideoId}, using=${videoId}, isLive=${isLive}`);
         
         // Build the widget data with channelHandle for future "Check Again"
         const widgetData: Partial<Widget> = {

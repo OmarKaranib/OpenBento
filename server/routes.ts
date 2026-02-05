@@ -166,6 +166,7 @@ export async function registerRoutes(
         channelId: result.channelId,
         isLive: result.isLive,
         liveVideoId: result.liveVideoId,
+        latestVideoId: result.latestVideoId, // LATEST-VIDEO FALLBACK: Returns latest video when not live
         title: result.title,
         apiError: result.apiError || false,
       });
@@ -174,6 +175,7 @@ export async function registerRoutes(
       res.status(500).json({ 
         channelHandle,
         isLive: false,
+        latestVideoId: null,
         apiError: true,
         error: String(error) 
       });

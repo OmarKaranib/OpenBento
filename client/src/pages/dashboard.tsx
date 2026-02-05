@@ -906,14 +906,34 @@ const MasterControlDashboard = ({
           ));
           checkedVideoIds.current.delete(widget.videoId || '');
           return;
+        } else if (result.latestVideoId) {
+          // LATEST-VIDEO FALLBACK: Channel not live, but we have their latest video
+          // Swap in the latestVideoId so user sees actual content instead of "Video Unavailable"
+          console.log(`[CheckAgain] Channel @${widget.channelHandle} not live - using latest video fallback: ${result.latestVideoId}`);
+          setWidgets(prev => prev.map(w => 
+            w.id === widgetId 
+              ? { 
+                  ...w, 
+                  videoId: result.latestVideoId, 
+                  youtubeChannelId: result.channelId,
+                  url: '', 
+                  lastRefresh: Date.now(), 
+                  isOffline: false, // Has content to show
+                  isLive: false, // Not live, but playing latest video
+                  apiError: false,
+                  error: null,
+                  embedBlocked: false,
+                } 
+              : w
+          ));
+          return;
         } else {
           const hasApiError = result.apiError === true;
           console.log(`[CheckAgain] Channel @${widget.channelHandle} is not currently live (apiError: ${hasApiError})`);
           setWidgets(prev => prev.map(w => 
             w.id === widgetId ? { 
               ...w, 
-              isOffline: true, 
-              isLive: false,
+              isLive: false, // Badge only - no offline overlay
               apiError: hasApiError,
               error: null,
               embedBlocked: false,

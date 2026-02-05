@@ -281,11 +281,52 @@ export async function resolveChannelHandle(
   }
 }
 
+// LATEST-VIDEO FALLBACK: Get the most recent video from a channel's uploads playlist
+// Uses playlistItems.list (1 unit) - much cheaper than search.list (100 units)
+export async function getLatestVideoId(
+  channelId: string,
+  apiKey: string
+): Promise<{ videoId: string | null; title: string | null; apiError?: boolean }> {
+  // First, get the channel's uploads playlist ID (derived from channelId: UC... -> UU...)
+  // YouTube uploads playlist ID is always channelId with first 'UC' replaced by 'UU'
+  const uploadsPlaylistId = channelId.replace(/^UC/, 'UU');
+  
+  // Fetch the most recent video from the uploads playlist (1 quota unit)
+  const url = `${YOUTUBE_API_BASE}/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=1&key=${apiKey}`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error('[YouTube API] Uploads playlist fetch failed:', response.status);
+      return { videoId: null, title: null, apiError: true };
+    }
+    
+    const data = await response.json();
+    const items = data.items || [];
+    
+    if (items.length === 0) {
+      console.log('[YouTube API] No videos in uploads playlist');
+      return { videoId: null, title: null, apiError: false };
+    }
+    
+    const latestVideo = items[0];
+    const videoId = latestVideo.snippet?.resourceId?.videoId;
+    const title = latestVideo.snippet?.title;
+    
+    console.log(`[YouTube API] Latest video fallback: ${videoId} - "${title}"`);
+    return { videoId, title, apiError: false };
+  } catch (error) {
+    console.error('[YouTube API] Uploads playlist fetch error:', error);
+    return { videoId: null, title: null, apiError: true };
+  }
+}
+
 // Search for current live stream by channel handle/username - returns new live video ID
+// LATEST-VIDEO FALLBACK: If no live stream, returns latestVideoId from uploads playlist
 export async function searchChannelLiveStream(
   channelHandle: string,
   apiKey: string
-): Promise<{ isLive: boolean; liveVideoId: string | null; channelId: string | null; title: string | null; apiError?: boolean }> {
+): Promise<{ isLive: boolean; liveVideoId: string | null; latestVideoId: string | null; channelId: string | null; title: string | null; apiError?: boolean }> {
   console.log(`[YouTube API] Searching live stream for channel handle: ${channelHandle}`);
   
   // First resolve the channel handle to a channel ID
@@ -294,7 +335,7 @@ export async function searchChannelLiveStream(
   if (!channelId) {
     console.log(`[YouTube API] Could not resolve channel handle: ${channelHandle}`);
     // Could not resolve handle - this is an API error, not genuinely offline
-    return { isLive: false, liveVideoId: null, channelId: null, title: null, apiError: true };
+    return { isLive: false, liveVideoId: null, latestVideoId: null, channelId: null, title: null, apiError: true };
   }
   
   console.log(`[YouTube API] Resolved ${channelHandle} -> channelId: ${channelId}`);
@@ -302,8 +343,21 @@ export async function searchChannelLiveStream(
   // Now search for live streams from this channel
   const liveResult = await checkChannelLiveStatus(channelId, apiKey);
   
+  // LATEST-VIDEO FALLBACK: If no live stream found, get the latest video instead
+  // This ensures users see actual content instead of "Video Unavailable"
+  let latestVideoId: string | null = null;
+  if (!liveResult.isLive && !liveResult.apiError) {
+    console.log(`[YouTube API] No live stream for ${channelHandle}, fetching latest video fallback...`);
+    const latestResult = await getLatestVideoId(channelId, apiKey);
+    if (latestResult.videoId) {
+      latestVideoId = latestResult.videoId;
+      console.log(`[YouTube API] Using latest video fallback: ${latestVideoId}`);
+    }
+  }
+  
   return {
     ...liveResult,
+    latestVideoId,
     channelId,
   };
 }

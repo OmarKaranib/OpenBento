@@ -420,14 +420,14 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, isBlocked, onSave
         ) : (
           getFallbackIcon()
         )}
-        {isLive && (
+        {isLive === true && (
           <div className="live-badge absolute -top-1 -right-1 w-[1rem] h-[1rem] bg-red-500 rounded-full animate-pulse" />
         )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-[0.6rem]">
           <p className="text-[1.2rem] font-semibold text-slate-200 truncate">{channel.name}</p>
-          {isLive && (
+          {isLive === true && (
             <span className="live-badge flex items-center gap-[0.3rem] px-[0.5rem] py-[0.1rem] bg-red-500/20 border border-red-500/50 rounded-full text-[0.8rem] font-bold text-red-400 uppercase tracking-wider" data-testid={`live-badge-${channel.id}`}>
               <span className="live-badge w-[0.6rem] h-[0.6rem] rounded-full bg-red-500 animate-pulse" />
               Live

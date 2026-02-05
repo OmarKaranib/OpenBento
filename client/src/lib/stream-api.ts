@@ -377,9 +377,11 @@ export async function checkChannelLiveStatus(channelId: string, forceRefresh: bo
 }
 
 // Search for current live stream by channel handle - returns new live video ID (with smart tiered cache)
+// LATEST-VIDEO FALLBACK: Also returns latestVideoId when channel is not live
 export async function searchChannelLiveStream(channelHandle: string, forceRefresh: boolean = false): Promise<{
   isLive: boolean;
   liveVideoId: string | null;
+  latestVideoId: string | null; // LATEST-VIDEO FALLBACK: Returns latest video when not live
   channelId: string | null;
   title: string | null;
   fromCache?: boolean;
@@ -394,6 +396,7 @@ export async function searchChannelLiveStream(channelHandle: string, forceRefres
       return {
         isLive: cached.isLive,
         liveVideoId: cached.liveVideoId,
+        latestVideoId: null, // Cache doesn't store latestVideoId
         channelId: null,
         title: cached.title,
         fromCache: true,
@@ -410,7 +413,7 @@ export async function searchChannelLiveStream(channelHandle: string, forceRefres
       // On API error (403, etc.), mark as API error - NOT genuine offline
       console.warn(`[StreamAPI] API error for handle ${channelHandle}: ${response.status}`);
       setCachedLiveStatus(cacheKey, { isLive: false, liveVideoId: null, title: null }, true);
-      return { isLive: false, liveVideoId: null, channelId: null, title: null, fromCache: false, apiError: true };
+      return { isLive: false, liveVideoId: null, latestVideoId: null, channelId: null, title: null, fromCache: false, apiError: true };
     }
     const data = await response.json();
     
@@ -420,6 +423,7 @@ export async function searchChannelLiveStream(channelHandle: string, forceRefres
     const result = {
       isLive: hasVideoId ? true : (data.isLive ?? false),
       liveVideoId: data.liveVideoId ?? null,
+      latestVideoId: data.latestVideoId ?? null, // LATEST-VIDEO FALLBACK
       channelId: data.channelId ?? null,
       title: data.title ?? null,
     };
@@ -432,6 +436,6 @@ export async function searchChannelLiveStream(channelHandle: string, forceRefres
     console.error('[StreamAPI] Search channel live stream failed:', error);
     // Cache as API error on exception
     setCachedLiveStatus(cacheKey, { isLive: false, liveVideoId: null, title: null }, true);
-    return { isLive: false, liveVideoId: null, channelId: null, title: null, fromCache: false, apiError: true };
+    return { isLive: false, liveVideoId: null, latestVideoId: null, channelId: null, title: null, fromCache: false, apiError: true };
   }
 }
