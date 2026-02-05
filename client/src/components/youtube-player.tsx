@@ -19,13 +19,13 @@ class YouTubeErrorBoundary extends Component<{ children: ReactNode; widgetId: st
   }
 
   componentDidCatch(error: Error) {
-    // Log but don't crash - especially for removeChild errors
+    // SILENCE: Use debug level for removeChild errors to keep console clean
     if (error.message?.includes('removeChild') || error.message?.includes('NotFoundError')) {
-      console.log('[YouTube ErrorBoundary] Caught removeChild error, recovering:', error.message);
+      console.debug('[YouTube ErrorBoundary] Caught removeChild error, recovering silently');
       // Reset error state after a tick to allow recovery
       setTimeout(() => this.setState({ hasError: false }), 100);
     } else {
-      console.error('[YouTube ErrorBoundary] Unexpected error:', error);
+      console.debug('[YouTube ErrorBoundary] Caught error:', error.message);
     }
   }
 

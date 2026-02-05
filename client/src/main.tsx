@@ -11,10 +11,11 @@ import "./index.css";
 // and use stopImmediatePropagation to prevent any other handlers from seeing it
 
 // Capture phase error listener - runs BEFORE other handlers including Vite overlay
+// SILENCE: Use debug level to keep console clean
 window.addEventListener('error', (event) => {
   const msg = event.message || event.error?.message || '';
   if (msg.includes("removeChild") || msg.includes("NotFoundError") || msg.includes("not a child")) {
-    console.log('[DOM Shield] Captured removeChild error in capture phase');
+    // Silent suppression - no console output for cleaner UX
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
@@ -25,10 +26,9 @@ window.addEventListener('error', (event) => {
 // Global error handler - backup for window.onerror
 const originalOnError = window.onerror;
 window.onerror = function(message, source, lineno, colno, error) {
-  // Catch removeChild/NotFoundError from YouTube IFrame API
+  // Catch removeChild/NotFoundError from YouTube IFrame API - silent suppression
   if (message && typeof message === 'string' && 
       (message.includes("removeChild") || message.includes("NotFoundError") || message.includes("not a child"))) {
-    console.log('[DOM Shield] Suppressed removeChild error via onerror');
     return true; // Prevent error from propagating
   }
   if (originalOnError) {
@@ -41,7 +41,7 @@ window.onerror = function(message, source, lineno, colno, error) {
 window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason?.message || String(event.reason);
   if (reason.includes("removeChild") || reason.includes("NotFoundError") || reason.includes("not a child")) {
-    console.log('[DOM Shield] Caught unhandled rejection with removeChild error');
+    // Silent suppression - no console output
     event.preventDefault();
     event.stopImmediatePropagation();
   }
