@@ -710,9 +710,11 @@ export function WidgetSidebar({
           let isLive = false;
           
           if (channel.platform === 'youtube') {
-            // YouTube: use isLive from API if defined, otherwise assume live (for fallback channels)
+            // BADGE FINAL FIX: Only show LIVE badge if API specifically returns isLive: true
+            // (which comes from liveBroadcastContent: 'live')
+            // Do NOT default to true - must have explicit API confirmation
             const hasApiData = 'isLive' in channel;
-            isLive = hasApiData ? (channel as any).isLive === true : true;
+            isLive = hasApiData ? (channel as any).isLive === true : false;
           } else if (channel.platform === 'twitch') {
             // Twitch: use isLive from API if defined, otherwise check with fallback
             const hasApiData = 'isLive' in channel;
@@ -1164,7 +1166,7 @@ export function WidgetSidebar({
                           key={channel.id} 
                           channel={channel as TrendingChannel} 
                           onClick={() => onChannelClick?.(channel as TrendingChannel)}
-                          isLive={true}
+                          isLive={liveStatuses[channel.id]?.isLive}
                           showSaveButton={true}
                           isSaved={true}
                           onRemove={() => removeFromPersonalLibrary(channel.id)}

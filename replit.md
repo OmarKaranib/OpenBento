@@ -71,6 +71,10 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Zero-Gate Rendering:** When clicking a channel, player renders immediately using verifiedLiveId > STATIC_LIVE_IDS > savedVideoId priority. No API live-check wait.
 - **150/101 Override:** Both Error 150 (embed restriction) and Error 101 (account restriction) now force latestVideoId fallback without showing "Unavailable" screen.
 - **Conditional Badge:** LIVE badges removed from dashboard widgets. In sidebar, LIVE badge only shows when API confirms `isLive: true`.
+- **VERIFIED_CHANNELS:** Manual ID Map with hardcoded 24/7 Live IDs for ABC News, Reuters, Sky News that API CANNOT overwrite.
+- **FALLBACK_VIDEO_IDS:** Hardcoded Featured Video defaults for 150/101 error recovery - always has a fallback ready.
+- **Pure IFrame Fallback:** When IFrame API throws postMessage errors and no fallback available, switches to standard HTML iframe with origin=https://openbento.tv.
+- **Badge Final Fix:** Sidebar LIVE badge only shows when API specifically returns `liveBroadcastContent: 'live'` - no defaults.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.

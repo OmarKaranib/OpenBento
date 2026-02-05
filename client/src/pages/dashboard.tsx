@@ -342,45 +342,66 @@ const MasterControlDashboard = ({
   const handleVideoError = useCallback(async (widget: Widget, errorCode?: number) => {
     console.log(`[Self-Healing] Error detected for widget: ${widget.id}, errorCode: ${errorCode}`);
 
+    // Import hardcoded fallback helper from shared constants (avoids circular import)
+    const { getFallbackVideoId } = await import('@/lib/channel-constants');
+
     // THE 150/101 OVERRIDE: Force latestVideoId fallback on restriction errors
     // Both errors swap to latestVideoId without showing "Unavailable" screen
     if (errorCode === 150 || errorCode === 101) {
       const errorType = errorCode === 150 ? 'EmbedRestriction' : 'AccountRestriction';
+      const channelHandle = widget.channelHandle || widget.youtubeChannelId;
       
-      // If player already swapped to latestVideoId, just update state
-      if (widget.latestVideoId) {
-        console.log(`[${errorType}Fallback] Widget ${widget.id} using latestVideoId: ${widget.latestVideoId}`);
+      // HARDCODED FALLBACK PRIORITY:
+      // 1. widget.latestVideoId (already stored fallback)
+      // 2. getFallbackVideoId(channelHandle) (hardcoded Featured Video default - normalized lookup)
+      // 3. API fetch (last resort)
+      const hardcodedFallback = getFallbackVideoId(channelHandle);
+      const fallbackId = widget.latestVideoId || hardcodedFallback;
+      
+      if (fallbackId) {
+        console.log(`[${errorType}Fallback] Widget ${widget.id} using fallbackId: ${fallbackId} (source: ${widget.latestVideoId ? 'stored' : 'hardcoded'})`);
         setWidgets(prev => prev.map(w => 
           w.id === widget.id 
-            ? { ...w, videoId: widget.latestVideoId, isLive: false, isPlayingLatestVideo: true, isOffline: false, apiError: false } 
+            ? { ...w, videoId: fallbackId, latestVideoId: fallbackId, isLive: false, isPlayingLatestVideo: true, isOffline: false, apiError: false, usePureIframe: false } 
             : w
         ));
         return;
       }
-      // If no latestVideoId, fetch it from the API using channel handle
-      const channelHandle = widget.channelHandle || widget.youtubeChannelId;
+      
+      // If no hardcoded fallback, try API fetch
       if (channelHandle) {
-        console.log(`[${errorType}Fallback] Fetching latestVideoId for ${channelHandle}...`);
+        console.log(`[${errorType}Fallback] No hardcoded fallback, fetching from API for ${channelHandle}...`);
         try {
           const { searchChannelLiveStream } = await import('@/lib/stream-api');
           const status = await searchChannelLiveStream(channelHandle, true);
           if (status?.latestVideoId) {
-            console.log(`[${errorType}Fallback] Got latestVideoId: ${status.latestVideoId}`);
+            console.log(`[${errorType}Fallback] Got latestVideoId from API: ${status.latestVideoId}`);
             setWidgets(prev => prev.map(w => 
               w.id === widget.id 
-                ? { ...w, videoId: status.latestVideoId, latestVideoId: status.latestVideoId, isLive: false, isPlayingLatestVideo: true, isOffline: false, apiError: false } 
+                ? { ...w, videoId: status.latestVideoId, latestVideoId: status.latestVideoId, isLive: false, isPlayingLatestVideo: true, isOffline: false, apiError: false, usePureIframe: false } 
                 : w
             ));
             return;
           }
         } catch (e) {
-          console.log(`[${errorType}Fallback] Failed to fetch latestVideoId:`, e);
+          console.log(`[${errorType}Fallback] API fetch failed:`, e);
         }
       }
-      // If we couldn't get latestVideoId, just update badge state (no offline)
-      setWidgets(prev => prev.map(w => 
-        w.id === widget.id ? { ...w, isLive: false, apiError: false } : w
-      ));
+      
+      // PURE IFRAME FALLBACK: If no fallback ID available but videoId exists, switch to pure iframe mode
+      // This avoids IFrame API postMessage errors by using standard HTML iframe
+      // Only enable if widget.videoId exists - otherwise there's nothing to render
+      if (widget.videoId) {
+        console.log(`[${errorType}Fallback] No fallback available, switching to pure iframe mode with existing videoId: ${widget.videoId}`);
+        setWidgets(prev => prev.map(w => 
+          w.id === widget.id ? { ...w, isLive: false, apiError: false, usePureIframe: true } : w
+        ));
+      } else {
+        console.log(`[${errorType}Fallback] No fallback available and no videoId - cannot switch to pure iframe`);
+        setWidgets(prev => prev.map(w => 
+          w.id === widget.id ? { ...w, isLive: false, apiError: false } : w
+        ));
+      }
       return;
     }
 
@@ -1262,6 +1283,23 @@ const MasterControlDashboard = ({
         // YouTube IFrame API with MediaSession for background play, rel=0, iv_load_policy=3
         // Key is ONLY widget.id for stability - refreshKey prop handles manual refresh
         if (widget.isYouTube && (widget.videoId || widget.youtubeChannelId)) {
+          // PURE IFRAME FALLBACK: Use standard HTML iframe if IFrame API throws postMessage errors
+          if (widget.usePureIframe && widget.videoId) {
+            const pureIframeSrc = getYouTubeEmbedUrl(widget.videoId);
+            return (
+              <iframe
+                key={widget.id}
+                ref={(el) => { iframeRefs.current[widget.id] = el; }}
+                src={pureIframeSrc}
+                className="w-full h-full"
+                style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
+                title={`YouTube Pure - ${widget.id}`}
+                allow="autoplay; encrypted-media; fullscreen"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            );
+          }
           return (
             <YouTubePlayer
               key={widget.id}

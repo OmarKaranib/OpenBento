@@ -7,26 +7,12 @@ import { MobileGuard } from '@/components/mobile-guard';
 import { useViralAds, AdBlockData } from '@/components/ad-block';
 import { searchChannelLiveStream } from '@/lib/stream-api';
 
-// STATIC HANDLE MAPPING: Permanent Live IDs for major 24/7 channels
-// Keyed by channelHandle (as used in links.json), NOT YouTube channel IDs
-// These channels have stable live stream IDs that rarely change
-// Using static IDs saves API quota and ensures immediate playback
-const STATIC_LIVE_IDS: Record<string, string> = {
-  // News Networks - 24/7 Live (keyed by channelHandle from links.json)
-  'skynews': '9Auq9mYxFEe',           // Sky News
-  'SkyNews': '9Auq9mYxFEe',           // Sky News (alternate case)
-  'ABCNews': 'w_Ma8oQLmSM',           // ABC News Live
-  'NASA': 'tz4THVd5rdI',              // NASA TV
-  'NASAtelevision': '21X5lGlDOfg',    // NASA TV (alternate channel)
-  'NBCNews': 'sVEGHdVRIoU',           // NBC News NOW
-  'MSNBC': 'nlKwThfNggk',             // MSNBC Live
-  'LofiGirl': 'jfKfPfyJRdk',          // Lofi Girl (24/7 beats)
-  'AlJazeeraEnglish': 'kxPCFljwJws',  // Al Jazeera English
-  'France24English': 'l8PMl7tUDIE',   // France 24 English
-  'France24english': 'l8PMl7tUDIE',   // France 24 (alternate case)
-  'NDTV': 'NvqKZHpKs-g',              // NDTV 24x7
-  'Reuters': '9hBfiYUpyVo',           // Reuters
-};
+// Import channel constants from shared module to avoid circular imports
+import { 
+  getVerifiedChannel, 
+  getStaticLiveId, 
+  getFallbackVideoId 
+} from '@/lib/channel-constants';
 
 // Static background - High-contrast light mode
 const StaticBackground = () => {
@@ -98,6 +84,7 @@ export interface Widget {
   isOffline?: boolean;
   isLive?: boolean;
   isPlayingLatestVideo?: boolean; // True when playing latestVideoId fallback (not a live stream)
+  usePureIframe?: boolean; // True when IFrame API fails and we fall back to standard HTML iframe
   latestVideoId?: string | null; // Fallback videoId for when live stream is not available (most recent upload)
   verifiedLiveId?: string | null; // Static 24/7 embed ID - use immediately for Zero-Gate Rendering
   customColor?: string;
@@ -825,17 +812,22 @@ function AppContent() {
     
     // For YouTube channels: ZERO-GATE RENDERING - render immediately, no live check wait
     if (channel.platform === 'youtube' && channel.channelId) {
-      // STATIC HANDLE MAPPING: Check if this is a major 24/7 channel with permanent ID
-      const staticVideoId = STATIC_LIVE_IDS[channel.channelId];
+      // Use helper functions from shared constants (normalized lookup)
+      const verifiedChannel = getVerifiedChannel(channel.channelId);
+      const staticVideoId = getStaticLiveId(channel.channelId);
+      const fallbackVideoId = getFallbackVideoId(channel.channelId);
       
-      // ZERO-GATE RENDERING PRIORITY:
-      // 1. verifiedLiveId (static 24/7 embed) - highest priority, always live
-      // 2. Static mapping (STATIC_LIVE_IDS) - known permanent streams
-      // 3. Channel's saved videoId - from previous API calls
-      const immediateVideoId = channel.verifiedLiveId || staticVideoId || channel.videoId || null;
+      // ZERO-GATE RENDERING PRIORITY (STRICT):
+      // 1. VERIFIED_CHANNELS liveId - manually verified 24/7 streams (CANNOT be overwritten)
+      // 2. channel.verifiedLiveId - stored verified ID  
+      // 3. STATIC_LIVE_IDS - secondary known permanent streams
+      // 4. Channel's saved videoId - from previous API calls
+      const immediateVideoId = verifiedChannel?.liveId || channel.verifiedLiveId || staticVideoId || channel.videoId || null;
+      // Store fallback ID for 150/101 error recovery
+      const channelFallbackId = verifiedChannel?.fallbackId || fallbackVideoId || channel.latestVideoId || null;
       
       if (immediateVideoId) {
-        const source = channel.verifiedLiveId ? 'VERIFIED' : staticVideoId ? 'STATIC' : 'SAVED';
+        const source = verifiedChannel?.liveId ? 'VERIFIED_MANUAL' : channel.verifiedLiveId ? 'VERIFIED' : staticVideoId ? 'STATIC' : 'SAVED';
         console.log(`[ChannelClick] ZERO-GATE RENDER (${source}): @${channel.channelId} -> ${immediateVideoId} (no wait)`);
         
         // ZERO-GATE RENDERING: Render embed immediately - no API call needed
@@ -852,8 +844,8 @@ function AppContent() {
           kickChannel: null,
           isLive: true, // Force LIVE when we have a videoId
           isOffline: false,
-          verifiedLiveId: channel.verifiedLiveId || null, // Store for future reference
-          latestVideoId: channel.latestVideoId || null, // Fallback for 150/101 errors
+          verifiedLiveId: verifiedChannel?.liveId || channel.verifiedLiveId || null, // Store verified ID
+          latestVideoId: channelFallbackId, // Hardcoded fallback for 150/101 errors
           isPlayingLatestVideo: false, // Not using fallback initially
           apiError: false,
           error: null,
