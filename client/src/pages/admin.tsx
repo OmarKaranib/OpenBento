@@ -524,7 +524,7 @@ export default function Admin() {
                 ) : (
                   <>
                     <Trash2 className="w-5 h-5" />
-                    Purge Broken Streams
+                    🧹 Purge Broken Streams
                   </>
                 )}
               </button>
