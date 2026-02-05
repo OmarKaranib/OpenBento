@@ -44,6 +44,7 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Smart Tiered localStorage Cache:** YouTube API responses are cached in `localStorage` with tiered TTLs for online, offline, and API error states.
 - **ARCHITECTURE PIVOT: Multi-View Replication:** Decouples API from rendering, forcing embeds if `videoId` exists. Live status checks only update badge color.
 - **TRUST THE VIDEOID:** If YouTube API returns a `liveVideoId`, the stream is considered LIVE. `liveBroadcastContent` values 'live' and 'upcoming' are treated as ONLINE.
+- **Latest-Video Fallback:** When a YouTube channel is not live, the system fetches their most recent video from the uploads playlist (using playlistItems.list API - only 1 quota unit vs 100 for search.list). This ensures users see actual content instead of "Video Unavailable". The channel ID prefix is converted from UC to UU to get the uploads playlist ID.
 - **Corporate Footer:** Professional footer with copyright and links to terms and privacy pages.
 - **Note Widget:** Editable text area.
 - **Spacer Widget:** Empty placeholder.
