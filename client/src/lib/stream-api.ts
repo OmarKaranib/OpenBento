@@ -39,7 +39,7 @@ const CACHE_TTL_MS = 30000;
 // Smart localStorage cache for YouTube live status with tiered TTLs
 const LIVE_STATUS_CACHE_KEY = 'openbento_live_status_cache';
 const CACHE_VERSION_KEY = 'openbento_cache_version';
-const CURRENT_CACHE_VERSION = '2.1.0'; // Increment to force cache flush - new API key + apiError fix
+const CURRENT_CACHE_VERSION = '2.2.0'; // Increment to force cache flush - trust videoId logic
 const ONLINE_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes for LIVE streams
 const OFFLINE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes for offline streams (faster re-check)
 const API_ERROR_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes for API errors (retry soon)
@@ -355,19 +355,19 @@ export async function checkChannelLiveStatus(channelId: string, forceRefresh: bo
     }
     const data = await response.json();
     
-    // Server now returns apiError flag to distinguish API failures from genuine offline
-    const apiError = data.apiError === true;
+    // TRUST THE VIDEOID: If API returns a videoId, the stream is LIVE - no further validation
+    const hasVideoId = !!data.liveVideoId;
     
     const result = {
-      isLive: data.isLive ?? false,
+      isLive: hasVideoId ? true : (data.isLive ?? false),
       liveVideoId: data.liveVideoId ?? null,
       title: data.title ?? null,
     };
     
-    // Cache the result with correct apiError flag from server
-    setCachedLiveStatus(channelId, result, apiError);
+    // Cache the result
+    setCachedLiveStatus(channelId, result, false);
     
-    return { ...result, fromCache: false, apiError };
+    return { ...result, fromCache: false, apiError: false };
   } catch (error) {
     console.error('[StreamAPI] Channel live check failed:', error);
     // Cache as API error on exception
@@ -414,20 +414,20 @@ export async function searchChannelLiveStream(channelHandle: string, forceRefres
     }
     const data = await response.json();
     
-    // Server now returns apiError flag to distinguish API failures from genuine offline
-    const apiError = data.apiError === true;
+    // TRUST THE VIDEOID: If API returns a videoId, the stream is LIVE - no further validation
+    const hasVideoId = !!data.liveVideoId;
     
     const result = {
-      isLive: data.isLive ?? false,
+      isLive: hasVideoId ? true : (data.isLive ?? false),
       liveVideoId: data.liveVideoId ?? null,
       channelId: data.channelId ?? null,
       title: data.title ?? null,
     };
     
-    // Cache the result with correct apiError flag from server
-    setCachedLiveStatus(cacheKey, { isLive: result.isLive, liveVideoId: result.liveVideoId, title: result.title }, apiError);
+    // Cache the result
+    setCachedLiveStatus(cacheKey, { isLive: result.isLive, liveVideoId: result.liveVideoId, title: result.title }, false);
     
-    return { ...result, fromCache: false, apiError };
+    return { ...result, fromCache: false, apiError: false };
   } catch (error) {
     console.error('[StreamAPI] Search channel live stream failed:', error);
     // Cache as API error on exception

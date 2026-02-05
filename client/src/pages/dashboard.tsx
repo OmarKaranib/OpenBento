@@ -1059,11 +1059,8 @@ const MasterControlDashboard = ({
     ));
   };
 
-  // Offline Placeholder Component with prominent OFFLINE badge or System Maintenance for API errors
+  // Offline Placeholder Component with prominent OFFLINE badge
   const OfflinePlaceholder = ({ widget }: { widget: Widget }) => {
-    // Check if this is an API error (403, etc.) vs genuine offline
-    const isApiError = widget.apiError === true;
-    
     // Check if this is a sports channel that's "Live during Games"
     const sportsChannelIds = ['nfl-network', 'nba-tv', 'espn-live', 'NFL', 'NBA', 'espn'];
     const widgetUrl = widget.url?.toLowerCase() || '';
@@ -1073,33 +1070,6 @@ const MasterControlDashboard = ({
       widgetChannelId.includes(id.toLowerCase()) ||
       widget.id?.includes(id.toLowerCase())
     );
-    
-    // If API error, show System Maintenance message instead of OFFLINE
-    if (isApiError) {
-      return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/50 p-[1.5rem] relative">
-          {/* MAINTENANCE Badge */}
-          <div className="absolute top-[0.8rem] left-[0.8rem] z-50">
-            <span className="px-[0.8rem] py-[0.3rem] bg-yellow-600 text-white text-[0.9rem] font-bold tracking-wide rounded shadow-lg uppercase">
-              MAINTENANCE
-            </span>
-          </div>
-          <AlertCircle className="w-[3rem] h-[3rem] text-yellow-500 mb-[1rem]" />
-          <h3 className="text-[1.3rem] font-semibold text-yellow-500 mb-[0.5rem]">System Maintenance</h3>
-          <p className="text-slate-400 text-center text-[1rem] mb-[1rem]">
-            Live status verification is temporarily unavailable. The stream may still be live.
-          </p>
-          <button
-            onClick={() => handleRefreshWidget(widget.id)}
-            className="px-[1.2rem] py-[0.6rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300"
-            data-testid={`button-retry-${widget.id}`}
-          >
-            <RefreshCw className="w-[1.2rem] h-[1.2rem]" />
-            Retry
-          </button>
-        </div>
-      );
-    }
     
     if (isSportsChannel) {
       return (
