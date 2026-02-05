@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useCallback, memo, Component, ReactNode, useState } from 'react';
-import { Lock } from 'lucide-react';
+import { Lock, ExternalLink } from 'lucide-react';
 import { isVideoBlacklisted } from '@/lib/channel-constants';
 
 // DOM EXCEPTION SHIELD: Error Boundary to catch YouTube player errors
@@ -492,9 +492,14 @@ function YouTubePlayerInner({
     }
   }, [volume]);
 
-  // LOOP PROTECTION: Show Content Restricted when both primary and fallback fail
+  // LOOP PROTECTION: Show Content Restricted when both primary and fallback fail (150 error twice)
   if (contentRestricted) {
     console.log('[YouTube] Content Restricted for widget:', widgetId);
+    const youtubeUrl = stableVideoId 
+      ? `https://www.youtube.com/watch?v=${stableVideoId}`
+      : stableChannelId 
+        ? `https://www.youtube.com/@${stableChannelId}`
+        : 'https://www.youtube.com';
     return (
       <div
         ref={containerRef}
@@ -503,7 +508,17 @@ function YouTubePlayerInner({
         <div className="text-center text-slate-300">
           <Lock className="w-6 h-6 mx-auto mb-2 text-slate-400" />
           <p className="text-sm font-medium">Content Restricted</p>
-          <p className="text-xs mt-1 text-slate-400">This video cannot be embedded</p>
+          <p className="text-xs mt-1 text-slate-400 mb-3">This video cannot be embedded</p>
+          <a
+            href={youtubeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-medium rounded-md transition-colors"
+            data-testid="button-view-on-youtube"
+          >
+            <ExternalLink className="w-3 h-3" />
+            View on YouTube
+          </a>
         </div>
       </div>
     );

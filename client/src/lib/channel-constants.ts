@@ -3,14 +3,16 @@
 // Keyed by channelHandle (lowercase normalized) - API results are IGNORED for these channels
 export const VERIFIED_CHANNELS: Record<string, { liveId: string; fallbackId: string; name: string }> = {
   'abcnews': { liveId: 'w_Ma8oQLmSM', fallbackId: 'iipR5yUp36o', name: 'ABC News' },
-  'reuters': { liveId: 'NvKaVw0X3oU', fallbackId: 'IEmqRjrIkF0', name: 'Reuters' },
-  'skynews': { liveId: '9Auq9mYxFEe', fallbackId: 'YDvsBbKfLPA', name: 'Sky News' }, // Updated: siyW0GOBtbo is restricted
+  'reuters': { liveId: 'NvKaVw0X3oU', fallbackId: '_Xh7Sst91yQ', name: 'Reuters' }, // Updated: verified open-embed fallback
+  'skynews': { liveId: '9Auq9mYxFEe', fallbackId: '9Auq9mYxFEe', name: 'Sky News' }, // Updated: verified open-embed ID
 };
 
 // BLACKLISTED_VIDEO_IDS: Known restricted videos that should NOT be used as fallbacks
 // If a video ID is in this list, skip it and show "Content Restricted" UI
 export const BLACKLISTED_VIDEO_IDS: Set<string> = new Set([
   'siyW0GOBtbo', // Sky News - restricted
+  'YDvsBbKfLPA', // Sky News - restricted
+  'IEmqRjrIkF0', // Reuters - restricted
   // Add more known restricted IDs here as discovered
 ]);
 
@@ -33,8 +35,8 @@ export const STATIC_LIVE_IDS: Record<string, string> = {
 // Keyed by channelHandle (lowercase normalized)
 export const FALLBACK_VIDEO_IDS: Record<string, string> = {
   'abcnews': 'iipR5yUp36o',
-  'reuters': 'IEmqRjrIkF0',
-  'skynews': 'YDvsBbKfLPA', // Updated: siyW0GOBtbo is restricted
+  'reuters': '_Xh7Sst91yQ', // Updated: verified open-embed fallback
+  'skynews': '9Auq9mYxFEe', // Updated: verified open-embed ID
   'nasa': 'xCrPD7tfcr0',
   'nbcnews': 'Xfzjnt6p5jU',
   'msnbc': 'B8AQJB9c3u8',
