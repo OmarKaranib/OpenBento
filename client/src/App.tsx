@@ -98,6 +98,7 @@ export interface Widget {
   isOffline?: boolean;
   isLive?: boolean;
   isPlayingLatestVideo?: boolean; // True when playing latestVideoId fallback (not a live stream)
+  latestVideoId?: string | null; // Fallback videoId for when live stream is not available (most recent upload)
   customColor?: string;
   apiError?: boolean; // True if YouTube API returned 403/error - show "System Maintenance" instead of "Offline"
 }

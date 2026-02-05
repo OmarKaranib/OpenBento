@@ -339,14 +339,31 @@ const MasterControlDashboard = ({
     });
   }, []);
 
-  const handleVideoError = useCallback(async (widget: Widget) => {
-    console.log(`[Self-Healing] Error detected for widget: ${widget.id}`);
+  const handleVideoError = useCallback(async (widget: Widget, errorCode?: number) => {
+    console.log(`[Self-Healing] Error detected for widget: ${widget.id}, errorCode: ${errorCode}`);
+
+    // ERROR 150 FALLBACK BYPASS: Player already swapped to latestVideoId, just update state
+    if (errorCode === 150 && widget.latestVideoId) {
+      console.log(`[Error150Bypass] Widget ${widget.id} swapped to latestVideoId: ${widget.latestVideoId}`);
+      setWidgets(prev => prev.map(w => 
+        w.id === widget.id 
+          ? { ...w, videoId: widget.latestVideoId, isLive: false, isPlayingLatestVideo: true, isOffline: false } 
+          : w
+      ));
+      return; // Don't trigger self-healing, player already swapped
+    }
 
     // ARCHITECTURE PIVOT: Never set isOffline=true if videoId exists
     // Only update isLive for badge state - embed should always render
     setWidgets(prev => prev.map(w => 
       w.id === widget.id ? { ...w, isLive: false } : w // Badge only, not offline
     ));
+
+    // Skip self-healing for embed restriction errors (101/150)
+    if (errorCode === 101 || errorCode === 150) {
+      console.log(`[Self-Healing] Skipping self-heal for embed restriction error ${errorCode}`);
+      return;
+    }
 
     if (widget.isYouTube && widget.youtubeChannelId) {
       const channelName = widget.channelName || widget.youtubeChannelId;
@@ -1225,6 +1242,7 @@ const MasterControlDashboard = ({
               widgetId={widget.id}
               videoId={widget.videoId}
               channelId={widget.youtubeChannelId}
+              latestVideoId={widget.latestVideoId}
               isMuted={widget.isMuted}
               isPaused={widget.isPaused}
               volume={widget.volume}
@@ -1233,7 +1251,7 @@ const MasterControlDashboard = ({
               onReady={() => {
                 console.log(`[YouTube] Player ready: ${widget.id}`);
               }}
-              onError={() => handleVideoError(widget)}
+              onError={(errorCode) => handleVideoError(widget, errorCode)}
               onMutedChange={(muted) => {
                 setWidgets(prev => prev.map(w =>
                   w.id === widget.id ? { ...w, isMuted: muted } : w
