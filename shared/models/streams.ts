@@ -120,12 +120,14 @@ export const channels = pgTable("channels", {
   url: text("url"),
   isLive: boolean("is_live").default(true),
   isManualOverride: boolean("is_manual_override").default(false),
+  rank: integer("rank").default(999),
   lastUpdated: timestamp("last_updated").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("idx_channels_platform").on(table.platform),
   index("idx_channels_category").on(table.category),
+  index("idx_channels_rank").on(table.rank),
 ]);
 
 export const insertChannelSchema = createInsertSchema(channels).omit({

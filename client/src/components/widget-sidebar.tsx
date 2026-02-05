@@ -807,18 +807,24 @@ export function WidgetSidebar({
       );
     }
     
-    // DYNAMIC RANK SORTING: Live streams pinned to top, offline streams at bottom
-    // Sort by live status: online (true) first, then unknown (undefined), then offline (false)
+    // CHANNEL RANKING: Primary sort by admin-defined rank (ascending), secondary by live status
+    // Lower rank = higher priority (rank 1 shows first)
     filtered = [...filtered].sort((a, b) => {
+      // Primary sort: Admin-defined rank (lower = higher priority)
+      const adminRankA = (a as any).rank ?? 999;
+      const adminRankB = (b as any).rank ?? 999;
+      
+      if (adminRankA !== adminRankB) {
+        return adminRankA - adminRankB;
+      }
+      
+      // Secondary sort: Live status (live first, then unknown, then offline)
       const statusA = liveStatuses[a.id];
       const statusB = liveStatuses[b.id];
+      const liveRankA = statusA?.isLive === true ? 2 : statusA?.isLive === false ? 0 : 1;
+      const liveRankB = statusB?.isLive === true ? 2 : statusB?.isLive === false ? 0 : 1;
       
-      // Get live status values (true = 2, undefined = 1, false = 0)
-      const rankA = statusA?.isLive === true ? 2 : statusA?.isLive === false ? 0 : 1;
-      const rankB = statusB?.isLive === true ? 2 : statusB?.isLive === false ? 0 : 1;
-      
-      // Sort descending (live first, then unknown, then offline)
-      return rankB - rankA;
+      return liveRankB - liveRankA;
     });
     
     return filtered;

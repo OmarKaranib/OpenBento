@@ -24,6 +24,7 @@ interface Channel {
   url: string | null;
   isLive: boolean | null;
   isManualOverride: boolean | null;
+  rank: number | null;
   lastUpdated: string | null;
 }
 
@@ -634,6 +635,7 @@ export default function Admin() {
                     <th className="pb-3 pr-4">Category</th>
                     <th className="pb-3 pr-4">Video ID</th>
                     <th className="pb-3 pr-4">Status</th>
+                    <th className="pb-3 pr-4">Rank</th>
                     <th className="pb-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -715,6 +717,16 @@ export default function Admin() {
                               <option value="offline">Offline</option>
                             </select>
                           </td>
+                          <td className="py-3 pr-4">
+                            <input
+                              type="number"
+                              value={editingChannel.rank ?? 999}
+                              onChange={(e) => setEditingChannel({ ...editingChannel, rank: parseInt(e.target.value) || 999 })}
+                              className="w-16 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm text-center"
+                              min="1"
+                              placeholder="999"
+                            />
+                          </td>
                           <td className="py-3 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button
@@ -754,6 +766,7 @@ export default function Admin() {
                               {channel.isLive ? 'Live' : 'Offline'}
                             </span>
                           </td>
+                          <td className="py-3 pr-4 text-slate-400 text-center">{channel.rank ?? 999}</td>
                           <td className="py-3 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button
