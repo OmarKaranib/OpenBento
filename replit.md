@@ -91,6 +91,8 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Global Verified Sync (Feb 2026):** Updated Sky News liveId/fallbackId to 9Auq9mYxFEe, Reuters fallbackId to _Xh7Sst91yQ. Added YDvsBbKfLPA and IEmqRjrIkF0 to BLACKLISTED_VIDEO_IDS. Content Restricted UI now shows "View on YouTube" button instead of black box when 150 error occurs twice.
 - **Loop Termination Final (Feb 2026):** Same-ID swap check added - if fallbackId === currentVideoId, swap is aborted. React Safety Key: YouTubePlayer key now includes videoId (key={widget.id + videoId}) forcing clean component recreation. Static fallbacks: Sky News bPqD3p24KjI, ABC News iipR5yUp36o, Reuters IEmqRjrIkF0.
 - **Production Space Optimization (Feb 2026):** Request dropdown added to header (idea/bug mailto links). Promo code PRO2FREE displayed in pricing modal. Footer removed to maximize grid space. Legal links (Terms/Privacy) moved to sidebar bottom in small dimmed text. Final YouTube Shield: strict if (iframe.parentNode === container) check in safeCleanupPlayer prevents NotFoundError.
+- **Feedback System (Feb 2026):** /feedback page with Category/Description/Email form. Submissions sent via Resend email integration to support@openbento.tv. Request dropdown routes to /feedback?category=idea or /feedback?category=bug.
+- **Nuclear YouTube Fix (Feb 2026):** When error 150 occurs TWICE (after swap attempt), component switches from YT.Player to standard HTML <iframe> with origin=https://openbento.tv. This bypasses postMessage errors and embed restrictions. useNuclearIframe state triggers pure HTML5 video embed.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.

@@ -7,6 +7,7 @@ import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerC
 import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, verifyVideoIsLive, searchChannelLiveStream, checkVideoLiveStatusById } from "./services/youtube-api";
 import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema } from "@shared/schema";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import { getUncachableResendClient } from "./services/resend-client";
 
 // Admin email list - used for admin access and auto-premium
 const ADMIN_EMAILS = [
@@ -796,6 +797,60 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error('[Stripe] Checkout error:', error);
       res.status(500).json({ error: error.message || 'Failed to create checkout session' });
+    }
+  });
+
+  // Feedback endpoint - sends email via Resend
+  app.post("/api/feedback", async (req: Request, res: Response) => {
+    try {
+      const { category, description, email } = req.body;
+      
+      if (!category || !description) {
+        return res.status(400).json({ error: "Category and description are required" });
+      }
+      
+      if (!['idea', 'bug'].includes(category)) {
+        return res.status(400).json({ error: "Invalid category" });
+      }
+      
+      const { client, fromEmail } = await getUncachableResendClient();
+      
+      const categoryLabel = category === 'idea' ? 'New Idea' : 'Bug Report';
+      const subjectLine = `[OpenBento ${categoryLabel}] Feedback Received`;
+      
+      // Escape HTML to prevent injection
+      const escapeHtml = (str: string) => str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+      
+      const safeDescription = escapeHtml(description).replace(/\n/g, '<br />');
+      const safeEmail = escapeHtml(email || 'Anonymous');
+      
+      await client.emails.send({
+        from: fromEmail,
+        to: 'support@openbento.tv',
+        subject: subjectLine,
+        html: `
+          <h2>OpenBento Feedback - ${categoryLabel}</h2>
+          <p><strong>Category:</strong> ${categoryLabel}</p>
+          <p><strong>From:</strong> ${safeEmail}</p>
+          <hr />
+          <p><strong>Description:</strong></p>
+          <p>${safeDescription}</p>
+          <hr />
+          <p style="color: #666; font-size: 12px;">Sent from OpenBento Feedback Form</p>
+        `,
+      });
+      
+      console.log(`[Feedback] Sent ${category} feedback${email ? ` from ${email}` : ''}`);
+      
+      res.json({ success: true, message: "Feedback sent successfully" });
+    } catch (error) {
+      console.error('[Feedback] Error sending feedback:', error);
+      res.status(500).json({ error: "Failed to send feedback. Please try again later." });
     }
   });
 

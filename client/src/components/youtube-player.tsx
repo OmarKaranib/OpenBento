@@ -169,6 +169,9 @@ function YouTubePlayerInner({
   // Content Restricted state - shown when both primary and fallback fail
   const [contentRestricted, setContentRestricted] = useState(false);
   
+  // NUCLEAR YouTube Fix: Use standard HTML iframe instead of YT.Player on error 150
+  const [useNuclearIframe, setUseNuclearIframe] = useState(false);
+  
   // Use refs to track current state without causing re-renders
   const isMutedRef = useRef(isMuted);
   const isPausedRef = useRef(isPaused);
@@ -313,11 +316,12 @@ function YouTubePlayerInner({
             const errorCode = event.data;
             console.log('[YouTube] Player error:', errorCode, 'for widget:', widgetId, 'hasSwapped:', hasSwappedRef.current);
             
-            // LOOP PROTECTION: Only allow ONE swap per session
-            // If we've already swapped and still get error 150/101, show Content Restricted
+            // LOOP PROTECTION + NUCLEAR FIX: Only allow ONE swap per session
+            // If we've already swapped and still get error 150/101, switch to NUCLEAR HTML iframe
             if ((errorCode === 150 || errorCode === 101) && hasSwappedRef.current) {
-              console.log('[YouTube] LOOP PROTECTION: Already swapped once, showing Content Restricted');
-              setContentRestricted(true);
+              console.log('[YouTube] NUCLEAR FIX: Already swapped once, switching to standard HTML iframe');
+              // Don't show Content Restricted - use nuclear iframe instead
+              setUseNuclearIframe(true);
               return;
             }
             
@@ -430,6 +434,8 @@ function YouTubePlayerInner({
     // Reset loop protection when videoId changes (new content)
     hasSwappedRef.current = false;
     setContentRestricted(false);
+    // Reset nuclear iframe mode on videoId change so we can try YT.Player again
+    setUseNuclearIframe(false);
     
     if (window.YT?.Player) {
       initializePlayer();
@@ -466,6 +472,8 @@ function YouTubePlayerInner({
       // Reset loop protection on manual refresh (allows retry)
       hasSwappedRef.current = false;
       setContentRestricted(false);
+      // Reset nuclear iframe mode on refresh so we can try YT.Player again
+      setUseNuclearIframe(false);
       
       // DOM EXCEPTION SHIELD: Use safe cleanup with parentNode check
       safeCleanupPlayer(playerRef.current, playerId);
@@ -520,6 +528,27 @@ function YouTubePlayerInner({
       }
     }
   }, [volume]);
+
+  // NUCLEAR YouTube Fix: Use standard HTML iframe instead of YT.Player
+  // This bypasses postMessage errors and embed restrictions on error 150 twice
+  if (useNuclearIframe && stableVideoId) {
+    console.log('[YouTube] NUCLEAR FIX: Rendering standard HTML iframe for:', stableVideoId);
+    return (
+      <div
+        ref={containerRef}
+        className="w-full h-full"
+      >
+        <iframe
+          src={`https://www.youtube.com/embed/${stableVideoId}?autoplay=1&mute=${isMuted ? 1 : 0}&origin=https://openbento.tv&playsinline=1&rel=0&modestbranding=1`}
+          className="w-full h-full border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+          data-testid={`nuclear-iframe-${widgetId}`}
+        />
+      </div>
+    );
+  }
 
   // LOOP PROTECTION: Show Content Restricted when both primary and fallback fail (150 error twice)
   if (contentRestricted) {

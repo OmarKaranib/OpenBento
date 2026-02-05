@@ -38,6 +38,7 @@ import MasterControlDashboard from "@/pages/dashboard";
 import Admin from "@/pages/admin";
 import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
+import Feedback from "@/pages/feedback";
 import { WidgetSidebar, TrendingChannel, WidgetTemplate, WIDGET_TEMPLATES } from '@/components/widget-sidebar';
 import { 
   DndContext, 
@@ -1092,6 +1093,7 @@ function AppContent() {
             <Route path="/admin" component={Admin} />
             <Route path="/terms" component={Terms} />
             <Route path="/privacy" component={Privacy} />
+            <Route path="/feedback" component={Feedback} />
             <Route component={NotFound} />
           </Switch>
         </SortableContext>

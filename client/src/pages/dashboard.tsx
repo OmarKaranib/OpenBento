@@ -1822,22 +1822,22 @@ const MasterControlDashboard = ({
                 <ChevronDown className="w-[1rem] h-[1rem]" />
               </button>
               <div className="absolute right-0 top-full mt-[0.4rem] w-[16rem] bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[10001]">
-                <a
-                  href="mailto:support@openbento.tv?subject=New%20Idea%20for%20OpenBento"
+                <Link
+                  href="/feedback?category=idea"
                   className="flex items-center gap-[0.8rem] px-[1.2rem] py-[1rem] hover-elevate rounded-t-lg text-[1.1rem] text-slate-300"
                   data-testid="link-request-idea"
                 >
                   <Lightbulb className="w-[1.2rem] h-[1.2rem] text-amber-400" />
                   Add a new idea
-                </a>
-                <a
-                  href="mailto:support@openbento.tv?subject=Bug%20Report%20for%20OpenBento"
+                </Link>
+                <Link
+                  href="/feedback?category=bug"
                   className="flex items-center gap-[0.8rem] px-[1.2rem] py-[1rem] hover-elevate rounded-b-lg text-[1.1rem] text-slate-300 border-t border-slate-700/50"
                   data-testid="link-request-bug"
                 >
                   <Bug className="w-[1.2rem] h-[1.2rem] text-red-400" />
                   Report a bug
-                </a>
+                </Link>
               </div>
             </div>
 
