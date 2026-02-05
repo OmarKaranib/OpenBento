@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from "./link-refresher";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerChannel } from "./services/pulse-cache";
-import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, verifyVideoIsLive, searchChannelLiveStream } from "./services/youtube-api";
+import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, verifyVideoIsLive, searchChannelLiveStream, checkVideoLiveStatusById } from "./services/youtube-api";
 import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema } from "@shared/schema";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
@@ -113,7 +113,8 @@ export async function registerRoutes(
     }
   });
 
-  // True Live Filter: Verify if a specific video is currently live
+  // QUOTA OPTIMIZATION: Uses videos.list (1 unit) instead of search.list (100 units)
+  // This is the preferred endpoint for checking live status when videoId is known
   app.get("/api/youtube/video-live/:videoId", async (req, res) => {
     const { videoId } = req.params;
     const apiKey = process.env.YOUTUBE_API_KEY;
@@ -126,11 +127,13 @@ export async function registerRoutes(
     }
     
     try {
-      const result = await verifyVideoIsLive(videoId, apiKey);
+      // Use checkVideoLiveStatusById which uses videos.list (1 unit)
+      const result = await checkVideoLiveStatusById(videoId, apiKey);
       res.json({
         videoId,
         isLive: result.isLive,
-        liveBroadcastContent: result.liveBroadcastContent,
+        liveVideoId: result.liveVideoId,
+        title: result.title,
         apiError: result.apiError || false,
       });
     } catch (error) {

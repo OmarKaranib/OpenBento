@@ -728,10 +728,13 @@ export function WidgetSidebar({
       setLiveStatuses(newStatuses);
     };
 
+    // QUOTA OPTIMIZATION: Only check Kick status on mount (Kick doesn't use YouTube API quota)
+    // YouTube status checks are disabled - user must manually click "Check Again"
     checkAllStatuses();
-
-    const interval = setInterval(checkAllStatuses, LIVE_STATUS_POLL_INTERVAL);
-    return () => clearInterval(interval);
+    
+    // Auto-refresh disabled to save YouTube API quota
+    console.log('[Sidebar] Auto-refresh disabled for quota optimization. Use "Check Again" for manual refresh.');
+    return () => {};
   }, [checkKickLiveStatus, channels]);
 
   // Ref to track current liveStatuses for hourly revalidation without causing re-renders
@@ -740,76 +743,13 @@ export function WidgetSidebar({
     liveStatusesRef.current = liveStatuses;
   }, [liveStatuses]);
 
-  // HOURLY REVALIDATION: Deep YouTube API check every 60 minutes
-  // This triggers YouTube eventType=live search to detect newly live streams
-  // AUTOMATIC PROMOTION: When offline stream returns live, status flips and it jumps to top
-  // Uses forceRefresh=true to bypass 30-min localStorage cache for fresh API data
+  // QUOTA OPTIMIZATION: Hourly revalidation DISABLED to save YouTube API quota
+  // Previously used search.list (100 units per call) which exhausted quota quickly
+  // Now live status is only updated via manual "Check Again" button clicks
+  // which uses videos.list (1 unit per call) - 100x more efficient
   useEffect(() => {
-    const hourlyRevalidation = async () => {
-      console.log('[HourlyRevalidation] Starting deep YouTube API live check (forceRefresh=true)...');
-      const now = Date.now();
-      const currentStatuses = liveStatusesRef.current;
-      const updatedStatuses: Record<string, LiveStatus> = { ...currentStatuses };
-      let promotedCount = 0;
-      const promotedChannels: string[] = [];
-
-      for (const channel of channels) {
-        if (channel.platform === 'youtube' && channel.channelId) {
-          try {
-            // Use cached API function with forceRefresh=true to bypass localStorage cache
-            const data = await checkChannelLiveStatusAPI(channel.channelId, true);
-            
-            // TRUST THE VIDEOID: If API returns videoId, stream is LIVE - no secondary checks
-            const hasVideoId = !!data.liveVideoId;
-            const isNowLive = hasVideoId || data.isLive === true;
-            
-            const wasOffline = currentStatuses[channel.id]?.isLive === false || currentStatuses[channel.id]?.isLive === undefined;
-            
-            // AUTOMATIC PROMOTION: Track when offline becomes live
-            if (wasOffline && isNowLive) {
-              console.log(`[HourlyRevalidation] PROMOTED: ${channel.name} is now LIVE! (videoId: ${data.liveVideoId})`);
-              promotedCount++;
-              promotedChannels.push(channel.id);
-            }
-            
-            updatedStatuses[channel.id] = {
-              channelId: channel.channelId,
-              isLive: isNowLive,
-              isOffline: !isNowLive,
-              apiError: false, // Trust the videoId - if we got a response, it's not an API error
-              lastChecked: now
-            };
-          } catch (error) {
-            console.error(`[HourlyRevalidation] Error checking ${channel.name}:`, error);
-            // Exception = API error - keep previous state rather than marking offline
-            const prevStatus = currentStatuses[channel.id];
-            updatedStatuses[channel.id] = {
-              channelId: channel.channelId,
-              isLive: prevStatus?.isLive ?? false,
-              isOffline: prevStatus?.isOffline ?? true,
-              apiError: true,
-              lastChecked: now
-            };
-          }
-        }
-      }
-      
-      // FORCE ARRAY REFRESH: State update triggers re-sort via useMemo dependency on liveStatuses
-      // Creating a new object reference guarantees React detects the change
-      setLiveStatuses({ ...updatedStatuses });
-      console.log(`[HourlyRevalidation] Complete. ${promotedCount} streams promoted to LIVE: [${promotedChannels.join(', ')}]`);
-    };
-
-    // Run hourly revalidation on mount (after a short delay to not conflict with initial check)
-    const initialDelay = setTimeout(hourlyRevalidation, 10000);
-
-    // Then run every 60 minutes
-    const hourlyInterval = setInterval(hourlyRevalidation, HOURLY_REVALIDATION_INTERVAL);
-
-    return () => {
-      clearTimeout(initialDelay);
-      clearInterval(hourlyInterval);
-    };
+    console.log('[Sidebar] HourlyRevalidation DISABLED for quota optimization. Use "Check Again" for manual refresh.');
+    return () => {};
   }, [channels]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {

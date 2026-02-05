@@ -444,15 +444,13 @@ const MasterControlDashboard = ({
       }
     };
     
-    // Run initial check after a short delay to allow widgets to render
-    const timeoutId = setTimeout(checkYouTubeLiveStatus, 2000);
-    
-    // Set up periodic revalidation interval
-    const intervalId = setInterval(checkYouTubeLiveStatus, REVALIDATION_INTERVAL_MS);
+    // QUOTA OPTIMIZATION: Disabled all auto-refresh to save API quota
+    // Live status is only updated when user manually clicks "Check Again" on a widget
+    // This saves 100x quota (videos.list = 1 unit vs search.list = 100 units)
+    console.log('[Dashboard] Auto-refresh disabled for quota optimization. Use "Check Again" for manual refresh.');
     
     return () => {
-      clearTimeout(timeoutId);
-      clearInterval(intervalId);
+      // No intervals to clean up
     };
   }, [widgets, setWidgets]);
 
@@ -828,17 +826,72 @@ const MasterControlDashboard = ({
     const widget = widgets.find(w => w.id === widgetId);
     if (!widget) return;
 
-    // For YouTube widgets with channelHandle, search for NEW live stream ID via YouTube Search API
-    if (widget.isYouTube && widget.channelHandle) {
-      console.log(`[CheckAgain] Searching for new live stream from @${widget.channelHandle} (forceRefresh=true)`);
+    // QUOTA OPTIMIZATION: Prefer videos.list (1 unit) over search.list (100 units)
+    // If widget has a videoId, check if it's still live using videos.list first
+    if (widget.isYouTube && widget.videoId) {
+      console.log(`[CheckAgain] QUOTA OPT: Using videos.list (1 unit) for videoId: ${widget.videoId}`);
       
       try {
-        // Use forceRefresh=true to bypass localStorage cache - user wants fresh data
+        const liveStatus = await checkVideoLiveStatus(widget.videoId);
+        
+        if (liveStatus.isLive) {
+          console.log(`[CheckAgain] Video ${widget.videoId} is LIVE (videos.list 1 unit)`);
+          setWidgets(prev => prev.map(w => 
+            w.id === widgetId 
+              ? { 
+                  ...w, 
+                  url: '', 
+                  lastRefresh: Date.now(), 
+                  isOffline: false,
+                  isLive: true,
+                  apiError: false,
+                  error: null,
+                  embedBlocked: false,
+                } 
+              : w
+          ));
+          return;
+        } else {
+          // Video is no longer live - mark as offline (genuine, not API error)
+          const hasApiError = liveStatus.apiError === true;
+          console.log(`[CheckAgain] Video ${widget.videoId} is OFFLINE (apiError: ${hasApiError})`);
+          setWidgets(prev => prev.map(w => 
+            w.id === widgetId ? { 
+              ...w, 
+              isOffline: true, 
+              isLive: false,
+              apiError: hasApiError,
+              error: null,
+              embedBlocked: false,
+            } : w
+          ));
+          return;
+        }
+      } catch (error) {
+        console.error('[CheckAgain] Error checking video status:', error);
+        setWidgets(prev => prev.map(w => 
+          w.id === widgetId ? { 
+            ...w, 
+            isOffline: true, 
+            isLive: false,
+            apiError: true,
+            error: null,
+          } : w
+        ));
+        return;
+      }
+    }
+    
+    // FALLBACK: Only use search.list (100 units) if no videoId exists
+    // This path should be rare - only for widgets without a stored videoId
+    if (widget.isYouTube && widget.channelHandle && !widget.videoId) {
+      console.warn(`[CheckAgain] EXPENSIVE: Using search.list (100 units) for @${widget.channelHandle} - no videoId stored`);
+      
+      try {
         const result = await searchChannelLiveStream(widget.channelHandle, true);
         
         if (result.isLive && result.liveVideoId) {
           console.log(`[CheckAgain] Found live stream: ${result.liveVideoId} for @${widget.channelHandle}`);
-          // Update widget with new live video ID - consistent state updates
           setWidgets(prev => prev.map(w => 
             w.id === widgetId 
               ? { 
@@ -855,19 +908,17 @@ const MasterControlDashboard = ({
                 } 
               : w
           ));
-          // Remove from checkedVideoIds so it will be re-checked
           checkedVideoIds.current.delete(widget.videoId || '');
           return;
         } else {
           const hasApiError = result.apiError === true;
           console.log(`[CheckAgain] Channel @${widget.channelHandle} is not currently live (apiError: ${hasApiError})`);
-          // Consistent state updates for offline - track API error vs genuine offline
           setWidgets(prev => prev.map(w => 
             w.id === widgetId ? { 
               ...w, 
               isOffline: true, 
               isLive: false,
-              apiError: hasApiError, // Track if this was an API error
+              apiError: hasApiError,
               error: null,
               embedBlocked: false,
             } : w
@@ -876,13 +927,12 @@ const MasterControlDashboard = ({
         }
       } catch (error) {
         console.error('[CheckAgain] Error searching for live stream:', error);
-        // Exception = API error
         setWidgets(prev => prev.map(w => 
           w.id === widgetId ? { 
             ...w, 
             isOffline: true, 
             isLive: false,
-            apiError: true, // Exception means API error
+            apiError: true,
             error: null,
           } : w
         ));
@@ -890,7 +940,7 @@ const MasterControlDashboard = ({
       }
     }
 
-    // For YouTube widgets without channelHandle, just check current videoId
+    // For YouTube widgets without channelHandle or videoId, just refresh
     if (widget.isYouTube && widget.videoId && !widget.channelHandle) {
       setWidgets(prev => prev.map(w => 
         w.id === widgetId && w.type === 'video' 

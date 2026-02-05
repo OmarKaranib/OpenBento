@@ -39,7 +39,7 @@ const CACHE_TTL_MS = 30000;
 // Smart localStorage cache for YouTube live status with tiered TTLs
 const LIVE_STATUS_CACHE_KEY = 'openbento_live_status_cache';
 const CACHE_VERSION_KEY = 'openbento_cache_version';
-const CURRENT_CACHE_VERSION = '2.3.0'; // Increment to force cache flush - zero-evidence live logic
+const CURRENT_CACHE_VERSION = '2.4.0'; // Increment to force cache flush - quota optimization (videos.list 1 unit)
 const ONLINE_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes for LIVE streams
 const OFFLINE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes for offline streams (faster re-check)
 const API_ERROR_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes for API errors (retry soon)

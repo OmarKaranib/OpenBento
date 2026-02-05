@@ -146,11 +146,53 @@ export async function checkStreamHealth(
   return { isHealthy: true, isLive };
 }
 
-// True Live Filter: Search for live streams from a specific channel using channelId
+// QUOTA OPTIMIZATION: Use videos.list (1 unit) instead of search.list (100 units)
+// Requires a known videoId - verifies if that specific video is currently live
+export async function checkVideoLiveStatusById(
+  videoId: string,
+  apiKey: string
+): Promise<{ isLive: boolean; liveVideoId: string | null; title: string | null; apiError?: boolean }> {
+  // Use YouTube Videos API (1 unit) instead of Search API (100 units)
+  const url = `${YOUTUBE_API_BASE}/videos?part=snippet,status&id=${videoId}&key=${apiKey}`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error('[YouTube API] Video status check failed:', response.status);
+      return { isLive: false, liveVideoId: null, title: null, apiError: true };
+    }
+    
+    const data = await response.json();
+    const video = data.items?.[0];
+    
+    if (!video) {
+      // Video not found - may have ended
+      return { isLive: false, liveVideoId: null, title: null, apiError: false };
+    }
+    
+    // FALSE OFFLINE FIX: Stream is LIVE unless liveBroadcastContent is explicitly 'none'
+    const liveBroadcastContent = video.snippet?.liveBroadcastContent;
+    const isLive = liveBroadcastContent !== 'none';
+    
+    return {
+      isLive,
+      liveVideoId: isLive ? videoId : null,
+      title: video.snippet?.title ?? null,
+      apiError: false,
+    };
+  } catch (error) {
+    console.error('[YouTube API] Video status check error:', error);
+    return { isLive: false, liveVideoId: null, title: null, apiError: true };
+  }
+}
+
+// DEPRECATED: Search-based channel live check - costs 100 units per call
+// Only used as fallback when no videoId is available (should be rare)
 export async function checkChannelLiveStatus(
   channelId: string,
   apiKey: string
 ): Promise<{ isLive: boolean; liveVideoId: string | null; title: string | null; apiError?: boolean }> {
+  console.warn('[YouTube API] Using expensive search.list (100 units) - should have videoId for videos.list (1 unit)');
   // Use YouTube Search API with channelId and eventType=live
   const url = `${YOUTUBE_API_BASE}/search?part=snippet&channelId=${channelId}&type=video&eventType=live&maxResults=1&key=${apiKey}`;
   
