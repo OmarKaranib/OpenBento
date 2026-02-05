@@ -97,6 +97,7 @@ export interface Widget {
   lastRefresh?: number;
   isOffline?: boolean;
   isLive?: boolean;
+  isPlayingLatestVideo?: boolean; // True when playing latestVideoId fallback (not a live stream)
   customColor?: string;
   apiError?: boolean; // True if YouTube API returned 403/error - show "System Maintenance" instead of "Offline"
 }
@@ -889,12 +890,13 @@ function AppContent() {
         // This ensures user sees actual content instead of "Video Unavailable"
         const videoId = result.liveVideoId || result.latestVideoId || null;
         const isLive = !!result.liveVideoId; // Only LIVE if liveVideoId exists
+        const isPlayingLatestVideo = !result.liveVideoId && !!result.latestVideoId; // Playing fallback latest video
         
         // If we have ANY videoId (live or latest), we have content to show
         const hasVideoId = !!videoId;
         const isOffline = !hasVideoId; // Only offline if no videoId at all
         
-        console.log(`[ChannelClick] @${channel.channelId}: liveVideoId=${result.liveVideoId}, latestVideoId=${result.latestVideoId}, using=${videoId}, isLive=${isLive}`);
+        console.log(`[ChannelClick] @${channel.channelId}: liveVideoId=${result.liveVideoId}, latestVideoId=${result.latestVideoId}, using=${videoId}, isLive=${isLive}, isPlayingLatestVideo=${isPlayingLatestVideo}`);
         
         // Build the widget data with channelHandle for future "Check Again"
         const widgetData: Partial<Widget> = {
@@ -908,8 +910,9 @@ function AppContent() {
           twitchChannel: null,
           isKick: false,
           kickChannel: null,
-          isLive: isLive, // TRUST THE VIDEOID
-          isOffline: isOffline, // Only offline if no videoId
+          isLive: isLive, // Only true if liveVideoId exists
+          isPlayingLatestVideo: isPlayingLatestVideo, // True when using latestVideoId fallback
+          isOffline: isOffline, // Only offline if no videoId at all
           apiError: false, // No secondary checks - videoId is the source of truth
           error: null,
           embedBlocked: false,

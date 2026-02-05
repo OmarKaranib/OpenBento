@@ -898,6 +898,7 @@ const MasterControlDashboard = ({
                   lastRefresh: Date.now(), 
                   isOffline: false,
                   isLive: true,
+                  isPlayingLatestVideo: false, // Playing live stream, not fallback
                   apiError: false,
                   error: null,
                   embedBlocked: false,
@@ -908,8 +909,8 @@ const MasterControlDashboard = ({
           return;
         } else if (result.latestVideoId) {
           // LATEST-VIDEO FALLBACK: Channel not live, but we have their latest video
-          // Swap in the latestVideoId so user sees actual content instead of "Video Unavailable"
-          console.log(`[CheckAgain] Channel @${widget.channelHandle} not live - using latest video fallback: ${result.latestVideoId}`);
+          // AUTO-SPLICING: Refresh the player with latestVideoId - no error shown
+          console.log(`[CheckAgain] Channel @${widget.channelHandle} not live - auto-splicing latest video: ${result.latestVideoId}`);
           setWidgets(prev => prev.map(w => 
             w.id === widgetId 
               ? { 
@@ -918,8 +919,9 @@ const MasterControlDashboard = ({
                   youtubeChannelId: result.channelId,
                   url: '', 
                   lastRefresh: Date.now(), 
-                  isOffline: false, // Has content to show
-                  isLive: false, // Not live, but playing latest video
+                  isOffline: false, // Has content to show - no offline overlay
+                  isLive: false, // Badge lockdown: LIVE badge hidden
+                  isPlayingLatestVideo: true, // Flag for latest video fallback
                   apiError: false,
                   error: null,
                   embedBlocked: false,
@@ -936,6 +938,7 @@ const MasterControlDashboard = ({
               ...w, 
               isOffline: true, // No content available - show offline state
               isLive: false,
+              isPlayingLatestVideo: false,
               apiError: hasApiError,
               error: null,
               embedBlocked: false,
