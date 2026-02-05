@@ -66,7 +66,7 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Smart Tiered localStorage Cache:**
   - YouTube API responses cached in localStorage with smart tiered TTLs
   - Cache key: `openbento_live_status_cache`, version key: `openbento_cache_version`
-  - CURRENT_CACHE_VERSION = '2.2.0' - increment to force cache flush on load (trust videoId logic)
+  - CURRENT_CACHE_VERSION = '2.3.0' - increment to force cache flush on load (zero-evidence live logic)
   - ONLINE_CACHE_TTL_MS = 30 minutes (for LIVE streams - stable, no need to re-check often)
   - OFFLINE_CACHE_TTL_MS = 5 minutes (for offline streams - faster re-check to detect going live)
   - API_ERROR_CACHE_TTL_MS = 2 minutes (for API errors - retry soon)

@@ -751,47 +751,53 @@ export function WidgetSidebar({
       const currentStatuses = liveStatusesRef.current;
       const updatedStatuses: Record<string, LiveStatus> = { ...currentStatuses };
       let promotedCount = 0;
+      const promotedChannels: string[] = [];
 
       for (const channel of channels) {
         if (channel.platform === 'youtube' && channel.channelId) {
           try {
             // Use cached API function with forceRefresh=true to bypass localStorage cache
             const data = await checkChannelLiveStatusAPI(channel.channelId, true);
-            const wasOffline = currentStatuses[channel.id]?.isLive === false;
-            const isNowLive = data.isLive === true;
+            
+            // TRUST THE VIDEOID: If API returns videoId, stream is LIVE - no secondary checks
+            const hasVideoId = !!data.liveVideoId;
+            const isNowLive = hasVideoId || data.isLive === true;
+            
+            const wasOffline = currentStatuses[channel.id]?.isLive === false || currentStatuses[channel.id]?.isLive === undefined;
             
             // AUTOMATIC PROMOTION: Track when offline becomes live
             if (wasOffline && isNowLive) {
-              console.log(`[HourlyRevalidation] PROMOTED: ${channel.name} is now LIVE!`);
+              console.log(`[HourlyRevalidation] PROMOTED: ${channel.name} is now LIVE! (videoId: ${data.liveVideoId})`);
               promotedCount++;
+              promotedChannels.push(channel.id);
             }
             
-            // THE "LIAR" FIX: If no live results, explicitly set isLive=false and status=offline
-            // Track apiError separately so UI can show "System Maintenance" instead of "Offline"
             updatedStatuses[channel.id] = {
               channelId: channel.channelId,
               isLive: isNowLive,
               isOffline: !isNowLive,
-              apiError: data.apiError === true, // Track if this was an API error vs genuine offline
+              apiError: false, // Trust the videoId - if we got a response, it's not an API error
               lastChecked: now
             };
           } catch (error) {
             console.error(`[HourlyRevalidation] Error checking ${channel.name}:`, error);
-            // Exception = API error, not genuine offline
+            // Exception = API error - keep previous state rather than marking offline
+            const prevStatus = currentStatuses[channel.id];
             updatedStatuses[channel.id] = {
               channelId: channel.channelId,
-              isLive: false,
-              isOffline: true,
-              apiError: true, // Exception means API error
+              isLive: prevStatus?.isLive ?? false,
+              isOffline: prevStatus?.isOffline ?? true,
+              apiError: true,
               lastChecked: now
             };
           }
         }
       }
       
-      // Single state update with all results - triggers re-sort via useMemo
-      setLiveStatuses(updatedStatuses);
-      console.log(`[HourlyRevalidation] Complete. ${promotedCount} streams promoted to LIVE.`);
+      // FORCE ARRAY REFRESH: State update triggers re-sort via useMemo dependency on liveStatuses
+      // Creating a new object reference guarantees React detects the change
+      setLiveStatuses({ ...updatedStatuses });
+      console.log(`[HourlyRevalidation] Complete. ${promotedCount} streams promoted to LIVE: [${promotedChannels.join(', ')}]`);
     };
 
     // Run hourly revalidation on mount (after a short delay to not conflict with initial check)

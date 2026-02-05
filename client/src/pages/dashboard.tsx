@@ -1753,6 +1753,16 @@ const MasterControlDashboard = ({
             isDarkMode={isDarkMode}
             onColorPickerOpen={() => setColorPickerWidget(colorPickerWidget === widget.id ? null : widget.id)}
           >
+            {/* LIVE Badge - Visual Confirmation for streams with videoId */}
+            {widget.type === 'video' && widget.videoId && !widget.isOffline && widget.isLive && (
+              <div className="absolute top-[0.8rem] left-[0.8rem] z-50 pointer-events-none" data-testid={`live-badge-widget-${widget.id}`}>
+                <span className="flex items-center gap-[0.4rem] px-[0.8rem] py-[0.3rem] bg-red-600 text-white text-[0.9rem] font-bold tracking-wide rounded shadow-lg uppercase">
+                  <span className="w-[0.6rem] h-[0.6rem] rounded-full bg-white animate-pulse" />
+                  LIVE
+                </span>
+              </div>
+            )}
+
             {widget.type === 'video' && (widget.url || widget.videoId || widget.youtubeChannelId || widget.twitchChannel || widget.kickChannel) && !isEditMode && !widget.isOffline && (
               <>
                 {/* Seek Mode "Done" button - always visible when seek mode is active */}
