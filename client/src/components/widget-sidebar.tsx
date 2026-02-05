@@ -1237,7 +1237,7 @@ export function WidgetSidebar({
               ? 'Drag blocks to add • Resize in Edit Mode' 
               : 'Click or drag streams to add'}
           </p>
-          <div className="text-center text-[0.9rem] text-slate-600">
+          <div className="text-center text-[10px] text-slate-600">
             <span>© 2026 ANCU LABS FZC LLC</span>
             <span className="mx-2">•</span>
             <a href="/terms" className="hover:text-slate-400 transition-colors" data-testid="link-terms-sidebar">Terms</a>
