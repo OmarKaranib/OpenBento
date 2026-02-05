@@ -350,6 +350,16 @@ const MasterControlDashboard = ({
       const errorType = errorCode === 150 ? 'EmbedRestriction' : 'AccountRestriction';
       const channelHandle = widget.channelHandle || widget.youtubeChannelId;
       
+      // LOOP PROTECTION: If already playing latestVideo and still getting errors,
+      // skip swap and go straight to pure iframe mode
+      if (widget.isPlayingLatestVideo) {
+        console.log(`[${errorType}] Already playing latestVideo - switching to pure iframe mode`);
+        setWidgets(prev => prev.map(w => 
+          w.id === widget.id ? { ...w, isLive: false, apiError: false, usePureIframe: true } : w
+        ));
+        return;
+      }
+      
       // HARDCODED FALLBACK PRIORITY:
       // 1. widget.latestVideoId (already stored fallback)
       // 2. getFallbackVideoId(channelHandle) (hardcoded Featured Video default - normalized lookup)
