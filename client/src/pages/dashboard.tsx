@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, Crown, LogIn, LogOut, User, Loader2, Shield } from 'lucide-react';
+import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, Crown, LogIn, LogOut, User, Loader2, Shield, MessageSquare, Lightbulb, Bug } from 'lucide-react';
 import { Link } from 'wouter';
 import { ADMIN_EMAIL } from '@/pages/admin';
 import { UniqueIdentifier } from '@dnd-kit/core';
@@ -13,7 +13,6 @@ import { useToast } from '@/hooks/use-toast';
 import { FloatingTutorial } from '@/components/floating-tutorial';
 import { AdBlock, AdBlockData } from '@/components/ad-block';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
-import { Footer } from '@/components/footer';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -1811,6 +1810,36 @@ const MasterControlDashboard = ({
               </button>
             )}
 
+            {/* Request Dropdown */}
+            <div className="relative group">
+              <button
+                className="menu-btn h-[3.2rem] px-[1.2rem] bg-slate-600/60 hover:bg-slate-500/70 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-md text-white"
+                data-testid="button-request"
+                title="Submit feedback"
+              >
+                <MessageSquare className="w-[1.4rem] h-[1.4rem]" />
+                Request
+                <ChevronDown className="w-[1rem] h-[1rem]" />
+              </button>
+              <div className="absolute right-0 top-full mt-[0.4rem] w-[16rem] bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[10001]">
+                <a
+                  href="mailto:support@openbento.tv?subject=New%20Idea%20for%20OpenBento"
+                  className="flex items-center gap-[0.8rem] px-[1.2rem] py-[1rem] hover-elevate rounded-t-lg text-[1.1rem] text-slate-300"
+                  data-testid="link-request-idea"
+                >
+                  <Lightbulb className="w-[1.2rem] h-[1.2rem] text-amber-400" />
+                  Add a new idea
+                </a>
+                <a
+                  href="mailto:support@openbento.tv?subject=Bug%20Report%20for%20OpenBento"
+                  className="flex items-center gap-[0.8rem] px-[1.2rem] py-[1rem] hover-elevate rounded-b-lg text-[1.1rem] text-slate-300 border-t border-slate-700/50"
+                  data-testid="link-request-bug"
+                >
+                  <Bug className="w-[1.2rem] h-[1.2rem] text-red-400" />
+                  Report a bug
+                </a>
+              </div>
+            </div>
 
             {/* Login Button - Consistent height with other menu buttons - shown when NOT logged in */}
             {!isAuthenticated && (
@@ -2245,7 +2274,6 @@ const MasterControlDashboard = ({
         </div>
       </div>
 
-      <Footer />
     </div>
   );
 };

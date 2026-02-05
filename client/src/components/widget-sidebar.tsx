@@ -1232,11 +1232,18 @@ export function WidgetSidebar({
         </div>
         
         <div className="p-[1.6rem] border-t border-slate-700 flex-shrink-0">
-          <p className="text-[1rem] text-slate-500 text-center">
+          <p className="text-[1rem] text-slate-500 text-center mb-[1rem]">
             {activeTab === 'library' 
               ? 'Drag blocks to add • Resize in Edit Mode' 
               : 'Click or drag streams to add'}
           </p>
+          <div className="text-center text-[0.9rem] text-slate-600">
+            <span>© 2026 ANCU LABS FZC LLC</span>
+            <span className="mx-2">•</span>
+            <a href="/terms" className="hover:text-slate-400 transition-colors" data-testid="link-terms-sidebar">Terms</a>
+            <span className="mx-2">•</span>
+            <a href="/privacy" className="hover:text-slate-400 transition-colors" data-testid="link-privacy-sidebar">Privacy</a>
+          </div>
         </div>
       </div>
     </>

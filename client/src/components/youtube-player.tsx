@@ -111,20 +111,35 @@ function safeCleanupPlayer(player: YTPlayer | null, playerId: string): void {
   if (!player) return;
   
   try {
-    // Manual parentNode check: verify DOM element still exists before any cleanup
+    // STRICT PARENTNODE CHECK: Find the container and iframe
     const playerElement = document.getElementById(playerId);
-    if (playerElement && playerElement.parentNode) {
-      // Element exists and has parent - safe to attempt cleanup
-      // But we still don't call destroy() - just let React handle DOM
-      console.log('[YouTube] Safe cleanup - element exists, nulling reference');
-    } else {
-      // Element already removed or orphaned - return early
-      console.log('[YouTube] Safe cleanup - element already removed, skipping');
+    if (!playerElement) {
+      // Element already removed - return early silently
       return;
     }
+    
+    // FINAL YOUTUBE SHIELD: Only attempt cleanup if element has a valid parent
+    const container = playerElement.parentNode;
+    if (!container) {
+      // No parent - element is orphaned, skip cleanup
+      return;
+    }
+    
+    // Find any iframe within the player element
+    const iframe = playerElement.tagName === 'IFRAME' 
+      ? playerElement as HTMLIFrameElement 
+      : playerElement.querySelector('iframe');
+    
+    // STRICT CHECK: Only remove if iframe exists AND its parentNode === container
+    if (iframe && iframe.parentNode === container) {
+      // Safe to remove - but let React handle it instead
+      // We just null references and let unmount handle DOM
+    }
+    
+    // Never call destroy() - it causes removeChild errors
+    // Just let React handle DOM cleanup on unmount
   } catch (e) {
-    // Catch any DOM exception and log it instead of crashing
-    console.log('[YouTube] Safe cleanup caught exception:', e);
+    // Silently catch any DOM exception - don't log to keep console clean
   }
 }
 
