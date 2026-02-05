@@ -75,6 +75,9 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **FALLBACK_VIDEO_IDS:** Hardcoded Featured Video defaults for 150/101 error recovery - always has a fallback ready.
 - **Pure IFrame Fallback:** When IFrame API throws postMessage errors and no fallback available, switches to standard HTML iframe with origin=https://openbento.tv.
 - **Badge Final Fix:** Sidebar LIVE badge only shows when API specifically returns `liveBroadcastContent: 'live'` - no defaults.
+- **Shared Constants Module:** `channel-constants.ts` centralizes VERIFIED_CHANNELS, STATIC_LIVE_IDS, FALLBACK_VIDEO_IDS with normalized lowercase lookups to avoid circular imports.
+- **YouTube Player Cleanup Fix:** Player cleanup no longer calls `destroy()` - just nulls references. This prevents "removeChild" errors from React/YouTube API lifecycle conflicts.
+- **Dev Error Suppression:** Global error handler in `main.tsx` suppresses harmless YouTube removeChild errors in development mode only.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.

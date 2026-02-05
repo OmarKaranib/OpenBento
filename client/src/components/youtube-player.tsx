@@ -148,13 +148,9 @@ function YouTubePlayerInner({
     if (!containerRef.current || !window.YT?.Player) return;
     if (isInitializedRef.current && playerRef.current) return; // Already initialized
     
-    // Cleanup existing player
+    // Cleanup existing player - just null the reference, don't call destroy()
+    // Calling destroy() causes "removeChild" errors due to React/IFrame API conflicts
     if (playerRef.current) {
-      try {
-        playerRef.current.destroy();
-      } catch (e) {
-        console.log('[YouTube] Player cleanup error:', e);
-      }
       playerRef.current = null;
     }
 
@@ -312,11 +308,10 @@ function YouTubePlayerInner({
 
     return () => {
       if (playerRef.current) {
-        try {
-          playerRef.current.destroy();
-        } catch (e) {
-          console.log('[YouTube] Cleanup error:', e);
-        }
+        // CRITICAL: Do NOT call destroy() here - it causes "removeChild" errors
+        // when React has already unmounted the DOM node. Just null the reference
+        // and let React handle DOM cleanup naturally.
+        // The YouTube IFrame will be garbage collected along with the DOM element.
         playerRef.current = null;
         isInitializedRef.current = false;
       }
@@ -329,13 +324,8 @@ function YouTubePlayerInner({
       console.log(`[YouTube] RefreshKey changed from ${lastRefreshKeyRef.current} to ${refreshKey} - reinitializing player`);
       lastRefreshKeyRef.current = refreshKey;
       
-      // Destroy and reinitialize
+      // Reset player reference for reinitialize - don't call destroy() to avoid removeChild errors
       if (playerRef.current) {
-        try {
-          playerRef.current.destroy();
-        } catch (e) {
-          console.log('[YouTube] Refresh cleanup error:', e);
-        }
         playerRef.current = null;
         isInitializedRef.current = false;
       }
