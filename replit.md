@@ -87,6 +87,7 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **Safe Widget Deletion (Feb 2026):** handleRemoveWidget() uses two-phase deletion: marks widget with isDeleting=true (hides from render) then removes after 100ms delay.
 - **Loop Protection (Feb 2026):** hasSwapped ref limits fallback swaps to ONCE per session. If fallback also fails with 150/101, shows "Content Restricted" UI instead of infinite loop.
 - **Blacklist Restricted Fallbacks (Feb 2026):** BLACKLISTED_VIDEO_IDS set in channel-constants.ts prevents using known restricted videos (e.g., siyW0GOBtbo). Shows "Content Restricted" UI immediately if fallback is blacklisted.
+- **Dynamic Live-ID Priority (Feb 2026):** Background discovery now updates videoId immediately when a new live ID is found (not just badge). Al Jazeera removed from STATIC_LIVE_IDS to use fresh API results. VERIFIED_MANUAL channels (ABC News, Reuters, Sky News) keep locked IDs. Zero-Gate still uses cached ID for initial render, then swaps if background finds better.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.

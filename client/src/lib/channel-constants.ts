@@ -17,13 +17,13 @@ export const BLACKLISTED_VIDEO_IDS: Set<string> = new Set([
 // STATIC_LIVE_IDS: Secondary mapping for channels without VERIFIED status
 // These are used when VERIFIED_CHANNELS doesn't have an entry
 // Keyed by channelHandle (lowercase normalized)
+// NOTE: Al Jazeera, CNN, Euronews REMOVED - they work dynamically without 150 errors
 export const STATIC_LIVE_IDS: Record<string, string> = {
   'nasa': 'tz4THVd5rdI',
   'nasatelevision': '21X5lGlDOfg',
   'nbcnews': 'sVEGHdVRIoU',
   'msnbc': 'nlKwThfNggk',
   'lofigirl': 'jfKfPfyJRdk',
-  'aljazeeraenglish': 'kxPCFljwJws',
   'france24english': 'l8PMl7tUDIE',
   'ndtv': 'NvqKZHpKs-g',
 };

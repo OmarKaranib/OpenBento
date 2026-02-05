@@ -864,13 +864,28 @@ function AppContent() {
           addWidget('video', 3, 2, widgetData);
         }
         
-        // BACKGROUND-ONLY STATUS: Run API check in background to update badge color only
-        // This never blocks render or shows offline overlay
-        if (!staticVideoId) {
+        // DYNAMIC LIVE-ID PRIORITY: Run API check in background
+        // If a NEW live ID is found, update videoId immediately (not just badge)
+        // Skip for VERIFIED_MANUAL channels - those IDs are locked
+        const isVerifiedManual = !!verifiedChannel?.liveId;
+        if (!isVerifiedManual) {
           searchChannelLiveStream(channel.channelId, false).then(result => {
             if (result.liveVideoId && result.liveVideoId !== immediateVideoId) {
-              console.log(`[Background] New live ID found: ${result.liveVideoId} (updating badge only)`);
-              // Only update badge state, not blocking render
+              console.log(`[Background] NEW live ID discovered: ${result.liveVideoId} -> updating videoId immediately`);
+              // DYNAMIC PRIORITY: Update videoId immediately to swap to fresh stream
+              setWidgets(prev => prev.map(w => 
+                w.channelHandle === channel.channelId ? { 
+                  ...w, 
+                  videoId: result.liveVideoId,
+                  url: `https://www.youtube.com/watch?v=${result.liveVideoId}`,
+                  isLive: true,
+                  isOffline: false,
+                  isPlayingLatestVideo: false,
+                  lastRefresh: Date.now(),
+                } : w
+              ));
+            } else if (result.liveVideoId) {
+              // Same ID, just update badge to confirm live status
               setWidgets(prev => prev.map(w => 
                 w.channelHandle === channel.channelId ? { ...w, isLive: true } : w
               ));
