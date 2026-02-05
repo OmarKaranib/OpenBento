@@ -342,15 +342,38 @@ const MasterControlDashboard = ({
   const handleVideoError = useCallback(async (widget: Widget, errorCode?: number) => {
     console.log(`[Self-Healing] Error detected for widget: ${widget.id}, errorCode: ${errorCode}`);
 
-    // ERROR 150 FALLBACK BYPASS: Player already swapped to latestVideoId, just update state
-    if (errorCode === 150 && widget.latestVideoId) {
-      console.log(`[Error150Bypass] Widget ${widget.id} swapped to latestVideoId: ${widget.latestVideoId}`);
-      setWidgets(prev => prev.map(w => 
-        w.id === widget.id 
-          ? { ...w, videoId: widget.latestVideoId, isLive: false, isPlayingLatestVideo: true, isOffline: false } 
-          : w
-      ));
-      return; // Don't trigger self-healing, player already swapped
+    // MANDATORY 150 FALLBACK: Force latestVideoId fallback on error 150
+    if (errorCode === 150) {
+      // If player already swapped to latestVideoId, just update state
+      if (widget.latestVideoId) {
+        console.log(`[Error150Fallback] Widget ${widget.id} using latestVideoId: ${widget.latestVideoId}`);
+        setWidgets(prev => prev.map(w => 
+          w.id === widget.id 
+            ? { ...w, videoId: widget.latestVideoId, isLive: false, isPlayingLatestVideo: true, isOffline: false, apiError: false } 
+            : w
+        ));
+        return;
+      }
+      // If no latestVideoId, fetch it from the API using channel handle
+      const channelHandle = widget.channelHandle || widget.youtubeChannelId;
+      if (channelHandle) {
+        console.log(`[Error150Fallback] Fetching latestVideoId for ${channelHandle}...`);
+        try {
+          const { searchChannelLiveStream } = await import('@/lib/stream-api');
+          const status = await searchChannelLiveStream(channelHandle, true);
+          if (status?.latestVideoId) {
+            console.log(`[Error150Fallback] Got latestVideoId: ${status.latestVideoId}`);
+            setWidgets(prev => prev.map(w => 
+              w.id === widget.id 
+                ? { ...w, videoId: status.latestVideoId, latestVideoId: status.latestVideoId, isLive: false, isPlayingLatestVideo: true, isOffline: false, apiError: false } 
+                : w
+            ));
+            return;
+          }
+        } catch (e) {
+          console.log(`[Error150Fallback] Failed to fetch latestVideoId:`, e);
+        }
+      }
     }
 
     // ARCHITECTURE PIVOT: Never set isOffline=true if videoId exists
@@ -359,9 +382,9 @@ const MasterControlDashboard = ({
       w.id === widget.id ? { ...w, isLive: false } : w // Badge only, not offline
     ));
 
-    // Skip self-healing for embed restriction errors (101/150)
-    if (errorCode === 101 || errorCode === 150) {
-      console.log(`[Self-Healing] Skipping self-heal for embed restriction error ${errorCode}`);
+    // Skip self-healing only for error 101 (account-level restriction, can't fix)
+    if (errorCode === 101) {
+      console.log(`[Self-Healing] Skipping self-heal for error 101 (account restriction)`);
       return;
     }
 

@@ -64,7 +64,7 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **No-Cookie Toggle:** Switched from youtube-nocookie.com to youtube.com (standard player has fewer restriction issues)
 - **Error 101/150 Loop Prevention:** Embed restriction errors (101, 150) do NOT trigger self-healing re-fetch - only recoverable errors [2, 5, 100]
 - **Visual Fallback Synchronization:** When a channel is not live, the widget automatically plays the channel's latest video. The offline overlay is hidden when latestVideoId exists. LIVE badge is strictly hidden when playing latest video (isPlayingLatestVideo flag). "Check Again" auto-splices the latest video if no live stream is found (no error shown).
-- **Error 150 Fallback Bypass:** On embed restriction error 150, youtube-player.tsx immediately swaps to latestVideoId using loadVideoById() instead of showing gray "Unavailable" screen. Widget state updates to isPlayingLatestVideo=true, isLive=false. Self-healing skipped for 101/150 errors.
+- **Error 150 Fallback Bypass:** On embed restriction error 150, youtube-player.tsx immediately swaps to latestVideoId using loadVideoById() instead of showing gray "Unavailable" screen. Widget state updates to isPlayingLatestVideo=true, isLive=false, isOffline=false, apiError=false. If latestVideoId not available, fetches it from API. Only error 101 (account restriction) skips self-healing.
 - **Production Domain Handshake:** playerVars origin hardcoded to exactly `https://openbento.tv` to stop postMessage security warnings in console.
 
 ## External Dependencies
