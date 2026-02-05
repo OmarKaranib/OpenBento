@@ -4,8 +4,15 @@
 export const VERIFIED_CHANNELS: Record<string, { liveId: string; fallbackId: string; name: string }> = {
   'abcnews': { liveId: 'w_Ma8oQLmSM', fallbackId: 'iipR5yUp36o', name: 'ABC News' },
   'reuters': { liveId: 'NvKaVw0X3oU', fallbackId: 'IEmqRjrIkF0', name: 'Reuters' },
-  'skynews': { liveId: '9Auq9mYxFEe', fallbackId: 'siyW0GOBtbo', name: 'Sky News' },
+  'skynews': { liveId: '9Auq9mYxFEe', fallbackId: 'YDvsBbKfLPA', name: 'Sky News' }, // Updated: siyW0GOBtbo is restricted
 };
+
+// BLACKLISTED_VIDEO_IDS: Known restricted videos that should NOT be used as fallbacks
+// If a video ID is in this list, skip it and show "Content Restricted" UI
+export const BLACKLISTED_VIDEO_IDS: Set<string> = new Set([
+  'siyW0GOBtbo', // Sky News - restricted
+  // Add more known restricted IDs here as discovered
+]);
 
 // STATIC_LIVE_IDS: Secondary mapping for channels without VERIFIED status
 // These are used when VERIFIED_CHANNELS doesn't have an entry
@@ -27,13 +34,14 @@ export const STATIC_LIVE_IDS: Record<string, string> = {
 export const FALLBACK_VIDEO_IDS: Record<string, string> = {
   'abcnews': 'iipR5yUp36o',
   'reuters': 'IEmqRjrIkF0',
-  'skynews': 'siyW0GOBtbo',
+  'skynews': 'YDvsBbKfLPA', // Updated: siyW0GOBtbo is restricted
   'nasa': 'xCrPD7tfcr0',
   'nbcnews': 'Xfzjnt6p5jU',
   'msnbc': 'B8AQJB9c3u8',
   'aljazeeraenglish': 'gCNeDWCI0vo',
   'france24english': 'l8PMl7tUDIE',
   'ndtv': 'bjYzJfjD7WE',
+  'cnn': 'tP0awqtu3Ag', // CNN featured video
 };
 
 // Helper function to normalize channel handle for lookup
@@ -57,4 +65,10 @@ export function getStaticLiveId(channelId: string | null | undefined): string | 
 export function getFallbackVideoId(channelId: string | null | undefined): string | null {
   const normalized = normalizeChannelHandle(channelId);
   return FALLBACK_VIDEO_IDS[normalized] || null;
+}
+
+// Check if a video ID is blacklisted (known to be restricted)
+export function isVideoBlacklisted(videoId: string | null | undefined): boolean {
+  if (!videoId) return false;
+  return BLACKLISTED_VIDEO_IDS.has(videoId);
 }

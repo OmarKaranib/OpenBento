@@ -1,4 +1,6 @@
-import { useEffect, useRef, useMemo, useCallback, memo, Component, ReactNode } from 'react';
+import { useEffect, useRef, useMemo, useCallback, memo, Component, ReactNode, useState } from 'react';
+import { Lock } from 'lucide-react';
+import { isVideoBlacklisted } from '@/lib/channel-constants';
 
 // DOM EXCEPTION SHIELD: Error Boundary to catch YouTube player errors
 // Prevents removeChild errors from crashing the entire dashboard
@@ -145,6 +147,13 @@ function YouTubePlayerInner({
   const playerRef = useRef<YTPlayer | null>(null);
   const isInitializedRef = useRef(false);
   
+  // LOOP PROTECTION: Track if we've already swapped once this session
+  // A widget is only allowed ONE swap per session to prevent infinite loops
+  const hasSwappedRef = useRef(false);
+  
+  // Content Restricted state - shown when both primary and fallback fail
+  const [contentRestricted, setContentRestricted] = useState(false);
+  
   // Use refs to track current state without causing re-renders
   const isMutedRef = useRef(isMuted);
   const isPausedRef = useRef(isPaused);
@@ -287,17 +296,35 @@ function YouTubePlayerInner({
           },
           onError: (event) => {
             const errorCode = event.data;
-            console.log('[YouTube] Player error:', errorCode, 'for widget:', widgetId);
+            console.log('[YouTube] Player error:', errorCode, 'for widget:', widgetId, 'hasSwapped:', hasSwappedRef.current);
+            
+            // LOOP PROTECTION: Only allow ONE swap per session
+            // If we've already swapped and still get error 150/101, show Content Restricted
+            if ((errorCode === 150 || errorCode === 101) && hasSwappedRef.current) {
+              console.log('[YouTube] LOOP PROTECTION: Already swapped once, showing Content Restricted');
+              setContentRestricted(true);
+              return;
+            }
             
             // BYPASS RESTRICTION ON 150: Force latestVideoId with 300ms delay
             // Delay gives React time to finish first render before triggering second
             if (errorCode === 150) {
-              if (latestVideoIdRef.current && playerRef.current) {
-                console.log('[YouTube] Error 150 - FORCING latestVideoId swap in 300ms:', latestVideoIdRef.current);
+              const fallbackId = latestVideoIdRef.current;
+              
+              // BLACKLIST CHECK: If fallback is known to be restricted, don't use it
+              if (fallbackId && isVideoBlacklisted(fallbackId)) {
+                console.log('[YouTube] Error 150 - fallback video is BLACKLISTED:', fallbackId);
+                setContentRestricted(true);
+                return;
+              }
+              
+              if (fallbackId && playerRef.current) {
+                console.log('[YouTube] Error 150 - FORCING latestVideoId swap in 300ms:', fallbackId);
+                hasSwappedRef.current = true; // Mark as swapped
                 setTimeout(() => {
                   try {
                     if (playerRef.current) {
-                      playerRef.current.loadVideoById(latestVideoIdRef.current!);
+                      playerRef.current.loadVideoById(fallbackId);
                       console.log('[YouTube] Successfully swapped to latestVideoId');
                     }
                     onErrorRef.current?.(150);
@@ -317,12 +344,22 @@ function YouTubePlayerInner({
             
             // ERROR 101 OVERRIDE: Also force latestVideoId fallback with 300ms delay
             if (errorCode === 101) {
-              if (latestVideoIdRef.current && playerRef.current) {
-                console.log('[YouTube] Error 101 - FORCING latestVideoId swap in 300ms:', latestVideoIdRef.current);
+              const fallbackId = latestVideoIdRef.current;
+              
+              // BLACKLIST CHECK: If fallback is known to be restricted, don't use it
+              if (fallbackId && isVideoBlacklisted(fallbackId)) {
+                console.log('[YouTube] Error 101 - fallback video is BLACKLISTED:', fallbackId);
+                setContentRestricted(true);
+                return;
+              }
+              
+              if (fallbackId && playerRef.current) {
+                console.log('[YouTube] Error 101 - FORCING latestVideoId swap in 300ms:', fallbackId);
+                hasSwappedRef.current = true; // Mark as swapped
                 setTimeout(() => {
                   try {
                     if (playerRef.current) {
-                      playerRef.current.loadVideoById(latestVideoIdRef.current!);
+                      playerRef.current.loadVideoById(fallbackId);
                       console.log('[YouTube] Successfully swapped to latestVideoId on error 101');
                     }
                     onErrorRef.current?.(101);
@@ -361,6 +398,10 @@ function YouTubePlayerInner({
     // Reset initialization flag when video changes
     isInitializedRef.current = false;
     
+    // Reset loop protection when videoId changes (new content)
+    hasSwappedRef.current = false;
+    setContentRestricted(false);
+    
     if (window.YT?.Player) {
       initializePlayer();
     } else {
@@ -392,6 +433,10 @@ function YouTubePlayerInner({
     if (refreshKey !== lastRefreshKeyRef.current) {
       console.log(`[YouTube] RefreshKey changed from ${lastRefreshKeyRef.current} to ${refreshKey} - reinitializing player`);
       lastRefreshKeyRef.current = refreshKey;
+      
+      // Reset loop protection on manual refresh (allows retry)
+      hasSwappedRef.current = false;
+      setContentRestricted(false);
       
       // DOM EXCEPTION SHIELD: Use safe cleanup with parentNode check
       safeCleanupPlayer(playerRef.current, playerId);
@@ -446,6 +491,23 @@ function YouTubePlayerInner({
       }
     }
   }, [volume]);
+
+  // LOOP PROTECTION: Show Content Restricted when both primary and fallback fail
+  if (contentRestricted) {
+    console.log('[YouTube] Content Restricted for widget:', widgetId);
+    return (
+      <div
+        ref={containerRef}
+        className="w-full h-full flex items-center justify-center bg-slate-900/80"
+      >
+        <div className="text-center text-slate-300">
+          <Lock className="w-6 h-6 mx-auto mb-2 text-slate-400" />
+          <p className="text-sm font-medium">Content Restricted</p>
+          <p className="text-xs mt-1 text-slate-400">This video cannot be embedded</p>
+        </div>
+      </div>
+    );
+  }
 
   // If no videoId, show offline state - live_stream?channel= format is deprecated
   if (!stableVideoId) {

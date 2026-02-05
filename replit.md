@@ -85,6 +85,8 @@ The dashboard is built on a 12-column magnetic grid with `grid-auto-flow: dense`
 - **DOM Exception Shield (Feb 2026):** safeCleanupPlayer() helper checks node.parentNode before any cleanup, wraps in try...catch, and returns early if element already removed - prevents NotFoundError from killing the app.
 - **YouTube Error Boundary (Feb 2026):** YouTubePlayer wrapped in YouTubeErrorBoundary class component that catches removeChild/NotFoundError and recovers automatically instead of crashing.
 - **Safe Widget Deletion (Feb 2026):** handleRemoveWidget() uses two-phase deletion: marks widget with isDeleting=true (hides from render) then removes after 100ms delay.
+- **Loop Protection (Feb 2026):** hasSwapped ref limits fallback swaps to ONCE per session. If fallback also fails with 150/101, shows "Content Restricted" UI instead of infinite loop.
+- **Blacklist Restricted Fallbacks (Feb 2026):** BLACKLISTED_VIDEO_IDS set in channel-constants.ts prevents using known restricted videos (e.g., siyW0GOBtbo). Shows "Content Restricted" UI immediately if fallback is blacklisted.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.
