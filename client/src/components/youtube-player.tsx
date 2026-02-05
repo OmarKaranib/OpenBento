@@ -130,14 +130,15 @@ function safeCleanupPlayer(player: YTPlayer | null, playerId: string): void {
       ? playerElement as HTMLIFrameElement 
       : playerElement.querySelector('iframe');
     
-    // STRICT CHECK: Only remove if iframe exists AND its parentNode === container
-    if (iframe && iframe.parentNode === container) {
-      // Safe to remove - but let React handle it instead
-      // We just null references and let unmount handle DOM
+    // STRICT CHECK: Only call destroy() if iframe exists AND parentNode === container
+    // This kills the YouTube API process before React unmounts
+    if (iframe && iframe.parentNode === container && playerElement.parentNode) {
+      try {
+        player.destroy();
+      } catch (destroyError) {
+        // Silently ignore destroy errors
+      }
     }
-    
-    // Never call destroy() - it causes removeChild errors
-    // Just let React handle DOM cleanup on unmount
   } catch (e) {
     // Silently catch any DOM exception - don't log to keep console clean
   }
@@ -330,10 +331,10 @@ function YouTubePlayerInner({
             if (errorCode === 150) {
               const fallbackId = latestVideoIdRef.current;
               
-              // SAME-ID SWAP CHECK: Abort if fallback equals current video
+              // SAME-ID SWAP CHECK: Abort if fallback equals current video - use nuclear iframe
               if (fallbackId && fallbackId === stableVideoId) {
-                console.log('[YouTube] Error 150 - ABORT: fallbackId same as currentVideoId:', fallbackId);
-                setContentRestricted(true);
+                console.log('[YouTube] Error 150 - ABORT: fallbackId same as currentVideoId, switching to nuclear iframe:', fallbackId);
+                setUseNuclearIframe(true);
                 return;
               }
               
@@ -431,8 +432,8 @@ function YouTubePlayerInner({
     // Reset initialization flag when video changes
     isInitializedRef.current = false;
     
-    // Reset loop protection when videoId changes (new content)
-    hasSwappedRef.current = false;
+    // DO NOT reset hasSwappedRef here - it should only reset on widgetId change
+    // This ensures "One Swap Only" rule works correctly
     setContentRestricted(false);
     // Reset nuclear iframe mode on videoId change so we can try YT.Player again
     setUseNuclearIframe(false);

@@ -865,12 +865,10 @@ function AppContent() {
           addWidget('video', 3, 2, widgetData);
         }
         
-        // DYNAMIC LIVE-ID PRIORITY: Run API check in background
+        // DYNAMIC LIVE-ID PRIORITY: Run API check in background for ALL channels
         // If a NEW live ID is found, update videoId immediately (not just badge)
-        // Skip for VERIFIED_MANUAL channels - those IDs are locked
-        const isVerifiedManual = !!verifiedChannel?.liveId;
-        if (!isVerifiedManual) {
-          searchChannelLiveStream(channel.channelId, false).then(result => {
+        // NOTE: Even VERIFIED_MANUAL channels get background checks to stay live (fixes Al Jazeera drift)
+        searchChannelLiveStream(channel.channelId, false).then(result => {
             if (result.liveVideoId && result.liveVideoId !== immediateVideoId) {
               console.log(`[Background] NEW live ID discovered: ${result.liveVideoId} -> updating videoId immediately`);
               // DYNAMIC PRIORITY: Update videoId immediately to swap to fresh stream
@@ -892,7 +890,6 @@ function AppContent() {
               ));
             }
           }).catch(err => console.warn('[Background] Status check failed (non-blocking):', err));
-        }
         return;
       }
       
