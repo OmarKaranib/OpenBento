@@ -807,15 +807,16 @@ function AppContent() {
         // Use cached API call (will use localStorage cache if fresh, otherwise fetch)
         const result = await searchChannelLiveStream(channel.channelId, false);
         
-        // Determine the video ID to use - prefer dynamic, fallback to static
-        const videoId = result.isLive && result.liveVideoId 
-          ? result.liveVideoId 
-          : (channel.videoId || null);
+        // TRUST THE VIDEOID: If we have a videoId (from API or static), the stream is LIVE
+        // Prefer dynamic videoId from API, fallback to static videoId from channel data
+        const videoId = result.liveVideoId || channel.videoId || null;
         
-        const isOffline = !result.isLive;
-        const hasApiError = result.apiError === true;
+        // LINE 818 OVERRIDE: If videoId exists, force ONLINE status - no secondary checks
+        const hasVideoId = !!videoId;
+        const isLive = hasVideoId; // videoId presence = LIVE, period
+        const isOffline = !hasVideoId; // Only offline if no videoId exists
         
-        console.log(`[ChannelClick] @${channel.channelId}: ${result.isLive ? 'LIVE' : 'OFFLINE'}, apiError: ${hasApiError}, videoId: ${videoId}`);
+        console.log(`[ChannelClick] @${channel.channelId}: videoId=${videoId}, TRUST_VIDEOID: ${hasVideoId ? 'LIVE' : 'OFFLINE'}`);
         
         // Build the widget data with channelHandle for future "Check Again"
         const widgetData: Partial<Widget> = {
@@ -829,9 +830,9 @@ function AppContent() {
           twitchChannel: null,
           isKick: false,
           kickChannel: null,
-          isLive: result.isLive,
-          isOffline: isOffline,
-          apiError: hasApiError, // Track if this was an API error vs genuine offline
+          isLive: isLive, // TRUST THE VIDEOID
+          isOffline: isOffline, // Only offline if no videoId
+          apiError: false, // No secondary checks - videoId is the source of truth
           error: null,
           embedBlocked: false,
           lastRefresh: Date.now(),
