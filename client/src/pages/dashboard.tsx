@@ -1337,6 +1337,7 @@ const MasterControlDashboard = ({
               videoId={widget.videoId}
               channelId={widget.youtubeChannelId}
               latestVideoId={widget.latestVideoId}
+              isManualOverride={widget.isManualOverride}
               isMuted={widget.isMuted}
               isPaused={widget.isPaused}
               volume={widget.volume}

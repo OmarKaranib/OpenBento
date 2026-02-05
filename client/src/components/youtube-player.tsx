@@ -94,6 +94,7 @@ interface YouTubePlayerProps {
   videoId?: string | null;
   channelId?: string | null;
   latestVideoId?: string | null;
+  isManualOverride?: boolean; // OVERDRIVE: If true, bypass YT.Player API entirely
   isMuted: boolean;
   isPaused: boolean;
   volume: number;
@@ -151,6 +152,7 @@ function YouTubePlayerInner({
   videoId,
   channelId,
   latestVideoId,
+  isManualOverride = false,
   isMuted,
   isPaused,
   volume,
@@ -161,10 +163,11 @@ function YouTubePlayerInner({
   onMutedChange,
   onPausedChange,
 }: YouTubePlayerProps) {
+  // ALL HOOKS MUST BE DECLARED BEFORE ANY CONDITIONAL RETURNS (React rules of hooks)
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const isInitializedRef = useRef(false);
-
+  
   // LOOP PROTECTION: Track if we've already swapped once this session
   // A widget is only allowed ONE swap per session to prevent infinite loops
   const hasSwappedRef = useRef(false);
@@ -184,6 +187,12 @@ function YouTubePlayerInner({
   const onErrorRef = useRef(onError);
   const onPausedChangeRef = useRef(onPausedChange);
 
+  // Track refreshKey to force reinitialization when manual refresh is triggered
+  const lastRefreshKeyRef = useRef(refreshKey);
+
+  // Memoize the stable player ID - only changes if widgetId changes
+  const playerId = useMemo(() => `yt-player-${widgetId}`, [widgetId]);
+
   // Keep refs in sync with props
   useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
@@ -192,12 +201,6 @@ function YouTubePlayerInner({
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
   useEffect(() => { onPausedChangeRef.current = onPausedChange; }, [onPausedChange]);
-
-  // Track refreshKey to force reinitialization when manual refresh is triggered
-  const lastRefreshKeyRef = useRef(refreshKey);
-
-  // Memoize the stable player ID - only changes if widgetId changes
-  const playerId = useMemo(() => `yt-player-${widgetId}`, [widgetId]);
 
   // FIX #1: Reset hasSwappedRef and useNuclearIframe ONLY when widgetId changes
   // This prevents infinite loops when videoId swaps trigger re-renders
@@ -501,6 +504,29 @@ function YouTubePlayerInner({
     }
   }, [volume]);
 
+  // OVERDRIVE LOGIC: If isManualOverride is true, bypass YT.Player API entirely
+  // Render Nuclear HTML iframe immediately - no JavaScript handshake
+  // NOTE: This must come AFTER all hooks to comply with React rules of hooks
+  if (isManualOverride && videoId) {
+    console.log('[YouTube] OVERDRIVE: Manual override detected, bypassing YT.Player API for:', videoId);
+    return (
+      <div
+        ref={containerRef}
+        className="w-full h-full"
+        style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
+      >
+        <iframe
+          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${isMuted ? 1 : 0}&origin=https://openbento.tv&playsinline=1&rel=0&modestbranding=1`}
+          className="w-full h-full border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+          data-testid={`overdrive-iframe-${widgetId}`}
+        />
+      </div>
+    );
+  }
+
   // FIX #3: NUCLEAR YouTube Fix - Use standard HTML iframe when useNuclearIframe is true
   if (useNuclearIframe && stableVideoId) {
     console.log('[YouTube] NUCLEAR FIX: Rendering standard HTML iframe for:', stableVideoId);
@@ -594,6 +620,7 @@ const YouTubePlayerMemo = memo(YouTubePlayerInner, (prevProps, nextProps) => {
     prevProps.videoId === nextProps.videoId &&
     prevProps.channelId === nextProps.channelId &&
     prevProps.widgetId === nextProps.widgetId &&
+    prevProps.isManualOverride === nextProps.isManualOverride &&
     prevProps.isSeekMode === nextProps.isSeekMode &&
     prevProps.isMuted === nextProps.isMuted &&
     prevProps.isPaused === nextProps.isPaused &&

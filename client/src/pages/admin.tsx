@@ -64,7 +64,14 @@ export default function Admin() {
     if (!channels.length) return;
     
     setIsGlobalScraping(true);
-    const youtubeChannels = channels.filter(c => c.platform === 'youtube' && c.channelHandle);
+    // SYNC ALL STREAMS: Only scrape channels that are NOT marked as manual override
+    const youtubeChannels = channels.filter(c => 
+      c.platform === 'youtube' && 
+      c.channelHandle && 
+      !c.isManualOverride // Skip manual override channels
+    );
+    
+    console.log(`[SYNC ALL] Starting scrape for ${youtubeChannels.length} non-override channels`);
     
     for (let i = 0; i < youtubeChannels.length; i++) {
       const channel = youtubeChannels[i];
@@ -81,7 +88,7 @@ export default function Admin() {
           }
         }
       } catch (err) {
-        console.error(`[GlobalScrape] Failed for ${channel.name}:`, err);
+        console.error(`[SYNC ALL] Failed for ${channel.name}:`, err);
       }
       
       await new Promise(r => setTimeout(r, 500));
@@ -89,7 +96,9 @@ export default function Admin() {
     
     setIsGlobalScraping(false);
     setScrapeProgress(null);
+    // Invalidate all channel-related queries for instant refresh
     queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
   };
 
   const handleScrapeUrl = () => {
@@ -155,7 +164,9 @@ export default function Admin() {
     mutationFn: (channel: Partial<Channel> & { id: string }) => 
       apiRequest('PATCH', `/api/admin/channels/${channel.id}`, channel),
     onSuccess: () => {
+      // INSTANT ADMIN REFRESH: Invalidate all channel queries so entire app sees new ID immediately
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
       setEditingChannel(null);
     },
   });
@@ -400,8 +411,8 @@ export default function Admin() {
                   </>
                 ) : (
                   <>
-                    <Rocket className="w-4 h-4" />
-                    Force Global Scrape
+                    <Rocket className="w-5 h-5" />
+                    🚀 SYNC ALL STREAMS
                   </>
                 )}
               </button>

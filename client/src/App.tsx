@@ -88,6 +88,7 @@ export interface Widget {
   usePureIframe?: boolean; // True when IFrame API fails and we fall back to standard HTML iframe
   latestVideoId?: string | null; // Fallback videoId for when live stream is not available (most recent upload)
   verifiedLiveId?: string | null; // Static 24/7 embed ID - use immediately for Zero-Gate Rendering
+  isManualOverride?: boolean; // Admin locked ID - never touch with background scraper or self-healing
   customColor?: string;
   apiError?: boolean; // True if YouTube API returned 403/error - show "System Maintenance" instead of "Offline"
   isDeleting?: boolean; // True when widget is being deleted - prevents YouTube cleanup errors
@@ -849,6 +850,7 @@ function AppContent() {
           verifiedLiveId: verifiedChannel?.liveId || channel.verifiedLiveId || null, // Store verified ID
           latestVideoId: channelFallbackId, // Hardcoded fallback for 150/101 errors
           isPlayingLatestVideo: false, // Not using fallback initially
+          isManualOverride: channel.isManualOverride || false, // Admin locked - bypass YT.Player API
           apiError: false,
           error: null,
           embedBlocked: false,
@@ -865,8 +867,14 @@ function AppContent() {
           addWidget('video', 3, 2, widgetData);
         }
 
-        // FIX #4: ALWAYS RUN BACKGROUND CHECK - Remove isForced restriction
-        // Even VERIFIED_MANUAL channels need background checks to stay live (fixes Al Jazeera drift)
+        // OVERRIDE PRIORITY: Skip background scraper for isManualOverride channels
+        // Admin has locked this ID - app is FORBIDDEN from changing it automatically
+        if (channel.isManualOverride) {
+          console.log(`[ChannelClick] MANUAL OVERRIDE detected for @${channel.channelId} - skipping ALL background checks`);
+          return;
+        }
+        
+        // DYNAMIC LIVE-ID PRIORITY: Run API check in background for non-override channels
         // If a NEW live ID is found, update videoId immediately (not just badge)
         searchChannelLiveStream(channel.channelId, false).then(result => {
           if (result.liveVideoId && result.liveVideoId !== immediateVideoId) {
@@ -927,6 +935,7 @@ function AppContent() {
           isLive: isLive, // Only true if liveVideoId exists
           isPlayingLatestVideo: isPlayingLatestVideo, // True when using latestVideoId fallback
           isOffline: isOffline, // Only offline if no videoId at all
+          isManualOverride: channel.isManualOverride || false, // Admin locked - bypass YT.Player API
           apiError: false, // No secondary checks - videoId is the source of truth
           error: null,
           embedBlocked: false,
