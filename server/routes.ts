@@ -873,11 +873,6 @@ export async function registerRoutes(
           },
         ],
         allow_promotion_codes: true,
-        payment_method_options: {
-          card: {
-            setup_future_usage: 'off_session',
-          },
-        },
         success_url: `${origin}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/?canceled=true`,
       });

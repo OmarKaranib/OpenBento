@@ -897,7 +897,9 @@ export default function Admin() {
                                       <Edit2 className="w-4 h-4" />
                                     </button>
                                     <button
-                                      onClick={() => {
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         if (confirm(`Delete "${channel.name}"?`)) {
                                           deleteMutation.mutate(channel.id);
                                         }

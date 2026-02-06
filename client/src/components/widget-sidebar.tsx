@@ -425,8 +425,8 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, isBlocked, onSave
             src={logoUrl} 
             alt={channel.name} 
             className="w-full h-full object-cover rounded-lg"
-            onError={() => {
-              // Add to failed cache to prevent retrying this URL
+            onError={(e) => {
+              e.currentTarget.src = '/default-icon.png';
               if (logoUrl) failedLogoCache.add(logoUrl);
               setLogoError(true);
             }}
