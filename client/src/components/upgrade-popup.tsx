@@ -1,17 +1,21 @@
-import { X, Crown, Sparkles, Image, LayoutGrid } from 'lucide-react';
+import { X, Crown, Sparkles, Image, LayoutGrid, UserPlus } from 'lucide-react';
 
 interface UpgradePopupProps {
   isOpen: boolean;
   onClose: () => void;
   feature?: 'blocks' | 'background';
+  isAuthenticated?: boolean;
+  openLoginModal?: (reason?: string) => void;
 }
 
-export function UpgradePopup({ isOpen, onClose, feature = 'blocks' }: UpgradePopupProps) {
+export function UpgradePopup({ isOpen, onClose, feature = 'blocks', isAuthenticated, openLoginModal }: UpgradePopupProps) {
   if (!isOpen) return null;
 
+  const isAnonymous = !isAuthenticated;
+
   const featureMessage = feature === 'blocks' 
-    ? 'Upgrade to OpenBento Pro for unlimited blocks.'
-    : 'Upgrade to OpenBento Pro to unlock custom background images.';
+    ? (isAnonymous ? 'Sign up to unlock more blocks and save your dashboard.' : 'Upgrade to OpenBento Pro for unlimited blocks.')
+    : (isAnonymous ? 'Sign up to unlock custom background images.' : 'Upgrade to OpenBento Pro to unlock custom background images.');
 
   return (
     <div 
@@ -67,15 +71,30 @@ export function UpgradePopup({ isOpen, onClose, feature = 'blocks' }: UpgradePop
             >
               Maybe Later
             </button>
-            <a 
-              href="/api/login"
-              className="flex items-center gap-[0.8rem] px-[2.5rem] py-[1.2rem] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 font-bold text-[1.3rem] transition-all shadow-lg shadow-amber-500/30"
-              style={{ borderRadius: '0.8rem' }}
-              data-testid="upgrade-popup-upgrade"
-            >
-              <Sparkles className="w-[1.6rem] h-[1.6rem]" />
-              Upgrade to Pro
-            </a>
+            {isAnonymous ? (
+              <button
+                onClick={() => {
+                  onClose();
+                  openLoginModal?.('Sign up to unlock more blocks and save your dashboard.');
+                }}
+                className="flex items-center gap-[0.8rem] px-[2.5rem] py-[1.2rem] bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-[1.3rem] transition-all shadow-lg shadow-cyan-500/30"
+                style={{ borderRadius: '0.8rem' }}
+                data-testid="upgrade-popup-signup"
+              >
+                <UserPlus className="w-[1.6rem] h-[1.6rem]" />
+                Sign up to unlock more
+              </button>
+            ) : (
+              <a 
+                href="/api/login"
+                className="flex items-center gap-[0.8rem] px-[2.5rem] py-[1.2rem] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 font-bold text-[1.3rem] transition-all shadow-lg shadow-amber-500/30"
+                style={{ borderRadius: '0.8rem' }}
+                data-testid="upgrade-popup-upgrade"
+              >
+                <Sparkles className="w-[1.6rem] h-[1.6rem]" />
+                Upgrade to Pro
+              </a>
+            )}
           </div>
         </div>
       </div>

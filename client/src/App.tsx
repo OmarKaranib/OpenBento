@@ -1131,7 +1131,9 @@ function AppContent() {
       <Toaster />
       <PricingModal 
         isOpen={pricingModalOpen} 
-        onClose={() => setPricingModalOpen(false)} 
+        onClose={() => setPricingModalOpen(false)}
+        isAuthenticated={isAuthenticated}
+        openLoginModal={openLoginModal}
       />
     </TooltipProvider>
   );

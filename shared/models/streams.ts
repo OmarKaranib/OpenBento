@@ -118,6 +118,7 @@ export const channels = pgTable("channels", {
   category: varchar("category"),
   videoId: varchar("video_id"),
   url: text("url"),
+  logoUrl: text("logo_url"),
   isLive: boolean("is_live").default(true),
   isManualOverride: boolean("is_manual_override").default(false),
   rank: integer("rank").default(999),

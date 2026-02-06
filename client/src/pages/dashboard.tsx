@@ -1808,8 +1808,8 @@ const MasterControlDashboard = ({
               {isDarkMode ? 'Dark' : 'Light'}
             </button>
 
-            {/* Pro Crown Button - Only show for free users */}
-            {!isPremium && (
+            {/* Pro Crown Button - Only show for authenticated free users */}
+            {!isPremium && isAuthenticated && (
               <button
                 onClick={onOpenPricingModal}
                 className="menu-btn h-[3.2rem] px-[1.2rem] bg-gradient-to-r from-amber-500/80 to-amber-600/80 hover:from-amber-400/90 hover:to-amber-500/90 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-md text-slate-900"

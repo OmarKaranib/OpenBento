@@ -7,12 +7,14 @@ import { apiRequest } from '@/lib/queryClient';
 interface PricingModalProps {
   isOpen: boolean;
   onClose: () => void;
+  isAuthenticated?: boolean;
+  openLoginModal?: (reason?: string) => void;
 }
 
 export const MONTHLY_PRICE_ID = 'price_1Sx7AnC4mj6LbUjWpXwTb7Gi';
 export const YEARLY_PRICE_ID = 'price_1Sx7B5C4mj6LbUjWnIFhehZl';
 
-export function PricingModal({ isOpen, onClose }: PricingModalProps) {
+export function PricingModal({ isOpen, onClose, isAuthenticated, openLoginModal }: PricingModalProps) {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('yearly');
 
   const checkoutMutation = useMutation({
@@ -34,6 +36,11 @@ export function PricingModal({ isOpen, onClose }: PricingModalProps) {
   });
 
   const handleContinue = () => {
+    if (!isAuthenticated) {
+      onClose();
+      openLoginModal?.('Please create an account before subscribing so we can activate your Pro features.');
+      return;
+    }
     const priceId = billingPeriod === 'monthly' ? MONTHLY_PRICE_ID : YEARLY_PRICE_ID;
     checkoutMutation.mutate(priceId);
   };

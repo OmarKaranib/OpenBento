@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useReplitAuth } from '@/hooks/use-replit-auth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon } from 'lucide-react';
+import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon, GripVertical } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { searchChannelLiveStream } from '@/lib/stream-api';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 export const ADMIN_EMAILS = [
   'legionofoogabooga@gmail.com',
@@ -22,10 +25,40 @@ interface Channel {
   category: string | null;
   videoId: string | null;
   url: string | null;
+  logoUrl: string | null;
   isLive: boolean | null;
   isManualOverride: boolean | null;
   rank: number | null;
   lastUpdated: string | null;
+}
+
+function SortableChannelRow({ id, disabled, children }: { id: string; disabled?: boolean; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled: disabled || false,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    position: 'relative' as const,
+    zIndex: isDragging ? 10 : undefined,
+  };
+  return (
+    <tr ref={setNodeRef} style={style} className="border-b border-slate-700/50 hover:bg-slate-700/20">
+      <td className="py-3 pr-2 w-8">
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 text-slate-500 hover:text-slate-300"
+          data-testid={`drag-handle-${id}`}
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+      </td>
+      {children}
+    </tr>
+  );
 }
 
 function extractYouTubeVideoId(url: string): string | null {
@@ -66,6 +99,7 @@ export default function Admin() {
     iconType: 'news',
     category: 'News',
     videoId: '',
+    logoUrl: '',
     isLive: true,
     isManualOverride: false,
     rank: 999
@@ -271,6 +305,7 @@ export default function Admin() {
         iconType: 'news',
         category: 'News',
         videoId: '',
+        logoUrl: '',
         isLive: true,
         isManualOverride: false,
         rank: 999
@@ -329,6 +364,32 @@ export default function Admin() {
   }
 
   const channels = channelsData?.channels || [];
+
+  const sortedChannels = useMemo(() => [...channels].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)), [channels]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = sortedChannels.findIndex(c => c.id === active.id);
+    const newIndex = sortedChannels.findIndex(c => c.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(sortedChannels, oldIndex, newIndex);
+    const updates = reordered.map((ch, idx) => ({ id: ch.id, rank: idx + 1 }));
+
+    try {
+      await apiRequest('POST', '/api/admin/channels/reorder', { updates });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/links'] });
+    } catch (err) {
+      console.error('[Admin] Reorder failed:', err);
+    }
+  }, [sortedChannels, queryClient]);
 
   return (
     <div className="min-h-screen bg-slate-900 p-8">
@@ -593,6 +654,14 @@ export default function Admin() {
                   className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm"
                   data-testid="input-new-channel-videoid"
                 />
+                <input
+                  type="text"
+                  placeholder="Channel Logo URL"
+                  value={newChannel.logoUrl}
+                  onChange={(e) => setNewChannel({ ...newChannel, logoUrl: e.target.value })}
+                  className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm"
+                  data-testid="input-new-channel-logo"
+                />
                 <select
                   value={newChannel.platform}
                   onChange={(e) => setNewChannel({ ...newChannel, platform: e.target.value })}
@@ -660,181 +729,197 @@ export default function Admin() {
               <p>No channels in database. Click "Import from JSON" to migrate existing channels.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-slate-400 border-b border-slate-700">
-                    <th className="pb-3 pr-4">Name</th>
-                    <th className="pb-3 pr-4">Platform</th>
-                    <th className="pb-3 pr-4">Category</th>
-                    <th className="pb-3 pr-4">Video ID</th>
-                    <th className="pb-3 pr-4">Status</th>
-                    <th className="pb-3 pr-4">Rank</th>
-                    <th className="pb-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {channels.map((channel) => (
-                    <tr key={channel.id} className="border-b border-slate-700/50 hover:bg-slate-700/20">
-                      {editingChannel?.id === channel.id ? (
-                        <>
-                          <td className="py-3 pr-4">
-                            <input
-                              type="text"
-                              value={editingChannel.name}
-                              onChange={(e) => setEditingChannel({ ...editingChannel, name: e.target.value })}
-                              className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                            />
-                          </td>
-                          <td className="py-3 pr-4">
-                            <select
-                              value={editingChannel.platform}
-                              onChange={(e) => setEditingChannel({ ...editingChannel, platform: e.target.value })}
-                              className="px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                            >
-                              <option value="youtube">YouTube</option>
-                              <option value="twitch">Twitch</option>
-                              <option value="kick">Kick</option>
-                            </select>
-                          </td>
-                          <td className="py-3 pr-4">
-                            <input
-                              type="text"
-                              value={editingChannel.category || ''}
-                              onChange={(e) => setEditingChannel({ ...editingChannel, category: e.target.value })}
-                              className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                            />
-                          </td>
-                          <td className="py-3 pr-4">
-                            <div className="space-y-1">
-                              <input
-                                type="text"
-                                value={editingChannel.videoId || ''}
-                                onChange={(e) => {
-                                  const raw = e.target.value;
-                                  const resolved = smartVideoIdHandler(raw);
-                                  setEditingChannel({ ...editingChannel, videoId: resolved, isManualOverride: true });
-                                }}
-                                className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                                placeholder="Video ID or YouTube URL"
-                              />
-                              <div className="flex gap-1">
-                                <input
-                                  type="text"
-                                  value={scrapeUrl}
-                                  onChange={(e) => setScrapeUrl(e.target.value)}
-                                  className="flex-1 px-2 py-1 bg-slate-700 border border-slate-500 rounded text-white text-xs"
-                                  placeholder="Paste YouTube URL..."
-                                />
-                                <button
-                                  onClick={handleScrapeUrl}
-                                  className="px-2 py-1 bg-purple-600 hover:bg-purple-500 rounded text-white text-xs"
-                                  title="Extract ID from URL"
-                                >
-                                  <LinkIcon className="w-3 h-3" />
-                                </button>
-                              </div>
-                              <label className="flex items-center gap-1 text-xs text-slate-400">
-                                <input
-                                  type="checkbox"
-                                  checked={editingChannel.isManualOverride || false}
-                                  onChange={(e) => setEditingChannel({ ...editingChannel, isManualOverride: e.target.checked })}
-                                  className="w-3 h-3"
-                                />
-                                Manual Override (locked)
-                              </label>
-                            </div>
-                          </td>
-                          <td className="py-3 pr-4">
-                            <select
-                              value={editingChannel.isLive ? 'live' : 'offline'}
-                              onChange={(e) => setEditingChannel({ ...editingChannel, isLive: e.target.value === 'live' })}
-                              className="px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                            >
-                              <option value="live">Live</option>
-                              <option value="offline">Offline</option>
-                            </select>
-                          </td>
-                          <td className="py-3 pr-4">
-                            <input
-                              type="number"
-                              value={editingChannel.rank ?? 999}
-                              onChange={(e) => setEditingChannel({ ...editingChannel, rank: parseInt(e.target.value) || 999 })}
-                              className="w-16 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm text-center"
-                              min="1"
-                              placeholder="999"
-                            />
-                          </td>
-                          <td className="py-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => updateMutation.mutate(editingChannel)}
-                                disabled={updateMutation.isPending}
-                                className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white transition-colors"
-                              >
-                                <Save className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => setEditingChannel(null)}
-                                className="p-2 bg-slate-600 hover:bg-slate-500 rounded-lg text-white transition-colors"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="py-3 pr-4 text-white font-medium">{channel.name}</td>
-                          <td className="py-3 pr-4">
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              channel.platform === 'youtube' ? 'bg-red-500/20 text-red-400' :
-                              channel.platform === 'twitch' ? 'bg-purple-500/20 text-purple-400' :
-                              'bg-green-500/20 text-green-400'
-                            }`}>
-                              {channel.platform}
-                            </span>
-                          </td>
-                          <td className="py-3 pr-4 text-slate-300">{channel.category || '-'}</td>
-                          <td className="py-3 pr-4 text-slate-400 font-mono text-xs">{channel.videoId || '-'}</td>
-                          <td className="py-3 pr-4">
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              channel.isLive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'
-                            }`}>
-                              {channel.isLive ? 'Live' : 'Offline'}
-                            </span>
-                          </td>
-                          <td className="py-3 pr-4 text-slate-400 text-center">{channel.rank ?? 999}</td>
-                          <td className="py-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => setEditingChannel(channel)}
-                                className="p-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white transition-colors"
-                                data-testid={`button-edit-${channel.id}`}
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (confirm(`Delete "${channel.name}"?`)) {
-                                    deleteMutation.mutate(channel.id);
-                                  }
-                                }}
-                                disabled={deleteMutation.isPending}
-                                className="p-2 bg-red-600 hover:bg-red-500 rounded-lg text-white transition-colors"
-                                data-testid={`button-delete-${channel.id}`}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      )}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-slate-400 border-b border-slate-700">
+                      <th className="pb-3 pr-2 w-8"></th>
+                      <th className="pb-3 pr-4">Name</th>
+                      <th className="pb-3 pr-4">Platform</th>
+                      <th className="pb-3 pr-4">Category</th>
+                      <th className="pb-3 pr-4">Video ID</th>
+                      <th className="pb-3 pr-4">Status</th>
+                      <th className="pb-3 pr-4">Rank</th>
+                      <th className="pb-3 text-right">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <SortableContext items={sortedChannels.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                    <tbody>
+                      {sortedChannels.map((channel) => {
+                        const isEditing = editingChannel?.id === channel.id;
+                        return (
+                          <SortableChannelRow key={channel.id} id={channel.id} disabled={isEditing}>
+                            {isEditing ? (
+                              <>
+                                <td className="py-3 pr-4">
+                                  <input
+                                    type="text"
+                                    value={editingChannel.name}
+                                    onChange={(e) => setEditingChannel({ ...editingChannel, name: e.target.value })}
+                                    className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                                  />
+                                </td>
+                                <td className="py-3 pr-4">
+                                  <select
+                                    value={editingChannel.platform}
+                                    onChange={(e) => setEditingChannel({ ...editingChannel, platform: e.target.value })}
+                                    className="px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                                  >
+                                    <option value="youtube">YouTube</option>
+                                    <option value="twitch">Twitch</option>
+                                    <option value="kick">Kick</option>
+                                  </select>
+                                </td>
+                                <td className="py-3 pr-4">
+                                  <input
+                                    type="text"
+                                    value={editingChannel.category || ''}
+                                    onChange={(e) => setEditingChannel({ ...editingChannel, category: e.target.value })}
+                                    className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                                  />
+                                </td>
+                                <td className="py-3 pr-4">
+                                  <div className="space-y-1">
+                                    <input
+                                      type="text"
+                                      value={editingChannel.videoId || ''}
+                                      onChange={(e) => {
+                                        const raw = e.target.value;
+                                        const resolved = smartVideoIdHandler(raw);
+                                        setEditingChannel({ ...editingChannel, videoId: resolved, isManualOverride: true });
+                                      }}
+                                      className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                                      placeholder="Video ID or YouTube URL"
+                                    />
+                                    <div className="flex gap-1">
+                                      <input
+                                        type="text"
+                                        value={scrapeUrl}
+                                        onChange={(e) => setScrapeUrl(e.target.value)}
+                                        className="flex-1 px-2 py-1 bg-slate-700 border border-slate-500 rounded text-white text-xs"
+                                        placeholder="Paste YouTube URL..."
+                                      />
+                                      <button
+                                        onClick={handleScrapeUrl}
+                                        className="px-2 py-1 bg-purple-600 hover:bg-purple-500 rounded text-white text-xs"
+                                        title="Extract ID from URL"
+                                      >
+                                        <LinkIcon className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                    <input
+                                      type="text"
+                                      value={editingChannel.logoUrl || ''}
+                                      onChange={(e) => setEditingChannel({ ...editingChannel, logoUrl: e.target.value })}
+                                      className="w-full px-2 py-1 bg-slate-700 border border-slate-500 rounded text-white text-xs"
+                                      placeholder="Channel Logo URL"
+                                      data-testid="input-edit-channel-logo"
+                                    />
+                                    <label className="flex items-center gap-1 text-xs text-slate-400">
+                                      <input
+                                        type="checkbox"
+                                        checked={editingChannel.isManualOverride || false}
+                                        onChange={(e) => setEditingChannel({ ...editingChannel, isManualOverride: e.target.checked })}
+                                        className="w-3 h-3"
+                                      />
+                                      Manual Override (locked)
+                                    </label>
+                                  </div>
+                                </td>
+                                <td className="py-3 pr-4">
+                                  <select
+                                    value={editingChannel.isLive ? 'live' : 'offline'}
+                                    onChange={(e) => setEditingChannel({ ...editingChannel, isLive: e.target.value === 'live' })}
+                                    className="px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                                  >
+                                    <option value="live">Live</option>
+                                    <option value="offline">Offline</option>
+                                  </select>
+                                </td>
+                                <td className="py-3 pr-4">
+                                  <input
+                                    type="number"
+                                    value={editingChannel.rank ?? 999}
+                                    onChange={(e) => setEditingChannel({ ...editingChannel, rank: parseInt(e.target.value) || 999 })}
+                                    className="w-16 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm text-center"
+                                    min="1"
+                                    placeholder="999"
+                                  />
+                                </td>
+                                <td className="py-3 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      onClick={() => updateMutation.mutate(editingChannel)}
+                                      disabled={updateMutation.isPending}
+                                      className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white transition-colors"
+                                    >
+                                      <Save className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingChannel(null)}
+                                      className="p-2 bg-slate-600 hover:bg-slate-500 rounded-lg text-white transition-colors"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="py-3 pr-4 text-white font-medium">{channel.name}</td>
+                                <td className="py-3 pr-4">
+                                  <span className={`px-2 py-1 rounded text-xs ${
+                                    channel.platform === 'youtube' ? 'bg-red-500/20 text-red-400' :
+                                    channel.platform === 'twitch' ? 'bg-purple-500/20 text-purple-400' :
+                                    'bg-green-500/20 text-green-400'
+                                  }`}>
+                                    {channel.platform}
+                                  </span>
+                                </td>
+                                <td className="py-3 pr-4 text-slate-300">{channel.category || '-'}</td>
+                                <td className="py-3 pr-4 text-slate-400 font-mono text-xs">{channel.videoId || '-'}</td>
+                                <td className="py-3 pr-4">
+                                  <span className={`px-2 py-1 rounded text-xs ${
+                                    channel.isLive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'
+                                  }`}>
+                                    {channel.isLive ? 'Live' : 'Offline'}
+                                  </span>
+                                </td>
+                                <td className="py-3 pr-4 text-slate-400 text-center">{channel.rank ?? 999}</td>
+                                <td className="py-3 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      onClick={() => setEditingChannel(channel)}
+                                      className="p-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white transition-colors"
+                                      data-testid={`button-edit-${channel.id}`}
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (confirm(`Delete "${channel.name}"?`)) {
+                                          deleteMutation.mutate(channel.id);
+                                        }
+                                      }}
+                                      disabled={deleteMutation.isPending}
+                                      className="p-2 bg-red-600 hover:bg-red-500 rounded-lg text-white transition-colors"
+                                      data-testid={`button-delete-${channel.id}`}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
+                            )}
+                          </SortableChannelRow>
+                        );
+                      })}
+                    </tbody>
+                  </SortableContext>
+                </table>
+              </div>
+            </DndContext>
           )}
         </div>
 

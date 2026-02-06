@@ -212,6 +212,7 @@ export interface TrendingChannel {
   latestVideoId?: string | null; // Fallback when live stream not available
   isManualOverride?: boolean; // Admin override - app forbidden from changing videoId automatically
   rank?: number; // Admin-defined sort priority (1 = top)
+  logoUrl?: string | null; // Channel branding logo from admin
   lastUpdated?: number;
   isLive?: boolean; // True for live streams (10-min refresh), false for normal videos (no refresh)
 }
@@ -360,17 +361,20 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, isBlocked, onSave
     }
   };
 
-  // Get channel logo URL from CHANNEL_LOGOS map with fallback caching
-  // If a URL fails once (404/error), it's cached and won't be retried
+  // Get channel logo URL: DB logoUrl > CHANNEL_LOGOS map > null
   const getLogoUrl = () => {
-    const mappedUrl = CHANNEL_LOGOS[channel.id];
+    // Priority 1: Admin-set logoUrl from database (via /api/links)
+    if ('logoUrl' in channel && (channel as TrendingChannel).logoUrl) {
+      const dbLogo = (channel as TrendingChannel).logoUrl!;
+      if (!failedLogoCache.has(dbLogo)) return dbLogo;
+    }
     
-    // If we have a mapped URL and it hasn't failed before, use it
+    // Priority 2: Hardcoded CHANNEL_LOGOS map
+    const mappedUrl = CHANNEL_LOGOS[channel.id];
     if (mappedUrl && !failedLogoCache.has(mappedUrl)) {
       return mappedUrl;
     }
     
-    // No mapped URL or it already failed - return null for local fallback
     return null;
   };
   

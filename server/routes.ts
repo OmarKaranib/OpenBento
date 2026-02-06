@@ -62,6 +62,7 @@ export async function registerRoutes(
             isManualOverride: dbCh.isManualOverride || false,
             rank: dbCh.rank ?? 999,
             isLive: dbCh.isLive ?? true,
+            logoUrl: dbCh.logoUrl || null,
           };
         }
         return jc;
@@ -94,6 +95,7 @@ export async function registerRoutes(
             isManualOverride: dbCh.isManualOverride || false,
             rank: dbCh.rank ?? 999,
             isLive: dbCh.isLive ?? true,
+            logoUrl: dbCh.logoUrl || null,
           });
         }
       }
@@ -679,6 +681,29 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/channels/reorder", async (req: Request, res: Response) => {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    try {
+      const { updates } = req.body;
+      if (!Array.isArray(updates) || updates.length === 0) {
+        return res.status(400).json({ error: "updates must be a non-empty array of { id, rank }" });
+      }
+      for (const item of updates) {
+        if (!item || typeof item.id !== 'string' || typeof item.rank !== 'number' || !Number.isInteger(item.rank) || item.rank < 1) {
+          return res.status(400).json({ error: `Invalid update entry: each must have string id and integer rank >= 1` });
+        }
+      }
+      for (const { id, rank } of updates) {
+        await storage.updateChannel(id, { rank });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
   // Migration endpoint - import channels from links.json to database
   app.post("/api/admin/migrate-channels", async (req: Request, res: Response) => {
     if (!isAdmin(req)) {
@@ -848,6 +873,11 @@ export async function registerRoutes(
           },
         ],
         allow_promotion_codes: true,
+        payment_method_options: {
+          card: {
+            setup_future_usage: 'off_session',
+          },
+        },
         success_url: `${origin}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/?canceled=true`,
       });
