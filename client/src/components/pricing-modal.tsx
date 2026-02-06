@@ -200,7 +200,7 @@ export function PricingModal({ isOpen, onClose, isAuthenticated, openLoginModal 
               
               <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
                 <p className="text-center text-emerald-400 text-sm font-medium">
-                  Use code <span className="font-bold text-emerald-300">PRO2FREE</span> for 2 months free!
+                  Use code <span className="font-bold text-emerald-300">BENTO2FREE</span> for 2 Months Free Trial!
                 </p>
               </div>
             </div>

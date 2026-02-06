@@ -283,6 +283,7 @@ export default function Admin() {
   });
 
   const handleDelete = (id: string) => {
+    console.log("Attempting to delete channel ID:", id);
     deleteMutation.mutate(id);
   };
 
