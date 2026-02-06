@@ -104,6 +104,23 @@ export default function Admin() {
     isManualOverride: false,
     rank: 999
   });
+  const [idError, setIdError] = useState('');
+
+  const sanitizeChannelId = (raw: string): string => {
+    const urlPatterns = [
+      /youtube\.com\/(?:channel\/|c\/|@)([^\/?&#]+)/i,
+      /twitch\.tv\/([^\/?&#]+)/i,
+      /kick\.com\/([^\/?&#]+)/i,
+      /youtu\.be\/([^\/?&#]+)/i,
+    ];
+    for (const pattern of urlPatterns) {
+      const match = raw.match(pattern);
+      if (match) return match[1].toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+    return raw.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  };
+
+  const isValidChannelId = (id: string): boolean => /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(id);
 
   const handleGlobalScrape = async () => {
     if (!channels.length) return;
@@ -631,13 +648,33 @@ export default function Admin() {
                 </button>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <input
-                  type="text"
-                  placeholder="ID (e.g., my-channel)"
-                  value={newChannel.id}
-                  onChange={(e) => setNewChannel({ ...newChannel, id: e.target.value })}
-                  className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm"
-                />
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="text"
+                    placeholder="ID (e.g., sky-news)"
+                    value={newChannel.id}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const hasUrl = /^https?:\/\//i.test(raw) || /\.(com|tv|be)\//i.test(raw);
+                      if (hasUrl) {
+                        const extracted = sanitizeChannelId(raw);
+                        setNewChannel({ ...newChannel, id: extracted });
+                        setIdError('URL detected — extracted ID: ' + extracted);
+                      } else {
+                        const cleaned = raw.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                        setNewChannel({ ...newChannel, id: cleaned });
+                        if (cleaned && !isValidChannelId(cleaned)) {
+                          setIdError('Only lowercase letters, numbers, and dashes allowed');
+                        } else {
+                          setIdError('');
+                        }
+                      }
+                    }}
+                    className={`px-3 py-2 bg-slate-800 border rounded-lg text-white text-sm ${idError ? 'border-red-500' : 'border-slate-600'}`}
+                    data-testid="input-new-channel-id"
+                  />
+                  {idError && <span className="text-red-400 text-xs">{idError}</span>}
+                </div>
                 <input
                   type="text"
                   placeholder="Name"

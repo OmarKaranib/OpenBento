@@ -638,7 +638,10 @@ export async function registerRoutes(
       return res.status(403).json({ error: "Admin access required" });
     }
     try {
-      const id = req.params.id as string;
+      const id = decodeURIComponent(req.params.id as string);
+      if (/[\/\\]/.test(id)) {
+        return res.status(400).json({ error: "Channel ID must not contain slashes" });
+      }
       const body = req.body;
       const sanitized: Record<string, any> = {};
       if (body.name !== undefined) sanitized.name = body.name;
@@ -670,7 +673,10 @@ export async function registerRoutes(
       return res.status(403).json({ error: "Admin access required" });
     }
     try {
-      const id = req.params.id as string;
+      const id = decodeURIComponent(req.params.id as string);
+      if (/[\/\\]/.test(id)) {
+        return res.status(400).json({ error: "Channel ID must not contain slashes" });
+      }
       const deleted = await storage.deleteChannel(id);
       
       if (!deleted) {
