@@ -49,7 +49,8 @@ export async function registerRoutes(
     }));
 
     try {
-      const dbChannels = await storage.getAllChannels();
+      const allDbChannels = await storage.getAllChannels();
+      const dbChannels = allDbChannels.filter(ch => ch.isVisible !== false);
 
       if (dbChannels.length > 0) {
         const dbOnly = dbChannels.map(dbCh => {
@@ -654,6 +655,7 @@ export async function registerRoutes(
       if (body.logoUrl !== undefined) sanitized.logoUrl = body.logoUrl;
       if (body.isLive !== undefined) sanitized.isLive = body.isLive;
       if (body.isManualOverride !== undefined) sanitized.isManualOverride = body.isManualOverride;
+      if (body.isVisible !== undefined) sanitized.isVisible = body.isVisible;
       if (body.rank !== undefined) sanitized.rank = body.rank;
       
       const channel = await storage.updateChannel(id, sanitized);

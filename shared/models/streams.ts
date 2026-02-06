@@ -121,6 +121,7 @@ export const channels = pgTable("channels", {
   logoUrl: text("logo_url"),
   isLive: boolean("is_live").default(true),
   isManualOverride: boolean("is_manual_override").default(false),
+  isVisible: boolean("is_visible").default(true),
   rank: integer("rank").default(999),
   lastUpdated: timestamp("last_updated").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),

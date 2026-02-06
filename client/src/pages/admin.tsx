@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useReplitAuth } from '@/hooks/use-replit-auth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon, GripVertical } from 'lucide-react';
+import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon, GripVertical, Eye, EyeOff } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { searchChannelLiveStream } from '@/lib/stream-api';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
@@ -28,11 +28,12 @@ interface Channel {
   logoUrl: string | null;
   isLive: boolean | null;
   isManualOverride: boolean | null;
+  isVisible: boolean | null;
   rank: number | null;
   lastUpdated: string | null;
 }
 
-function SortableChannelRow({ id, disabled, children }: { id: string; disabled?: boolean; children: React.ReactNode }) {
+function SortableChannelRow({ id, disabled, isHidden, children }: { id: string; disabled?: boolean; isHidden?: boolean; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
     disabled: disabled || false,
@@ -40,7 +41,7 @@ function SortableChannelRow({ id, disabled, children }: { id: string; disabled?:
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.5 : isHidden ? 0.45 : 1,
     position: 'relative' as const,
     zIndex: isDragging ? 10 : undefined,
   };
@@ -289,8 +290,9 @@ export default function Admin() {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest('DELETE', `/api/admin/channels/${id}`),
+  const hideMutation = useMutation({
+    mutationFn: ({ id, isVisible }: { id: string; isVisible: boolean }) =>
+      apiRequest('PATCH', `/api/admin/channels/${id}`, { isVisible }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
       queryClient.invalidateQueries({ queryKey: ['/api/links'] });
@@ -299,10 +301,17 @@ export default function Admin() {
     },
   });
 
-  const handleDelete = (id: string) => {
-    console.log("Attempting to delete channel ID:", id);
-    deleteMutation.mutate(id);
+  const handleHide = (id: string) => {
+    console.log("Hiding channel ID:", id);
+    hideMutation.mutate({ id, isVisible: false });
   };
+
+  const handleUnhide = (id: string) => {
+    console.log("Unhiding channel ID:", id);
+    hideMutation.mutate({ id, isVisible: true });
+  };
+
+  const [showHidden, setShowHidden] = useState(false);
 
   const updateMutation = useMutation({
     mutationFn: (channel: Partial<Channel> & { id: string }) => 
@@ -341,7 +350,14 @@ export default function Admin() {
 
   const channels = channelsData?.channels || [];
 
-  const sortedChannels = useMemo(() => [...channels].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)), [channels]);
+  const filteredChannels = useMemo(() => {
+    if (showHidden) return channels;
+    return channels.filter(ch => ch.isVisible !== false);
+  }, [channels, showHidden]);
+
+  const sortedChannels = useMemo(() => [...filteredChannels].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)), [filteredChannels]);
+
+  const hiddenCount = useMemo(() => channels.filter(ch => ch.isVisible === false).length, [channels]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -599,6 +615,20 @@ export default function Admin() {
                 <Plus className="w-4 h-4" />
                 Add Channel
               </button>
+              {hiddenCount > 0 && (
+                <button
+                  onClick={() => setShowHidden(!showHidden)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    showHidden
+                      ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                      : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                  }`}
+                  data-testid="button-toggle-hidden"
+                >
+                  {showHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showHidden ? `Hide ${hiddenCount} Hidden` : `Show ${hiddenCount} Hidden`}
+                </button>
+              )}
               <button
                 onClick={() => migrateMutation.mutate()}
                 disabled={migrateMutation.isPending}
@@ -788,7 +818,7 @@ export default function Admin() {
                       <th className="pb-3 pr-4">Status</th>
                       <th className="pb-3 pr-4">Rank</th>
                       <th className="pb-3 pr-4">Edit</th>
-                      <th className="pb-3 text-right">Actions</th>
+                      <th className="pb-3 text-right">Visibility</th>
                     </tr>
                   </thead>
                   <SortableContext items={sortedChannels.map(c => c.id)} strategy={verticalListSortingStrategy}>
@@ -796,7 +826,7 @@ export default function Admin() {
                       {sortedChannels.map((channel) => {
                         const isEditing = editingChannel?.id === channel.id;
                         return (
-                          <SortableChannelRow key={channel.id} id={channel.id} disabled={isEditing}>
+                          <SortableChannelRow key={channel.id} id={channel.id} disabled={isEditing} isHidden={channel.isVisible === false}>
                             {isEditing ? (
                               <>
                                 <td className="py-3 pr-4">
@@ -945,20 +975,35 @@ export default function Admin() {
                                   </button>
                                 </td>
                                 <td className="py-3 text-right">
-                                  <button
-                                    type="button"
-                                    onPointerDown={(e) => {
-                                      e.stopPropagation();
-                                      if (confirm('Are you sure?')) {
-                                        handleDelete(channel.id);
-                                      }
-                                    }}
-                                    disabled={deleteMutation.isPending}
-                                    className="z-50 relative px-3 py-1.5 bg-transparent hover:bg-red-600/20 border border-red-600 rounded-lg text-red-500 font-bold text-xs uppercase tracking-wide transition-colors"
-                                    data-testid={`button-delete-${channel.id}`}
-                                  >
-                                    DELETE
-                                  </button>
+                                  {channel.isVisible === false ? (
+                                    <button
+                                      type="button"
+                                      onPointerDown={(e) => {
+                                        e.stopPropagation();
+                                        handleUnhide(channel.id);
+                                      }}
+                                      disabled={hideMutation.isPending}
+                                      className="z-50 relative px-3 py-1.5 bg-transparent hover:bg-emerald-600/20 border border-emerald-600 rounded-lg text-emerald-500 font-bold text-xs uppercase tracking-wide transition-colors"
+                                      data-testid={`button-unhide-${channel.id}`}
+                                    >
+                                      SHOW
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onPointerDown={(e) => {
+                                        e.stopPropagation();
+                                        if (confirm('Hide this channel from the sidebar?')) {
+                                          handleHide(channel.id);
+                                        }
+                                      }}
+                                      disabled={hideMutation.isPending}
+                                      className="z-50 relative px-3 py-1.5 bg-transparent hover:bg-amber-600/20 border border-amber-600 rounded-lg text-amber-500 font-bold text-xs uppercase tracking-wide transition-colors"
+                                      data-testid={`button-hide-${channel.id}`}
+                                    >
+                                      HIDE
+                                    </button>
+                                  )}
                                 </td>
                               </>
                             )}
