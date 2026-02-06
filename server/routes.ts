@@ -50,28 +50,9 @@ export async function registerRoutes(
 
     try {
       const dbChannels = await storage.getAllChannels();
-      const dbMap = new Map(dbChannels.map(ch => [ch.id, ch]));
-      const mergedIds = new Set<string>();
-      const merged = jsonChannels.map(jc => {
-        const dbCh = dbMap.get(jc.id);
-        mergedIds.add(jc.id);
-        if (dbCh) {
-          return {
-            ...jc,
-            videoId: dbCh.isManualOverride ? dbCh.videoId : (jc.videoId || dbCh.videoId),
-            isManualOverride: dbCh.isManualOverride || false,
-            rank: dbCh.rank ?? 999,
-            isLive: dbCh.isLive ?? true,
-            logoUrl: dbCh.logoUrl || null,
-          };
-        }
-        return jc;
-      });
 
-      for (const dbCh of dbChannels) {
-        if (!mergedIds.has(dbCh.id)) {
-          let safeOrigin = 'https://localhost';
-          try { safeOrigin = new URL(origin).origin; } catch { safeOrigin = origin; }
+      if (dbChannels.length > 0) {
+        const dbOnly = dbChannels.map(dbCh => {
           let url = '';
           if (dbCh.platform === 'youtube' && dbCh.videoId) {
             url = `https://www.youtube.com/watch?v=${dbCh.videoId}`;
@@ -82,7 +63,7 @@ export async function registerRoutes(
           } else if (dbCh.platform === 'kick') {
             url = `https://kick.com/${dbCh.channelHandle}`;
           }
-          merged.push({
+          return {
             id: dbCh.id,
             name: dbCh.name,
             url,
@@ -96,12 +77,19 @@ export async function registerRoutes(
             rank: dbCh.rank ?? 999,
             isLive: dbCh.isLive ?? true,
             logoUrl: dbCh.logoUrl || null,
-          });
-        }
+          };
+        });
+
+        res.json({
+          channels: dbOnly,
+          lastRefresh: linksData.lastRefresh,
+          origin,
+        });
+        return;
       }
 
       res.json({
-        channels: merged,
+        channels: jsonChannels,
         lastRefresh: linksData.lastRefresh,
         origin,
       });

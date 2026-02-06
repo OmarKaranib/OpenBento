@@ -277,6 +277,7 @@ export default function Admin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
       queryClient.invalidateQueries({ queryKey: ['/api/links'] });
+      queryClient.refetchQueries({ queryKey: ['/api/links'] });
     },
   });
 
@@ -286,6 +287,7 @@ export default function Admin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
       queryClient.invalidateQueries({ queryKey: ['/api/links'] });
+      queryClient.refetchQueries({ queryKey: ['/api/links'] });
       setEditingChannel(null);
     },
   });
@@ -296,6 +298,7 @@ export default function Admin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
       queryClient.invalidateQueries({ queryKey: ['/api/links'] });
+      queryClient.refetchQueries({ queryKey: ['/api/links'] });
       setShowAddForm(false);
       setNewChannel({
         id: '',
@@ -898,14 +901,15 @@ export default function Admin() {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={(e) => {
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
                                         e.stopPropagation();
                                         if (confirm(`Delete "${channel.name}"?`)) {
                                           deleteMutation.mutate(channel.id);
                                         }
                                       }}
                                       disabled={deleteMutation.isPending}
-                                      className="p-2 bg-red-600 hover:bg-red-500 rounded-lg text-white transition-colors"
+                                      className="z-50 relative p-2 bg-red-600 hover:bg-red-500 rounded-lg text-white transition-colors"
                                       data-testid={`button-delete-${channel.id}`}
                                     >
                                       <Trash2 className="w-4 h-4" />
