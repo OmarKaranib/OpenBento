@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -7,7 +7,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Send, Lightbulb, Bug, Loader2 } from 'lucide-react';
+import { ArrowLeft, Send, Lightbulb, Bug, Loader2, ImagePlus, Trash2 } from 'lucide-react';
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function Feedback() {
   const [, setLocation] = useLocation();
@@ -17,6 +28,38 @@ export default function Feedback() {
   const [category, setCategory] = useState<string>('');
   const [description, setDescription] = useState('');
   const [email, setEmail] = useState('');
+  const [screenshot, setScreenshot] = useState<string | null>(null);
+  const [screenshotName, setScreenshotName] = useState('');
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFileError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+      setFileError('Only .png and .jpg files are allowed.');
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      setFileError('File must be under 5MB.');
+      return;
+    }
+    try {
+      const base64 = await fileToBase64(file);
+      setScreenshot(base64);
+      setScreenshotName(file.name);
+    } catch {
+      setFileError('Failed to read file.');
+    }
+  };
+
+  const removeScreenshot = () => {
+    setScreenshot(null);
+    setScreenshotName('');
+    setFileError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   // Parse category from URL query param
   useEffect(() => {
@@ -49,6 +92,7 @@ export default function Feedback() {
           category,
           description: description.trim(),
           email: email.trim() || undefined,
+          screenshot: screenshot || undefined,
         }),
       });
 
@@ -62,6 +106,7 @@ export default function Feedback() {
         setCategory('');
         setDescription('');
         setEmail('');
+        removeScreenshot();
         setTimeout(() => setLocation('/'), 2000);
       } else {
         throw new Error(data.error || 'Failed to send feedback');
@@ -136,6 +181,56 @@ export default function Feedback() {
                 className="bg-slate-700 border-slate-600 text-white min-h-[120px] resize-none"
                 data-testid="input-description"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300">
+                Screenshot <span className="text-slate-500">(optional)</span>
+              </Label>
+              {screenshot ? (
+                <div className="rounded-lg border border-slate-600 bg-slate-700 p-2">
+                  <img
+                    src={screenshot}
+                    alt="Screenshot preview"
+                    className="max-h-32 rounded-md object-contain mx-auto"
+                    data-testid="img-screenshot-preview"
+                  />
+                  <div className="flex items-center justify-between mt-2 px-1">
+                    <span className="text-xs text-slate-400 truncate max-w-[200px]">{screenshotName}</span>
+                    <button
+                      type="button"
+                      onClick={removeScreenshot}
+                      className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors"
+                      data-testid="button-remove-screenshot"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 border border-dashed border-slate-500 rounded-lg text-slate-400 hover:border-slate-400 hover:text-slate-300 transition-colors"
+                  data-testid="button-attach-screenshot"
+                >
+                  <ImagePlus className="w-5 h-5" />
+                  <span className="text-sm">Attach Screenshot (.png, .jpg)</span>
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+                id="screenshot-upload"
+                data-testid="input-screenshot-file"
+              />
+              {fileError && (
+                <p className="text-red-400 text-xs mt-1" data-testid="text-file-error">{fileError}</p>
+              )}
             </div>
 
             <div className="space-y-2">
