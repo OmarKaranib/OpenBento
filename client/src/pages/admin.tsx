@@ -30,15 +30,21 @@ interface Channel {
 
 function extractYouTubeVideoId(url: string): string | null {
   if (!url) return null;
+  const trimmed = url.trim();
   const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/,
     /^([a-zA-Z0-9_-]{11})$/,
   ];
   for (const pattern of patterns) {
-    const match = url.match(pattern);
+    const match = trimmed.match(pattern);
     if (match) return match[1];
   }
   return null;
+}
+
+function smartVideoIdHandler(rawInput: string): string {
+  const extracted = extractYouTubeVideoId(rawInput);
+  return extracted || rawInput;
 }
 
 export default function Admin() {
@@ -60,7 +66,9 @@ export default function Admin() {
     iconType: 'news',
     category: 'News',
     videoId: '',
-    isLive: true
+    isLive: true,
+    isManualOverride: false,
+    rank: 999
   });
 
   const handleGlobalScrape = async () => {
@@ -254,6 +262,7 @@ export default function Admin() {
       apiRequest('POST', '/api/admin/channels', channel),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
       setShowAddForm(false);
       setNewChannel({
         id: '',
@@ -263,7 +272,9 @@ export default function Admin() {
         iconType: 'news',
         category: 'News',
         videoId: '',
-        isLive: true
+        isLive: true,
+        isManualOverride: false,
+        rank: 999
       });
     },
   });
@@ -574,10 +585,14 @@ export default function Admin() {
                 />
                 <input
                   type="text"
-                  placeholder="Video ID"
+                  placeholder="Video ID or YouTube URL"
                   value={newChannel.videoId}
-                  onChange={(e) => setNewChannel({ ...newChannel, videoId: e.target.value })}
+                  onChange={(e) => {
+                    const resolved = smartVideoIdHandler(e.target.value);
+                    setNewChannel({ ...newChannel, videoId: resolved });
+                  }}
                   className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm"
+                  data-testid="input-new-channel-videoid"
                 />
                 <select
                   value={newChannel.platform}
@@ -599,10 +614,30 @@ export default function Admin() {
                   <option value="Finance">Finance</option>
                   <option value="Music">Music</option>
                 </select>
+                <input
+                  type="number"
+                  placeholder="Rank (1=top)"
+                  value={newChannel.rank}
+                  onChange={(e) => setNewChannel({ ...newChannel, rank: parseInt(e.target.value) || 999 })}
+                  className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm w-24"
+                  min="1"
+                  data-testid="input-new-channel-rank"
+                />
+                <label className="flex items-center gap-2 text-sm text-slate-300 px-1">
+                  <input
+                    type="checkbox"
+                    checked={newChannel.isManualOverride}
+                    onChange={(e) => setNewChannel({ ...newChannel, isManualOverride: e.target.checked })}
+                    className="w-4 h-4"
+                    data-testid="checkbox-new-channel-manual-override"
+                  />
+                  Manual Override (locked)
+                </label>
                 <button
                   onClick={() => createMutation.mutate(newChannel)}
                   disabled={createMutation.isPending || !newChannel.id || !newChannel.name}
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-sm transition-colors disabled:opacity-50 col-span-2"
+                  data-testid="button-create-channel"
                 >
                   <Save className="w-4 h-4" />
                   {createMutation.isPending ? 'Creating...' : 'Create Channel'}
@@ -676,9 +711,13 @@ export default function Admin() {
                               <input
                                 type="text"
                                 value={editingChannel.videoId || ''}
-                                onChange={(e) => setEditingChannel({ ...editingChannel, videoId: e.target.value, isManualOverride: true })}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  const resolved = smartVideoIdHandler(raw);
+                                  setEditingChannel({ ...editingChannel, videoId: resolved, isManualOverride: true });
+                                }}
                                 className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                                placeholder="Video ID"
+                                placeholder="Video ID or YouTube URL"
                               />
                               <div className="flex gap-1">
                                 <input
