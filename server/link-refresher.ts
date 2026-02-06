@@ -12,6 +12,7 @@ export interface LiveChannel {
   iconType: 'news' | 'science' | 'finance' | 'gaming';
   category: string;
   isLive: boolean; // True for live streams (refresh every 10 min), false for normal videos (no refresh)
+  isManualOverride?: boolean; // Admin locked - skip during background scrape
 }
 
 export interface LinksData {
@@ -116,6 +117,11 @@ export async function refreshAllLinks(): Promise<LinksData> {
   const channels: LiveChannel[] = [];
 
   for (const channel of existingData.channels) {
+    if (channel.isManualOverride) {
+      channels.push({ ...channel, lastUpdated: now });
+      log(`[LinkRefresher] SKIP manual override: ${channel.name}`);
+      continue;
+    }
     if (channel.platform === 'youtube' && channel.isLive) {
       const result = await fetchYouTubeLiveVideoId(channel.channelHandle);
       channels.push({

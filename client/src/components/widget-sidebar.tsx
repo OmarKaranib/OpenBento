@@ -211,6 +211,7 @@ export interface TrendingChannel {
   verifiedLiveId?: string | null; // Static 24/7 embed ID for Zero-Gate Rendering
   latestVideoId?: string | null; // Fallback when live stream not available
   isManualOverride?: boolean; // Admin override - app forbidden from changing videoId automatically
+  rank?: number; // Admin-defined sort priority (1 = top)
   lastUpdated?: number;
   isLive?: boolean; // True for live streams (10-min refresh), false for normal videos (no refresh)
 }
@@ -811,8 +812,8 @@ export function WidgetSidebar({
     // Lower rank = higher priority (rank 1 shows first)
     filtered = [...filtered].sort((a, b) => {
       // Primary sort: Admin-defined rank (lower = higher priority)
-      const adminRankA = (a as any).rank ?? 999;
-      const adminRankB = (b as any).rank ?? 999;
+      const adminRankA = a.rank ?? 999;
+      const adminRankB = b.rank ?? 999;
       
       if (adminRankA !== adminRankB) {
         return adminRankA - adminRankB;

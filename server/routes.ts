@@ -30,11 +30,11 @@ export async function registerRoutes(
   
   initializePulseCache();
 
-  app.get("/api/links", (req, res) => {
+  app.get("/api/links", async (req, res) => {
     const origin = req.headers.origin || req.headers.referer || `${req.protocol}://${req.get('host')}`;
     const linksData = loadLinks();
     
-    const channels = linksData.channels.map(channel => ({
+    const jsonChannels = linksData.channels.map(channel => ({
       id: channel.id,
       name: channel.name,
       url: getChannelUrl(channel, origin),
@@ -44,13 +44,72 @@ export async function registerRoutes(
       channelId: channel.platform === 'youtube' ? channel.channelHandle : channel.channelHandle,
       videoId: channel.videoId,
       lastUpdated: channel.lastUpdated,
+      isManualOverride: false,
+      rank: 999,
     }));
 
-    res.json({
-      channels,
-      lastRefresh: linksData.lastRefresh,
-      origin,
-    });
+    try {
+      const dbChannels = await storage.getAllChannels();
+      const dbMap = new Map(dbChannels.map(ch => [ch.id, ch]));
+      const mergedIds = new Set<string>();
+      const merged = jsonChannels.map(jc => {
+        const dbCh = dbMap.get(jc.id);
+        mergedIds.add(jc.id);
+        if (dbCh) {
+          return {
+            ...jc,
+            videoId: dbCh.isManualOverride ? dbCh.videoId : (jc.videoId || dbCh.videoId),
+            isManualOverride: dbCh.isManualOverride || false,
+            rank: dbCh.rank ?? 999,
+            isLive: dbCh.isLive ?? true,
+          };
+        }
+        return jc;
+      });
+
+      for (const dbCh of dbChannels) {
+        if (!mergedIds.has(dbCh.id)) {
+          let safeOrigin = 'https://localhost';
+          try { safeOrigin = new URL(origin).origin; } catch { safeOrigin = origin; }
+          let url = '';
+          if (dbCh.platform === 'youtube' && dbCh.videoId) {
+            url = `https://www.youtube.com/watch?v=${dbCh.videoId}`;
+          } else if (dbCh.platform === 'youtube' && dbCh.channelHandle) {
+            url = `https://www.youtube.com/@${dbCh.channelHandle}/live`;
+          } else if (dbCh.platform === 'twitch') {
+            url = `https://www.twitch.tv/${dbCh.channelHandle}`;
+          } else if (dbCh.platform === 'kick') {
+            url = `https://kick.com/${dbCh.channelHandle}`;
+          }
+          merged.push({
+            id: dbCh.id,
+            name: dbCh.name,
+            url,
+            iconType: (dbCh.iconType as any) || 'default',
+            category: dbCh.category || 'General',
+            platform: dbCh.platform as any,
+            channelId: dbCh.channelHandle || '',
+            videoId: dbCh.videoId || null,
+            lastUpdated: dbCh.lastUpdated ? new Date(dbCh.lastUpdated).getTime() : Date.now(),
+            isManualOverride: dbCh.isManualOverride || false,
+            rank: dbCh.rank ?? 999,
+            isLive: dbCh.isLive ?? true,
+          });
+        }
+      }
+
+      res.json({
+        channels: merged,
+        lastRefresh: linksData.lastRefresh,
+        origin,
+      });
+    } catch (error) {
+      res.json({
+        channels: jsonChannels,
+        lastRefresh: linksData.lastRefresh,
+        origin,
+      });
+    }
   });
 
   app.post("/api/links/refresh", async (req, res) => {

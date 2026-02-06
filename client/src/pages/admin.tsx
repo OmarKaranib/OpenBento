@@ -107,9 +107,8 @@ export default function Admin() {
     
     setIsGlobalScraping(false);
     setScrapeProgress(null);
-    // Invalidate all channel-related queries for instant refresh
     queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
-    queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/links'] });
   };
 
   const handleScrapeUrl = () => {
@@ -191,7 +190,7 @@ export default function Admin() {
     setIsPurging(false);
     setPurgeProgress(null);
     queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
-    queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/links'] });
     
     alert(`Purge complete! Deleted ${deletedCount} broken channels.`);
   };
@@ -243,6 +242,7 @@ export default function Admin() {
     mutationFn: (id: string) => apiRequest('DELETE', `/api/admin/channels/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/links'] });
     },
   });
 
@@ -250,9 +250,8 @@ export default function Admin() {
     mutationFn: (channel: Partial<Channel> & { id: string }) => 
       apiRequest('PATCH', `/api/admin/channels/${channel.id}`, channel),
     onSuccess: () => {
-      // INSTANT ADMIN REFRESH: Invalidate all channel queries so entire app sees new ID immediately
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/links'] });
       setEditingChannel(null);
     },
   });
@@ -262,7 +261,7 @@ export default function Admin() {
       apiRequest('POST', '/api/admin/channels', channel),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/links'] });
       setShowAddForm(false);
       setNewChannel({
         id: '',
