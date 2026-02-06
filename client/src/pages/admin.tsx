@@ -901,7 +901,7 @@ export default function Admin() {
                                     </button>
                                     <button
                                       type="button"
-                                      onMouseDown={(e) => {
+                                      onPointerDown={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
                                         if (confirm(`Delete "${channel.name}"?`)) {

@@ -244,17 +244,8 @@ const getProYouTubeEmbedUrl = (videoId: string): string => {
 
 // NOTE: live_stream?channel= format is deprecated - we now require real videoIds from /api/links
 
-// Fallback channels (used when API is not available) - Music/Lofi content removed
-const FALLBACK_CHANNELS: TrendingChannel[] = [
-  { id: 'nasa-live', name: 'NASA Live', url: getProYouTubeEmbedUrl('21X5lGlDOfg'), iconType: 'science', category: 'Science', platform: 'youtube', channelId: undefined },
-  { id: 'sky-news', name: 'Sky News', url: getProYouTubeEmbedUrl('9Auqkrry-jE'), iconType: 'news', category: 'News', platform: 'youtube', channelId: undefined },
-  { id: 'abc-news', name: 'ABC News', url: getProYouTubeEmbedUrl('I9u-j-2V_Vw'), iconType: 'news', category: 'News', platform: 'youtube', channelId: undefined },
-  { id: 'twitch-esl', name: 'ESL CS:GO', url: 'https://www.twitch.tv/esl_csgo', iconType: 'gaming', category: 'Esports', platform: 'twitch', channelId: 'esl_csgo' },
-  { id: 'twitch-rocket', name: 'Rocket League', url: 'https://www.twitch.tv/rocketleague', iconType: 'gaming', category: 'Esports', platform: 'twitch', channelId: 'rocketleague' },
-  { id: 'twitch-gaules', name: 'Gaules', url: 'https://www.twitch.tv/gaules', iconType: 'gaming', category: 'Gaming', platform: 'twitch', channelId: 'gaules' },
-  { id: 'kick-xqc', name: 'xQc', url: 'https://kick.com/xqc', iconType: 'gaming', category: 'Gaming', platform: 'kick', channelId: 'xqc' },
-  { id: 'kick-adin', name: 'Adin Ross', url: 'https://kick.com/adinross', iconType: 'gaming', category: 'Gaming', platform: 'kick', channelId: 'adinross' },
-];
+// No hardcoded fallback channels - sidebar pulls exclusively from the database via /api/links
+const FALLBACK_CHANNELS: TrendingChannel[] = [];
 
 // API response type
 interface LinksApiResponse {

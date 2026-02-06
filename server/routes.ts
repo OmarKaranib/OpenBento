@@ -639,7 +639,21 @@ export async function registerRoutes(
     }
     try {
       const id = req.params.id as string;
-      const channel = await storage.updateChannel(id, req.body);
+      const body = req.body;
+      const sanitized: Record<string, any> = {};
+      if (body.name !== undefined) sanitized.name = body.name;
+      if (body.channelHandle !== undefined) sanitized.channelHandle = body.channelHandle;
+      if (body.platform !== undefined) sanitized.platform = body.platform;
+      if (body.iconType !== undefined) sanitized.iconType = body.iconType;
+      if (body.category !== undefined) sanitized.category = body.category;
+      if (body.videoId !== undefined) sanitized.videoId = body.videoId;
+      if (body.url !== undefined) sanitized.url = body.url;
+      if (body.logoUrl !== undefined) sanitized.logoUrl = body.logoUrl;
+      if (body.isLive !== undefined) sanitized.isLive = body.isLive;
+      if (body.isManualOverride !== undefined) sanitized.isManualOverride = body.isManualOverride;
+      if (body.rank !== undefined) sanitized.rank = body.rank;
+      
+      const channel = await storage.updateChannel(id, sanitized);
       
       if (!channel) {
         return res.status(404).json({ error: "Channel not found" });
