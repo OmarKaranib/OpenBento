@@ -108,7 +108,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps = {}) {
           <div className="text-center mb-[3rem]">
             <div className="flex items-center justify-center gap-[1rem] mb-[1rem]">
               <img 
-                src="/openbento-logo.png" 
+                src="/t.png" 
                 alt="OpenBento Logo" 
                 className="h-[4rem] w-auto object-contain"
                 data-testid="img-login-logo"

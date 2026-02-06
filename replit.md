@@ -56,8 +56,10 @@ The dashboard is built on a 12-column magnetic grid.
 - **Admin Dashboard:** `/admin` route with client-side and server-side authorization. Features user list, premium toggle, channel manager (CRUD with soft-delete), channel auto-import, and system statistics.
 - **Soft Delete (Hide/Show):** Channels use `isVisible` boolean column.
 - **Channel ID Sanitization:** Admin "Add Channel" form only accepts alphanumeric + dashes. Pasting a URL auto-extracts the channel slug. Backend PATCH/DELETE routes reject IDs containing slashes.
-- **Feedback System:** `feedback` table (id, user_email, message, type, created_at). POST `/api/feedback` is public (no auth required). GET `/api/admin/feedback` is admin-only. Feedback section in Admin Dashboard displays messages with bug/idea type badges.
-- **Supabase Auth Hardening:** Client initialized with `autoRefreshToken: true` and `persistSession: true` to prevent session timeouts.
+- **Feedback System:** `feedback` table (id, user_email, message, type, created_at). POST `/api/feedback` is public (no auth required), accepts both `type/message` and `category/description` field formats, saves to DB and sends email via Resend. GET `/api/admin/feedback` is admin-only. Feedback section in Admin Dashboard displays messages with bug/idea type badges. Standalone `feedback-modal.tsx` component available for in-app modal feedback.
+- **Supabase Auth Hardening:** Client initialized with `autoRefreshToken: true` and `persistSession: true` to prevent session timeouts. Auth hook includes exponential retry (up to 3 attempts) for session fetch failures and safe cleanup on unmount to prevent 504 errors.
+- **Logo:** All logos use `/t.png` (stored in `client/public/t.png`).
+- **Promo:** Coupon code `BENTO2FREE` with text "Get 2 Months Free Trial" in pricing modal. Stripe checkout has `allow_promotion_codes: true`.
 - **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core`, `lucide-react`.
 
 ## External Dependencies

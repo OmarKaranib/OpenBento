@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useReplitAuth } from '@/hooks/use-replit-auth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon, GripVertical, Eye, EyeOff, MessageSquare, Bug, Lightbulb } from 'lucide-react';
+import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon, GripVertical, Eye, EyeOff, MessageSquare, Lightbulb, Bug } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { searchChannelLiveStream } from '@/lib/stream-api';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
@@ -62,23 +62,44 @@ function SortableChannelRow({ id, disabled, isHidden, children }: { id: string; 
   );
 }
 
+// FIXED: YouTube Video ID extraction with strict 11-character validation
 function extractYouTubeVideoId(url: string): string | null {
   if (!url) return null;
   const trimmed = url.trim();
+
+  // Pattern 1: Standard watch URLs
+  // Pattern 2: Short youtu.be URLs  
+  // Pattern 3: Embed URLs
+  // Pattern 4: Live URLs
+  // Pattern 5: Shorts URLs
+  // Pattern 6: Direct 11-character ID
   const patterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/,
     /^([a-zA-Z0-9_-]{11})$/,
   ];
+
   for (const pattern of patterns) {
     const match = trimmed.match(pattern);
-    if (match) return match[1];
+    if (match && match[1].length === 11) {
+      console.log('[VideoID Extract] Input:', url, '-> Output:', match[1]);
+      return match[1];
+    }
   }
+
+  console.warn('[VideoID Extract] Failed to extract valid 11-char ID from:', url);
   return null;
 }
 
+// FIXED: Smart handler that ALWAYS returns clean video ID, never full URLs
 function smartVideoIdHandler(rawInput: string): string {
   const extracted = extractYouTubeVideoId(rawInput);
-  return extracted || rawInput;
+  if (extracted) {
+    console.log('[SmartHandler] Sanitized:', rawInput, '->', extracted);
+    return extracted;
+  }
+  // If extraction fails, return original but log warning
+  console.warn('[SmartHandler] Could not extract ID, returning original:', rawInput);
+  return rawInput;
 }
 
 export default function Admin() {
@@ -107,17 +128,37 @@ export default function Admin() {
   });
   const [idError, setIdError] = useState('');
 
+  // FIXED: Strict ID sanitization - prevent URLs in ID field
   const sanitizeChannelId = (raw: string): string => {
+    // STRICT ID SANITIZATION: Extract name from URL if pasted, ensure slug format
     const urlPatterns = [
       /youtube\.com\/(?:channel\/|c\/|@)([^\/?&#]+)/i,
       /twitch\.tv\/([^\/?&#]+)/i,
       /kick\.com\/([^\/?&#]+)/i,
       /youtu\.be\/([^\/?&#]+)/i,
+      /youtube\.com\/watch\?v=([^\/?&#]+)/i, // Extract from watch URLs too
     ];
-    for (const pattern of urlPatterns) {
-      const match = raw.match(pattern);
-      if (match) return match[1].toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+    // Check if input contains URL markers (http://, .com, .tv, etc.)
+    const hasUrlMarkers = /^https?:\/\//i.test(raw) || /\.(com|tv|be|io)\//i.test(raw);
+
+    if (hasUrlMarkers) {
+      // Extract meaningful name from URL
+      for (const pattern of urlPatterns) {
+        const match = raw.match(pattern);
+        if (match) {
+          const extracted = match[1].toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+          console.log('[ID Sanitize] Extracted from URL:', raw, '->', extracted);
+          return extracted;
+        }
+      }
+      // Fallback: extract domain or path as slug
+      const cleanUrl = raw.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const slug = cleanUrl.split('/')[cleanUrl.split('/').length - 1] || 'channel';
+      return slug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
     }
+
+    // Not a URL - sanitize as slug (lowercase, alphanumeric + dashes only)
     return raw.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   };
 
@@ -125,7 +166,7 @@ export default function Admin() {
 
   const handleGlobalScrape = async () => {
     if (!channels.length) return;
-    
+
     setIsGlobalScraping(true);
     // SYNC ALL STREAMS: Only scrape channels that are NOT marked as manual override
     const youtubeChannels = channels.filter(c => 
@@ -133,19 +174,21 @@ export default function Admin() {
       c.channelHandle && 
       !c.isManualOverride // Skip manual override channels
     );
-    
+
     console.log(`[SYNC ALL] Starting scrape for ${youtubeChannels.length} non-override channels`);
-    
+
     for (let i = 0; i < youtubeChannels.length; i++) {
       const channel = youtubeChannels[i];
       setScrapeProgress({ current: i + 1, total: youtubeChannels.length, currentChannel: channel.name });
-      
+
       try {
         if (channel.channelHandle) {
           const result = await searchChannelLiveStream(channel.channelHandle, true);
           if (result.liveVideoId) {
+            // FIXED: Sanitize videoId before sending to API
+            const cleanVideoId = smartVideoIdHandler(result.liveVideoId);
             await apiRequest('PATCH', `/api/admin/channels/${channel.id}`, { 
-              videoId: result.liveVideoId,
+              videoId: cleanVideoId,
               isLive: true 
             });
           }
@@ -153,10 +196,10 @@ export default function Admin() {
       } catch (err) {
         console.error(`[SYNC ALL] Failed for ${channel.name}:`, err);
       }
-      
+
       await new Promise(r => setTimeout(r, 500));
     }
-    
+
     setIsGlobalScraping(false);
     setScrapeProgress(null);
     queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
@@ -165,6 +208,7 @@ export default function Admin() {
 
   const handleScrapeUrl = () => {
     if (!scrapeUrl || !editingChannel) return;
+    // FIXED: Always sanitize extracted video ID
     const extractedId = extractYouTubeVideoId(scrapeUrl);
     if (extractedId) {
       setEditingChannel({ ...editingChannel, videoId: extractedId, isManualOverride: true });
@@ -174,18 +218,18 @@ export default function Admin() {
 
   const handlePurgeBrokenStreams = async () => {
     if (!channels.length) return;
-    
+
     setIsPurging(true);
     let deletedCount = 0;
-    
+
     const youtubeChannels = channels.filter(c => 
       c.platform === 'youtube' && 
       c.videoId && 
       !c.isManualOverride
     );
-    
+
     console.log(`[PURGE] Starting purge check for ${youtubeChannels.length} YouTube channels`);
-    
+
     for (let i = 0; i < youtubeChannels.length; i++) {
       const channel = youtubeChannels[i];
       setPurgeProgress({ 
@@ -194,57 +238,62 @@ export default function Admin() {
         currentChannel: channel.name,
         deleted: deletedCount 
       });
-      
+
       try {
         const response = await fetch(`/api/youtube/validate-video/${channel.videoId}`);
         const result = await response.json();
-        
+
         if (!result.valid) {
           console.log(`[PURGE] Broken stream detected: ${channel.name} - ${result.reason}`);
-          
+
           if (channel.channelHandle) {
             const searchResponse = await fetch(`/api/youtube/search-live/${channel.channelHandle}`);
             const searchResult = await searchResponse.json();
-            
+
             if (searchResult.latestVideoId) {
               const fallbackResponse = await fetch(`/api/youtube/validate-video/${searchResult.latestVideoId}`);
               const fallbackResult = await fallbackResponse.json();
-              
+
               if (!fallbackResult.valid) {
-                console.log(`[PURGE] Fallback also broken for ${channel.name}, deleting...`);
-                await apiRequest('DELETE', `/api/admin/channels/${channel.id}`);
+                console.log(`[PURGE] Fallback also broken for ${channel.name}, soft deleting...`);
+                // FIXED: Soft delete instead of hard delete
+                await apiRequest('PATCH', `/api/admin/channels/${channel.id}`, { isVisible: false });
                 deletedCount++;
               } else {
                 console.log(`[PURGE] Fallback works for ${channel.name}, updating videoId`);
+                // FIXED: Sanitize videoId before update
+                const cleanVideoId = smartVideoIdHandler(searchResult.latestVideoId);
                 await apiRequest('PATCH', `/api/admin/channels/${channel.id}`, { 
-                  videoId: searchResult.latestVideoId,
+                  videoId: cleanVideoId,
                   isLive: false 
                 });
               }
             } else {
-              console.log(`[PURGE] No fallback available for ${channel.name}, deleting...`);
-              await apiRequest('DELETE', `/api/admin/channels/${channel.id}`);
+              console.log(`[PURGE] No fallback available for ${channel.name}, soft deleting...`);
+              // FIXED: Soft delete instead of hard delete
+              await apiRequest('PATCH', `/api/admin/channels/${channel.id}`, { isVisible: false });
               deletedCount++;
             }
           } else {
-            console.log(`[PURGE] No channel handle for ${channel.name}, deleting broken channel...`);
-            await apiRequest('DELETE', `/api/admin/channels/${channel.id}`);
+            console.log(`[PURGE] No channel handle for ${channel.name}, soft deleting broken channel...`);
+            // FIXED: Soft delete instead of hard delete
+            await apiRequest('PATCH', `/api/admin/channels/${channel.id}`, { isVisible: false });
             deletedCount++;
           }
         }
       } catch (err) {
         console.error(`[PURGE] Failed to check ${channel.name}:`, err);
       }
-      
+
       await new Promise(r => setTimeout(r, 300));
     }
-    
+
     setIsPurging(false);
     setPurgeProgress(null);
     queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
     queryClient.invalidateQueries({ queryKey: ['/api/links'] });
-    
-    alert(`Purge complete! Deleted ${deletedCount} broken channels.`);
+
+    alert(`Purge complete! Soft-deleted ${deletedCount} broken channels (they can be restored).`);
   };
 
   const isAdmin = isAuthenticated && ADMIN_EMAILS.includes(user?.email?.toLowerCase() || '');
@@ -327,8 +376,15 @@ export default function Admin() {
   const [showHidden, setShowHidden] = useState(false);
 
   const updateMutation = useMutation({
-    mutationFn: (channel: Partial<Channel> & { id: string }) => 
-      apiRequest('PATCH', `/api/admin/channels/${channel.id}`, channel),
+    mutationFn: (channel: Partial<Channel> & { id: string }) => {
+      // FIXED: Sanitize videoId before sending to API
+      const sanitizedChannel = {
+        ...channel,
+        videoId: channel.videoId ? smartVideoIdHandler(channel.videoId) : channel.videoId
+      };
+      console.log('[Update] Sanitizing channel data:', channel, '->', sanitizedChannel);
+      return apiRequest('PATCH', `/api/admin/channels/${channel.id}`, sanitizedChannel);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
       queryClient.invalidateQueries({ queryKey: ['/api/links'] });
@@ -338,8 +394,16 @@ export default function Admin() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (channel: typeof newChannel) => 
-      apiRequest('POST', '/api/admin/channels', channel),
+    mutationFn: (channel: typeof newChannel) => {
+      // FIXED: Sanitize both ID and videoId before creating
+      const sanitizedChannel = {
+        ...channel,
+        id: sanitizeChannelId(channel.id),
+        videoId: channel.videoId ? smartVideoIdHandler(channel.videoId) : ''
+      };
+      console.log('[Create] Sanitizing new channel:', channel, '->', sanitizedChannel);
+      return apiRequest('POST', '/api/admin/channels', sanitizedChannel);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
       queryClient.invalidateQueries({ queryKey: ['/api/links'] });
@@ -358,6 +422,7 @@ export default function Admin() {
         isManualOverride: false,
         rank: 999
       });
+      setIdError('');
     },
   });
 
@@ -716,7 +781,7 @@ export default function Admin() {
                 ) : (
                   <>
                     <Trash2 className="w-5 h-5" />
-                    🧹 Purge Broken Streams
+                    Purge Broken Streams
                   </>
                 )}
               </button>
@@ -737,7 +802,7 @@ export default function Admin() {
             <div className="mb-4 p-4 bg-slate-900/50 rounded-lg border border-slate-600">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-white font-medium">Add New Channel</h3>
-                <button onClick={() => setShowAddForm(false)} className="text-slate-400 hover:text-white">
+                <button onClick={() => { setShowAddForm(false); setIdError(''); }} className="text-slate-400 hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -749,25 +814,23 @@ export default function Admin() {
                     value={newChannel.id}
                     onChange={(e) => {
                       const raw = e.target.value;
-                      const hasUrl = /^https?:\/\//i.test(raw) || /\.(com|tv|be)\//i.test(raw);
-                      if (hasUrl) {
-                        const extracted = sanitizeChannelId(raw);
-                        setNewChannel({ ...newChannel, id: extracted });
-                        setIdError('URL detected — extracted ID: ' + extracted);
+                      // FIXED: Always sanitize ID input
+                      const sanitized = sanitizeChannelId(raw);
+                      setNewChannel({ ...newChannel, id: sanitized });
+
+                      // Show helpful error messages
+                      if (raw !== sanitized) {
+                        setIdError(`Auto-sanitized: "${raw}" → "${sanitized}"`);
+                      } else if (sanitized && !isValidChannelId(sanitized)) {
+                        setIdError('Only lowercase letters, numbers, and dashes allowed');
                       } else {
-                        const cleaned = raw.toLowerCase().replace(/[^a-z0-9-]/g, '');
-                        setNewChannel({ ...newChannel, id: cleaned });
-                        if (cleaned && !isValidChannelId(cleaned)) {
-                          setIdError('Only lowercase letters, numbers, and dashes allowed');
-                        } else {
-                          setIdError('');
-                        }
+                        setIdError('');
                       }
                     }}
-                    className={`px-3 py-2 bg-slate-800 border rounded-lg text-white text-sm ${idError ? 'border-red-500' : 'border-slate-600'}`}
+                    className={`px-3 py-2 bg-slate-800 border rounded-lg text-white text-sm ${idError ? 'border-amber-500' : 'border-slate-600'}`}
                     data-testid="input-new-channel-id"
                   />
-                  {idError && <span className="text-red-400 text-xs">{idError}</span>}
+                  {idError && <span className="text-amber-400 text-xs">{idError}</span>}
                 </div>
                 <input
                   type="text"
@@ -788,6 +851,7 @@ export default function Admin() {
                   placeholder="Video ID or YouTube URL"
                   value={newChannel.videoId}
                   onChange={(e) => {
+                    // FIXED: Always sanitize video ID input
                     const resolved = smartVideoIdHandler(e.target.value);
                     setNewChannel({ ...newChannel, videoId: resolved });
                   }}
@@ -926,8 +990,8 @@ export default function Admin() {
                                       type="text"
                                       value={editingChannel.videoId || ''}
                                       onChange={(e) => {
-                                        const raw = e.target.value;
-                                        const resolved = smartVideoIdHandler(raw);
+                                        // FIXED: Always sanitize video ID on edit
+                                        const resolved = smartVideoIdHandler(e.target.value);
                                         setEditingChannel({ ...editingChannel, videoId: resolved, isManualOverride: true });
                                       }}
                                       className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"

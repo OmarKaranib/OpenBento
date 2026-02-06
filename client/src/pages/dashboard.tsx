@@ -1619,7 +1619,7 @@ const MasterControlDashboard = ({
             {/* Help/Tutorial Button - Right beside Fullscreen */}
             <FloatingTutorial isPremium={isPremium} isDarkMode={isDarkMode} />
             <img 
-              src="/openbento-logo.png" 
+              src="/t.png" 
               alt="OpenBento Logo" 
               className="h-[2.4rem] w-auto object-contain"
               data-testid="img-logo"

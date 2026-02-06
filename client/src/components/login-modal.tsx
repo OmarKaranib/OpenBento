@@ -133,7 +133,7 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason }: L
           <div className="text-center mb-[2.5rem]">
             <div className="flex items-center justify-center gap-[0.8rem] mb-[0.5rem]">
               <img 
-                src="/openbento-logo.png" 
+                src="/t.png" 
                 alt="OpenBento Logo" 
                 className="h-[3rem] w-auto object-contain"
                 data-testid="img-modal-logo"
