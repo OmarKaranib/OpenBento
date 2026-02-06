@@ -17,7 +17,12 @@ if (!isConfigured) {
 let supabase: SupabaseClient | null = null;
 
 if (isConfigured) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+    },
+  });
 }
 
 export { supabase };

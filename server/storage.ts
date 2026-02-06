@@ -6,6 +6,7 @@ import {
   dashboards,
   channels,
   profiles,
+  feedback,
   type UserLibraryItem,
   type InsertUserLibraryItem,
   type StreamStatus,
@@ -15,8 +16,10 @@ import {
   type InsertChannel,
   type Profile,
   type InsertProfile,
+  type Feedback,
+  type InsertFeedback,
 } from "@shared/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUserLibrary(userId: string): Promise<UserLibraryItem[]>;
@@ -45,6 +48,10 @@ export interface IStorage {
   getProfilesByIds(ids: string[]): Promise<Profile[]>;
   upsertProfile(data: InsertProfile): Promise<Profile>;
   updateProfilePremium(id: string, isPremium: boolean): Promise<Profile | null>;
+
+  // Feedback methods
+  createFeedback(data: InsertFeedback): Promise<Feedback>;
+  getAllFeedback(): Promise<Feedback[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -212,6 +219,19 @@ export class DatabaseStorage implements IStorage {
       .where(eq(profiles.id, id))
       .returning();
     return updated || null;
+  }
+
+  async createFeedback(data: InsertFeedback): Promise<Feedback> {
+    const [inserted] = await db.insert(feedback)
+      .values(data)
+      .returning();
+    return inserted;
+  }
+
+  async getAllFeedback(): Promise<Feedback[]> {
+    return await db.select()
+      .from(feedback)
+      .orderBy(desc(feedback.createdAt));
   }
 }
 

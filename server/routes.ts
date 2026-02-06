@@ -5,7 +5,7 @@ import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from ".
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerChannel } from "./services/pulse-cache";
 import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, verifyVideoIsLive, searchChannelLiveStream, checkVideoLiveStatusById } from "./services/youtube-api";
-import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema } from "@shared/schema";
+import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema, insertFeedbackSchema } from "@shared/schema";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { getUncachableResendClient } from "./services/resend-client";
 
@@ -709,6 +709,36 @@ export async function registerRoutes(
         await storage.updateChannel(id, { rank });
       }
       res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  // Feedback routes
+  app.post("/api/feedback", async (req: Request, res: Response) => {
+    try {
+      const validation = insertFeedbackSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: validation.error.message });
+      }
+      const { type } = validation.data;
+      if (type && !['bug', 'idea'].includes(type)) {
+        return res.status(400).json({ error: "Type must be 'bug' or 'idea'" });
+      }
+      const item = await storage.createFeedback(validation.data);
+      res.json({ success: true, feedback: item });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.get("/api/admin/feedback", async (req: Request, res: Response) => {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    try {
+      const items = await storage.getAllFeedback();
+      res.json({ feedback: items });
     } catch (error) {
       res.status(500).json({ error: String(error) });
     }

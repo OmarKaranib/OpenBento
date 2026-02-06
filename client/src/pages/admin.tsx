@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useReplitAuth } from '@/hooks/use-replit-auth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon, GripVertical, Eye, EyeOff } from 'lucide-react';
+import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon, GripVertical, Eye, EyeOff, MessageSquare, Bug, Lightbulb } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { searchChannelLiveStream } from '@/lib/stream-api';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
@@ -272,6 +272,19 @@ export default function Admin() {
 
   const { data: usersData, isLoading: usersLoading } = useQuery<{ users: AdminUser[], total: number }>({
     queryKey: ['/api/admin/users'],
+    enabled: isAdmin,
+  });
+
+  interface FeedbackItem {
+    id: string;
+    userEmail: string | null;
+    message: string;
+    type: string;
+    createdAt: string;
+  }
+
+  const { data: feedbackData, isLoading: feedbackLoading } = useQuery<{ feedback: FeedbackItem[] }>({
+    queryKey: ['/api/admin/feedback'],
     enabled: isAdmin,
   });
 
@@ -574,6 +587,57 @@ export default function Admin() {
                 <p className="text-slate-400 text-sm">Other Platforms</p>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div
+          className="mt-6 bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6"
+          data-testid="card-feedback"
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-amber-500/20 rounded-lg">
+              <MessageSquare className="w-6 h-6 text-amber-400" />
+            </div>
+            <h2 className="text-xl font-semibold text-white">
+              Feedback {feedbackData?.feedback?.length ? `(${feedbackData.feedback.length})` : ''}
+            </h2>
+          </div>
+          <div className="bg-slate-900/50 rounded-lg p-4 max-h-[400px] overflow-y-auto">
+            {feedbackLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />
+              </div>
+            ) : feedbackData?.feedback && feedbackData.feedback.length > 0 ? (
+              <div className="space-y-3">
+                {feedbackData.feedback.map((item) => (
+                  <div key={item.id} className="p-3 bg-slate-800 rounded-lg border-l-4 border-l-transparent" style={{
+                    borderLeftColor: item.type === 'bug' ? '#ef4444' : '#3b82f6'
+                  }}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {item.type === 'bug' ? (
+                        <Bug className="w-4 h-4 text-red-400" />
+                      ) : (
+                        <Lightbulb className="w-4 h-4 text-blue-400" />
+                      )}
+                      <span className={`px-2 py-0.5 rounded text-xs uppercase font-bold ${
+                        item.type === 'bug' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+                      }`}>
+                        {item.type}
+                      </span>
+                      <span className="text-slate-500 text-xs ml-auto">
+                        {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}
+                      </span>
+                    </div>
+                    <p className="text-white text-sm">{item.message}</p>
+                    {item.userEmail && (
+                      <p className="text-slate-500 text-xs mt-1">From: {item.userEmail}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-500 text-sm text-center py-4">No feedback received yet.</p>
+            )}
           </div>
         </div>
 

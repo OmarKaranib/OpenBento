@@ -55,7 +55,9 @@ The dashboard is built on a 12-column magnetic grid.
 - **Stripe Pro Subscription:** Integrated Stripe for recurring subscriptions. Enforces 6-block limit for free users.
 - **Admin Dashboard:** `/admin` route with client-side and server-side authorization. Features user list, premium toggle, channel manager (CRUD with soft-delete), channel auto-import, and system statistics.
 - **Soft Delete (Hide/Show):** Channels use `isVisible` boolean column.
-- **Channel ID Sanitization:** Admin "Add Channel" form only accepts alphanumeric + dashes.
+- **Channel ID Sanitization:** Admin "Add Channel" form only accepts alphanumeric + dashes. Pasting a URL auto-extracts the channel slug. Backend PATCH/DELETE routes reject IDs containing slashes.
+- **Feedback System:** `feedback` table (id, user_email, message, type, created_at). POST `/api/feedback` is public (no auth required). GET `/api/admin/feedback` is admin-only. Feedback section in Admin Dashboard displays messages with bug/idea type badges.
+- **Supabase Auth Hardening:** Client initialized with `autoRefreshToken: true` and `persistSession: true` to prevent session timeouts.
 - **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core`, `lucide-react`.
 
 ## External Dependencies
