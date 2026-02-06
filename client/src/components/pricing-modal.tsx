@@ -199,9 +199,15 @@ export function PricingModal({ isOpen, onClose, isAuthenticated, openLoginModal 
               </Button>
               
               <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                <p className="text-center text-emerald-400 text-sm font-medium">
-                  Use code <span className="font-bold text-emerald-300">BENTO2FREE</span> for 2 Months Free Trial!
-                </p>
+                {billingPeriod === 'monthly' ? (
+                  <p className="text-center text-emerald-400 text-sm font-medium" data-testid="text-coupon-monthly">
+                    Use code <span className="font-bold text-emerald-300">BENTO2FREE</span> for 2 Months Free on Monthly!
+                  </p>
+                ) : (
+                  <p className="text-center text-emerald-400 text-sm font-medium" data-testid="text-coupon-yearly">
+                    Use code <span className="font-bold text-emerald-300">FREE2BENTO</span> for $16 off your first Yearly purchase!
+                  </p>
+                )}
               </div>
             </div>
           </div>

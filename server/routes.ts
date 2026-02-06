@@ -717,12 +717,22 @@ export async function registerRoutes(
   // Feedback routes - saves to DB and sends email notification
   app.post("/api/feedback", async (req: Request, res: Response) => {
     try {
-      const { category, description, email, type, message, userEmail } = req.body;
-      const normalizedBody = {
+      const { category, description, email, type, message, userEmail, screenshot } = req.body;
+      const normalizedBody: Record<string, unknown> = {
         type: type || category,
         message: message || description,
         userEmail: userEmail || email || null,
       };
+
+      if (screenshot && typeof screenshot === 'string') {
+        if (!screenshot.startsWith('data:image/')) {
+          return res.status(400).json({ error: "Invalid screenshot format. Must be a base64 data URL." });
+        }
+        if (screenshot.length > 7 * 1024 * 1024) {
+          return res.status(400).json({ error: "Screenshot too large. Must be under 5MB." });
+        }
+        normalizedBody.screenshot = screenshot;
+      }
 
       const validation = insertFeedbackSchema.safeParse(normalizedBody);
       if (!validation.success) {

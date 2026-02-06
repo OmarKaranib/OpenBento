@@ -329,6 +329,7 @@ export default function Admin() {
     userEmail: string | null;
     message: string;
     type: string;
+    screenshot: string | null;
     createdAt: string;
   }
 
@@ -812,6 +813,18 @@ export default function Admin() {
                       </button>
                     </div>
                     <p className="text-white text-sm">{item.message}</p>
+                    {item.screenshot && (
+                      <div className="mt-2">
+                        <img
+                          src={item.screenshot}
+                          alt="Feedback screenshot"
+                          className="max-h-40 rounded-md border border-slate-700 cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => window.open(item.screenshot!, '_blank')}
+                          title="Click to view full size"
+                          data-testid={`img-feedback-screenshot-${item.id}`}
+                        />
+                      </div>
+                    )}
                     {item.userEmail && (
                       <p className="text-slate-500 text-xs mt-1">From: {item.userEmail}</p>
                     )}
