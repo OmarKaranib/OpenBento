@@ -56,10 +56,10 @@ The dashboard is built on a 12-column magnetic grid.
 - **Admin Dashboard:** `/admin` route with client-side and server-side authorization. Features user list, premium toggle, channel manager (CRUD with soft-delete), channel auto-import, and system statistics.
 - **Soft Delete (Hide/Show):** Channels use `isVisible` boolean column.
 - **Channel ID Sanitization:** Admin "Add Channel" form only accepts alphanumeric + dashes. Pasting a URL auto-extracts the channel slug. Backend PATCH/DELETE routes reject IDs containing slashes.
-- **Feedback System:** `feedback` table (id, user_email, message, type, created_at). POST `/api/feedback` is public (no auth required), accepts both `type/message` and `category/description` field formats, saves to DB and sends email via Resend. GET `/api/admin/feedback` is admin-only. Feedback section in Admin Dashboard displays messages with bug/idea type badges. Standalone `feedback-modal.tsx` component available for in-app modal feedback.
+- **Feedback System:** `feedback` table (id, user_email, message, type, screenshot, created_at). POST `/api/feedback` is public (no auth required), accepts both `type/message` and `category/description` field formats plus optional `screenshot` (base64 data URL, .png/.jpg only, 5MB client limit). Saves to DB and sends email via Resend. GET `/api/admin/feedback` is admin-only. Feedback section in Admin Dashboard displays messages with bug/idea type badges and screenshot thumbnails (click to open full size). Standalone `feedback-modal.tsx` component with file upload UI for in-app modal feedback. Express JSON body limit set to 10mb for base64 payloads.
 - **Supabase Auth Hardening:** Client initialized with `autoRefreshToken: true` and `persistSession: true` to prevent session timeouts. Auth hook includes exponential retry (up to 3 attempts) for session fetch failures and safe cleanup on unmount to prevent 504 errors.
 - **Logo:** All logos use `/t.png` (stored in `client/public/t.png`).
-- **Promo:** Coupon code `BENTO2FREE` with text "Get 2 Months Free Trial" in pricing modal. Stripe checkout has `allow_promotion_codes: true`.
+- **Promo:** Dual coupon strategy in pricing modal. Monthly: `BENTO2FREE` (2 Months Free on Monthly). Yearly: `FREE2BENTO` ($16 off first Yearly purchase). Stripe checkout has `allow_promotion_codes: true`.
 - **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core`, `lucide-react`.
 
 ## External Dependencies
