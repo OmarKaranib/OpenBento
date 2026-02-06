@@ -106,12 +106,20 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps = {}) {
       <div className="relative z-10 w-full max-w-[40rem] mx-[2rem]">
         <div className="bg-slate-800/80 backdrop-blur-xl border border-slate-700/50 rounded-[2rem] p-[4rem] shadow-2xl shadow-cyan-500/10">
           <div className="text-center mb-[3rem]">
-            <h1 
-              className="text-[4rem] font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent mb-[1rem]"
-              style={{ fontFamily: 'Inter, sans-serif' }}
-            >
-              OpenBento
-            </h1>
+            <div className="flex items-center justify-center gap-[1rem] mb-[1rem]">
+              <img 
+                src="/openbento-logo.png" 
+                alt="OpenBento Logo" 
+                className="h-[4rem] w-auto object-contain"
+                data-testid="img-login-logo"
+              />
+              <h1 
+                className="text-[4rem] font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent"
+                style={{ fontFamily: 'Inter, sans-serif' }}
+              >
+                OpenBento
+              </h1>
+            </div>
             <p className="text-slate-400 text-[1.4rem]" style={{ fontFamily: 'Inter, sans-serif' }}>
               Your personalized mission control dashboard
             </p>

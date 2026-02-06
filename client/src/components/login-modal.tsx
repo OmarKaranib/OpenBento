@@ -131,12 +131,20 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason }: L
 
         <div className="p-[3rem]">
           <div className="text-center mb-[2.5rem]">
-            <h1 
-              className="text-[2.8rem] font-bold text-gray-900 mb-[0.5rem]"
-              style={{ fontFamily: 'Inter, sans-serif' }}
-            >
-              OpenBento
-            </h1>
+            <div className="flex items-center justify-center gap-[0.8rem] mb-[0.5rem]">
+              <img 
+                src="/openbento-logo.png" 
+                alt="OpenBento Logo" 
+                className="h-[3rem] w-auto object-contain"
+                data-testid="img-modal-logo"
+              />
+              <h1 
+                className="text-[2.8rem] font-bold text-gray-900"
+                style={{ fontFamily: 'Inter, sans-serif' }}
+              >
+                OpenBento
+              </h1>
+            </div>
             <div className="h-[0.2rem] w-[8rem] mx-auto bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full mb-[1.5rem]" />
             <h2 
               className="text-[1.8rem] font-semibold text-gray-800 mb-[0.5rem]"
