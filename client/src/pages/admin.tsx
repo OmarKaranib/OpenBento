@@ -277,9 +277,14 @@ export default function Admin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
       queryClient.invalidateQueries({ queryKey: ['/api/links'] });
+      queryClient.refetchQueries({ queryKey: ['/api/admin/channels'] });
       queryClient.refetchQueries({ queryKey: ['/api/links'] });
     },
   });
+
+  const handleDelete = (id: string) => {
+    deleteMutation.mutate(id);
+  };
 
   const updateMutation = useMutation({
     mutationFn: (channel: Partial<Channel> & { id: string }) => 
@@ -744,6 +749,7 @@ export default function Admin() {
                       <th className="pb-3 pr-4">Video ID</th>
                       <th className="pb-3 pr-4">Status</th>
                       <th className="pb-3 pr-4">Rank</th>
+                      <th className="pb-3 pr-4">Edit</th>
                       <th className="pb-3 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -850,8 +856,8 @@ export default function Admin() {
                                     placeholder="999"
                                   />
                                 </td>
-                                <td className="py-3 text-right">
-                                  <div className="flex items-center justify-end gap-2">
+                                <td className="py-3 pr-4">
+                                  <div className="flex items-center gap-2">
                                     <button
                                       onClick={() => updateMutation.mutate(editingChannel)}
                                       disabled={updateMutation.isPending}
@@ -867,6 +873,7 @@ export default function Admin() {
                                     </button>
                                   </div>
                                 </td>
+                                <td className="py-3 text-right"></td>
                               </>
                             ) : (
                               <>
@@ -890,31 +897,30 @@ export default function Admin() {
                                   </span>
                                 </td>
                                 <td className="py-3 pr-4 text-slate-400 text-center">{channel.rank ?? 999}</td>
+                                <td className="py-3 pr-4">
+                                  <button
+                                    onClick={() => setEditingChannel(channel)}
+                                    className="p-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white transition-colors"
+                                    data-testid={`button-edit-${channel.id}`}
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                </td>
                                 <td className="py-3 text-right">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <button
-                                      onClick={() => setEditingChannel(channel)}
-                                      className="p-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white transition-colors"
-                                      data-testid={`button-edit-${channel.id}`}
-                                    >
-                                      <Edit2 className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onPointerDown={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        if (confirm(`Delete "${channel.name}"?`)) {
-                                          deleteMutation.mutate(channel.id);
-                                        }
-                                      }}
-                                      disabled={deleteMutation.isPending}
-                                      className="z-50 relative p-2 bg-red-600 hover:bg-red-500 rounded-lg text-white transition-colors"
-                                      data-testid={`button-delete-${channel.id}`}
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </div>
+                                  <button
+                                    type="button"
+                                    onPointerDown={(e) => {
+                                      e.stopPropagation();
+                                      if (confirm('Are you sure?')) {
+                                        handleDelete(channel.id);
+                                      }
+                                    }}
+                                    disabled={deleteMutation.isPending}
+                                    className="z-50 relative px-3 py-1.5 bg-transparent hover:bg-red-600/20 border border-red-600 rounded-lg text-red-500 font-bold text-xs uppercase tracking-wide transition-colors"
+                                    data-testid={`button-delete-${channel.id}`}
+                                  >
+                                    DELETE
+                                  </button>
                                 </td>
                               </>
                             )}
