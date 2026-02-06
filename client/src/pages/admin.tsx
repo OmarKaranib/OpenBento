@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useReplitAuth } from '@/hooks/use-replit-auth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon, GripVertical, Eye, EyeOff, MessageSquare, Lightbulb, Bug } from 'lucide-react';
+import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon, GripVertical, Eye, EyeOff, MessageSquare, Lightbulb, Bug, Search, CheckCircle2 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { searchChannelLiveStream } from '@/lib/stream-api';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
@@ -337,6 +337,45 @@ export default function Admin() {
     enabled: isAdmin,
   });
 
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userFilterMode, setUserFilterMode] = useState<'all' | 'premium' | 'free'>('all');
+  const [feedbackFilterType, setFeedbackFilterType] = useState<'all' | 'bug' | 'idea'>('all');
+  const [resolvedFeedbackIds, setResolvedFeedbackIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('openBentoResolvedFeedback');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
+  const [hideResolved, setHideResolved] = useState(false);
+
+  const toggleFeedbackResolved = useCallback((id: string) => {
+    setResolvedFeedbackIds(prev => {
+      const next = new Set(Array.from(prev));
+      if (next.has(id)) next.delete(id); else next.add(id);
+      localStorage.setItem('openBentoResolvedFeedback', JSON.stringify(Array.from(next)));
+      return next;
+    });
+  }, []);
+
+  const filteredUsers = useMemo(() => {
+    if (!usersData?.users) return [];
+    return usersData.users.filter(u => {
+      if (userSearchQuery && !u.email?.toLowerCase().includes(userSearchQuery.toLowerCase())) return false;
+      if (userFilterMode === 'premium' && !u.isPremium) return false;
+      if (userFilterMode === 'free' && u.isPremium) return false;
+      return true;
+    });
+  }, [usersData?.users, userSearchQuery, userFilterMode]);
+
+  const filteredFeedback = useMemo(() => {
+    if (!feedbackData?.feedback) return [];
+    return feedbackData.feedback.filter(item => {
+      if (feedbackFilterType !== 'all' && item.type !== feedbackFilterType) return false;
+      if (hideResolved && resolvedFeedbackIds.has(item.id)) return false;
+      return true;
+    });
+  }, [feedbackData?.feedback, feedbackFilterType, hideResolved, resolvedFeedbackIds]);
+
   const migrateMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/admin/migrate-channels'),
     onSuccess: () => {
@@ -542,14 +581,46 @@ export default function Admin() {
                 User List {usersData?.total ? `(${usersData.total})` : ''}
               </h2>
             </div>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <div className="relative flex-1 min-w-[180px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Search by email..."
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  data-testid="input-user-search"
+                />
+              </div>
+              <div className="flex rounded-lg overflow-hidden border border-slate-700">
+                {(['all', 'premium', 'free'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setUserFilterMode(mode)}
+                    className={`px-3 py-2 text-xs font-medium transition-colors ${
+                      userFilterMode === mode
+                        ? 'bg-cyan-600 text-white'
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    }`}
+                    data-testid={`button-user-filter-${mode}`}
+                  >
+                    {mode === 'all' ? 'All' : mode === 'premium' ? 'Premium' : 'Free'}
+                  </button>
+                ))}
+              </div>
+              {(userSearchQuery || userFilterMode !== 'all') && (
+                <span className="text-xs text-slate-500">{filteredUsers.length} result{filteredUsers.length !== 1 ? 's' : ''}</span>
+              )}
+            </div>
             <div className="bg-slate-900/50 rounded-lg p-4 max-h-[400px] overflow-y-auto">
               {usersLoading ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />
                 </div>
-              ) : usersData?.users && usersData.users.length > 0 ? (
+              ) : filteredUsers.length > 0 ? (
                 <div className="space-y-2">
-                  {usersData.users.map((u) => (
+                  {filteredUsers.map((u) => (
                     <div key={u.id} className="flex items-center gap-3 p-3 bg-slate-800 rounded-lg">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                         ADMIN_EMAILS.includes(u.email?.toLowerCase() || '') ? 'bg-cyan-500/20' : 'bg-slate-700'
@@ -667,15 +738,50 @@ export default function Admin() {
               Feedback {feedbackData?.feedback?.length ? `(${feedbackData.feedback.length})` : ''}
             </h2>
           </div>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <div className="flex rounded-lg overflow-hidden border border-slate-700">
+              {(['all', 'bug', 'idea'] as const).map((ft) => (
+                <button
+                  key={ft}
+                  onClick={() => setFeedbackFilterType(ft)}
+                  className={`px-3 py-2 text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                    feedbackFilterType === ft
+                      ? 'bg-cyan-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  }`}
+                  data-testid={`button-feedback-filter-${ft}`}
+                >
+                  {ft === 'bug' && <Bug className="w-3 h-3" />}
+                  {ft === 'idea' && <Lightbulb className="w-3 h-3" />}
+                  {ft === 'all' ? 'All' : ft === 'bug' ? 'Bugs' : 'Ideas'}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setHideResolved(!hideResolved)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                hideResolved
+                  ? 'bg-emerald-600/20 border-emerald-600 text-emerald-400'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+              }`}
+              data-testid="button-hide-resolved"
+            >
+              <CheckCircle2 className="w-3 h-3" />
+              {hideResolved ? 'Hiding Resolved' : 'Hide Resolved'}
+            </button>
+            <span className="text-xs text-slate-500 ml-auto">
+              {filteredFeedback.length} item{filteredFeedback.length !== 1 ? 's' : ''}
+            </span>
+          </div>
           <div className="bg-slate-900/50 rounded-lg p-4 max-h-[400px] overflow-y-auto">
             {feedbackLoading ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />
               </div>
-            ) : feedbackData?.feedback && feedbackData.feedback.length > 0 ? (
+            ) : filteredFeedback.length > 0 ? (
               <div className="space-y-3">
-                {feedbackData.feedback.map((item) => (
-                  <div key={item.id} className="p-3 bg-slate-800 rounded-lg border-l-4 border-l-transparent" style={{
+                {filteredFeedback.map((item) => (
+                  <div key={item.id} className={`p-3 bg-slate-800 rounded-lg border-l-4 border-l-transparent ${resolvedFeedbackIds.has(item.id) ? 'opacity-50' : ''}`} style={{
                     borderLeftColor: item.type === 'bug' ? '#ef4444' : '#3b82f6'
                   }}>
                     <div className="flex items-center gap-2 mb-2">
@@ -692,6 +798,18 @@ export default function Admin() {
                       <span className="text-slate-500 text-xs ml-auto">
                         {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}
                       </span>
+                      <button
+                        onClick={() => toggleFeedbackResolved(item.id)}
+                        className={`p-1 rounded transition-colors ${
+                          resolvedFeedbackIds.has(item.id)
+                            ? 'text-emerald-400 hover:text-emerald-300'
+                            : 'text-slate-600 hover:text-slate-400'
+                        }`}
+                        title={resolvedFeedbackIds.has(item.id) ? 'Mark as unresolved' : 'Mark as resolved'}
+                        data-testid={`button-resolve-feedback-${item.id}`}
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                      </button>
                     </div>
                     <p className="text-white text-sm">{item.message}</p>
                     {item.userEmail && (
@@ -701,7 +819,9 @@ export default function Admin() {
                 ))}
               </div>
             ) : (
-              <p className="text-slate-500 text-sm text-center py-4">No feedback received yet.</p>
+              <p className="text-slate-500 text-sm text-center py-4">
+                {feedbackData?.feedback?.length ? 'No feedback matches your filters.' : 'No feedback received yet.'}
+              </p>
             )}
           </div>
         </div>

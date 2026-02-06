@@ -186,7 +186,13 @@ const MasterControlDashboard = ({
   const [clearHoldProgress, setClearHoldProgress] = useState(0);
   const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
   const [colorPickerWidget, setColorPickerWidget] = useState<string | null>(null);
-  const [hasStartedBuilding, setHasStartedBuilding] = useState(false); // Track if user clicked "Start Building"
+  const [hasStartedBuilding, setHasStartedBuilding] = useState(false);
+
+  useEffect(() => {
+    if (widgets.length > 0 && !hasStartedBuilding) {
+      setHasStartedBuilding(true);
+    }
+  }, [widgets.length, hasStartedBuilding]);
 
   const { triggerHeal, getHealingState, registerChannel } = useStreamHealing();
   const { toast } = useToast();
