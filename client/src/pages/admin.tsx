@@ -313,6 +313,34 @@ export default function Admin() {
     },
   });
 
+  const channels = channelsData?.channels || [];
+
+  const sortedChannels = useMemo(() => [...channels].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)), [channels]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = sortedChannels.findIndex(c => c.id === active.id);
+    const newIndex = sortedChannels.findIndex(c => c.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(sortedChannels, oldIndex, newIndex);
+    const updates = reordered.map((ch, idx) => ({ id: ch.id, rank: idx + 1 }));
+
+    try {
+      await apiRequest('POST', '/api/admin/channels/reorder', { updates });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/links'] });
+    } catch (err) {
+      console.error('[Admin] Reorder failed:', err);
+    }
+  }, [sortedChannels, queryClient]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -362,34 +390,6 @@ export default function Admin() {
       </div>
     );
   }
-
-  const channels = channelsData?.channels || [];
-
-  const sortedChannels = useMemo(() => [...channels].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)), [channels]);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  );
-
-  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = sortedChannels.findIndex(c => c.id === active.id);
-    const newIndex = sortedChannels.findIndex(c => c.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const reordered = arrayMove(sortedChannels, oldIndex, newIndex);
-    const updates = reordered.map((ch, idx) => ({ id: ch.id, rank: idx + 1 }));
-
-    try {
-      await apiRequest('POST', '/api/admin/channels/reorder', { updates });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/links'] });
-    } catch (err) {
-      console.error('[Admin] Reorder failed:', err);
-    }
-  }, [sortedChannels, queryClient]);
 
   return (
     <div className="min-h-screen bg-slate-900 p-8">
