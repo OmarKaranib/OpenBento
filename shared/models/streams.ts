@@ -145,6 +145,7 @@ export const feedback = pgTable("feedback", {
   userEmail: varchar("user_email"),
   message: text("message").notNull(),
   type: varchar("type").notNull().default("bug"),
+  screenshot: text("screenshot"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
