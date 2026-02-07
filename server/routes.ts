@@ -27,13 +27,13 @@ export async function registerRoutes(
   registerAuthRoutes(app);
 
   startLinkRefresher();
-  
+
   initializePulseCache();
 
   app.get("/api/links", async (req, res) => {
     const origin = req.headers.origin || req.headers.referer || `${req.protocol}://${req.get('host')}`;
     const linksData = loadLinks();
-    
+
     const jsonChannels = linksData.channels.map(channel => ({
       id: channel.id,
       name: channel.name,
@@ -124,11 +124,11 @@ export async function registerRoutes(
   app.get("/api/stream-status/:channelId", (req, res) => {
     const { channelId } = req.params;
     const status = getStreamStatus(channelId);
-    
+
     if (!status) {
       return res.status(404).json({ error: "Channel not found in cache" });
     }
-    
+
     res.json(status);
   });
 
@@ -136,14 +136,14 @@ export async function registerRoutes(
   app.get("/api/youtube/channel-live/:channelId", async (req, res) => {
     const { channelId } = req.params;
     const apiKey = process.env.YOUTUBE_API_KEY;
-    
+
     if (!apiKey) {
       return res.status(503).json({ 
         isLive: null,
         error: "YouTube API key not configured" 
       });
     }
-    
+
     try {
       const result = await checkChannelLiveStatus(channelId, apiKey);
       res.json({
@@ -169,14 +169,14 @@ export async function registerRoutes(
   app.get("/api/youtube/video-live/:videoId", async (req, res) => {
     const { videoId } = req.params;
     const apiKey = process.env.YOUTUBE_API_KEY;
-    
+
     if (!apiKey) {
       return res.status(503).json({ 
         isLive: null,
         error: "YouTube API key not configured" 
       });
     }
-    
+
     try {
       // Use checkVideoLiveStatusById which uses videos.list (1 unit)
       const result = await checkVideoLiveStatusById(videoId, apiKey);
@@ -202,14 +202,14 @@ export async function registerRoutes(
   app.get("/api/youtube/search-live/:channelHandle", async (req, res) => {
     const { channelHandle } = req.params;
     const apiKey = process.env.YOUTUBE_API_KEY;
-    
+
     if (!apiKey) {
       return res.status(503).json({ 
         isLive: false,
         error: "YouTube API key not configured" 
       });
     }
-    
+
     try {
       const result = await searchChannelLiveStream(channelHandle, apiKey);
       res.json({
@@ -235,11 +235,11 @@ export async function registerRoutes(
 
   app.post("/api/stream/register", async (req, res) => {
     const { channelId, channelName, platform, videoId } = req.body;
-    
+
     if (!channelId || !channelName || !platform) {
       return res.status(400).json({ error: "Missing required fields" });
     }
-    
+
     await registerChannel(channelId, channelName, platform, videoId);
     res.json({ success: true });
   });
@@ -247,21 +247,21 @@ export async function registerRoutes(
   app.post("/api/stream/heal", async (req, res) => {
     const { channelId, channelName, currentVideoId } = req.body;
     const apiKey = process.env.YOUTUBE_API_KEY;
-    
+
     if (!apiKey) {
       return res.status(503).json({ 
         success: false, 
         error: "YouTube API key not configured" 
       });
     }
-    
+
     if (!channelId || !channelName) {
       return res.status(400).json({ error: "Missing channelId or channelName" });
     }
-    
+
     try {
       const result = await healStream(channelName, channelId, apiKey);
-      
+
       await storage.logHealing(
         channelId,
         currentVideoId || null,
@@ -270,11 +270,11 @@ export async function registerRoutes(
         result.success,
         result.reason
       );
-      
+
       if (result.success && result.newVideoId) {
         await registerChannel(channelId, channelName, 'youtube', result.newVideoId);
       }
-      
+
       res.json(result);
     } catch (error) {
       res.status(500).json({ 
@@ -287,21 +287,21 @@ export async function registerRoutes(
   app.get("/api/live-video", async (req, res) => {
     const { channelId } = req.query;
     const apiKey = process.env.YOUTUBE_API_KEY;
-    
+
     if (!channelId || typeof channelId !== 'string') {
       return res.status(400).json({ error: "Missing channelId parameter" });
     }
-    
+
     if (!apiKey) {
       return res.status(503).json({ 
         error: "YouTube API key not configured",
         videoId: null 
       });
     }
-    
+
     try {
       const result = await healStream(channelId, channelId, apiKey);
-      
+
       if (result.success && result.newVideoId) {
         res.json({ 
           videoId: result.newVideoId,
@@ -326,11 +326,11 @@ export async function registerRoutes(
   // Kick API proxy (browser CORS blocked)
   app.get("/api/kick/channel/:channelId", async (req, res) => {
     const { channelId } = req.params;
-    
+
     if (!channelId) {
       return res.status(400).json({ error: "Missing channelId" });
     }
-    
+
     try {
       // Try v2 API with full browser headers
       const response = await fetch(`https://kick.com/api/v2/channels/${channelId}`, {
@@ -348,7 +348,7 @@ export async function registerRoutes(
           'sec-fetch-site': 'same-origin'
         }
       });
-      
+
       if (!response.ok) {
         // Kick blocks server requests - return unknown status, player will show actual state
         return res.json({ 
@@ -358,7 +358,7 @@ export async function registerRoutes(
           status: 'unknown'
         });
       }
-      
+
       const data = await response.json();
       res.json({
         isLive: data?.livestream !== null && data?.livestream !== undefined,
@@ -375,30 +375,30 @@ export async function registerRoutes(
   app.post("/api/stream/validate", async (req, res) => {
     const { videoId } = req.body;
     const apiKey = process.env.YOUTUBE_API_KEY;
-    
+
     if (!apiKey) {
       return res.status(503).json({ valid: true, reason: "API key not configured - assuming valid" });
     }
-    
+
     if (!videoId) {
       return res.status(400).json({ error: "Missing videoId" });
     }
-    
+
     try {
       const details = await getVideoDetails(videoId, apiKey);
-      
+
       if (!details) {
         return res.json({ valid: false, reason: "Video not found" });
       }
-      
+
       if (isMusicCategory(details.categoryId)) {
         return res.json({ valid: false, reason: "Music category (filtered)" });
       }
-      
+
       if (!details.isEmbeddable) {
         return res.json({ valid: false, reason: "Not embeddable" });
       }
-      
+
       res.json({ 
         valid: true, 
         channelId: details.channelId,
@@ -411,11 +411,11 @@ export async function registerRoutes(
 
   app.get("/api/library", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
-    
+
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
     }
-    
+
     try {
       const library = await storage.getUserLibrary(userId);
       res.json({ items: library });
@@ -426,18 +426,18 @@ export async function registerRoutes(
 
   app.post("/api/library", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
-    
+
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
     }
-    
+
     try {
       const validation = insertUserLibrarySchema.safeParse({ ...req.body, userId });
-      
+
       if (!validation.success) {
         return res.status(400).json({ error: validation.error.message });
       }
-      
+
       const item = await storage.addToLibrary(validation.data);
       res.json({ item });
     } catch (error) {
@@ -448,11 +448,11 @@ export async function registerRoutes(
   app.delete("/api/library/:id", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
     const id = req.params.id as string;
-    
+
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
     }
-    
+
     try {
       const deleted = await storage.removeFromLibrary(id, userId);
       res.json({ success: deleted });
@@ -464,18 +464,18 @@ export async function registerRoutes(
   app.patch("/api/library/:id", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
     const id = req.params.id as string;
-    
+
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
     }
-    
+
     try {
       const updated = await storage.updateLibraryItem(id, userId, req.body);
-      
+
       if (!updated) {
         return res.status(404).json({ error: "Item not found" });
       }
-      
+
       res.json({ item: updated });
     } catch (error) {
       res.status(500).json({ error: String(error) });
@@ -487,18 +487,18 @@ export async function registerRoutes(
     const userId = (req as any).userId || (req as any).user?.id;
     const user = (req as any).user;
     const email = user?.claims?.email || user?.email;
-    
+
     if (!userId) {
       return res.json({ isPremium: false, userId: null, isAdmin: false });
     }
-    
+
     try {
       // Admin users automatically get premium
       const userIsAdmin = isAdminEmail(email || '');
-      
+
       const profile = await storage.getProfile(userId);
       const isPremium = userIsAdmin || (profile?.isPremium ?? false);
-      
+
       res.json({ 
         isPremium, 
         userId,
@@ -512,11 +512,11 @@ export async function registerRoutes(
 
   app.get("/api/dashboard", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
-    
+
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
     }
-    
+
     try {
       const dashboard = await storage.getDashboard(userId);
       res.json({ dashboard });
@@ -529,30 +529,30 @@ export async function registerRoutes(
     const userId = (req as any).userId || (req as any).user?.id;
     const user = (req as any).user;
     const email = user?.claims?.email || user?.email;
-    
+
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
     }
-    
+
     try {
       // Check premium status before saving (admins are automatically premium)
       const userIsAdmin = isAdminEmail(email || '');
       const profile = await storage.getProfile(userId);
       const hasPremiumAccess = userIsAdmin || (profile?.isPremium ?? false);
-      
+
       if (!hasPremiumAccess) {
         return res.status(403).json({ 
           error: "Premium required", 
           message: "Save Layout is a Pro feature. Upgrade to save your dashboard." 
         });
       }
-      
+
       const validation = insertDashboardSchema.safeParse({ ...req.body, userId });
-      
+
       if (!validation.success) {
         return res.status(400).json({ error: validation.error.message });
       }
-      
+
       const dashboard = await storage.saveDashboard(validation.data);
       res.json({ dashboard });
     } catch (error) {
@@ -564,30 +564,30 @@ export async function registerRoutes(
     const userId = (req as any).userId || (req as any).user?.id;
     const user = (req as any).user;
     const email = user?.claims?.email || user?.email;
-    
+
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
     }
-    
+
     try {
       // Check premium status before updating (admins are automatically premium)
       const userIsAdmin = isAdminEmail(email || '');
       const profile = await storage.getProfile(userId);
       const hasPremiumAccess = userIsAdmin || (profile?.isPremium ?? false);
-      
+
       if (!hasPremiumAccess) {
         return res.status(403).json({ 
           error: "Premium required", 
           message: "Save Layout is a Pro feature. Upgrade to save your dashboard." 
         });
       }
-      
+
       const dashboard = await storage.updateDashboard(userId, req.body);
-      
+
       if (!dashboard) {
         return res.status(404).json({ error: "Dashboard not found" });
       }
-      
+
       res.json({ dashboard });
     } catch (error) {
       res.status(500).json({ error: String(error) });
@@ -622,11 +622,11 @@ export async function registerRoutes(
     }
     try {
       const validation = insertChannelSchema.safeParse(req.body);
-      
+
       if (!validation.success) {
         return res.status(400).json({ error: validation.error.message });
       }
-      
+
       const channel = await storage.createChannel(validation.data);
       res.json({ channel });
     } catch (error) {
@@ -657,13 +657,13 @@ export async function registerRoutes(
       if (body.isManualOverride !== undefined) sanitized.isManualOverride = body.isManualOverride;
       if (body.isVisible !== undefined) sanitized.isVisible = body.isVisible;
       if (body.rank !== undefined) sanitized.rank = body.rank;
-      
+
       const channel = await storage.updateChannel(id, sanitized);
-      
+
       if (!channel) {
         return res.status(404).json({ error: "Channel not found" });
       }
-      
+
       res.json({ channel });
     } catch (error) {
       res.status(500).json({ error: String(error) });
@@ -680,11 +680,11 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Channel ID must not contain slashes" });
       }
       const deleted = await storage.deleteChannel(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ error: "Channel not found" });
       }
-      
+
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: String(error) });
@@ -803,7 +803,7 @@ export async function registerRoutes(
     try {
       const linksData = loadLinks();
       let imported = 0;
-      
+
       for (const channel of linksData.channels) {
         const existing = await storage.getChannel(channel.id);
         if (!existing) {
@@ -821,7 +821,7 @@ export async function registerRoutes(
           imported++;
         }
       }
-      
+
       res.json({ success: true, imported, total: linksData.channels.length });
     } catch (error) {
       res.status(500).json({ error: String(error) });
@@ -833,50 +833,67 @@ export async function registerRoutes(
     if (!isAdmin(req)) {
       return res.status(403).json({ error: "Admin access required" });
     }
-    
+
     try {
       const supabaseUrl = process.env.VITE_SUPABASE_URL;
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      
+
       if (!supabaseUrl || !serviceRoleKey) {
         return res.status(500).json({ error: "Supabase credentials not configured" });
       }
-      
-      // Use Supabase Admin API to fetch users
-      const response = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${serviceRoleKey}`,
-          'apikey': serviceRoleKey,
-          'Content-Type': 'application/json'
+
+      // Create AbortController with 10-second timeout to prevent 504 errors
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      try {
+        // Use Supabase Admin API to fetch users with timeout
+        const response = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'apikey': serviceRoleKey,
+            'Content-Type': 'application/json'
+          },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[Admin] Supabase user fetch error:', errorText);
+          return res.status(response.status).json({ error: 'Failed to fetch users from Supabase' });
         }
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[Admin] Supabase user fetch error:', errorText);
-        return res.status(response.status).json({ error: 'Failed to fetch users from Supabase' });
+
+        const data = await response.json();
+
+        // Get user IDs to fetch premium status from profiles
+        const userIds = (data.users || []).map((u: any) => u.id);
+        const profilesData = await storage.getProfilesByIds(userIds);
+        const profilesMap = new Map(profilesData.map(p => [p.id, p]));
+
+        // Map to simplified user objects for the admin panel
+        const users = (data.users || []).map((user: any) => ({
+          id: user.id,
+          email: user.email,
+          createdAt: user.created_at,
+          lastSignIn: user.last_sign_in_at,
+          emailConfirmed: user.email_confirmed_at ? true : false,
+          provider: user.app_metadata?.provider || 'email',
+          isPremium: profilesMap.get(user.id)?.isPremium || false
+        }));
+
+        res.json({ users, total: users.length });
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+
+        if (fetchError.name === 'AbortError') {
+          console.error('[Admin] Supabase fetch timeout after 10 seconds');
+          return res.status(504).json({ error: 'Request timeout - Supabase took too long to respond' });
+        }
+        throw fetchError;
       }
-      
-      const data = await response.json();
-      
-      // Get user IDs to fetch premium status from profiles
-      const userIds = (data.users || []).map((u: any) => u.id);
-      const profilesData = await storage.getProfilesByIds(userIds);
-      const profilesMap = new Map(profilesData.map(p => [p.id, p]));
-      
-      // Map to simplified user objects for the admin panel
-      const users = (data.users || []).map((user: any) => ({
-        id: user.id,
-        email: user.email,
-        createdAt: user.created_at,
-        lastSignIn: user.last_sign_in_at,
-        emailConfirmed: user.email_confirmed_at ? true : false,
-        provider: user.app_metadata?.provider || 'email',
-        isPremium: profilesMap.get(user.id)?.isPremium || false
-      }));
-      
-      res.json({ users, total: users.length });
     } catch (error) {
       console.error('[Admin] Error fetching users:', error);
       res.status(500).json({ error: String(error) });
@@ -888,22 +905,22 @@ export async function registerRoutes(
     if (!isAdmin(req)) {
       return res.status(403).json({ error: "Admin access required" });
     }
-    
+
     try {
       const userId = req.params.id as string;
       const { isPremium } = req.body;
-      
+
       if (typeof isPremium !== 'boolean') {
         return res.status(400).json({ error: "isPremium must be a boolean" });
       }
-      
+
       // Upsert profile with the premium status
       const profile = await storage.upsertProfile({
         id: userId,
         email: '', // Will be updated with actual email if available
         isPremium,
       });
-      
+
       console.log('[Admin] Updated premium status for user:', userId, 'isPremium:', isPremium);
       res.json({ success: true, profile });
     } catch (error) {
@@ -930,30 +947,47 @@ export async function registerRoutes(
   };
 
   // Create Stripe Checkout Session for Pro subscription
-  app.post("/api/stripe/create-checkout-session", async (req, res) => {
+  app.post("/api/stripe/create-checkout-session", async (req: Request, res: Response) => {
     try {
       const { priceId, billingPeriod } = req.body;
-      
+      const user = (req as any).user;
+
+      // Extract userId - try multiple sources for maximum reliability
+      const userId = (req as any).userId || (req as any).user?.id || user?.claims?.sub;
+      const email = user?.claims?.email || user?.email;
+
+      if (!email) {
+        console.error('[Stripe] No email found for user:', userId);
+        return res.status(401).json({ error: 'User email not found. Please log in again.' });
+      }
+
+      if (!userId) {
+        console.error('[Stripe] No userId found for email:', email);
+        return res.status(401).json({ error: 'User ID not found. Please log in again.' });
+      }
+
+      console.log('[Stripe] Creating checkout session - userId:', userId, 'email:', email);
+
       // Validate billingPeriod
       if (!billingPeriod || !['monthly', 'yearly'].includes(billingPeriod)) {
         return res.status(400).json({ error: 'Invalid billing period. Must be "monthly" or "yearly".' });
       }
-      
+
       // Validate priceId against allowlist
       const expectedPriceId = VALID_PRICE_IDS[billingPeriod];
       if (!priceId || priceId !== expectedPriceId) {
         console.warn('[Stripe] Invalid priceId attempted:', priceId, 'expected:', expectedPriceId);
         return res.status(400).json({ error: 'Invalid price configuration.' });
       }
-      
+
       const stripe = await getUncachableStripeClient();
-      
+
       // Use production domain if available, otherwise fallback to request origin
       const productionDomain = 'https://openbento.tv';
       const origin = process.env.NODE_ENV === 'production' 
         ? productionDomain 
         : (req.headers.origin || `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`);
-      
+
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         payment_method_types: ['card'],
@@ -963,15 +997,143 @@ export async function registerRoutes(
             quantity: 1,
           },
         ],
+        customer_email: email,
+        metadata: {
+          userId: userId,
+          email: email, // Include email as backup in metadata
+        },
         allow_promotion_codes: true,
         success_url: `${origin}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/?canceled=true`,
       });
-      
+
+      console.log('[Stripe] Created checkout session for:', email, 'userId:', userId);
       res.json({ url: session.url });
     } catch (error: any) {
       console.error('[Stripe] Checkout error:', error);
       res.status(500).json({ error: error.message || 'Failed to create checkout session' });
+    }
+  });
+
+  // Stripe Webhook Handler
+  app.post("/api/stripe/webhook", async (req: Request, res: Response) => {
+    const sig = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!webhookSecret) {
+      console.error('[Stripe] Webhook secret not configured');
+      return res.status(500).json({ error: 'Webhook secret not configured' });
+    }
+
+    if (!sig) {
+      console.error('[Stripe] Missing stripe-signature header');
+      return res.status(400).json({ error: 'Missing stripe-signature header' });
+    }
+
+    let event: any;
+
+    try {
+      const stripe = await getUncachableStripeClient();
+      // req.body should be raw buffer for webhook signature verification
+      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    } catch (err: any) {
+      console.error('[Stripe] Webhook signature verification failed:', err.message);
+      return res.status(400).json({ error: `Webhook Error: ${err.message}` });
+    }
+
+    // Handle the event
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed': {
+          const session = event.data.object;
+          const userId = session.metadata?.userId;
+          const email = session.metadata?.email || session.customer_email;
+
+          console.log('[Stripe] Checkout completed - userId:', userId, 'email:', email);
+
+          // Priority 1: Use userId from metadata (most reliable)
+          if (userId) {
+            try {
+              await storage.upsertProfile({
+                id: userId,
+                email: email || '',
+                isPremium: true,
+              });
+              console.log('[Stripe] ✅ Granted premium via metadata userId:', userId, email);
+              break;
+            } catch (upsertError) {
+              console.error('[Stripe] Error upserting profile for userId:', userId, upsertError);
+              // Continue to email fallback if userId upsert fails
+            }
+          } else {
+            console.warn('[Stripe] ⚠️ No userId in checkout session metadata');
+          }
+
+          // Priority 2: Fallback to email lookup if userId not in metadata or upsert failed
+          if (email) {
+            try {
+              const profile = await storage.getProfileByEmail(email);
+
+              if (profile) {
+                await storage.upsertProfile({
+                  id: profile.id,
+                  email: email,
+                  isPremium: true,
+                });
+                console.log('[Stripe] ✅ Granted premium via email lookup:', profile.id, email);
+              } else {
+                console.error('[Stripe] ❌ No user profile found for email:', email);
+              }
+            } catch (emailError) {
+              console.error('[Stripe] Error in email fallback:', emailError);
+            }
+          } else {
+            console.error('[Stripe] ❌ No userId or email in checkout session:', session.id);
+          }
+
+          break;
+        }
+
+        case 'customer.subscription.deleted': {
+          const subscription = event.data.object;
+          const stripe = await getUncachableStripeClient();
+
+          // Get customer email from Stripe
+          const customer = await stripe.customers.retrieve(subscription.customer);
+          const customerEmail = (customer as any).email;
+
+          if (!customerEmail) {
+            console.error('[Stripe] No customer email for subscription:', subscription.id);
+            break;
+          }
+
+          console.log('[Stripe] Subscription cancelled for:', customerEmail);
+
+          // Find user by email and revoke premium
+          const profile = await storage.getProfileByEmail(customerEmail);
+
+          if (profile) {
+            await storage.upsertProfile({
+              id: profile.id,
+              email: customerEmail,
+              isPremium: false,
+            });
+            console.log('[Stripe] Revoked premium from user:', profile.id, customerEmail);
+          } else {
+            console.warn('[Stripe] No user found with email:', customerEmail);
+          }
+
+          break;
+        }
+
+        default:
+          console.log('[Stripe] Unhandled event type:', event.type);
+      }
+
+      res.json({ received: true });
+    } catch (err: any) {
+      console.error('[Stripe] Error handling webhook event:', err);
+      res.status(500).json({ error: 'Error processing webhook' });
     }
   });
 
@@ -984,7 +1146,7 @@ export async function registerRoutes(
         console.log('[Startup] No channels found in database, auto-importing from links.json...');
         const linksData = loadLinks();
         let imported = 0;
-        
+
         for (const channel of linksData.channels) {
           try {
             await storage.createChannel({
@@ -1003,7 +1165,7 @@ export async function registerRoutes(
             // Skip duplicates silently
           }
         }
-        
+
         console.log(`[Startup] Auto-imported ${imported} channels from links.json`);
       } else {
         console.log(`[Startup] Found ${existingChannels.length} channels in database, skipping auto-import`);
@@ -1012,7 +1174,7 @@ export async function registerRoutes(
       console.error('[Startup] Error during auto-import:', error);
     }
   }
-  
+
   // Run auto-import
   autoImportChannels();
 

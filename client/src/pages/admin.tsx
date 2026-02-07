@@ -43,7 +43,7 @@ function SortableChannelRow({ id, disabled, isHidden, children }: { id: string; 
     transition,
     opacity: isDragging ? 0.5 : isHidden ? 0.45 : 1,
     position: 'relative' as const,
-    zIndex: isDragging ? 10 : undefined,
+    zIndex: isDragging ? 1000000 : undefined,
   };
   return (
     <tr ref={setNodeRef} style={style} className="border-b border-slate-700/50 hover:bg-slate-700/20">
@@ -66,7 +66,7 @@ function SortableChannelRow({ id, disabled, isHidden, children }: { id: string; 
 function extractYouTubeVideoId(url: string): string | null {
   if (!url) return null;
   const trimmed = url.trim();
-  
+
   // Pattern 1: Standard watch URLs
   // Pattern 2: Short youtu.be URLs  
   // Pattern 3: Embed URLs
@@ -77,7 +77,7 @@ function extractYouTubeVideoId(url: string): string | null {
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/,
     /^([a-zA-Z0-9_-]{11})$/,
   ];
-  
+
   for (const pattern of patterns) {
     const match = trimmed.match(pattern);
     if (match && match[1].length === 11) {
@@ -85,22 +85,29 @@ function extractYouTubeVideoId(url: string): string | null {
       return match[1];
     }
   }
-  
+
   console.warn('[VideoID Extract] Failed to extract valid 11-char ID from:', url);
   return null;
 }
 
-// FIXED: Smart handler that ALWAYS returns clean video ID, never full URLs
+// UPDATED: Smart handler that accepts any 11-character text for manual entry
 function smartVideoIdHandler(rawInput: string): string {
   const trimmed = rawInput.trim();
+
+  // Accept any 11-character alphanumeric string (manual entry mode)
   if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+    console.log('[SmartHandler] Valid 11-char ID:', trimmed);
     return trimmed;
   }
+
+  // Try to extract from URL
   const extracted = extractYouTubeVideoId(trimmed);
   if (extracted) {
     console.log('[SmartHandler] Sanitized:', rawInput, '->', extracted);
     return extracted;
   }
+
+  // Return as-is if can't extract (allows partial manual entry)
   return trimmed;
 }
 
@@ -140,10 +147,10 @@ export default function Admin() {
       /youtu\.be\/([^\/?&#]+)/i,
       /youtube\.com\/watch\?v=([^\/?&#]+)/i, // Extract from watch URLs too
     ];
-    
+
     // Check if input contains URL markers (http://, .com, .tv, etc.)
     const hasUrlMarkers = /^https?:\/\//i.test(raw) || /\.(com|tv|be|io)\//i.test(raw);
-    
+
     if (hasUrlMarkers) {
       // Extract meaningful name from URL
       for (const pattern of urlPatterns) {
@@ -159,7 +166,7 @@ export default function Admin() {
       const slug = cleanUrl.split('/')[cleanUrl.split('/').length - 1] || 'channel';
       return slug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
     }
-    
+
     // Not a URL - sanitize as slug (lowercase, alphanumeric + dashes only)
     return raw.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   };
@@ -168,7 +175,7 @@ export default function Admin() {
 
   const handleGlobalScrape = async () => {
     if (!channels.length) return;
-    
+
     setIsGlobalScraping(true);
     // SYNC ALL STREAMS: Only scrape channels that are NOT marked as manual override
     const youtubeChannels = channels.filter(c => 
@@ -176,13 +183,13 @@ export default function Admin() {
       c.channelHandle && 
       !c.isManualOverride // Skip manual override channels
     );
-    
+
     console.log(`[SYNC ALL] Starting scrape for ${youtubeChannels.length} non-override channels`);
-    
+
     for (let i = 0; i < youtubeChannels.length; i++) {
       const channel = youtubeChannels[i];
       setScrapeProgress({ current: i + 1, total: youtubeChannels.length, currentChannel: channel.name });
-      
+
       try {
         if (channel.channelHandle) {
           const result = await searchChannelLiveStream(channel.channelHandle, true);
@@ -198,10 +205,10 @@ export default function Admin() {
       } catch (err) {
         console.error(`[SYNC ALL] Failed for ${channel.name}:`, err);
       }
-      
+
       await new Promise(r => setTimeout(r, 500));
     }
-    
+
     setIsGlobalScraping(false);
     setScrapeProgress(null);
     queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
@@ -220,18 +227,18 @@ export default function Admin() {
 
   const handlePurgeBrokenStreams = async () => {
     if (!channels.length) return;
-    
+
     setIsPurging(true);
     let deletedCount = 0;
-    
+
     const youtubeChannels = channels.filter(c => 
       c.platform === 'youtube' && 
       c.videoId && 
       !c.isManualOverride
     );
-    
+
     console.log(`[PURGE] Starting purge check for ${youtubeChannels.length} YouTube channels`);
-    
+
     for (let i = 0; i < youtubeChannels.length; i++) {
       const channel = youtubeChannels[i];
       setPurgeProgress({ 
@@ -240,22 +247,22 @@ export default function Admin() {
         currentChannel: channel.name,
         deleted: deletedCount 
       });
-      
+
       try {
         const response = await fetch(`/api/youtube/validate-video/${channel.videoId}`);
         const result = await response.json();
-        
+
         if (!result.valid) {
           console.log(`[PURGE] Broken stream detected: ${channel.name} - ${result.reason}`);
-          
+
           if (channel.channelHandle) {
             const searchResponse = await fetch(`/api/youtube/search-live/${channel.channelHandle}`);
             const searchResult = await searchResponse.json();
-            
+
             if (searchResult.latestVideoId) {
               const fallbackResponse = await fetch(`/api/youtube/validate-video/${searchResult.latestVideoId}`);
               const fallbackResult = await fallbackResponse.json();
-              
+
               if (!fallbackResult.valid) {
                 console.log(`[PURGE] Fallback also broken for ${channel.name}, soft deleting...`);
                 // FIXED: Soft delete instead of hard delete
@@ -286,15 +293,15 @@ export default function Admin() {
       } catch (err) {
         console.error(`[PURGE] Failed to check ${channel.name}:`, err);
       }
-      
+
       await new Promise(r => setTimeout(r, 300));
     }
-    
+
     setIsPurging(false);
     setPurgeProgress(null);
     queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
     queryClient.invalidateQueries({ queryKey: ['/api/links'] });
-    
+
     alert(`Purge complete! Soft-deleted ${deletedCount} broken channels (they can be restored).`);
   };
 
@@ -416,14 +423,14 @@ export default function Admin() {
     },
   });
 
+  const handleReveal = (id: string) => {
+    console.log("Revealing channel ID:", id);
+    hideMutation.mutate({ id, isVisible: true });
+  };
+
   const handleHide = (id: string) => {
     console.log("Hiding channel ID:", id);
     hideMutation.mutate({ id, isVisible: false });
-  };
-
-  const handleUnhide = (id: string) => {
-    console.log("Unhiding channel ID:", id);
-    hideMutation.mutate({ id, isVisible: true });
   };
 
   const handlePermanentDelete = (id: string, name: string) => {
@@ -968,7 +975,7 @@ export default function Admin() {
                       // FIXED: Always sanitize ID input
                       const sanitized = sanitizeChannelId(raw);
                       setNewChannel({ ...newChannel, id: sanitized });
-                      
+
                       // Show helpful error messages
                       if (raw !== sanitized) {
                         setIdError(`Auto-sanitized: "${raw}" → "${sanitized}"`);
@@ -1097,15 +1104,16 @@ export default function Admin() {
                       <th className="pb-3 pr-4">Status</th>
                       <th className="pb-3 pr-4">Rank</th>
                       <th className="pb-3 pr-4">Edit</th>
-                      <th className="pb-3 text-right">Visibility</th>
+                      <th className="pb-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <SortableContext items={sortedChannels.map(c => c.id)} strategy={verticalListSortingStrategy}>
                     <tbody>
                       {sortedChannels.map((channel) => {
                         const isEditing = editingChannel?.id === channel.id;
+                        const isHidden = channel.isVisible === false;
                         return (
-                          <SortableChannelRow key={channel.id} id={channel.id} disabled={isEditing} isHidden={channel.isVisible === false}>
+                          <SortableChannelRow key={channel.id} id={channel.id} disabled={isEditing} isHidden={isHidden}>
                             {isEditing ? (
                               <>
                                 <td className="py-3 pr-4">
@@ -1254,19 +1262,19 @@ export default function Admin() {
                                   </button>
                                 </td>
                                 <td className="py-3 text-right">
-                                  {channel.isVisible === false ? (
+                                  {isHidden ? (
                                     <div className="flex items-center gap-2 justify-end">
                                       <button
                                         type="button"
                                         onPointerDown={(e) => {
                                           e.stopPropagation();
-                                          handleUnhide(channel.id);
+                                          handleReveal(channel.id);
                                         }}
                                         disabled={hideMutation.isPending}
-                                        className="z-50 relative px-3 py-1.5 bg-transparent hover:bg-emerald-600/20 border border-emerald-600 rounded-lg text-emerald-500 font-bold text-xs uppercase tracking-wide transition-colors"
-                                        data-testid={`button-unhide-${channel.id}`}
+                                        className="z-50 relative px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-medium text-xs transition-colors disabled:opacity-50"
+                                        data-testid={`button-reveal-${channel.id}`}
                                       >
-                                        SHOW
+                                        Reveal
                                       </button>
                                       <button
                                         type="button"
@@ -1275,10 +1283,10 @@ export default function Admin() {
                                           handlePermanentDelete(channel.id, channel.name);
                                         }}
                                         disabled={deleteMutation.isPending}
-                                        className="z-50 relative px-3 py-1.5 bg-transparent hover:bg-red-600/20 border border-red-600 rounded-lg text-red-500 font-bold text-xs uppercase tracking-wide transition-colors"
+                                        className="z-50 relative px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium text-xs transition-colors disabled:opacity-50"
                                         data-testid={`button-delete-${channel.id}`}
                                       >
-                                        DELETE
+                                        Delete
                                       </button>
                                     </div>
                                   ) : (
@@ -1286,15 +1294,15 @@ export default function Admin() {
                                       type="button"
                                       onPointerDown={(e) => {
                                         e.stopPropagation();
-                                        if (confirm('Hide this channel from the sidebar?')) {
+                                        if (confirm(`Hide "${channel.name}" from the sidebar?`)) {
                                           handleHide(channel.id);
                                         }
                                       }}
                                       disabled={hideMutation.isPending}
-                                      className="z-50 relative px-3 py-1.5 bg-transparent hover:bg-amber-600/20 border border-amber-600 rounded-lg text-amber-500 font-bold text-xs uppercase tracking-wide transition-colors"
+                                      className="z-50 relative px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-white font-medium text-xs transition-colors disabled:opacity-50"
                                       data-testid={`button-hide-${channel.id}`}
                                     >
-                                      HIDE
+                                      Hide
                                     </button>
                                   )}
                                 </td>

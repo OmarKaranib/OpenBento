@@ -887,7 +887,7 @@ function AppContent() {
           console.log(`[ChannelClick] MANUAL OVERRIDE detected for @${channel.channelId} - skipping ALL background checks`);
           return;
         }
-        
+
         // DYNAMIC LIVE-ID PRIORITY: Run API check in background for non-override channels
         // If a NEW live ID is found, update videoId immediately (not just badge)
         searchChannelLiveStream(channel.channelId, false).then(result => {
@@ -1126,7 +1126,7 @@ function AppContent() {
                 width: '12rem',
                 height: '8rem',
                 opacity: 0.9,
-                zIndex: 100000,
+                zIndex: 1000000,
                 pointerEvents: 'none'
               }}
             >
