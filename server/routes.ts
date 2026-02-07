@@ -26,6 +26,92 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
 
+  // Custom signup route with timeout and proper error handling
+  app.post("/api/auth/signup", async (req: Request, res: Response) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    try {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+      if (!supabaseUrl || !serviceRoleKey) {
+        console.error('[Signup Error] Supabase credentials not configured');
+        return res.status(500).json({ error: "Server configuration error" });
+      }
+
+      // Create AbortController with 15-second timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      try {
+        // Use Supabase Admin API with service role key to bypass rate limits
+        const response = await fetch(`${supabaseUrl}/auth/v1/signup`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'apikey': serviceRoleKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email, password }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          // Handle specific error cases
+          if (data.error_description?.includes('already registered') || data.msg?.includes('already registered')) {
+            console.error('[Signup Error] User already exists:', email);
+            return res.status(409).json({ error: 'User already exists' });
+          }
+
+          console.error('[Signup Error]', {
+            status: response.status,
+            error: data.error,
+            message: data.error_description || data.msg,
+            email: email
+          });
+
+          return res.status(response.status).json({ 
+            error: data.error_description || data.msg || 'Signup failed' 
+          });
+        }
+
+        console.log('[Signup] User created successfully:', email);
+        res.json({ 
+          user: data.user,
+          session: data.session,
+          message: 'Signup successful'
+        });
+
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+
+        if (fetchError.name === 'AbortError') {
+          console.error('[Signup Error] Request timeout after 15 seconds for:', email);
+          return res.status(504).json({ error: 'Signup request timed out. Please try again.' });
+        }
+
+        console.error('[Signup Error]', fetchError);
+        throw fetchError;
+      }
+
+    } catch (error: any) {
+      console.error('[Signup Error]', {
+        message: error.message,
+        stack: error.stack,
+        email: email
+      });
+      res.status(500).json({ error: 'An error occurred during signup' });
+    }
+  });
+
   startLinkRefresher();
 
   initializePulseCache();
