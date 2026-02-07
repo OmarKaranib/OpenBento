@@ -897,20 +897,18 @@ export default function Admin() {
                 <Plus className="w-4 h-4" />
                 Add Channel
               </button>
-              {hiddenCount > 0 && (
-                <button
-                  onClick={() => setShowHidden(!showHidden)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    showHidden
-                      ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                      : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                  }`}
-                  data-testid="button-toggle-hidden"
-                >
-                  {showHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  {showHidden ? `Hide ${hiddenCount} Hidden` : `Show ${hiddenCount} Hidden`}
-                </button>
-              )}
+              <button
+                onClick={() => setShowHidden(!showHidden)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  showHidden
+                    ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                    : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                }`}
+                data-testid="button-toggle-hidden"
+              >
+                {showHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showHidden ? `Hide ${hiddenCount} Hidden` : `Show ${hiddenCount} Hidden`}
+              </button>
               <button
                 onClick={() => migrateMutation.mutate()}
                 disabled={migrateMutation.isPending}
