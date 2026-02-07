@@ -1945,7 +1945,7 @@ const MasterControlDashboard = ({
         {/* Ghost Preview - shows during drag */}
         {ghostPosition && (
           <div 
-            className="absolute inset-[1rem] grid gap-[1rem] pointer-events-none z-[20]"
+            className="absolute inset-[1rem] grid gap-[1rem] pointer-events-none z-[99999]"
             style={{
               gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
               gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`

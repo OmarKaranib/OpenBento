@@ -135,6 +135,7 @@ function AppContent() {
   const activeWidgetIdRef = useRef<string | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const ghostPositionRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+  const ghostValidRef = useRef<boolean>(true);
 
   useEffect(() => {
     activeWidgetIdRef.current = activeWidgetId;
@@ -560,52 +561,65 @@ function AppContent() {
           return clampedX < widgetRight && previewRight > widget.x && clampedY < widgetBottom && previewBottom > widget.y;
         });
 
-        // Push colliding widgets in real-time
+        // Push colliding widgets in real-time using functional state for freshness
         if (collidingWidgets.length > 0) {
           setWidgets(currentWidgets => {
             let updatedWidgets = [...currentWidgets];
             const GRID_ROWS = 6;
 
-            for (const collidingWidget of collidingWidgets) {
-              // Find next available slot for the pushed widget
-              const findSlot = (w: Widget, allWidgets: Widget[], excludeIds: string[]): { x: number; y: number } | null => {
-                for (let y = 0; y <= GRID_ROWS - w.h; y++) {
-                  for (let x = 0; x <= GRID_COLS - w.w; x++) {
-                    let collision = false;
-                    for (const other of allWidgets) {
-                      if (excludeIds.includes(other.id)) continue;
-                      // Also check against the preview position
-                      if (x < other.x + other.w && x + w.w > other.x && y < other.y + other.h && y + w.h > other.y) {
-                        collision = true;
-                        break;
-                      }
-                    }
-                    // Also check against the preview position
-                    if (!collision && x < clampedX + previewW && x + w.w > clampedX && y < clampedY + previewH && y + w.h > clampedY) {
+            const findSlot = (w: Widget, allWidgets: Widget[], excludeIds: string[]): { x: number; y: number } | null => {
+              for (let y = 0; y <= GRID_ROWS - w.h; y++) {
+                for (let x = 0; x <= GRID_COLS - w.w; x++) {
+                  let collision = false;
+                  for (const other of allWidgets) {
+                    if (excludeIds.includes(other.id)) continue;
+                    if (x < other.x + other.w && x + w.w > other.x && y < other.y + other.h && y + w.h > other.y) {
                       collision = true;
-                    }
-                    if (!collision) {
-                      return { x, y };
+                      break;
                     }
                   }
+                  if (!collision && x < clampedX + previewW && x + w.w > clampedX && y < clampedY + previewH && y + w.h > clampedY) {
+                    collision = true;
+                  }
+                  if (!collision) {
+                    return { x, y };
+                  }
                 }
-                return null;
-              };
+              }
+              return null;
+            };
 
+            let invalid = false;
+            for (const collidingWidget of collidingWidgets) {
               const newSlot = findSlot(collidingWidget, updatedWidgets, [collidingWidget.id, draggedWidgetId]);
               if (newSlot) {
                 updatedWidgets = updatedWidgets.map(w =>
                   w.id === collidingWidget.id ? { ...w, x: newSlot.x, y: newSlot.y } : w
                 );
+              } else {
+                invalid = true;
+                break;
               }
             }
+
+            if (invalid) {
+              ghostValidRef.current = false;
+              return currentWidgets;
+            }
+            ghostValidRef.current = true;
             return updatedWidgets;
           });
+        } else {
+          ghostValidRef.current = true;
         }
 
-        // Update ghost position
-        ghostPositionRef.current = { x: clampedX, y: clampedY, w: previewW, h: previewH };
-        setGhostPosition(ghostPositionRef.current);
+        if (!ghostValidRef.current) {
+          ghostPositionRef.current = null;
+          setGhostPosition(null);
+        } else {
+          ghostPositionRef.current = { x: clampedX, y: clampedY, w: previewW, h: previewH };
+          setGhostPosition(ghostPositionRef.current);
+        }
         return;
       }
     }
