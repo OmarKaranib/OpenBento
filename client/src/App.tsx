@@ -1111,7 +1111,9 @@ function AppContent() {
               style={{
                 width: '12rem',
                 height: '8rem',
-                opacity: 0.9
+                opacity: 0.9,
+                zIndex: 100000,
+                pointerEvents: 'none'
               }}
             >
               <div className="flex items-center justify-center h-full">

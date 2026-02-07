@@ -92,14 +92,16 @@ function extractYouTubeVideoId(url: string): string | null {
 
 // FIXED: Smart handler that ALWAYS returns clean video ID, never full URLs
 function smartVideoIdHandler(rawInput: string): string {
-  const extracted = extractYouTubeVideoId(rawInput);
+  const trimmed = rawInput.trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+    return trimmed;
+  }
+  const extracted = extractYouTubeVideoId(trimmed);
   if (extracted) {
     console.log('[SmartHandler] Sanitized:', rawInput, '->', extracted);
     return extracted;
   }
-  // If extraction fails, return original but log warning
-  console.warn('[SmartHandler] Could not extract ID, returning original:', rawInput);
-  return rawInput;
+  return trimmed;
 }
 
 export default function Admin() {
@@ -403,6 +405,17 @@ export default function Admin() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: ({ id }: { id: string }) =>
+      apiRequest('DELETE', `/api/admin/channels/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/links'] });
+      queryClient.refetchQueries({ queryKey: ['/api/admin/channels'] });
+      queryClient.refetchQueries({ queryKey: ['/api/links'] });
+    },
+  });
+
   const handleHide = (id: string) => {
     console.log("Hiding channel ID:", id);
     hideMutation.mutate({ id, isVisible: false });
@@ -411,6 +424,13 @@ export default function Admin() {
   const handleUnhide = (id: string) => {
     console.log("Unhiding channel ID:", id);
     hideMutation.mutate({ id, isVisible: true });
+  };
+
+  const handlePermanentDelete = (id: string, name: string) => {
+    if (confirm(`PERMANENTLY delete "${name}"? This cannot be undone.`)) {
+      console.log("Permanently deleting channel ID:", id);
+      deleteMutation.mutate({ id });
+    }
   };
 
   const [showHidden, setShowHidden] = useState(false);
@@ -1237,18 +1257,32 @@ export default function Admin() {
                                 </td>
                                 <td className="py-3 text-right">
                                   {channel.isVisible === false ? (
-                                    <button
-                                      type="button"
-                                      onPointerDown={(e) => {
-                                        e.stopPropagation();
-                                        handleUnhide(channel.id);
-                                      }}
-                                      disabled={hideMutation.isPending}
-                                      className="z-50 relative px-3 py-1.5 bg-transparent hover:bg-emerald-600/20 border border-emerald-600 rounded-lg text-emerald-500 font-bold text-xs uppercase tracking-wide transition-colors"
-                                      data-testid={`button-unhide-${channel.id}`}
-                                    >
-                                      SHOW
-                                    </button>
+                                    <div className="flex items-center gap-2 justify-end">
+                                      <button
+                                        type="button"
+                                        onPointerDown={(e) => {
+                                          e.stopPropagation();
+                                          handleUnhide(channel.id);
+                                        }}
+                                        disabled={hideMutation.isPending}
+                                        className="z-50 relative px-3 py-1.5 bg-transparent hover:bg-emerald-600/20 border border-emerald-600 rounded-lg text-emerald-500 font-bold text-xs uppercase tracking-wide transition-colors"
+                                        data-testid={`button-unhide-${channel.id}`}
+                                      >
+                                        SHOW
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onPointerDown={(e) => {
+                                          e.stopPropagation();
+                                          handlePermanentDelete(channel.id, channel.name);
+                                        }}
+                                        disabled={deleteMutation.isPending}
+                                        className="z-50 relative px-3 py-1.5 bg-transparent hover:bg-red-600/20 border border-red-600 rounded-lg text-red-500 font-bold text-xs uppercase tracking-wide transition-colors"
+                                        data-testid={`button-delete-${channel.id}`}
+                                      >
+                                        DELETE
+                                      </button>
+                                    </div>
                                   ) : (
                                     <button
                                       type="button"

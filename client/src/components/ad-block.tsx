@@ -4,7 +4,8 @@ import { Widget } from '@/App';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
-const EXPANSION_INTERVAL = 5000;
+const EXPANSION_INTERVAL = 10000;
+const SPAWN_INTERVAL = 1800000;
 
 export interface AdBlockData {
   id: string;
@@ -144,6 +145,8 @@ export function useViralAds(
 ) {
   const [ad, setAd] = useState<AdBlockData | null>(null);
   const expansionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const spawnTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const triggerAdRef = useRef<() => void>(() => {});
   const widgetsRef = useRef(widgets);
 
   useEffect(() => {
@@ -459,12 +462,23 @@ export function useViralAds(
     }
   }, [isPremium, ad, isPositionOccupied, performGridReflow, setWidgets]);
 
+  useEffect(() => {
+    triggerAdRef.current = triggerAd;
+  }, [triggerAd]);
+
   const skipAd = useCallback(() => {
     if (expansionTimerRef.current) {
       clearInterval(expansionTimerRef.current);
       expansionTimerRef.current = null;
     }
     setAd(null);
+    if (spawnTimerRef.current) {
+      clearTimeout(spawnTimerRef.current);
+      spawnTimerRef.current = null;
+    }
+    spawnTimerRef.current = setTimeout(() => {
+      triggerAdRef.current();
+    }, SPAWN_INTERVAL);
   }, []);
 
   const isAdActive = ad !== null;
@@ -475,6 +489,10 @@ export function useViralAds(
       if (expansionTimerRef.current) {
         clearInterval(expansionTimerRef.current);
         expansionTimerRef.current = null;
+      }
+      if (spawnTimerRef.current) {
+        clearTimeout(spawnTimerRef.current);
+        spawnTimerRef.current = null;
       }
     }
   }, [isPremium]);
@@ -503,6 +521,9 @@ export function useViralAds(
     return () => {
       if (expansionTimerRef.current) {
         clearInterval(expansionTimerRef.current);
+      }
+      if (spawnTimerRef.current) {
+        clearTimeout(spawnTimerRef.current);
       }
     };
   }, []);

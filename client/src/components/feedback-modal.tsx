@@ -33,6 +33,7 @@ export function FeedbackModal({
   const [screenshotName, setScreenshotName] = useState<string>('');
   const [fileError, setFileError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [cooldown, setCooldown] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const submitMutation = useMutation({
@@ -40,6 +41,7 @@ export function FeedbackModal({
       apiRequest('POST', '/api/feedback', data),
     onSuccess: () => {
       setSubmitted(true);
+      setCooldown(true);
       setTimeout(() => {
         onClose();
         setSubmitted(false);
@@ -48,6 +50,9 @@ export function FeedbackModal({
         setScreenshotName('');
         setFileError(null);
       }, 2000);
+      setTimeout(() => {
+        setCooldown(false);
+      }, 15000);
     },
   });
 
@@ -222,7 +227,7 @@ export function FeedbackModal({
 
             <button
               type="submit"
-              disabled={submitMutation.isPending || !message.trim()}
+              disabled={submitMutation.isPending || !message.trim() || cooldown}
               className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="button-submit-feedback"
             >
