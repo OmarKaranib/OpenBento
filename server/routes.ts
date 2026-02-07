@@ -1084,6 +1084,7 @@ export async function registerRoutes(
         ? productionDomain 
         : (req.headers.origin || `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`);
 
+      // Create checkout session - allow user to enter their own billing email
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         payment_method_types: ['card'],
@@ -1093,10 +1094,10 @@ export async function registerRoutes(
             quantity: 1,
           },
         ],
-        customer_email: email,
+        // REMOVED customer_email to allow users to enter their own billing email on Stripe page
         metadata: {
-          userId: userId,
-          email: email, // Include email as backup in metadata
+          userId: userId, // Critical: webhook uses this to identify which user to upgrade
+          accountEmail: email, // Store account email for reference only
         },
         allow_promotion_codes: true,
         success_url: `${origin}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
@@ -1143,19 +1144,20 @@ export async function registerRoutes(
         case 'checkout.session.completed': {
           const session = event.data.object;
           const userId = session.metadata?.userId;
-          const email = session.metadata?.email || session.customer_email;
+          const accountEmail = session.metadata?.accountEmail; // User's account email (for reference)
+          const billingEmail = session.customer_email; // Billing email entered on Stripe page
 
-          console.log('[Stripe] Checkout completed - userId:', userId, 'email:', email);
+          console.log('[Stripe] Checkout completed - userId:', userId, 'accountEmail:', accountEmail, 'billingEmail:', billingEmail);
 
-          // Priority 1: Use userId from metadata (most reliable)
+          // Priority 1: Use userId from metadata (most reliable - always works regardless of billing email)
           if (userId) {
             try {
               await storage.upsertProfile({
                 id: userId,
-                email: email || '',
+                email: accountEmail || billingEmail || '',
                 isPremium: true,
               });
-              console.log('[Stripe] ✅ Granted premium via metadata userId:', userId, email);
+              console.log('[Stripe] ✅ Granted premium via metadata userId:', userId, accountEmail);
               break;
             } catch (upsertError) {
               console.error('[Stripe] Error upserting profile for userId:', userId, upsertError);
@@ -1165,26 +1167,27 @@ export async function registerRoutes(
             console.warn('[Stripe] ⚠️ No userId in checkout session metadata');
           }
 
-          // Priority 2: Fallback to email lookup if userId not in metadata or upsert failed
-          if (email) {
+          // Priority 2: Fallback to billing email lookup if userId not in metadata or upsert failed
+          // (This will only work if the billing email matches an account in the database)
+          if (billingEmail) {
             try {
-              const profile = await storage.getProfileByEmail(email);
+              const profile = await storage.getProfileByEmail(billingEmail);
 
               if (profile) {
                 await storage.upsertProfile({
                   id: profile.id,
-                  email: email,
+                  email: billingEmail,
                   isPremium: true,
                 });
-                console.log('[Stripe] ✅ Granted premium via email lookup:', profile.id, email);
+                console.log('[Stripe] ✅ Granted premium via billing email lookup:', profile.id, billingEmail);
               } else {
-                console.error('[Stripe] ❌ No user profile found for email:', email);
+                console.error('[Stripe] ❌ No user profile found for billing email:', billingEmail);
               }
             } catch (emailError) {
               console.error('[Stripe] Error in email fallback:', emailError);
             }
           } else {
-            console.error('[Stripe] ❌ No userId or email in checkout session:', session.id);
+            console.error('[Stripe] ❌ No userId or billing email in checkout session:', session.id);
           }
 
           break;
