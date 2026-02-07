@@ -34,21 +34,25 @@ export async function registerRoutes(
       return res.status(400).json({ error: "Email and password are required" });
     }
 
+    console.log('[Signup Debug] Attempting signup for:', email);
+
     try {
       const supabaseUrl = process.env.VITE_SUPABASE_URL;
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
       if (!supabaseUrl || !serviceRoleKey) {
-        console.error('[Signup Error] Supabase credentials not configured');
-        return res.status(500).json({ error: "Server configuration error" });
+        console.error('[Signup Debug] Error details: Supabase credentials not configured');
+        return res.status(500).json({ error: "Server configuration error - missing Supabase credentials" });
       }
 
-      // Create AbortController with 15-second timeout
+      // Create AbortController with strict 10-second timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       try {
-        // Use Supabase Admin API with service role key to bypass rate limits
+        console.log('[Signup Debug] Making Supabase signup request...');
+
+        // Use Supabase Admin API with service role key (admin) to bypass rate limits
         const response = await fetch(`${supabaseUrl}/auth/v1/signup`, {
           method: 'POST',
           headers: {
@@ -63,27 +67,28 @@ export async function registerRoutes(
         clearTimeout(timeoutId);
 
         const data = await response.json();
+        console.log('[Signup Debug] Supabase response status:', response.status);
 
         if (!response.ok) {
           // Handle specific error cases
           if (data.error_description?.includes('already registered') || data.msg?.includes('already registered')) {
-            console.error('[Signup Error] User already exists:', email);
+            console.error('[Signup Debug] Error details: User already exists -', email);
             return res.status(409).json({ error: 'User already exists' });
           }
 
-          console.error('[Signup Error]', {
+          const errorMessage = data.error_description || data.msg || data.error || 'Signup failed';
+          console.error('[Signup Debug] Error details:', {
             status: response.status,
             error: data.error,
-            message: data.error_description || data.msg,
-            email: email
+            message: errorMessage,
+            email: email,
+            fullResponse: data
           });
 
-          return res.status(response.status).json({ 
-            error: data.error_description || data.msg || 'Signup failed' 
-          });
+          return res.status(response.status).json({ error: errorMessage });
         }
 
-        console.log('[Signup] User created successfully:', email);
+        console.log('[Signup Debug] User created successfully:', email);
         res.json({ 
           user: data.user,
           session: data.session,
@@ -94,21 +99,26 @@ export async function registerRoutes(
         clearTimeout(timeoutId);
 
         if (fetchError.name === 'AbortError') {
-          console.error('[Signup Error] Request timeout after 15 seconds for:', email);
-          return res.status(504).json({ error: 'Signup request timed out. Please try again.' });
+          console.error('[Signup Debug] Error details: Request timeout after 10 seconds for:', email);
+          return res.status(504).json({ error: 'Signup timed out - please try again' });
         }
 
-        console.error('[Signup Error]', fetchError);
-        throw fetchError;
+        console.error('[Signup Debug] Error details:', fetchError);
+        return res.status(500).json({ 
+          error: fetchError.message || 'Network error during signup' 
+        });
       }
 
     } catch (error: any) {
-      console.error('[Signup Error]', {
+      console.error('[Signup Debug] Error details:', {
         message: error.message,
+        name: error.name,
         stack: error.stack,
         email: email
       });
-      res.status(500).json({ error: 'An error occurred during signup' });
+      return res.status(500).json({ 
+        error: error.message || 'An unexpected error occurred during signup' 
+      });
     }
   });
 
