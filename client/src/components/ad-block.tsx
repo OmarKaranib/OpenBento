@@ -11,6 +11,10 @@ const DONATION_URL = 'https://buymeacoffee.com/openbento';
 const AD_COOLDOWN_DAYS = 10; // Show ad once every 10 days
 const LAST_AD_SEEN_KEY = 'last_ad_seen';
 
+// ✅ FIXED AD SIZE: Always 3 columns × 2 rows
+const AD_WIDTH = 3;
+const AD_HEIGHT = 2;
+
 export interface AdBlockData {
   id: string;
   x: number;
@@ -47,7 +51,7 @@ export function AdBlock({ ad, onSkip, isDarkMode = true }: AdBlockProps) {
 
   return (
     <div
-      className={`relative w-full h-full flex flex-col items-center justify-center overflow-hidden rounded-[12px] ${
+      className={`relative flex flex-col items-center justify-center overflow-hidden rounded-[12px] ${
         isDarkMode 
           ? 'bg-gradient-to-br from-pink-900 via-purple-900 to-blue-900 border-2 border-pink-500/60 shadow-lg shadow-pink-900/50' 
           : 'bg-gradient-to-br from-pink-400 via-purple-400 to-blue-400 border-3 border-pink-600 shadow-xl shadow-pink-500/40'
@@ -55,6 +59,9 @@ export function AdBlock({ ad, onSkip, isDarkMode = true }: AdBlockProps) {
       style={{
         gridColumn: `${ad.x + 1} / span ${ad.w}`,
         gridRow: `${ad.y + 1} / span ${ad.h}`,
+        width: '100%',
+        height: '100%',
+        boxSizing: 'border-box',
         animation: 'pulse 2s ease-in-out infinite',
         zIndex: 100
       }}
@@ -127,36 +134,23 @@ export function AdBlock({ ad, onSkip, isDarkMode = true }: AdBlockProps) {
 function getPerimeterPositions(): { x: number; y: number }[] {
   const positions: { x: number; y: number }[] = [];
 
-  for (let x = 0; x < GRID_COLS; x++) {
-    positions.push({ x, y: 0 });
-    positions.push({ x, y: GRID_ROWS - 1 });
+  // Top and bottom rows
+  for (let x = 0; x <= GRID_COLS - AD_WIDTH; x++) {
+    positions.push({ x, y: 0 }); // Top row
+    if (GRID_ROWS - AD_HEIGHT >= 0) {
+      positions.push({ x, y: GRID_ROWS - AD_HEIGHT }); // Bottom row
+    }
   }
-  for (let y = 1; y < GRID_ROWS - 1; y++) {
-    positions.push({ x: 0, y });
-    positions.push({ x: GRID_COLS - 1, y });
+
+  // Left and right columns (excluding corners already added)
+  for (let y = 1; y < GRID_ROWS - AD_HEIGHT; y++) {
+    positions.push({ x: 0, y }); // Left column
+    if (GRID_COLS - AD_WIDTH > 0) {
+      positions.push({ x: GRID_COLS - AD_WIDTH, y }); // Right column
+    }
   }
 
   return positions;
-}
-
-function getAdjacentPositions(ad: AdBlockData): { x: number; y: number }[] {
-  const positions: { x: number; y: number }[] = [];
-
-  for (let dx = -1; dx <= ad.w; dx++) {
-    const topY = ad.y - 1;
-    const bottomY = ad.y + ad.h;
-    if (topY >= 0) positions.push({ x: ad.x + dx, y: topY });
-    if (bottomY < GRID_ROWS) positions.push({ x: ad.x + dx, y: bottomY });
-  }
-
-  for (let dy = 0; dy < ad.h; dy++) {
-    const leftX = ad.x - 1;
-    const rightX = ad.x + ad.w;
-    if (leftX >= 0) positions.push({ x: leftX, y: ad.y + dy });
-    if (rightX < GRID_COLS) positions.push({ x: rightX, y: ad.y + dy });
-  }
-
-  return positions.filter(p => p.x >= 0 && p.x < GRID_COLS && p.y >= 0 && p.y < GRID_ROWS);
 }
 
 // ✅ 10-DAY COOLDOWN: Check if enough time has passed since last ad
@@ -211,52 +205,40 @@ export function useViralAds(
     widgetsRef.current = widgets;
   }, [widgets]);
 
-  const isPositionOccupied = useCallback((x: number, y: number, currentAd: AdBlockData | null, currentWidgets: Widget[]) => {
-    if (currentAd) {
-      if (x >= currentAd.x && x < currentAd.x + currentAd.w && y >= currentAd.y && y < currentAd.y + currentAd.h) {
-        return { occupied: true, type: 'ad' as const, item: currentAd };
+  const isPositionOccupied = useCallback((x: number, y: number, w: number, h: number, currentAd: AdBlockData | null, currentWidgets: Widget[]) => {
+    // Check if any cell in the w×h area is occupied
+    for (let dx = 0; dx < w; dx++) {
+      for (let dy = 0; dy < h; dy++) {
+        const checkX = x + dx;
+        const checkY = y + dy;
+
+        // Check ad overlap
+        if (currentAd) {
+          if (checkX >= currentAd.x && checkX < currentAd.x + currentAd.w && 
+              checkY >= currentAd.y && checkY < currentAd.y + currentAd.h) {
+            return { occupied: true, type: 'ad' as const };
+          }
+        }
+
+        // Check widget overlap
+        for (const widget of currentWidgets) {
+          if (checkX >= widget.x && checkX < widget.x + widget.w && 
+              checkY >= widget.y && checkY < widget.y + widget.h) {
+            return { occupied: true, type: 'widget' as const };
+          }
+        }
       }
     }
 
-    for (const widget of currentWidgets) {
-      if (x >= widget.x && x < widget.x + widget.w && y >= widget.y && y < widget.y + widget.h) {
-        return { occupied: true, type: 'widget' as const, item: widget };
-      }
-    }
-
-    return { occupied: false, type: null, item: null };
+    return { occupied: false, type: null };
   }, []);
 
-  const checkWidgetOverlap = useCallback((
-    newWidget: Widget, 
-    allWidgets: Widget[], 
-    currentAd: AdBlockData | null,
-    excludeWidgetId: string
-  ): boolean => {
-    for (const other of allWidgets) {
-      if (other.id === excludeWidgetId) continue;
-      const overlapsX = newWidget.x < other.x + other.w && newWidget.x + newWidget.w > other.x;
-      const overlapsY = newWidget.y < other.y + other.h && newWidget.y + newWidget.h > other.y;
-      if (overlapsX && overlapsY) return true;
-    }
-
-    if (currentAd) {
-      const overlapsX = newWidget.x < currentAd.x + currentAd.w && newWidget.x + newWidget.w > currentAd.x;
-      const overlapsY = newWidget.y < currentAd.y + currentAd.h && newWidget.y + currentAd.h > currentAd.y;
-      if (overlapsX && overlapsY) return true;
-    }
-
-    return false;
-  }, []);
-
-  // Check if a widget overlaps with the ad's proposed new bounds
   const widgetOverlapsAdBounds = useCallback((widget: Widget, adBounds: { x: number; y: number; w: number; h: number }): boolean => {
     const overlapsX = widget.x < adBounds.x + adBounds.w && widget.x + widget.w > adBounds.x;
-    const overlapsY = widget.y < adBounds.y + adBounds.h && widget.y + adBounds.h > adBounds.y;
+    const overlapsY = widget.y < adBounds.y + adBounds.h && widget.y + widget.h > adBounds.y;
     return overlapsX && overlapsY;
   }, []);
 
-  // Find a new safe position for a widget, pushing it away from the ad
   const findSafePosition = useCallback((
     widget: Widget,
     adBounds: { x: number; y: number; w: number; h: number },
@@ -341,14 +323,12 @@ export function useViralAds(
     return null; // Cannot find safe position
   }, [widgetOverlapsAdBounds]);
 
-  // Helper to check if two widgets overlap
   const widgetsOverlap = useCallback((a: Widget, b: Widget): boolean => {
     const overlapsX = a.x < b.x + b.w && a.x + a.w > b.x;
     const overlapsY = a.y < b.y + b.h && a.y + a.h > b.y;
     return overlapsX && overlapsY;
   }, []);
 
-  // Final validation: check entire grid for any overlaps
   const validateGridState = useCallback((
     widgets: Widget[],
     adBounds: { x: number; y: number; w: number; h: number }
@@ -377,7 +357,6 @@ export function useViralAds(
     return true;
   }, [widgetOverlapsAdBounds, widgetsOverlap]);
 
-  // Perform grid reflow - move all affected widgets when ad expands
   const performGridReflow = useCallback((
     newAdBounds: { x: number; y: number; w: number; h: number },
     currentWidgets: Widget[]
@@ -428,69 +407,34 @@ export function useViralAds(
     return { success: true, newWidgets: workingWidgets };
   }, [widgetOverlapsAdBounds, findSafePosition, validateGridState]);
 
-  const expandAd = useCallback(() => {
-    const currentAd = ad;
-    if (!currentAd) return;
-
-    const currentWidgets = widgetsRef.current;
-
-    // Define possible expansion directions
-    const expansionOptions: { x: number; y: number; w: number; h: number }[] = [];
-
-    // Expand left (if possible)
-    if (currentAd.x > 0) {
-      expansionOptions.push({ x: currentAd.x - 1, y: currentAd.y, w: currentAd.w + 1, h: currentAd.h });
-    }
-    // Expand right
-    if (currentAd.x + currentAd.w < GRID_COLS) {
-      expansionOptions.push({ x: currentAd.x, y: currentAd.y, w: currentAd.w + 1, h: currentAd.h });
-    }
-    // Expand up
-    if (currentAd.y > 0) {
-      expansionOptions.push({ x: currentAd.x, y: currentAd.y - 1, w: currentAd.w, h: currentAd.h + 1 });
-    }
-    // Expand down
-    if (currentAd.y + currentAd.h < GRID_ROWS) {
-      expansionOptions.push({ x: currentAd.x, y: currentAd.y, w: currentAd.w, h: currentAd.h + 1 });
-    }
-
-    // Shuffle expansion options for randomness
-    const shuffled = [...expansionOptions].sort(() => Math.random() - 0.5);
-
-    for (const newBounds of shuffled) {
-      // Try to perform grid reflow for this expansion
-      const { success, newWidgets } = performGridReflow(newBounds, currentWidgets);
-
-      if (success) {
-        // Update widgets with new positions
-        setWidgets(newWidgets);
-        // Update ad with new bounds
-        setAd({ ...currentAd, ...newBounds });
-        return;
-      }
-    }
-
-    // No valid expansion found - ad stays the same
-  }, [ad, performGridReflow, setWidgets]);
-
   const triggerAd = useCallback(() => {
+    // ✅ SINGLE AD ENFORCEMENT: Check if ad already exists
+    if (ad !== null) {
+      console.log('[Ad] Skipping - ad already active');
+      return;
+    }
+
     // ✅ 10-DAY COOLDOWN: Only show ad if 10 days have passed
     if (!shouldShowAd()) {
       console.log('[Ad] Skipping ad - less than 10 days since last ad');
       return;
     }
 
-    if (ad !== null) return;
-
     const currentWidgets = widgetsRef.current;
     const perimeterPositions = getPerimeterPositions();
     const shuffled = [...perimeterPositions].sort(() => Math.random() - 0.5);
 
     for (const pos of shuffled) {
-      const newAdBounds = { x: pos.x, y: pos.y, w: 1, h: 1 };
+      // ✅ FIXED AD SIZE: Always 3×2
+      const newAdBounds = { x: pos.x, y: pos.y, w: AD_WIDTH, h: AD_HEIGHT };
+
+      // Check bounds
+      if (pos.x + AD_WIDTH > GRID_COLS || pos.y + AD_HEIGHT > GRID_ROWS) {
+        continue;
+      }
 
       // Check if position is empty (no overlap with existing widgets)
-      const occupation = isPositionOccupied(pos.x, pos.y, null, currentWidgets);
+      const occupation = isPositionOccupied(pos.x, pos.y, AD_WIDTH, AD_HEIGHT, null, currentWidgets);
 
       if (!occupation.occupied) {
         // Position is free - spawn ad directly
@@ -498,15 +442,15 @@ export function useViralAds(
           id: `ad-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           x: pos.x,
           y: pos.y,
-          w: 1,
-          h: 1,
+          w: AD_WIDTH,  // ✅ FIXED: Always 3 columns
+          h: AD_HEIGHT, // ✅ FIXED: Always 2 rows
           createdAt: Date.now()
         };
         setAd(newAd);
 
         // ✅ 10-DAY COOLDOWN: Mark ad as seen
         markAdAsSeen();
-        console.log('[Ad] Ad shown - next ad will appear in 10 days');
+        console.log('[Ad] Ad shown (3×2) - next ad in 10 days');
         return;
       }
 
@@ -519,18 +463,20 @@ export function useViralAds(
           id: `ad-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           x: pos.x,
           y: pos.y,
-          w: 1,
-          h: 1,
+          w: AD_WIDTH,  // ✅ FIXED: Always 3 columns
+          h: AD_HEIGHT, // ✅ FIXED: Always 2 rows
           createdAt: Date.now()
         };
         setAd(newAd);
 
         // ✅ 10-DAY COOLDOWN: Mark ad as seen
         markAdAsSeen();
-        console.log('[Ad] Ad shown - next ad will appear in 10 days');
+        console.log('[Ad] Ad shown (3×2) - next ad in 10 days');
         return;
       }
     }
+
+    console.log('[Ad] No valid position found for 3×2 ad');
   }, [ad, isPositionOccupied, performGridReflow, setWidgets]);
 
   useEffect(() => {
@@ -553,25 +499,8 @@ export function useViralAds(
 
   const isAdActive = ad !== null;
 
-  useEffect(() => {
-    if (expansionTimerRef.current) {
-      clearInterval(expansionTimerRef.current);
-      expansionTimerRef.current = null;
-    }
-
-    if (ad) {
-      expansionTimerRef.current = setInterval(() => {
-        expandAd();
-      }, EXPANSION_INTERVAL);
-    }
-
-    return () => {
-      if (expansionTimerRef.current) {
-        clearInterval(expansionTimerRef.current);
-        expansionTimerRef.current = null;
-      }
-    };
-  }, [ad, expandAd]);
+  // ✅ REMOVED: Ad expansion logic (ad is now fixed at 3×2)
+  // Ads no longer expand - they stay at 3×2 size
 
   useEffect(() => {
     return () => {
