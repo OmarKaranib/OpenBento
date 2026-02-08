@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Lock, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, Crown, LogIn, LogOut, User, Loader2, Shield, MessageSquare, Lightbulb, Bug } from 'lucide-react';
+import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, LogIn, LogOut, User, Loader2, Shield, MessageSquare, Lightbulb, Bug } from 'lucide-react';
 import { Link } from 'wouter';
 import { ADMIN_EMAIL } from '@/pages/admin';
 import { UniqueIdentifier } from '@dnd-kit/core';
@@ -132,8 +132,6 @@ interface MasterControlDashboardProps {
   onLogout: () => void;
   isAuthenticated: boolean;
   openLoginModal: (reason?: string) => void;
-  isPremium: boolean;
-  onOpenPricingModal: () => void;
   ad: AdBlockData | null;
   skipAd: () => void;
   triggerAd: () => void;
@@ -168,8 +166,6 @@ const MasterControlDashboard = ({
   onLogout,
   isAuthenticated,
   openLoginModal,
-  isPremium,
-  onOpenPricingModal,
   ad,
   skipAd,
   triggerAd,
@@ -1184,23 +1180,6 @@ const MasterControlDashboard = ({
   };
 
   const handleSaveLayout = () => {
-    // LIBRARY PERMISSIONS: Only Pro users can save layouts
-    if (!isPremium) {
-      toast({
-        title: "Pro Feature",
-        description: "Layout saving is a Pro feature. Upgrade to save your custom dashboard forever!",
-        variant: "default"
-      });
-      onOpenPricingModal();
-      return;
-    }
-    
-    // Only authenticated Pro users can save
-    if (!isAuthenticated) {
-      openLoginModal('Sign in to save your layout');
-      return;
-    }
-    
     localStorage.setItem('openBentoWidgets', JSON.stringify(widgets));
 
     const saveButton = document.getElementById('save-button');
@@ -1623,7 +1602,7 @@ const MasterControlDashboard = ({
               {isFullscreen ? <Minimize2 className="w-[1.6rem] h-[1.6rem] text-white" /> : <Maximize2 className={`w-[1.6rem] h-[1.6rem] ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`} />}
             </button>
             {/* Help/Tutorial Button - Right beside Fullscreen */}
-            <FloatingTutorial isPremium={isPremium} isDarkMode={isDarkMode} />
+            <FloatingTutorial isDarkMode={isDarkMode} />
             <img 
               src="/t.png" 
               alt="OpenBento Logo" 
@@ -1696,43 +1675,25 @@ const MasterControlDashboard = ({
             )}
 
             {/* Block button - Opens Stream Library sidebar */}
-            {(() => {
-              const FREE_BLOCK_LIMIT = 6;
-              const currentBlockCount = widgets.length;
-              const isAtFreeLimit = !isPremium && currentBlockCount >= FREE_BLOCK_LIMIT;
-              const isDisabled = isGridFull || isAtFreeLimit;
-              
-              const handleBlockClick = () => {
-                if (isAtFreeLimit) {
-                  onOpenPricingModal();
-                } else {
-                  handleOpenSidebarToContent();
-                  // Trigger viral ad on Add Block click (free users only)
-                  if (!isPremium && !isAdActive) {
-                    triggerAd();
-                  }
+            <button
+              onClick={() => {
+                handleOpenSidebarToContent();
+                if (!isAdActive) {
+                  triggerAd();
                 }
-              };
-              
-              return (
-                <button
-                  onClick={handleBlockClick}
-                  disabled={isGridFull}
-                  className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform shadow-md text-[1.2rem] leading-[3.2rem] ${
-                    isDisabled
-                      ? isAtFreeLimit 
-                        ? 'bg-amber-600/70 hover:bg-amber-500/80 hover:scale-105'
-                        : 'bg-slate-600/60 cursor-not-allowed opacity-60'
-                      : 'bg-emerald-600/70 hover:bg-emerald-500/80 hover:scale-105'
-                  }`}
-                  title={isGridFull ? 'Grid Full - No space available' : isAtFreeLimit ? `Free limit (${FREE_BLOCK_LIMIT}) reached - Upgrade to Pro` : 'Add a new block'}
-                  data-testid="button-add-block"
-                >
-                  {isAtFreeLimit ? <Lock className="w-[1.4rem] h-[1.4rem]" /> : <Plus className="w-[1.4rem] h-[1.4rem]" />}
-                  {isGridFull ? 'Full' : isAtFreeLimit ? 'Limit' : 'Block'}
-                </button>
-              );
-            })()}
+              }}
+              disabled={isGridFull}
+              className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform shadow-md text-[1.2rem] leading-[3.2rem] ${
+                isGridFull
+                  ? 'bg-slate-600/60 cursor-not-allowed opacity-60'
+                  : 'bg-emerald-600/70 hover:bg-emerald-500/80 hover:scale-105'
+              }`}
+              title={isGridFull ? 'Grid Full - No space available' : 'Add a new block'}
+              data-testid="button-add-block"
+            >
+              <Plus className="w-[1.4rem] h-[1.4rem]" />
+              {isGridFull ? 'Full' : 'Block'}
+            </button>
 
             <button
               onClick={handleRefreshAllWidgets}
@@ -1743,27 +1704,13 @@ const MasterControlDashboard = ({
               Refresh
             </button>
 
-            {/* Edit/Save button - Edit allowed for all, Save gated for free users */}
+            {/* Edit/Save button */}
             <button
               onClick={() => {
                 if (isEditMode) {
-                  // Exiting edit mode - check if user can save
-                  if (isPremium) {
-                    handleSaveLayout();
-                    setIsEditMode(false);
-                  } else {
-                    // Free user trying to save - show notification and pricing modal
-                    toast({
-                      title: "Save Layout is a Pro Feature",
-                      description: "Layout editing is temporary for Free users. Upgrade to Pro to save your custom dashboard forever!",
-                      variant: "default",
-                    });
-                    onOpenPricingModal();
-                    // Exit edit mode without saving
-                    setIsEditMode(false);
-                  }
+                  handleSaveLayout();
+                  setIsEditMode(false);
                 } else {
-                  // Entering edit mode - allowed for everyone
                   setIsEditMode(true);
                 }
               }}
@@ -1773,11 +1720,9 @@ const MasterControlDashboard = ({
                   : 'bg-orange-600/70 hover:bg-orange-500/80 shadow-md'
               }`}
               data-testid="button-edit-layout"
-              title={isEditMode && !isPremium ? "Save Layout requires Pro - Click to see upgrade options" : undefined}
             >
               {isEditMode ? (
                 <>
-                  {!isPremium && <Lock className="w-[1.2rem] h-[1.2rem]" />}
                   <Save className="w-[1.4rem] h-[1.4rem]" />
                 </>
               ) : (
@@ -1814,18 +1759,7 @@ const MasterControlDashboard = ({
               {isDarkMode ? 'Dark' : 'Light'}
             </button>
 
-            {/* Pro Crown Button - Only show for authenticated free users */}
-            {!isPremium && isAuthenticated && (
-              <button
-                onClick={onOpenPricingModal}
-                className="menu-btn h-[3.2rem] px-[1.2rem] bg-gradient-to-r from-amber-500/80 to-amber-600/80 hover:from-amber-400/90 hover:to-amber-500/90 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-md text-slate-900"
-                data-testid="button-pro-crown"
-                title="Upgrade to Pro"
-              >
-                <Crown className="w-[1.4rem] h-[1.4rem]" />
-                Pro
-              </button>
-            )}
+            
 
             {/* Request Dropdown */}
             <div className="relative group">
@@ -2276,7 +2210,7 @@ const MasterControlDashboard = ({
                 // Automatically open the library sidebar so users can add blocks
                 handleOpenSidebarToContent();
                 // Trigger viral ad on Start Building click (free users only)
-                if (!isPremium && !isAdActive) {
+                if (!isAdActive) {
                   triggerAd();
                 }
               }}

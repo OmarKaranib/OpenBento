@@ -84,7 +84,7 @@ function AnchoredLabel({ item }: AnchoredLabelProps) {
   );
 }
 
-export function FloatingTutorial({ isPremium, isDarkMode = true }: { isPremium: boolean; isDarkMode?: boolean }) {
+export function FloatingTutorial({ isDarkMode = true }: { isDarkMode?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleClose = useCallback(() => {
@@ -111,7 +111,7 @@ export function FloatingTutorial({ isPremium, isDarkMode = true }: { isPremium: 
   }, [isOpen, handleClose]);
 
   const visibleLabels = ALL_TUTORIAL_LABELS.filter(item => {
-    if (item.id === 'crown' && isPremium) return false;
+    if (item.id === 'crown') return false;
     return true;
   });
 

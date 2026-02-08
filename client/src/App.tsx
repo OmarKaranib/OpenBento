@@ -177,7 +177,7 @@ function AppContent() {
   const { ad, skipAd, triggerAd, isAdActive } = useViralAds(false, widgets, setWidgets);
 
   const extractYouTubeId = (url: string): string | null => {
-    // Updated regex to handle youtube-nocookie.com URLs (Pro format) and watch?v= URLs
+    // Updated regex to handle youtube-nocookie.com URLs and watch?v= URLs
     const regExp = /^.*((youtu\.be\/)|(youtube(-nocookie)?\.com\/(v\/|u\/\w\/|embed\/|watch\?)))\??v?=?([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[6] && match[6].length === 11) ? match[6] : null;
@@ -209,11 +209,14 @@ function AppContent() {
 
 
   // Smart auto-filling grid: Find first available position and shrink to fit if needed
+  // ✅ AD-AWARE: Treats ad as a solid 3×2 block that widgets cannot occupy
   const findSmartPosition = useCallback((requestedW: number, requestedH: number, currentWidgets: Widget[]): { x: number; y: number; w: number; h: number } | null => {
     const GRID_ROWS = 6;
 
     // Helper to check if a position is free for given dimensions
+    // ✅ AD-AWARE: Treats ad as a solid 3×2 block that widgets cannot occupy
     const isPositionFree = (x: number, y: number, w: number, h: number): boolean => {
+      // Check grid bounds
       if (x + w > GRID_COLS || y + h > GRID_ROWS) return false;
 
       // Check against widgets
@@ -228,15 +231,17 @@ function AppContent() {
         }
       }
 
-      // Check against ad block (treat as solid grid item)
+      // ✅ AD-BLOCK SOLIDIFICATION: Treat ad as solid 3×2 block
+      // Widgets CANNOT spawn or move into ad space
       if (ad) {
-        const adRight = ad.x + ad.w;
-        const adBottom = ad.y + ad.h;
+        const adRight = ad.x + ad.w;  // ad.w = 3 (always)
+        const adBottom = ad.y + ad.h; // ad.h = 2 (always)
         const newRight = x + w;
         const newBottom = y + h;
 
+        // AABB collision detection - blocks ANY overlap with ad
         if (x < adRight && newRight > ad.x && y < adBottom && newBottom > ad.y) {
-          return false;
+          return false; // Position overlaps with ad - NOT FREE
         }
       }
 
@@ -273,6 +278,7 @@ function AppContent() {
   }, [ad]);
 
   // Check if any space is available for a 1x1 minimum widget
+  // ✅ AD-AWARE: Counts ad space as occupied
   const isGridFull = useMemo(() => {
     const GRID_ROWS = 6;
 
@@ -292,20 +298,20 @@ function AppContent() {
           }
         }
 
-        // Check against ad block (treat as solid grid item)
+        // ✅ AD-BLOCK SOLIDIFICATION: Check collision with 3×2 ad
         if (cellFree && ad) {
-          const adRight = ad.x + ad.w;
-          const adBottom = ad.y + ad.h;
+          const adRight = ad.x + ad.w;  // ad.w = 3
+          const adBottom = ad.y + ad.h; // ad.h = 2
 
           if (x < adRight && x + 1 > ad.x && y < adBottom && y + 1 > ad.y) {
-            cellFree = false;
+            cellFree = false; // Cell occupied by ad
           }
         }
 
         if (cellFree) return false; // Found a free cell, grid is NOT full
       }
     }
-    return true; // No free cells found
+    return true; // No free cells found - grid is full
   }, [widgets, ad]);
 
   const addWidget = useCallback((type: WidgetType, w = 3, h = 2, extraData?: Partial<Widget>) => {
@@ -680,9 +686,10 @@ function AppContent() {
   }, []);
 
   // Find next available slot for a pushed widget (row by row scan)
-  // Also checks ad collision to ensure widgets don't get pushed into ad space
+  // ✅ AD-AWARE: Ensures widgets don't get pushed into ad space
   const findNextAvailableSlot = useCallback((widget: Widget, allWidgets: Widget[], excludeIds: string[]): { x: number; y: number } | null => {
     const GRID_ROWS = 6;
+
     for (let y = 0; y <= GRID_ROWS - widget.h; y++) {
       for (let x = 0; x <= GRID_COLS - widget.w; x++) {
         let collision = false;
@@ -700,23 +707,27 @@ function AppContent() {
           }
         }
 
-        // AD-BLOCK SOLIDIFICATION: Check collision with ad
+        // ✅ AD-BLOCK SOLIDIFICATION: Check collision with 3×2 ad
+        // Widgets being pushed CANNOT occupy ad space
         if (!collision && ad) {
-          const adRight = ad.x + ad.w;
-          const adBottom = ad.y + ad.h;
+          const adRight = ad.x + ad.w;  // ad.w = 3 (always)
+          const adBottom = ad.y + ad.h; // ad.h = 2 (always)
           const newRight = x + widget.w;
           const newBottom = y + widget.h;
+
+          // AABB collision detection - blocks ANY overlap with ad
           if (x < adRight && newRight > ad.x && y < adBottom && newBottom > ad.y) {
-            collision = true;
+            collision = true; // Position overlaps with ad - CANNOT USE
           }
         }
 
         if (!collision) {
-          return { x, y };
+          return { x, y }; // Found valid position that doesn't overlap ad
         }
       }
     }
-    return null; // No available slot
+
+    return null; // No available slot (grid full or blocked by ad)
   }, [ad]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
