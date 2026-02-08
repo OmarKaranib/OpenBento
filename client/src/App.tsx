@@ -1,8 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { usePremium } from '@/hooks/use-premium';
 import { LoginModal } from '@/components/login-modal';
-import { PricingModal } from '@/components/pricing-modal';
 import { MobileGuard } from '@/components/mobile-guard';
 import { useViralAds, AdBlockData } from '@/components/ad-block';
 import { searchChannelLiveStream } from '@/lib/stream-api';
@@ -115,21 +113,10 @@ function AppContent() {
   // Auth state - must be inside QueryClientProvider
   const { user, isAuthenticated, logout } = useAuth();
 
-  // Premium status
-  const { isPremium } = usePremium();
-
-  // Pricing modal state
-  const [pricingModalOpen, setPricingModalOpen] = useState(false);
-
   // Open login modal with optional reason
   const openLoginModal = useCallback((reason?: string) => {
     setLoginTriggerReason(reason);
     setLoginModalOpen(true);
-  }, []);
-
-  // Open pricing modal
-  const openPricingModal = useCallback(() => {
-    setPricingModalOpen(true);
   }, []);
 
   const activeWidgetIdRef = useRef<string | null>(null);
@@ -185,9 +172,9 @@ function AppContent() {
     return getDefaultWidgets();
   });
 
-  // VIRAL AD MECHANIC: Lifted to App.tsx for drag collision checking
-  // Premium users are immune, ads triggered on user action only
-  const { ad, skipAd, triggerAd, isAdActive } = useViralAds(isPremium, widgets, setWidgets);
+  // VIRAL AD MECHANIC: Ads now show for all users with donation messaging
+  // Ads are triggered on user actions to request donations
+  const { ad, skipAd, triggerAd, isAdActive } = useViralAds(false, widgets, setWidgets);
 
   const extractYouTubeId = (url: string): string | null => {
     // Updated regex to handle youtube-nocookie.com URLs (Pro format) and watch?v= URLs
@@ -1101,12 +1088,10 @@ function AppContent() {
                   onLogout={logout}
                   isAuthenticated={isAuthenticated}
                   openLoginModal={openLoginModal}
-                  isPremium={isPremium}
                   ad={ad}
                   skipAd={skipAd}
                   triggerAd={triggerAd}
                   isAdActive={isAdActive}
-                  onOpenPricingModal={openPricingModal}
                 />
               )}
             </Route>
@@ -1145,12 +1130,6 @@ function AppContent() {
         </DragOverlay>
       </DndContext>
       <Toaster />
-      <PricingModal 
-        isOpen={pricingModalOpen} 
-        onClose={() => setPricingModalOpen(false)}
-        isAuthenticated={isAuthenticated}
-        openLoginModal={openLoginModal}
-      />
     </TooltipProvider>
   );
 }

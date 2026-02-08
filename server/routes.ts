@@ -9,7 +9,7 @@ import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema, in
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { getUncachableResendClient } from "./services/resend-client";
 
-// Admin email list - used for admin access and auto-premium
+// Admin email list - used for admin access only
 const ADMIN_EMAILS = [
   'legionofoogabooga@gmail.com',
   'omar.karanib@anculabs.com',
@@ -578,34 +578,6 @@ export async function registerRoutes(
     }
   });
 
-  // Premium status endpoint
-  app.get("/api/user/premium-status", async (req: Request, res: Response) => {
-    const userId = (req as any).userId || (req as any).user?.id;
-    const user = (req as any).user;
-    const email = user?.claims?.email || user?.email;
-
-    if (!userId) {
-      return res.json({ isPremium: false, userId: null, isAdmin: false });
-    }
-
-    try {
-      // Admin users automatically get premium
-      const userIsAdmin = isAdminEmail(email || '');
-
-      const profile = await storage.getProfile(userId);
-      const isPremium = userIsAdmin || (profile?.isPremium ?? false);
-
-      res.json({ 
-        isPremium, 
-        userId,
-        isAdmin: userIsAdmin
-      });
-    } catch (error) {
-      console.error('[Premium] Error checking status:', error);
-      res.json({ isPremium: false, userId, isAdmin: false });
-    }
-  });
-
   app.get("/api/dashboard", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
 
@@ -621,28 +593,15 @@ export async function registerRoutes(
     }
   });
 
+  // Save dashboard - available to all authenticated users
   app.post("/api/dashboard", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
-    const user = (req as any).user;
-    const email = user?.claims?.email || user?.email;
 
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
     }
 
     try {
-      // Check premium status before saving (admins are automatically premium)
-      const userIsAdmin = isAdminEmail(email || '');
-      const profile = await storage.getProfile(userId);
-      const hasPremiumAccess = userIsAdmin || (profile?.isPremium ?? false);
-
-      if (!hasPremiumAccess) {
-        return res.status(403).json({ 
-          error: "Premium required", 
-          message: "Save Layout is a Pro feature. Upgrade to save your dashboard." 
-        });
-      }
-
       const validation = insertDashboardSchema.safeParse({ ...req.body, userId });
 
       if (!validation.success) {
@@ -656,28 +615,15 @@ export async function registerRoutes(
     }
   });
 
+  // Update dashboard - available to all authenticated users
   app.patch("/api/dashboard", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
-    const user = (req as any).user;
-    const email = user?.claims?.email || user?.email;
 
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
     }
 
     try {
-      // Check premium status before updating (admins are automatically premium)
-      const userIsAdmin = isAdminEmail(email || '');
-      const profile = await storage.getProfile(userId);
-      const hasPremiumAccess = userIsAdmin || (profile?.isPremium ?? false);
-
-      if (!hasPremiumAccess) {
-        return res.status(403).json({ 
-          error: "Premium required", 
-          message: "Save Layout is a Pro feature. Upgrade to save your dashboard." 
-        });
-      }
-
       const dashboard = await storage.updateDashboard(userId, req.body);
 
       if (!dashboard) {
@@ -810,7 +756,7 @@ export async function registerRoutes(
     }
   });
 
-  // Feedback routes - saves to DB and sends email notification
+  // Feedback routes with 15-minute cooldown
   app.post("/api/feedback", async (req: Request, res: Response) => {
     try {
       const { category, description, email, type, message, userEmail, screenshot } = req.body;
@@ -840,10 +786,33 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Type must be 'bug' or 'idea'" });
       }
 
-      const item = await storage.createFeedback(validation.data);
       const feedbackMessage = validation.data.message;
       const feedbackEmail = validation.data.userEmail;
 
+      // Get client IP for rate limiting
+      const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() 
+        || req.socket.remoteAddress 
+        || 'unknown';
+
+      // Check 15-minute cooldown
+      const COOLDOWN_MINUTES = 15;
+      const cooldownCheck = await storage.checkFeedbackCooldown(clientIp, COOLDOWN_MINUTES);
+
+      if (!cooldownCheck.allowed) {
+        const minutesLeft = Math.ceil(cooldownCheck.minutesRemaining || 0);
+        return res.status(429).json({ 
+          error: `Please wait ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''} before submitting more feedback.`,
+          retryAfter: cooldownCheck.minutesRemaining
+        });
+      }
+
+      // Save feedback to database
+      const item = await storage.createFeedback(validation.data);
+
+      // Update cooldown tracker
+      await storage.updateFeedbackCooldown(clientIp);
+
+      // Send email notification
       try {
         const { client, fromEmail } = await getUncachableResendClient();
         const categoryLabel = feedbackType === 'idea' ? 'New Idea' : 'Bug Report';
@@ -861,6 +830,7 @@ export async function registerRoutes(
             <h2>OpenBento Feedback - ${categoryLabel}</h2>
             <p><strong>Category:</strong> ${categoryLabel}</p>
             <p><strong>From:</strong> ${safeEmail}</p>
+            <p><strong>IP:</strong> ${clientIp}</p>
             <hr />
             <p><strong>Description:</strong></p>
             <p>${safeDescription}</p>
@@ -868,13 +838,14 @@ export async function registerRoutes(
             <p style="color: #666; font-size: 12px;">Sent from OpenBento Feedback Form</p>
           `,
         });
-        console.log(`[Feedback] Saved to DB + sent email for ${feedbackType} feedback`);
+        console.log(`[Feedback] Saved to DB + sent email for ${feedbackType} feedback from ${clientIp}`);
       } catch (emailError) {
         console.warn('[Feedback] Saved to DB but email failed:', emailError);
       }
 
       res.json({ success: true, feedback: item });
     } catch (error) {
+      console.error('[Feedback] Error:', error);
       res.status(500).json({ error: String(error) });
     }
   });
@@ -964,11 +935,6 @@ export async function registerRoutes(
 
         const data = await response.json();
 
-        // Get user IDs to fetch premium status from profiles
-        const userIds = (data.users || []).map((u: any) => u.id);
-        const profilesData = await storage.getProfilesByIds(userIds);
-        const profilesMap = new Map(profilesData.map(p => [p.id, p]));
-
         // Map to simplified user objects for the admin panel
         const users = (data.users || []).map((user: any) => ({
           id: user.id,
@@ -977,7 +943,6 @@ export async function registerRoutes(
           lastSignIn: user.last_sign_in_at,
           emailConfirmed: user.email_confirmed_at ? true : false,
           provider: user.app_metadata?.provider || 'email',
-          isPremium: profilesMap.get(user.id)?.isPremium || false
         }));
 
         res.json({ users, total: users.length });
@@ -996,35 +961,6 @@ export async function registerRoutes(
     }
   });
 
-  // Admin endpoint to toggle user premium status
-  app.patch("/api/admin/users/:id/premium", async (req: Request, res: Response) => {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: "Admin access required" });
-    }
-
-    try {
-      const userId = req.params.id as string;
-      const { isPremium } = req.body;
-
-      if (typeof isPremium !== 'boolean') {
-        return res.status(400).json({ error: "isPremium must be a boolean" });
-      }
-
-      // Upsert profile with the premium status
-      const profile = await storage.upsertProfile({
-        id: userId,
-        email: '', // Will be updated with actual email if available
-        isPremium,
-      });
-
-      console.log('[Admin] Updated premium status for user:', userId, 'isPremium:', isPremium);
-      res.json({ success: true, profile });
-    } catch (error) {
-      console.error('[Admin] Error updating premium status:', error);
-      res.status(500).json({ error: String(error) });
-    }
-  });
-
   // Stripe Publishable Key
   app.get("/api/stripe/publishable-key", async (req, res) => {
     try {
@@ -1036,44 +972,18 @@ export async function registerRoutes(
     }
   });
 
-  // Valid Stripe price IDs for OpenBento Pro subscription
-  const VALID_PRICE_IDS: Record<string, string> = {
-    monthly: 'price_1Sx7AnC4mj6LbUjWpXwTb7Gi',
-    yearly: 'price_1Sx7B5C4mj6LbUjWnIFhehZl',
-  };
-
-  // Create Stripe Checkout Session for Pro subscription
+  // Create Stripe Checkout Session for one-time donation
   app.post("/api/stripe/create-checkout-session", async (req: Request, res: Response) => {
     try {
-      const { priceId, billingPeriod } = req.body;
+      const { amount } = req.body; // Amount in cents (e.g., 500 = $5.00)
       const user = (req as any).user;
-
-      // Extract userId - try multiple sources for maximum reliability
-      const userId = (req as any).userId || (req as any).user?.id || user?.claims?.sub;
       const email = user?.claims?.email || user?.email;
 
-      if (!email) {
-        console.error('[Stripe] No email found for user:', userId);
-        return res.status(401).json({ error: 'User email not found. Please log in again.' });
-      }
-
-      if (!userId) {
-        console.error('[Stripe] No userId found for email:', email);
-        return res.status(401).json({ error: 'User ID not found. Please log in again.' });
-      }
-
-      console.log('[Stripe] Creating checkout session - userId:', userId, 'email:', email);
-
-      // Validate billingPeriod
-      if (!billingPeriod || !['monthly', 'yearly'].includes(billingPeriod)) {
-        return res.status(400).json({ error: 'Invalid billing period. Must be "monthly" or "yearly".' });
-      }
-
-      // Validate priceId against allowlist
-      const expectedPriceId = VALID_PRICE_IDS[billingPeriod];
-      if (!priceId || priceId !== expectedPriceId) {
-        console.warn('[Stripe] Invalid priceId attempted:', priceId, 'expected:', expectedPriceId);
-        return res.status(400).json({ error: 'Invalid price configuration.' });
+      // Validate amount
+      if (!amount || typeof amount !== 'number' || amount < 100 || amount > 100000) {
+        return res.status(400).json({ 
+          error: 'Invalid donation amount. Must be between $1.00 and $1,000.00' 
+        });
       }
 
       const stripe = await getUncachableStripeClient();
@@ -1084,27 +994,29 @@ export async function registerRoutes(
         ? productionDomain 
         : (req.headers.origin || `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`);
 
-      // Create checkout session - allow user to enter their own billing email
+      // Create one-time payment checkout session
       const session = await stripe.checkout.sessions.create({
-        mode: 'subscription',
+        mode: 'payment', // One-time payment instead of subscription
         payment_method_types: ['card'],
         line_items: [
           {
-            price: priceId,
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: 'OpenBento Donation',
+                description: 'Thank you for supporting OpenBento! Your donation helps us keep the platform running.',
+              },
+              unit_amount: amount, // Amount in cents
+            },
             quantity: 1,
           },
         ],
-        // REMOVED customer_email to allow users to enter their own billing email on Stripe page
-        metadata: {
-          userId: userId, // Critical: webhook uses this to identify which user to upgrade
-          accountEmail: email, // Store account email for reference only
-        },
-        allow_promotion_codes: true,
-        success_url: `${origin}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${origin}/?canceled=true`,
+        customer_email: email, // Pre-fill email if available
+        success_url: `${origin}/?donation=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/?donation=canceled`,
       });
 
-      console.log('[Stripe] Created checkout session for:', email, 'userId:', userId);
+      console.log('[Stripe] Created donation checkout session for amount:', amount);
       res.json({ url: session.url });
     } catch (error: any) {
       console.error('[Stripe] Checkout error:', error);
@@ -1112,7 +1024,7 @@ export async function registerRoutes(
     }
   });
 
-  // Stripe Webhook Handler
+  // Stripe Webhook Handler - for donation confirmations
   app.post("/api/stripe/webhook", async (req: Request, res: Response) => {
     const sig = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -1143,85 +1055,23 @@ export async function registerRoutes(
       switch (event.type) {
         case 'checkout.session.completed': {
           const session = event.data.object;
-          const userId = session.metadata?.userId;
-          const accountEmail = session.metadata?.accountEmail; // User's account email (for reference)
-          const billingEmail = session.customer_email; // Billing email entered on Stripe page
 
-          console.log('[Stripe] Checkout completed - userId:', userId, 'accountEmail:', accountEmail, 'billingEmail:', billingEmail);
-
-          // Priority 1: Use userId from metadata (most reliable - always works regardless of billing email)
-          if (userId) {
-            try {
-              await storage.upsertProfile({
-                id: userId,
-                email: accountEmail || billingEmail || '',
-                isPremium: true,
-              });
-              console.log('[Stripe] ✅ Granted premium via metadata userId:', userId, accountEmail);
-              break;
-            } catch (upsertError) {
-              console.error('[Stripe] Error upserting profile for userId:', userId, upsertError);
-              // Continue to email fallback if userId upsert fails
-            }
-          } else {
-            console.warn('[Stripe] ⚠️ No userId in checkout session metadata');
+          // Log successful donation
+          if (session.mode === 'payment') {
+            const amount = session.amount_total; // Amount in cents
+            const email = session.customer_email;
+            console.log('[Stripe] ✅ Donation received:', {
+              amount: `$${(amount / 100).toFixed(2)}`,
+              email,
+              sessionId: session.id
+            });
           }
-
-          // Priority 2: Fallback to billing email lookup if userId not in metadata or upsert failed
-          // (This will only work if the billing email matches an account in the database)
-          if (billingEmail) {
-            try {
-              const profile = await storage.getProfileByEmail(billingEmail);
-
-              if (profile) {
-                await storage.upsertProfile({
-                  id: profile.id,
-                  email: billingEmail,
-                  isPremium: true,
-                });
-                console.log('[Stripe] ✅ Granted premium via billing email lookup:', profile.id, billingEmail);
-              } else {
-                console.error('[Stripe] ❌ No user profile found for billing email:', billingEmail);
-              }
-            } catch (emailError) {
-              console.error('[Stripe] Error in email fallback:', emailError);
-            }
-          } else {
-            console.error('[Stripe] ❌ No userId or billing email in checkout session:', session.id);
-          }
-
           break;
         }
 
-        case 'customer.subscription.deleted': {
-          const subscription = event.data.object;
-          const stripe = await getUncachableStripeClient();
-
-          // Get customer email from Stripe
-          const customer = await stripe.customers.retrieve(subscription.customer);
-          const customerEmail = (customer as any).email;
-
-          if (!customerEmail) {
-            console.error('[Stripe] No customer email for subscription:', subscription.id);
-            break;
-          }
-
-          console.log('[Stripe] Subscription cancelled for:', customerEmail);
-
-          // Find user by email and revoke premium
-          const profile = await storage.getProfileByEmail(customerEmail);
-
-          if (profile) {
-            await storage.upsertProfile({
-              id: profile.id,
-              email: customerEmail,
-              isPremium: false,
-            });
-            console.log('[Stripe] Revoked premium from user:', profile.id, customerEmail);
-          } else {
-            console.warn('[Stripe] No user found with email:', customerEmail);
-          }
-
+        case 'payment_intent.succeeded': {
+          const paymentIntent = event.data.object;
+          console.log('[Stripe] Payment confirmed:', paymentIntent.id);
           break;
         }
 
@@ -1235,7 +1085,6 @@ export async function registerRoutes(
       res.status(500).json({ error: 'Error processing webhook' });
     }
   });
-
 
   // Auto-import channels on startup (runs once)
   async function autoImportChannels() {
