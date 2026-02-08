@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, AlertTriangle, Zap } from 'lucide-react';
+import { X, Heart, Coffee } from 'lucide-react';
 import { Widget } from '@/App';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
 const EXPANSION_INTERVAL = 10000;
-const SPAWN_INTERVAL = 1800000;
+const SPAWN_INTERVAL = 1800000; // 30 minutes
+
+const DONATION_URL = 'https://buymeacoffee.com/openbento';
+const AD_COOLDOWN_DAYS = 10; // Show ad once every 10 days
+const LAST_AD_SEEN_KEY = 'last_ad_seen';
 
 export interface AdBlockData {
   id: string;
@@ -45,8 +49,8 @@ export function AdBlock({ ad, onSkip, isDarkMode = true }: AdBlockProps) {
     <div
       className={`relative w-full h-full flex flex-col items-center justify-center overflow-hidden rounded-[12px] ${
         isDarkMode 
-          ? 'bg-gradient-to-br from-red-900 via-orange-900 to-yellow-900 border-2 border-red-500/60 shadow-lg shadow-red-900/50' 
-          : 'bg-gradient-to-br from-red-400 via-orange-400 to-yellow-400 border-3 border-red-600 shadow-xl shadow-red-500/40'
+          ? 'bg-gradient-to-br from-pink-900 via-purple-900 to-blue-900 border-2 border-pink-500/60 shadow-lg shadow-pink-900/50' 
+          : 'bg-gradient-to-br from-pink-400 via-purple-400 to-blue-400 border-3 border-pink-600 shadow-xl shadow-pink-500/40'
       }`}
       style={{
         gridColumn: `${ad.x + 1} / span ${ad.w}`,
@@ -66,14 +70,31 @@ export function AdBlock({ ad, onSkip, isDarkMode = true }: AdBlockProps) {
         </div>
       </div>
 
-      <div className="relative z-10 text-center p-4">
-        <AlertTriangle className={`w-8 h-8 mx-auto mb-2 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-900'} animate-bounce`} />
-        <h3 className={`font-bold text-lg mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-          Support OpenBento
+      <div className="relative z-10 text-center p-4 space-y-3">
+        <Heart className={`w-8 h-8 mx-auto mb-2 ${isDarkMode ? 'text-pink-400' : 'text-pink-900'} animate-pulse`} />
+        <h3 className={`font-bold text-base mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+          OpenBento is free for everyone
         </h3>
-        <p className={`text-sm ${isDarkMode ? 'text-slate-300' : 'text-slate-800'}`}>
-          Upgrade to Pro to remove ads
+        <p className={`text-xs leading-relaxed px-2 ${isDarkMode ? 'text-slate-300' : 'text-slate-800'}`}>
+          If you find this tool useful, please consider a small donation to help us keep the servers running.
         </p>
+
+        {/* Donation Button */}
+        <a
+          href={DONATION_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 ${
+            isDarkMode
+              ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white shadow-lg'
+              : 'bg-gradient-to-r from-pink-600 to-purple-700 hover:from-pink-700 hover:to-purple-800 text-white shadow-xl'
+          }`}
+          onClick={(e) => e.stopPropagation()}
+          data-testid="button-donate-ad"
+        >
+          <Coffee className="w-4 h-4" />
+          Buy Me a Coffee
+        </a>
       </div>
 
       <div className="absolute bottom-2 right-2 z-20">
@@ -84,19 +105,19 @@ export function AdBlock({ ad, onSkip, isDarkMode = true }: AdBlockProps) {
             data-testid="button-skip-ad"
           >
             <X className="w-3 h-3" />
-            Skip Ad
+            Close
           </button>
         ) : (
           <div className={`px-3 py-1.5 text-xs font-medium rounded ${isDarkMode ? 'bg-slate-800/80 text-slate-400' : 'bg-slate-200 text-slate-600'}`}>
-            Skip in {skipCountdown}s
+            Close in {skipCountdown}s
           </div>
         )}
       </div>
 
       <div className="absolute top-2 left-2 z-20">
-        <div className={`flex items-center gap-1 px-2 py-1 text-xs font-bold rounded ${isDarkMode ? 'bg-red-600 text-white' : 'bg-red-500 text-white'}`}>
-          <Zap className="w-3 h-3" />
-          AD
+        <div className={`flex items-center gap-1 px-2 py-1 text-xs font-bold rounded ${isDarkMode ? 'bg-pink-600 text-white' : 'bg-pink-500 text-white'}`}>
+          <Heart className="w-3 h-3" />
+          SUPPORT US
         </div>
       </div>
     </div>
@@ -105,7 +126,7 @@ export function AdBlock({ ad, onSkip, isDarkMode = true }: AdBlockProps) {
 
 function getPerimeterPositions(): { x: number; y: number }[] {
   const positions: { x: number; y: number }[] = [];
-  
+
   for (let x = 0; x < GRID_COLS; x++) {
     positions.push({ x, y: 0 });
     positions.push({ x, y: GRID_ROWS - 1 });
@@ -114,32 +135,69 @@ function getPerimeterPositions(): { x: number; y: number }[] {
     positions.push({ x: 0, y });
     positions.push({ x: GRID_COLS - 1, y });
   }
-  
+
   return positions;
 }
 
 function getAdjacentPositions(ad: AdBlockData): { x: number; y: number }[] {
   const positions: { x: number; y: number }[] = [];
-  
+
   for (let dx = -1; dx <= ad.w; dx++) {
     const topY = ad.y - 1;
     const bottomY = ad.y + ad.h;
     if (topY >= 0) positions.push({ x: ad.x + dx, y: topY });
     if (bottomY < GRID_ROWS) positions.push({ x: ad.x + dx, y: bottomY });
   }
-  
+
   for (let dy = 0; dy < ad.h; dy++) {
     const leftX = ad.x - 1;
     const rightX = ad.x + ad.w;
     if (leftX >= 0) positions.push({ x: leftX, y: ad.y + dy });
     if (rightX < GRID_COLS) positions.push({ x: rightX, y: ad.y + dy });
   }
-  
+
   return positions.filter(p => p.x >= 0 && p.x < GRID_COLS && p.y >= 0 && p.y < GRID_ROWS);
 }
 
+// ✅ 10-DAY COOLDOWN: Check if enough time has passed since last ad
+function shouldShowAd(): boolean {
+  try {
+    const lastAdSeen = localStorage.getItem(LAST_AD_SEEN_KEY);
+
+    if (!lastAdSeen) {
+      // No ad seen before - show ad
+      return true;
+    }
+
+    const lastSeenTime = parseInt(lastAdSeen, 10);
+    if (isNaN(lastSeenTime)) {
+      // Invalid timestamp - show ad
+      return true;
+    }
+
+    const now = Date.now();
+    const daysSinceLastAd = (now - lastSeenTime) / (1000 * 60 * 60 * 24);
+
+    // Show ad only if 10 or more days have passed
+    return daysSinceLastAd >= AD_COOLDOWN_DAYS;
+  } catch (error) {
+    // localStorage might be disabled - allow ad to show
+    console.warn('[Ad] localStorage error, showing ad anyway:', error);
+    return true;
+  }
+}
+
+// ✅ 10-DAY COOLDOWN: Update timestamp when ad is shown
+function markAdAsSeen(): void {
+  try {
+    localStorage.setItem(LAST_AD_SEEN_KEY, Date.now().toString());
+  } catch (error) {
+    console.warn('[Ad] Failed to save ad timestamp to localStorage:', error);
+  }
+}
+
 export function useViralAds(
-  isPremium: boolean,
+  _isPremium: boolean, // ❌ IGNORED - Donation model shows ads to everyone
   widgets: Widget[],
   setWidgets: React.Dispatch<React.SetStateAction<Widget[]>>
 ) {
@@ -159,13 +217,13 @@ export function useViralAds(
         return { occupied: true, type: 'ad' as const, item: currentAd };
       }
     }
-    
+
     for (const widget of currentWidgets) {
       if (x >= widget.x && x < widget.x + widget.w && y >= widget.y && y < widget.y + widget.h) {
         return { occupied: true, type: 'widget' as const, item: widget };
       }
     }
-    
+
     return { occupied: false, type: null, item: null };
   }, []);
 
@@ -181,20 +239,20 @@ export function useViralAds(
       const overlapsY = newWidget.y < other.y + other.h && newWidget.y + newWidget.h > other.y;
       if (overlapsX && overlapsY) return true;
     }
-    
+
     if (currentAd) {
       const overlapsX = newWidget.x < currentAd.x + currentAd.w && newWidget.x + newWidget.w > currentAd.x;
-      const overlapsY = newWidget.y < currentAd.y + currentAd.h && newWidget.y + newWidget.h > currentAd.y;
+      const overlapsY = newWidget.y < currentAd.y + currentAd.h && newWidget.y + currentAd.h > currentAd.y;
       if (overlapsX && overlapsY) return true;
     }
-    
+
     return false;
   }, []);
 
   // Check if a widget overlaps with the ad's proposed new bounds
   const widgetOverlapsAdBounds = useCallback((widget: Widget, adBounds: { x: number; y: number; w: number; h: number }): boolean => {
     const overlapsX = widget.x < adBounds.x + adBounds.w && widget.x + widget.w > adBounds.x;
-    const overlapsY = widget.y < adBounds.y + adBounds.h && widget.y + widget.h > adBounds.y;
+    const overlapsY = widget.y < adBounds.y + adBounds.h && widget.y + adBounds.h > adBounds.y;
     return overlapsX && overlapsY;
   }, []);
 
@@ -226,7 +284,7 @@ export function useViralAds(
     const adCenterY = adBounds.y + adBounds.h / 2;
     const widgetCenterX = widget.x + widget.w / 2;
     const widgetCenterY = widget.y + widget.h / 2;
-    
+
     // Try moving in the direction away from ad (increasing distance)
     const moveDirections: { dx: number; dy: number }[] = [];
     if (widgetCenterX < adCenterX) moveDirections.push({ dx: -1, dy: 0 }); // Move left
@@ -246,7 +304,7 @@ export function useViralAds(
         const key = `${newX},${newY}`;
         if (tried.has(key)) continue;
         tried.add(key);
-        
+
         const candidate = { ...widget, x: newX, y: newY };
         if (isValidPosition(candidate)) {
           return candidate;
@@ -326,7 +384,7 @@ export function useViralAds(
   ): { success: boolean; newWidgets: Widget[] } => {
     // Find all widgets that overlap with the new ad bounds
     const overlappingWidgets = currentWidgets.filter(w => widgetOverlapsAdBounds(w, newAdBounds));
-    
+
     if (overlappingWidgets.length === 0) {
       // Validate grid is still clean
       if (!validateGridState(currentWidgets, newAdBounds)) {
@@ -337,48 +395,48 @@ export function useViralAds(
 
     // Create a working copy of widgets
     let workingWidgets = [...currentWidgets];
-    
+
     // Process each overlapping widget - use workingWidgets for current state
     for (const originalWidget of overlappingWidgets) {
       // Get the current version of this widget from working set
       const widget = workingWidgets.find(w => w.id === originalWidget.id);
       if (!widget) continue;
-      
+
       // Skip if widget was already moved out of the way by a previous reflow
       if (!widgetOverlapsAdBounds(widget, newAdBounds)) continue;
-      
+
       // Get current state of other widgets (excluding the one being processed)
       const otherWidgets = workingWidgets.filter(w => w.id !== widget.id);
-      
+
       // Find a new safe position using current state of all other widgets
       const newPosition = findSafePosition(widget, newAdBounds, otherWidgets, widget.id);
-      
+
       if (!newPosition) {
         // Cannot relocate this widget - expansion fails
         return { success: false, newWidgets: currentWidgets };
       }
-      
+
       // Update working widgets with new position
       workingWidgets = workingWidgets.map(w => w.id === widget.id ? newPosition : w);
     }
-    
+
     // Final validation: ensure no overlaps in the resulting grid
     if (!validateGridState(workingWidgets, newAdBounds)) {
       return { success: false, newWidgets: currentWidgets };
     }
-    
+
     return { success: true, newWidgets: workingWidgets };
   }, [widgetOverlapsAdBounds, findSafePosition, validateGridState]);
 
   const expandAd = useCallback(() => {
     const currentAd = ad;
     if (!currentAd) return;
-    
+
     const currentWidgets = widgetsRef.current;
-    
+
     // Define possible expansion directions
     const expansionOptions: { x: number; y: number; w: number; h: number }[] = [];
-    
+
     // Expand left (if possible)
     if (currentAd.x > 0) {
       expansionOptions.push({ x: currentAd.x - 1, y: currentAd.y, w: currentAd.w + 1, h: currentAd.h });
@@ -395,14 +453,14 @@ export function useViralAds(
     if (currentAd.y + currentAd.h < GRID_ROWS) {
       expansionOptions.push({ x: currentAd.x, y: currentAd.y, w: currentAd.w, h: currentAd.h + 1 });
     }
-    
+
     // Shuffle expansion options for randomness
     const shuffled = [...expansionOptions].sort(() => Math.random() - 0.5);
-    
+
     for (const newBounds of shuffled) {
       // Try to perform grid reflow for this expansion
       const { success, newWidgets } = performGridReflow(newBounds, currentWidgets);
-      
+
       if (success) {
         // Update widgets with new positions
         setWidgets(newWidgets);
@@ -411,24 +469,29 @@ export function useViralAds(
         return;
       }
     }
-    
+
     // No valid expansion found - ad stays the same
   }, [ad, performGridReflow, setWidgets]);
 
   const triggerAd = useCallback(() => {
-    if (isPremium) return;
+    // ✅ 10-DAY COOLDOWN: Only show ad if 10 days have passed
+    if (!shouldShowAd()) {
+      console.log('[Ad] Skipping ad - less than 10 days since last ad');
+      return;
+    }
+
     if (ad !== null) return;
-    
+
     const currentWidgets = widgetsRef.current;
     const perimeterPositions = getPerimeterPositions();
     const shuffled = [...perimeterPositions].sort(() => Math.random() - 0.5);
-    
+
     for (const pos of shuffled) {
       const newAdBounds = { x: pos.x, y: pos.y, w: 1, h: 1 };
-      
+
       // Check if position is empty (no overlap with existing widgets)
       const occupation = isPositionOccupied(pos.x, pos.y, null, currentWidgets);
-      
+
       if (!occupation.occupied) {
         // Position is free - spawn ad directly
         const newAd: AdBlockData = {
@@ -440,12 +503,16 @@ export function useViralAds(
           createdAt: Date.now()
         };
         setAd(newAd);
+
+        // ✅ 10-DAY COOLDOWN: Mark ad as seen
+        markAdAsSeen();
+        console.log('[Ad] Ad shown - next ad will appear in 10 days');
         return;
       }
-      
+
       // Position is occupied - try grid reflow to make space
       const { success, newWidgets } = performGridReflow(newAdBounds, currentWidgets);
-      
+
       if (success) {
         setWidgets(newWidgets);
         const newAd: AdBlockData = {
@@ -457,10 +524,14 @@ export function useViralAds(
           createdAt: Date.now()
         };
         setAd(newAd);
+
+        // ✅ 10-DAY COOLDOWN: Mark ad as seen
+        markAdAsSeen();
+        console.log('[Ad] Ad shown - next ad will appear in 10 days');
         return;
       }
     }
-  }, [isPremium, ad, isPositionOccupied, performGridReflow, setWidgets]);
+  }, [ad, isPositionOccupied, performGridReflow, setWidgets]);
 
   useEffect(() => {
     triggerAdRef.current = triggerAd;
@@ -472,43 +543,28 @@ export function useViralAds(
       expansionTimerRef.current = null;
     }
     setAd(null);
+
+    // Clear spawn timer - no need to respawn since 10-day cooldown is active
     if (spawnTimerRef.current) {
       clearTimeout(spawnTimerRef.current);
       spawnTimerRef.current = null;
     }
-    spawnTimerRef.current = setTimeout(() => {
-      triggerAdRef.current();
-    }, SPAWN_INTERVAL);
   }, []);
 
   const isAdActive = ad !== null;
-
-  useEffect(() => {
-    if (isPremium) {
-      setAd(null);
-      if (expansionTimerRef.current) {
-        clearInterval(expansionTimerRef.current);
-        expansionTimerRef.current = null;
-      }
-      if (spawnTimerRef.current) {
-        clearTimeout(spawnTimerRef.current);
-        spawnTimerRef.current = null;
-      }
-    }
-  }, [isPremium]);
 
   useEffect(() => {
     if (expansionTimerRef.current) {
       clearInterval(expansionTimerRef.current);
       expansionTimerRef.current = null;
     }
-    
+
     if (ad) {
       expansionTimerRef.current = setInterval(() => {
         expandAd();
       }, EXPANSION_INTERVAL);
     }
-    
+
     return () => {
       if (expansionTimerRef.current) {
         clearInterval(expansionTimerRef.current);

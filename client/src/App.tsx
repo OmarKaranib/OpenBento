@@ -172,8 +172,8 @@ function AppContent() {
     return getDefaultWidgets();
   });
 
-  // VIRAL AD MECHANIC: Ads now show for all users with donation messaging
-  // Ads are triggered on user actions to request donations
+  // DONATION-BASED MODEL: Ads show for all users with donation messaging
+  // Ads are triggered on user actions to request support via Buy Me a Coffee
   const { ad, skipAd, triggerAd, isAdActive } = useViralAds(false, widgets, setWidgets);
 
   const extractYouTubeId = (url: string): string | null => {

@@ -6,7 +6,6 @@ import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerChannel } from "./services/pulse-cache";
 import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, verifyVideoIsLive, searchChannelLiveStream, checkVideoLiveStatusById } from "./services/youtube-api";
 import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema, insertFeedbackSchema } from "@shared/schema";
-import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { getUncachableResendClient } from "./services/resend-client";
 
 // Admin email list - used for admin access only
@@ -593,7 +592,7 @@ export async function registerRoutes(
     }
   });
 
-  // Save dashboard - available to all authenticated users
+  // Save dashboard - available to all authenticated users (no Premium check)
   app.post("/api/dashboard", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
 
@@ -615,7 +614,7 @@ export async function registerRoutes(
     }
   });
 
-  // Update dashboard - available to all authenticated users
+  // Update dashboard - available to all authenticated users (no Premium check)
   app.patch("/api/dashboard", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
 
@@ -756,7 +755,7 @@ export async function registerRoutes(
     }
   });
 
-  // Feedback routes with 15-minute cooldown
+  // ✅ FEEDBACK ROUTE WITH 15-MINUTE COOLDOWN (KEPT)
   app.post("/api/feedback", async (req: Request, res: Response) => {
     try {
       const { category, description, email, type, message, userEmail, screenshot } = req.body;
@@ -794,7 +793,7 @@ export async function registerRoutes(
         || req.socket.remoteAddress 
         || 'unknown';
 
-      // Check 15-minute cooldown
+      // ✅ 15-MINUTE COOLDOWN CHECK
       const COOLDOWN_MINUTES = 15;
       const cooldownCheck = await storage.checkFeedbackCooldown(clientIp, COOLDOWN_MINUTES);
 
@@ -958,131 +957,6 @@ export async function registerRoutes(
     } catch (error) {
       console.error('[Admin] Error fetching users:', error);
       res.status(500).json({ error: String(error) });
-    }
-  });
-
-  // Stripe Publishable Key
-  app.get("/api/stripe/publishable-key", async (req, res) => {
-    try {
-      const publishableKey = await getStripePublishableKey();
-      res.json({ publishableKey });
-    } catch (error) {
-      console.error('[Stripe] Error getting publishable key:', error);
-      res.status(500).json({ error: 'Failed to get Stripe config' });
-    }
-  });
-
-  // Create Stripe Checkout Session for one-time donation
-  app.post("/api/stripe/create-checkout-session", async (req: Request, res: Response) => {
-    try {
-      const { amount } = req.body; // Amount in cents (e.g., 500 = $5.00)
-      const user = (req as any).user;
-      const email = user?.claims?.email || user?.email;
-
-      // Validate amount
-      if (!amount || typeof amount !== 'number' || amount < 100 || amount > 100000) {
-        return res.status(400).json({ 
-          error: 'Invalid donation amount. Must be between $1.00 and $1,000.00' 
-        });
-      }
-
-      const stripe = await getUncachableStripeClient();
-
-      // Use production domain if available, otherwise fallback to request origin
-      const productionDomain = 'https://openbento.tv';
-      const origin = process.env.NODE_ENV === 'production' 
-        ? productionDomain 
-        : (req.headers.origin || `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`);
-
-      // Create one-time payment checkout session
-      const session = await stripe.checkout.sessions.create({
-        mode: 'payment', // One-time payment instead of subscription
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: 'OpenBento Donation',
-                description: 'Thank you for supporting OpenBento! Your donation helps us keep the platform running.',
-              },
-              unit_amount: amount, // Amount in cents
-            },
-            quantity: 1,
-          },
-        ],
-        customer_email: email, // Pre-fill email if available
-        success_url: `${origin}/?donation=success&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${origin}/?donation=canceled`,
-      });
-
-      console.log('[Stripe] Created donation checkout session for amount:', amount);
-      res.json({ url: session.url });
-    } catch (error: any) {
-      console.error('[Stripe] Checkout error:', error);
-      res.status(500).json({ error: error.message || 'Failed to create checkout session' });
-    }
-  });
-
-  // Stripe Webhook Handler - for donation confirmations
-  app.post("/api/stripe/webhook", async (req: Request, res: Response) => {
-    const sig = req.headers['stripe-signature'];
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    if (!webhookSecret) {
-      console.error('[Stripe] Webhook secret not configured');
-      return res.status(500).json({ error: 'Webhook secret not configured' });
-    }
-
-    if (!sig) {
-      console.error('[Stripe] Missing stripe-signature header');
-      return res.status(400).json({ error: 'Missing stripe-signature header' });
-    }
-
-    let event: any;
-
-    try {
-      const stripe = await getUncachableStripeClient();
-      // req.body should be raw buffer for webhook signature verification
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-    } catch (err: any) {
-      console.error('[Stripe] Webhook signature verification failed:', err.message);
-      return res.status(400).json({ error: `Webhook Error: ${err.message}` });
-    }
-
-    // Handle the event
-    try {
-      switch (event.type) {
-        case 'checkout.session.completed': {
-          const session = event.data.object;
-
-          // Log successful donation
-          if (session.mode === 'payment') {
-            const amount = session.amount_total; // Amount in cents
-            const email = session.customer_email;
-            console.log('[Stripe] ✅ Donation received:', {
-              amount: `$${(amount / 100).toFixed(2)}`,
-              email,
-              sessionId: session.id
-            });
-          }
-          break;
-        }
-
-        case 'payment_intent.succeeded': {
-          const paymentIntent = event.data.object;
-          console.log('[Stripe] Payment confirmed:', paymentIntent.id);
-          break;
-        }
-
-        default:
-          console.log('[Stripe] Unhandled event type:', event.type);
-      }
-
-      res.json({ received: true });
-    } catch (err: any) {
-      console.error('[Stripe] Error handling webhook event:', err);
-      res.status(500).json({ error: 'Error processing webhook' });
     }
   });
 

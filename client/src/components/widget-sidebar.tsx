@@ -48,13 +48,13 @@ const CHANNEL_LOGOS: Record<string, string> = {
   'ctv-news': 'https://www.google.com/s2/favicons?domain=ctvnews.ca&sz=128',
   'cbc-news': 'https://www.google.com/s2/favicons?domain=cbc.ca&sz=128',
   'weather-channel': 'https://www.google.com/s2/favicons?domain=weather.com&sz=128',
-  
+
   // Finance channels
   'bloomberg-live': 'https://www.google.com/s2/favicons?domain=bloomberg.com&sz=128',
   'cnbc-live': 'https://www.google.com/s2/favicons?domain=cnbc.com&sz=128',
   'yahoo-finance': 'https://www.google.com/s2/favicons?domain=finance.yahoo.com&sz=128',
   'cheddar-news': 'https://www.google.com/s2/favicons?domain=cheddar.com&sz=128',
-  
+
   // Science & Space channels
   'iss-hd-earth': 'https://www.google.com/s2/favicons?domain=nasa.gov&sz=128',
   'space-videos': 'https://www.google.com/s2/favicons?domain=space.com&sz=128',
@@ -65,20 +65,20 @@ const CHANNEL_LOGOS: Record<string, string> = {
   'sea-otter-cam': 'https://www.google.com/s2/favicons?domain=montereybayaquarium.org&sz=128',
   'jellyfish-cam': 'https://www.google.com/s2/favicons?domain=montereybayaquarium.org&sz=128',
   'spacex-live': 'https://www.google.com/s2/favicons?domain=spacex.com&sz=128',
-  
+
   // Live Cams
   'earth-cam-nyc': 'https://www.google.com/s2/favicons?domain=earthcam.com&sz=128',
   'earth-cam-tokyo': 'https://www.google.com/s2/favicons?domain=earthcam.com&sz=128',
   'earth-cam-paris': 'https://www.google.com/s2/favicons?domain=earthcam.com&sz=128',
   'earth-cam-london': 'https://www.google.com/s2/favicons?domain=earthcam.com&sz=128',
   'earth-cam-dubai': 'https://www.google.com/s2/favicons?domain=earthcam.com&sz=128',
-  
+
   // Sports
   'nfl-network': 'https://www.google.com/s2/favicons?domain=nfl.com&sz=128',
   'nba-tv': 'https://www.google.com/s2/favicons?domain=nba.com&sz=128',
   'espn-live': 'https://www.google.com/s2/favicons?domain=espn.com&sz=128',
   'free-sports-tv': 'https://www.google.com/s2/favicons?domain=freesports.tv&sz=128',
-  
+
   // Twitch - Esports & Gaming
   'twitch-esl': 'https://www.google.com/s2/favicons?domain=esl.com&sz=128',
   'twitch-rocketleague': 'https://www.google.com/s2/favicons?domain=rocketleague.com&sz=128',
@@ -91,7 +91,7 @@ const CHANNEL_LOGOS: Record<string, string> = {
   'twitch-pgl': 'https://www.google.com/s2/favicons?domain=pgl.gg&sz=128',
   'twitch-blast': 'https://www.google.com/s2/favicons?domain=blastpremier.com&sz=128',
   'twitch-chess': 'https://www.google.com/s2/favicons?domain=chess.com&sz=128',
-  
+
   // Twitch - Streamers (use Twitch favicon)
   'twitch-gaules': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
   'twitch-pokimane': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
@@ -107,7 +107,7 @@ const CHANNEL_LOGOS: Record<string, string> = {
   'twitch-ludwig': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
   'twitch-mizkif': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
   'twitch-nmplol': 'https://www.google.com/s2/favicons?domain=twitch.tv&sz=128',
-  
+
   // Kick - Streamers
   'kick-xqc': 'https://www.google.com/s2/favicons?domain=kick.com&sz=128',
   'kick-adinross': 'https://www.google.com/s2/favicons?domain=kick.com&sz=128',
@@ -359,18 +359,18 @@ function DraggableChannel({ channel, onClick, isLive, isSaved, isBlocked, onSave
       const dbLogo = (channel as TrendingChannel).logoUrl!;
       if (!failedLogoCache.has(dbLogo)) return dbLogo;
     }
-    
+
     // Priority 2: Hardcoded CHANNEL_LOGOS map
     const mappedUrl = CHANNEL_LOGOS[channel.id];
     if (mappedUrl && !failedLogoCache.has(mappedUrl)) {
       return mappedUrl;
     }
-    
+
     return null;
   };
-  
+
   const logoUrl = getLogoUrl();
-  
+
   // Get color based on category for fallback circle
   const getFallbackColor = () => {
     switch (channel.iconType) {
@@ -568,7 +568,7 @@ export function WidgetSidebar({
     const handleLibraryUpdate = () => {
       setPersonalLibrary(loadPersonalLibrary());
     };
-    
+
     window.addEventListener('personalLibraryUpdated', handleLibraryUpdate);
     return () => window.removeEventListener('personalLibraryUpdated', handleLibraryUpdate);
   }, []);
@@ -578,7 +578,7 @@ export function WidgetSidebar({
     const handleBlockedUpdate = () => {
       setBlockedChannels(loadBlockedChannels());
     };
-    
+
     window.addEventListener('blockedChannelsUpdated', handleBlockedUpdate);
     return () => window.removeEventListener('blockedChannelsUpdated', handleBlockedUpdate);
   }, []);
@@ -591,11 +591,11 @@ export function WidgetSidebar({
       openLoginModal?.('Sign Up Required: Please log in or sign up to save channels to your library.');
       return;
     }
-    
+
     setPersonalLibrary(prev => {
       const exists = prev.some(c => c.id === channel.id);
       if (exists) return prev;
-      
+
       const savedChannel: SavedChannel = {
         id: channel.id,
         name: channel.name,
@@ -607,7 +607,7 @@ export function WidgetSidebar({
         videoId: channel.videoId,
         savedAt: Date.now()
       };
-      
+
       const updated = [...prev, savedChannel];
       savePersonalLibrary(updated);
       // Dispatch event to sync dashboard star buttons
@@ -637,7 +637,7 @@ export function WidgetSidebar({
     setBlockedChannels(prev => {
       const exists = prev.some(c => c.id === channel.id);
       if (exists) return prev;
-      
+
       const blockedChannel: BlockedChannel = {
         id: channel.id,
         name: channel.name,
@@ -649,7 +649,7 @@ export function WidgetSidebar({
         videoId: channel.videoId,
         blockedAt: Date.now()
       };
-      
+
       const updated = [...prev, blockedChannel];
       saveBlockedChannels(updated);
       window.dispatchEvent(new CustomEvent('blockedChannelsUpdated'));
@@ -707,7 +707,7 @@ export function WidgetSidebar({
       for (const channel of channels) {
         if (channel.channelId) {
           let isLive = false;
-          
+
           if (channel.platform === 'youtube') {
             // BADGE FINAL FIX: Only show LIVE badge if API specifically returns isLive: true
             // (which comes from liveBroadcastContent: 'live')
@@ -737,7 +737,7 @@ export function WidgetSidebar({
     // QUOTA OPTIMIZATION: Only check Kick status on mount (Kick doesn't use YouTube API quota)
     // YouTube status checks are disabled - user must manually click "Check Again"
     checkAllStatuses();
-    
+
     // Auto-refresh disabled to save YouTube API quota
     console.log('[Sidebar] Auto-refresh disabled for quota optimization. Use "Check Again" for manual refresh.');
     return () => {};
@@ -773,25 +773,25 @@ export function WidgetSidebar({
   // DYNAMIC RANK SORTING: Live streams pinned to top, offline streams at bottom
   const filteredChannels = useMemo(() => {
     let filtered: TrendingChannel[] = channels;
-    
+
     // Filter by category - Music/Lofi content excluded from all views
     filtered = channels.filter(c => 
       c.category !== 'Lofi/Music' && 
       c.category !== 'Music'
     );
-    
+
     // Filter out blocked channels from main view (except when viewing blocked category)
     if (activeCategory !== 'blocked') {
       filtered = filtered.filter(c => !isChannelBlocked(c.id));
     }
-    
+
     if (activeCategory === 'news') {
       filtered = filtered.filter(c => c.category === 'News' || c.category === 'Finance' || c.category === 'Science' || c.category === 'Live Cams');
     } else if (activeCategory === 'gaming') {
       filtered = filtered.filter(c => c.category === 'Gaming' || c.category === 'Esports' || c.category === 'Sports');
     }
     // 'all' shows everything (except music and blocked), 'personal' and 'blocked' are handled separately
-    
+
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -802,27 +802,27 @@ export function WidgetSidebar({
           channel.platform.toLowerCase().includes(query)
       );
     }
-    
+
     // CHANNEL RANKING: Primary sort by admin-defined rank (ascending), secondary by live status
     // Lower rank = higher priority (rank 1 shows first)
     filtered = [...filtered].sort((a, b) => {
       // Primary sort: Admin-defined rank (lower = higher priority)
       const adminRankA = a.rank ?? 999;
       const adminRankB = b.rank ?? 999;
-      
+
       if (adminRankA !== adminRankB) {
         return adminRankA - adminRankB;
       }
-      
+
       // Secondary sort: Live status (live first, then unknown, then offline)
       const statusA = liveStatuses[a.id];
       const statusB = liveStatuses[b.id];
       const liveRankA = statusA?.isLive === true ? 2 : statusA?.isLive === false ? 0 : 1;
       const liveRankB = statusB?.isLive === true ? 2 : statusB?.isLive === false ? 0 : 1;
-      
+
       return liveRankB - liveRankA;
     });
-    
+
     return filtered;
   }, [searchQuery, channels, activeCategory, isChannelBlocked, liveStatuses]);
 
@@ -861,7 +861,7 @@ export function WidgetSidebar({
         onMouseDown={(e) => e.stopPropagation()}
         data-testid="sidebar-overlay"
       />
-      
+
       <div
         className="fixed left-0 h-[calc(100vh-var(--header-height)-1rem)] bg-slate-900 border-r border-slate-700 flex flex-col overflow-hidden shadow-2xl transition-all duration-300"
         style={{ 
@@ -890,7 +890,7 @@ export function WidgetSidebar({
               <X className="w-[1.8rem] h-[1.8rem] text-slate-400" />
             </button>
           </div>
-          
+
           {/* Streams-only tab - Library tab hidden since builder tools are hidden */}
           <div className="flex gap-[0.4rem] bg-slate-800 p-[0.4rem] rounded-lg">
             <button
@@ -902,7 +902,7 @@ export function WidgetSidebar({
               News / Stream Library
             </button>
           </div>
-          
+
           <div className="mt-[1.2rem]">
             <label className="block text-[1rem] font-semibold mb-[0.4rem] text-cyan-400">
               {activeWidgetId ? 'UPDATE WIDGET URL' : 'ADD VIDEO BY URL'}
@@ -933,7 +933,7 @@ export function WidgetSidebar({
             </div>
           </div>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-[1.6rem]">
           {activeTab === 'library' && (
             <div className="space-y-[1.6rem]">
@@ -958,7 +958,7 @@ export function WidgetSidebar({
                   ))}
                 </div>
               </div>
-              
+
               <div className="bg-purple-900/30 p-[1.2rem] rounded-lg border border-purple-500/50">
                 <h4 className="text-[1.2rem] font-semibold text-purple-300 mb-[0.8rem] flex items-center gap-[0.6rem]">
                   <ImageIcon className="w-[1.4rem] h-[1.4rem]" />
@@ -1013,7 +1013,7 @@ export function WidgetSidebar({
               */}
             </div>
           )}
-          
+
           {activeTab === 'content' && (
             <div className="space-y-[1.6rem]">
               <div className="relative">
@@ -1027,7 +1027,7 @@ export function WidgetSidebar({
                   data-testid="input-search-channels"
                 />
               </div>
-              
+
               <div className="flex flex-wrap gap-[0.4rem]">
                 <button
                   onClick={() => setActiveCategory('all')}
@@ -1100,7 +1100,7 @@ export function WidgetSidebar({
                   )}
                 </button>
               </div>
-              
+
               {activeCategory !== 'personal' && activeCategory !== 'blocked' ? (
                 <div>
                   <div className="flex items-center justify-between mb-[1rem]">
@@ -1235,8 +1235,20 @@ export function WidgetSidebar({
             </div>
           )}
         </div>
-        
+
         <div className="p-[1.6rem] border-t border-slate-700 flex-shrink-0">
+          {/* ✅ DONATION MODEL: Support OpenBento Button */}
+          <a
+            href="https://buymeacoffee.com/openbento"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-[0.8rem] px-[1.2rem] py-[1rem] bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 slot-button font-semibold transition-all shadow-lg mb-[1rem] text-[1.2rem]"
+            data-testid="button-support-openbento"
+          >
+            <Heart className="w-[1.6rem] h-[1.6rem]" />
+            Support OpenBento
+          </a>
+
           <p className="text-[1rem] text-slate-500 text-center mb-[1rem]">
             {activeTab === 'library' 
               ? 'Drag blocks to add • Resize in Edit Mode' 
