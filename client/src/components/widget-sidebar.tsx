@@ -2,8 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, TrendingUp, Layers,
   FileText, Square, Image as ImageIcon, Video, Gamepad2, RefreshCw, Star,
-  Trash2, Globe, Heart, Zap, Radio, PenLine, Clock, CloudSun, BarChart2,
-  Rss
+  Trash2, Globe, Heart, Radio, PenLine
 } from 'lucide-react';
 import { checkChannelLiveStatus as checkChannelLiveStatusAPI, searchChannelLiveStream as searchChannelLiveStreamAPI } from '@/lib/stream-api';
 
@@ -486,14 +485,6 @@ export function WidgetSidebar({
     },
   ];
 
-  // ── Coming-soon widgets ──
-  const comingSoonWidgets = [
-    { label: 'Weather',      desc: 'Live local forecast', Icon: CloudSun,   color: 'text-sky-400',    bg: 'bg-sky-500/10',    border: 'border-sky-500/20'    },
-    { label: 'News Feed',    desc: 'Headlines ticker',    Icon: Rss,         color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
-    { label: 'Stock Ticker', desc: 'Real-time prices',    Icon: BarChart2,   color: 'text-emerald-400',bg: 'bg-emerald-500/10',border: 'border-emerald-500/20'},
-    { label: 'World Clock',  desc: 'Multiple time zones', Icon: Clock,       color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20' },
-  ];
-
   return (
     <>
       {/* Backdrop */}
@@ -782,36 +773,6 @@ export function WidgetSidebar({
                         ADD
                       </span>
                     </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-slate-800" />
-
-              {/* ── Coming soon ── */}
-              <div>
-                <div className="flex items-center gap-[0.6rem] mb-[1rem]">
-                  <Zap className="w-[1.3rem] h-[1.3rem] text-slate-600" />
-                  <p className="text-[0.95rem] font-bold text-slate-500 uppercase tracking-[0.1em]">Coming Soon</p>
-                </div>
-                <div className="grid grid-cols-2 gap-[0.8rem]">
-                  {comingSoonWidgets.map(({ label, desc, Icon, color, bg, border }) => (
-                    <div
-                      key={label}
-                      className={`flex flex-col items-center gap-[0.8rem] p-[1.4rem] rounded-xl border ${border} ${bg} opacity-45 cursor-not-allowed select-none`}
-                    >
-                      <div className="w-[4rem] h-[4rem] rounded-xl bg-slate-800/70 border border-slate-700/40 flex items-center justify-center">
-                        <Icon className={`w-[2rem] h-[2rem] ${color}`} />
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[1.15rem] font-semibold text-slate-400 leading-tight">{label}</p>
-                        <p className="text-[0.95rem] text-slate-600 mt-[0.2rem] leading-snug">{desc}</p>
-                      </div>
-                      <span className="text-[0.8rem] font-bold text-slate-600 px-[0.55rem] py-[0.2rem] rounded-full border border-slate-700/60 bg-slate-800/50">
-                        SOON
-                      </span>
-                    </div>
                   ))}
                 </div>
               </div>
