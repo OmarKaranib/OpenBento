@@ -1,19 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword, isSupabaseConfigured } from '@/lib/supabase';
 import { supabase } from '@/lib/supabase';
 import { Loader2, Mail, Lock, Eye, EyeOff, X, KeyRound } from 'lucide-react';
+
+type AuthMode = 'login' | 'signup' | 'reset' | 'verify';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess?: () => void;
   triggerReason?: string;
+  defaultMode?: AuthMode;
 }
 
-type AuthMode = 'login' | 'signup' | 'reset' | 'verify';
-
-export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason }: LoginModalProps) {
-  const [mode, setMode] = useState<AuthMode>('login');
+export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason, defaultMode = 'login' }: LoginModalProps) {
+  const [mode, setMode] = useState<AuthMode>(defaultMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
@@ -21,6 +22,10 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason }: L
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMode(defaultMode);
+  }, [defaultMode]);
 
   if (!isOpen) return null;
 
