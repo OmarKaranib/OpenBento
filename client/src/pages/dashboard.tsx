@@ -1467,8 +1467,12 @@ const MasterControlDashboard = ({
 
       case 'note':
         return (
-          <div className="w-full h-full p-[1.2rem] flex flex-col bg-[#1a1b1e] rounded-[var(--outer-radius)]">
-            <div className="flex items-center gap-[0.6rem] mb-[0.8rem] text-yellow-400 pb-[0.6rem] border-b border-slate-700/50">
+          <div className={`w-full h-full p-[1.2rem] flex flex-col rounded-[var(--outer-radius)] ${
+            isDarkMode ? 'bg-[#1a1b1e]' : 'bg-gray-50 border border-slate-200'
+          }`}>
+            <div className={`flex items-center gap-[0.6rem] mb-[0.8rem] pb-[0.6rem] border-b ${
+              isDarkMode ? 'text-yellow-400 border-slate-700/50' : 'text-yellow-600 border-slate-200'
+            }`}>
               <FileText className="w-[1.4rem] h-[1.4rem]" />
               <span className="text-[1.1rem] font-semibold">Note</span>
             </div>
@@ -1476,7 +1480,9 @@ const MasterControlDashboard = ({
               value={widget.noteContent || ''}
               onChange={(e) => updateNoteContent(widget.id, e.target.value)}
               placeholder="Type your note here..."
-              className="flex-1 w-full bg-transparent border-none outline-none resize-none text-slate-200 text-[1.2rem] placeholder:text-slate-500 pt-[0.4rem]"
+              className={`flex-1 w-full bg-transparent border-none outline-none resize-none text-[1.2rem] pt-[0.4rem] ${
+                isDarkMode ? 'text-slate-200 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'
+              }`}
               style={{ pointerEvents: isEditMode ? 'none' : 'auto' }}
               data-testid={`textarea-note-${widget.id}`}
             />
