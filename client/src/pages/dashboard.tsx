@@ -1467,8 +1467,8 @@ const MasterControlDashboard = ({
 
       case 'note':
         return (
-          <div className="w-full h-full p-[1rem] flex flex-col">
-            <div className="flex items-center gap-2 mb-2 text-yellow-400">
+          <div className="w-full h-full p-[1.2rem] flex flex-col bg-[#1a1b1e] rounded-[var(--outer-radius)]">
+            <div className="flex items-center gap-[0.6rem] mb-[0.8rem] text-yellow-400 pb-[0.6rem] border-b border-slate-700/50">
               <FileText className="w-[1.4rem] h-[1.4rem]" />
               <span className="text-[1.1rem] font-semibold">Note</span>
             </div>
@@ -1476,7 +1476,7 @@ const MasterControlDashboard = ({
               value={widget.noteContent || ''}
               onChange={(e) => updateNoteContent(widget.id, e.target.value)}
               placeholder="Type your note here..."
-              className="flex-1 w-full bg-transparent border-none outline-none resize-none text-slate-200 text-[1.2rem] placeholder:text-slate-500"
+              className="flex-1 w-full bg-transparent border-none outline-none resize-none text-slate-200 text-[1.2rem] placeholder:text-slate-500 pt-[0.4rem]"
               style={{ pointerEvents: isEditMode ? 'none' : 'auto' }}
               data-testid={`textarea-note-${widget.id}`}
             />
