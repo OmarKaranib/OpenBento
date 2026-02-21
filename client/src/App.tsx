@@ -6,11 +6,12 @@ import { useViralAds, AdBlockData } from '@/components/ad-block';
 import { searchChannelLiveStream } from '@/lib/stream-api';
 
 // Import channel constants from shared module to avoid circular imports
-import { 
-  getVerifiedChannel, 
-  getStaticLiveId, 
-  getFallbackVideoId 
+import {
+  getVerifiedChannel,
+  getStaticLiveId,
+  getFallbackVideoId
 } from '@/lib/channel-constants';
+
 
 // Static background - High-contrast light mode
 const StaticBackground = () => {
@@ -26,6 +27,7 @@ const StaticBackground = () => {
 
   return null;
 };
+
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -38,14 +40,14 @@ import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
 import Feedback from "@/pages/feedback";
 import { WidgetSidebar, TrendingChannel, WidgetTemplate, WIDGET_TEMPLATES } from '@/components/widget-sidebar';
-import { 
-  DndContext, 
-  DragEndEvent, 
+import {
+  DndContext,
+  DragEndEvent,
   DragStartEvent,
   DragMoveEvent,
   DragOverlay,
-  useSensor, 
-  useSensors, 
+  useSensor,
+  useSensors,
   PointerSensor,
   UniqueIdentifier,
   rectIntersection
@@ -117,6 +119,7 @@ function AppContent() {
   const [location, setLocation] = useLocation();
 
   const { user, isAuthenticated, logout } = useAuth();
+
 
   useEffect(() => {
     if (location === '/auth/reset-password') {
@@ -213,6 +216,9 @@ function AppContent() {
     return match ? match[1] : null;
   };
 
+  // ─── findSmartPosition ────────────────────────────────────────────────────
+  // Solid 3x2 grid collision — ads and widgets are treated identically.
+  // First scans for a perfect fit, then shrinks to the largest slot available.
   const findSmartPosition = useCallback((requestedW: number, requestedH: number, currentWidgets: Widget[]): { x: number; y: number; w: number; h: number } | null => {
     const GRID_ROWS = 6;
 
@@ -227,6 +233,7 @@ function AppContent() {
           return false;
         }
       }
+      // Guard against ad block overlap
       if (ad) {
         const adRight = ad.x + ad.w;
         const adBottom = ad.y + ad.h;
@@ -247,6 +254,7 @@ function AppContent() {
       }
     }
 
+    // Shrink to fit if no exact slot available
     for (let tryH = requestedH; tryH >= 1; tryH--) {
       for (let tryW = requestedW; tryW >= 1; tryW--) {
         if (tryW === requestedW && tryH === requestedH) continue;
@@ -320,6 +328,8 @@ function AppContent() {
         // ── Note widget defaults ──────────────────────────────────────────
         // Always initialize noteContent for note widgets so the controlled
         // textarea never receives undefined as its value.
+        // Theme-aware background is handled in the note widget component
+        // (white in light mode, dark in dark mode) via CSS classes.
         ...(type === 'note' && { noteContent: '' }),
         // extraData is applied last so callers can override any default,
         // including noteContent if pre-populating with existing text.
@@ -364,7 +374,7 @@ function AppContent() {
     const currentActiveWidgetId = activeWidgetIdRef.current;
 
     if (currentActiveWidgetId) {
-      setWidgets(prev => prev.map(w => 
+      setWidgets(prev => prev.map(w =>
         w.id === currentActiveWidgetId ? {
           ...w,
           type: 'video',
@@ -418,7 +428,7 @@ function AppContent() {
     const twitchChannel = extractTwitchChannel(finalUrl);
     const kickChannel = extractKickChannel(finalUrl);
 
-    setWidgets(prev => prev.map(w => 
+    setWidgets(prev => prev.map(w =>
       w.id === widgetId ? {
         ...w,
         type: 'video',
@@ -774,7 +784,7 @@ function AppContent() {
         };
 
         if (currentActiveWidgetId) {
-          setWidgets(prev => prev.map(w => 
+          setWidgets(prev => prev.map(w =>
             w.id === currentActiveWidgetId ? {
               ...w, type: 'video', ...widgetData, isPaused: false, isMuted: true, volume: 0,
             } : w
@@ -791,9 +801,9 @@ function AppContent() {
         searchChannelLiveStream(channel.channelId, false).then(result => {
           if (result.liveVideoId && result.liveVideoId !== immediateVideoId) {
             console.log(`[Background] NEW live ID discovered: ${result.liveVideoId} -> updating videoId immediately`);
-            setWidgets(prev => prev.map(w => 
-              w.channelHandle === channel.channelId ? { 
-                ...w, 
+            setWidgets(prev => prev.map(w =>
+              w.channelHandle === channel.channelId ? {
+                ...w,
                 videoId: result.liveVideoId,
                 url: `https://www.youtube.com/watch?v=${result.liveVideoId}`,
                 isLive: true,
@@ -803,7 +813,7 @@ function AppContent() {
               } : w
             ));
           } else if (result.liveVideoId) {
-            setWidgets(prev => prev.map(w => 
+            setWidgets(prev => prev.map(w =>
               w.channelHandle === channel.channelId ? { ...w, isLive: true } : w
             ));
           }
@@ -845,7 +855,7 @@ function AppContent() {
         };
 
         if (currentActiveWidgetId) {
-          setWidgets(prev => prev.map(w => 
+          setWidgets(prev => prev.map(w =>
             w.id === currentActiveWidgetId ? {
               ...w,
               type: 'video',
@@ -898,7 +908,7 @@ function AppContent() {
   const handleImageUpload = useCallback((imageUrl: string) => {
     const currentActiveWidgetId = activeWidgetIdRef.current;
     if (currentActiveWidgetId) {
-      setWidgets(prev => prev.map(w => 
+      setWidgets(prev => prev.map(w =>
         w.id === currentActiveWidgetId ? {
           ...w,
           type: 'image',
@@ -918,11 +928,39 @@ function AppContent() {
     setActiveWidgetId(null);
   }, [addWidget]);
 
+  // ─── Shared dashboard props ───────────────────────────────────────────────
+  // Extracted to avoid repetition across the two Route renders below.
+  const dashboardProps = {
+    widgets,
+    setWidgets,
+    isEditMode,
+    setIsEditMode,
+    sidebarOpen: sidebarOpen && !isFullscreen,
+    activeId,
+    handleOpenSidebar,
+    onInlineUrlSubmit: handleInlineUrlSubmit,
+    handleOpenSidebarToContent,
+    addWidget,
+    isFullscreen,
+    setIsFullscreen,
+    ghostPosition,
+    gridContainerRef,
+    isGridFull,
+    user,
+    onLogout: logout,
+    isAuthenticated,
+    openLoginModal,
+    ad,
+    skipAd,
+    triggerAd,
+    isAdActive,
+  };
+
   return (
     <TooltipProvider>
       <StaticBackground />
 
-      <LoginModal 
+      <LoginModal
         isOpen={loginModalOpen}
         onClose={() => {
           setLoginModalOpen(false);
@@ -934,8 +972,8 @@ function AppContent() {
         defaultMode={loginDefaultMode}
       />
 
-      <DndContext 
-        sensors={sensors} 
+      <DndContext
+        sensors={sensors}
         collisionDetection={rectIntersection}
         onDragStart={handleDragStart}
         onDragMove={handleDragMove}
@@ -943,8 +981,8 @@ function AppContent() {
       >
         <SortableContext items={widgets.map(w => w.id)} strategy={rectSortingStrategy}>
           {!dashboardOnlyMode && (
-            <WidgetSidebar 
-              isOpen={sidebarOpen} 
+            <WidgetSidebar
+              isOpen={sidebarOpen}
               onClose={() => {
                 setSidebarOpen(false);
                 activeWidgetIdRef.current = null;
@@ -964,62 +1002,10 @@ function AppContent() {
           )}
           <Switch>
             <Route path="/">
-              {() => (
-                <MasterControlDashboard 
-                  widgets={widgets}
-                  setWidgets={setWidgets}
-                  isEditMode={isEditMode}
-                  setIsEditMode={setIsEditMode}
-                  sidebarOpen={sidebarOpen && !isFullscreen}
-                  activeId={activeId}
-                  handleOpenSidebar={handleOpenSidebar}
-                  onInlineUrlSubmit={handleInlineUrlSubmit}
-                  handleOpenSidebarToContent={handleOpenSidebarToContent}
-                  addWidget={addWidget}
-                  isFullscreen={isFullscreen}
-                  setIsFullscreen={setIsFullscreen}
-                  ghostPosition={ghostPosition}
-                  gridContainerRef={gridContainerRef}
-                  isGridFull={isGridFull}
-                  user={user}
-                  onLogout={logout}
-                  isAuthenticated={isAuthenticated}
-                  openLoginModal={openLoginModal}
-                  ad={ad}
-                  skipAd={skipAd}
-                  triggerAd={triggerAd}
-                  isAdActive={isAdActive}
-                />
-              )}
+              {() => <MasterControlDashboard {...dashboardProps} />}
             </Route>
             <Route path="/auth/reset-password">
-              {() => (
-                <MasterControlDashboard 
-                  widgets={widgets}
-                  setWidgets={setWidgets}
-                  isEditMode={isEditMode}
-                  setIsEditMode={setIsEditMode}
-                  sidebarOpen={sidebarOpen && !isFullscreen}
-                  activeId={activeId}
-                  handleOpenSidebar={handleOpenSidebar}
-                  onInlineUrlSubmit={handleInlineUrlSubmit}
-                  handleOpenSidebarToContent={handleOpenSidebarToContent}
-                  addWidget={addWidget}
-                  isFullscreen={isFullscreen}
-                  setIsFullscreen={setIsFullscreen}
-                  ghostPosition={ghostPosition}
-                  gridContainerRef={gridContainerRef}
-                  isGridFull={isGridFull}
-                  user={user}
-                  onLogout={logout}
-                  isAuthenticated={isAuthenticated}
-                  openLoginModal={openLoginModal}
-                  ad={ad}
-                  skipAd={skipAd}
-                  triggerAd={triggerAd}
-                  isAdActive={isAdActive}
-                />
-              )}
+              {() => <MasterControlDashboard {...dashboardProps} />}
             </Route>
             <Route path="/admin" component={Admin} />
             <Route path="/terms" component={Terms} />
@@ -1031,7 +1017,7 @@ function AppContent() {
 
         <DragOverlay>
           {activeId ? (
-            <div 
+            <div
               className="dashboard-slot bg-slate-900/80 backdrop-blur-sm border border-cyan-400 shadow-2xl shadow-cyan-500/40 pointer-events-none"
               style={{
                 width: '12rem',
@@ -1043,7 +1029,7 @@ function AppContent() {
             >
               <div className="flex items-center justify-center h-full">
                 <span className="text-cyan-400 font-bold text-[1.2rem]">
-                  {String(activeId).includes('channel-') 
+                  {String(activeId).includes('channel-')
                     ? 'Channel'
                     : String(activeId).includes('template-')
                       ? 'Widget'

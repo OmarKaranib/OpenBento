@@ -797,10 +797,10 @@ export function WidgetSidebar({
             {activeTab === 'streams' ? 'Click or drag streams to add to grid' : 'Click a widget block to add it'}
           </p>
           <div className="text-center text-[10px] text-slate-700">
-            <span>\u00A9 2026 ANCU LABS FZC LLC</span>
-            <span className="mx-2">\u2022</span>
+            <span>© 2026 ANCU LABS FZC LLC</span>
+            <span className="mx-2">•</span>
             <a href="/terms" className="hover:text-slate-400 transition-colors" data-testid="link-terms-sidebar">Terms</a>
-            <span className="mx-2">\u2022</span>
+            <span className="mx-2">•</span>
             <a href="/privacy" className="hover:text-slate-400 transition-colors" data-testid="link-privacy-sidebar">Privacy</a>
           </div>
         </div>
