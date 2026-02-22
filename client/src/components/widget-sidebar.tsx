@@ -303,7 +303,7 @@ function DraggableChannel({
           )}
         </div>
         <p className="text-[1rem] text-slate-400">
-          {channel.category} &bull; {channel.platform === 'youtube' ? 'YouTube' : channel.platform === 'kick' ? 'Kick' : channel.platform}
+          {channel.category} {"\u2022"} {channel.platform === 'youtube' ? 'YouTube' : channel.platform === 'kick' ? 'Kick' : channel.platform}
         </p>
       </div>
 
@@ -667,7 +667,7 @@ export function WidgetSidebar({
                     </button>
                   </div>
                   <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">
-                    {linksData?.lastRefresh ? `Updated ${new Date(linksData.lastRefresh).toLocaleDateString()} \u2022 ` : ''}Click &#9733; to save
+                    {linksData?.lastRefresh ? `Updated ${new Date(linksData.lastRefresh).toLocaleDateString()} \u2022 ` : ''}Click {"\u2605"} to save
                   </p>
                   <div className="space-y-[0.8rem]">
                     {filteredChannels.map(ch => (
@@ -688,7 +688,7 @@ export function WidgetSidebar({
                     <Heart className="w-[1.6rem] h-[1.6rem]" /> Personal Library
                     <span className="text-[1.1rem] text-slate-500 font-normal">({filteredPersonalLibrary.length})</span>
                   </h3>
-                  <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">Your saved streams &bull; Click &#9733; to remove</p>
+                  <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">Your saved streams {"\u2022"} Click {"\u2605"} to remove</p>
                   {filteredPersonalLibrary.length > 0 ? (
                     <div className="space-y-[0.8rem]">
                       {filteredPersonalLibrary.map(ch => (
@@ -700,7 +700,7 @@ export function WidgetSidebar({
                     <div className="text-center py-[3rem]">
                       <Star className="w-[3rem] h-[3rem] text-slate-700 mx-auto mb-[1rem]" />
                       <p className="text-[1.2rem] text-slate-500 mb-[0.4rem]">No saved streams yet</p>
-                      <p className="text-[1.1rem] text-slate-600">Click &#9733; on any stream to save it here</p>
+                      <p className="text-[1.1rem] text-slate-600">Click {"\u2605"} on any stream to save it here</p>
                     </div>
                   )}
                 </div>
@@ -712,7 +712,7 @@ export function WidgetSidebar({
                     <Trash2 className="w-[1.6rem] h-[1.6rem]" /> Blocked Channels
                     <span className="text-[1.1rem] text-slate-500 font-normal">({filteredBlockedChannels.length})</span>
                   </h3>
-                  <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">Hidden from library &bull; Click trash to unblock</p>
+                  <p className="text-[1.1rem] text-slate-400 mb-[1.2rem]">Hidden from library {"\u2022"} Click trash to unblock</p>
                   {filteredBlockedChannels.length > 0 ? (
                     <div className="space-y-[0.8rem]">
                       {filteredBlockedChannels.map(ch => (
@@ -797,10 +797,10 @@ export function WidgetSidebar({
             {activeTab === 'streams' ? 'Click or drag streams to add to grid' : 'Click a widget block to add it'}
           </p>
           <div className="text-center text-[10px] text-slate-700">
-            <span>© 2026 ANCU LABS FZC LLC</span>
-            <span className="mx-2">•</span>
+            <span>{"\u00A9"} 2026 ANCU LABS FZC LLC</span>
+            <span className="mx-2">{"\u2022"}</span>
             <a href="/terms" className="hover:text-slate-400 transition-colors" data-testid="link-terms-sidebar">Terms</a>
-            <span className="mx-2">•</span>
+            <span className="mx-2">{"\u2022"}</span>
             <a href="/privacy" className="hover:text-slate-400 transition-colors" data-testid="link-privacy-sidebar">Privacy</a>
           </div>
         </div>

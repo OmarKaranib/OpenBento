@@ -272,19 +272,11 @@ const MasterControlDashboard = ({
       return;
     }
 
-    // Generate descriptive name based on platform and channel
-    let name = 'Saved Stream';
-    if (widget.isYouTube) {
-      name = widget.youtubeChannelId 
-        ? `YouTube: ${widget.youtubeChannelId}` 
-        : widget.videoId 
-          ? `YouTube Video` 
-          : 'YouTube Stream';
-    } else if (widget.isTwitch && widget.twitchChannel) {
-      name = `Twitch: ${widget.twitchChannel}`;
-    } else if (widget.isKick && widget.kickChannel) {
-      name = `Kick: ${widget.kickChannel}`;
-    }
+    let name = widget.channelName
+      || widget.youtubeChannelId
+      || widget.twitchChannel
+      || widget.kickChannel
+      || 'Saved Stream';
 
     const savedChannel: SavedChannel = {
       id: `saved-${Date.now()}-${widget.videoId || widget.twitchChannel || widget.kickChannel || 'stream'}`,
