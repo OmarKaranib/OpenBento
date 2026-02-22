@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   X, Search, Tv, LayoutGrid, Grip, Newspaper, Rocket, TrendingUp, Layers,
   FileText, Square, Image as ImageIcon, Video, Gamepad2, RefreshCw, Star,
-  Trash2, Globe, Heart, Radio, PenLine
+  Trash2, Globe, Heart, Radio, PenLine, Clock
 } from 'lucide-react';
 import { checkChannelLiveStatus as checkChannelLiveStatusAPI, searchChannelLiveStream as searchChannelLiveStreamAPI } from '@/lib/stream-api';
 
@@ -202,7 +202,11 @@ export interface WidgetTemplate {
   widgetType: WidgetType;
   w: number;
   h: number;
-  icon: 'video' | 'note' | 'spacer' | 'image';
+  // ── icon type ────────────────────────────────────────────────────────────
+  // 'zoom' is kept in the union so existing saved data / type references
+  // remain valid, but the Zoom button is not rendered in the Widgets tab.
+  // 'clock' is the new World Clock widget type.
+  icon: 'video' | 'note' | 'spacer' | 'image' | 'zoom' | 'clock';
   color: string;
 }
 
@@ -214,11 +218,21 @@ interface LinksApiResponse {
   origin: string;
 }
 
+// ── WIDGET_TEMPLATES ──────────────────────────────────────────────────────────
+// Full template registry — all widget types are defined here for drag-and-drop
+// and programmatic use, even if their sidebar button is currently hidden.
+// To hide a widget from the UI, remove its entry from `availableWidgets` inside
+// the WidgetSidebar component below.  Do NOT remove it from this array, as
+// other parts of the codebase (App.tsx, dashboard.tsx) reference it.
 export const WIDGET_TEMPLATES: WidgetTemplate[] = [
-  { id: 'template-video', name: 'Video',  widgetType: 'video',  w: 3, h: 2, icon: 'video',  color: 'cyan'   },
-  { id: 'template-note',  name: 'Note',   widgetType: 'note',   w: 3, h: 2, icon: 'note',   color: 'yellow' },
-  { id: 'template-spacer',name: 'Spacer', widgetType: 'spacer', w: 2, h: 1, icon: 'spacer', color: 'slate'  },
-  { id: 'template-image', name: 'Photo',  widgetType: 'image',  w: 3, h: 2, icon: 'image',  color: 'purple' },
+  { id: 'template-video',  name: 'Video',        widgetType: 'video',  w: 3, h: 2, icon: 'video',  color: 'cyan'   },
+  { id: 'template-note',   name: 'Note',          widgetType: 'note',   w: 3, h: 2, icon: 'note',   color: 'yellow' },
+  { id: 'template-spacer', name: 'Spacer',        widgetType: 'spacer', w: 2, h: 1, icon: 'spacer', color: 'slate'  },
+  { id: 'template-image',  name: 'Photo',         widgetType: 'image',  w: 3, h: 2, icon: 'image',  color: 'purple' },
+  // Zoom template kept in registry for type-safety; button hidden in sidebar.
+  { id: 'template-zoom',   name: 'Zoom Meeting',  widgetType: 'zoom',   w: 3, h: 2, icon: 'zoom',   color: 'blue'   },
+  // Clock template — World Clock widget.
+  { id: 'template-clock',  name: 'World Clock',   widgetType: 'clock',  w: 3, h: 2, icon: 'clock',  color: 'cyan'   },
 ];
 
 // ─────────────────────────────────────────────────────────
@@ -470,7 +484,13 @@ export function WidgetSidebar({
     return blockedChannels.filter(c => c.name.toLowerCase().includes(q) || c.category.toLowerCase().includes(q) || c.platform.toLowerCase().includes(q));
   }, [searchQuery, blockedChannels]);
 
-  // ── Available widgets (live blocks) ──
+  // ── Available widgets (Widgets tab buttons) ───────────────────────────────
+  // Only widgets listed here are rendered as clickable buttons in the sidebar.
+  //
+  // Zoom has been removed. World Clock has been added.
+  //
+  // To re-enable Zoom, add its entry back here. The template definition in
+  // WIDGET_TEMPLATES and all App.tsx / dashboard.tsx logic remains intact.
   const availableWidgets = [
     {
       id: 'note',
@@ -481,8 +501,58 @@ export function WidgetSidebar({
       border: 'border-yellow-500/30 hover:border-yellow-400/70',
       glow: 'hover:shadow-yellow-500/10',
       badge: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/40',
-      template: { id: 'template-note', name: 'Note', widgetType: 'note' as WidgetType, w: 3, h: 2, icon: 'note' as const, color: 'yellow' },
+      template: {
+        id: 'template-note',
+        name: 'Note',
+        widgetType: 'note' as WidgetType,
+        w: 3,
+        h: 2,
+        icon: 'note' as const,
+        color: 'yellow',
+      },
     },
+    {
+      id: 'clock',
+      label: 'World Clock',
+      description: 'Live time & date display',
+      icon: <Clock className="w-[2rem] h-[2rem] text-yellow-400" />,
+      bg: 'bg-yellow-500/10',
+      border: 'border-yellow-500/30 hover:border-yellow-400/70',
+      glow: 'hover:shadow-yellow-500/10',
+      badge: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/40',
+      template: {
+        id: 'template-clock',
+        name: 'World Clock',
+        widgetType: 'clock' as WidgetType,
+        w: 3,
+        h: 2,
+        icon: 'clock' as const,
+        color: 'yellow',
+      },
+    },
+    // ── Zoom Meeting button is intentionally hidden here. ─────────────────
+    // The Zoom type and template entry in WIDGET_TEMPLATES are preserved for
+    // backwards-compatibility. To re-enable Zoom, add it back here:
+    //
+    // {
+    //   id: 'zoom',
+    //   label: 'Zoom Meeting',
+    //   description: 'Join a Zoom call',
+    //   icon: <Video className="w-[2rem] h-[2rem] text-blue-400" />,
+    //   bg: 'bg-blue-500/10',
+    //   border: 'border-blue-500/30 hover:border-blue-400/70',
+    //   glow: 'hover:shadow-blue-500/10',
+    //   badge: 'text-blue-400 bg-blue-500/15 border-blue-500/40',
+    //   template: {
+    //     id: 'template-zoom',
+    //     name: 'Zoom Meeting',
+    //     widgetType: 'zoom' as WidgetType,
+    //     w: 3,
+    //     h: 2,
+    //     icon: 'zoom' as const,
+    //     color: 'blue',
+    //   },
+    // },
   ];
 
   return (

@@ -54,11 +54,30 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 
-export type WidgetType = 'video' | 'note' | 'spacer' | 'image';
+// ─── WidgetType ───────────────────────────────────────────────────────────────
+// 'zoom' is kept in the union for backwards-compatibility with stored widget
+// data. The dashboard render layer returns null for zoom widgets so no
+// visible ghost boxes appear.
+// 'clock' is the World Clock widget type.
+export type WidgetType = 'video' | 'note' | 'spacer' | 'image' | 'zoom' | 'clock';
 
-// ─── Widget Interface ───────────────────────────────────────────────────────
-// noteContent?: string  →  stores the text for Note widgets (empty string = blank note)
-// All widget types share the same grid collision model (x, y, w, h)
+// ─── Widget Interface ─────────────────────────────────────────────────────────
+// noteContent?: string     → stores text for Note widgets ('' = blank note)
+// clockUse24Hour?: boolean → whether the Clock widget shows 24-hour format
+//
+// ── Nuclear Refresh Fix ───────────────────────────────────────────────────────
+// refreshCounter replaces the old iframeKey approach.
+// In the dashboard/widget render layer, use:
+//
+//   <iframe
+//     key={widget.id + '-' + widget.refreshCounter}   ← CRITICAL
+//     src={buildEmbedUrl(widget)}
+//     ...
+//   />
+//
+// Incrementing refreshCounter forces React to fully unmount + remount the
+// specific widget's iframe element, which is the only reliable way to
+// restart a stubborn YouTube/Twitch player without reloading the page.
 export interface Widget {
   id: string;
   type: WidgetType;
@@ -82,13 +101,12 @@ export interface Widget {
   previousVolume?: number;
   error?: string | null;
   embedBlocked?: boolean;
-  noteContent?: string;          // Note widget text content ('' = empty note)
+  noteContent?: string;
   imageUrl?: string;
   lastRefresh?: number;
-  // ── Per-widget iframe key ─────────────────────────────────────────────────
-  // Incrementing iframeKey forces a hard remount of the iframe for that
-  // specific widget without affecting any other widget on the board.
-  iframeKey?: number;
+  // ── Nuclear Refresh Fix ───────────────────────────────────────────────────
+  // Use in JSX: key={`${widget.id}-${widget.refreshCounter ?? 0}`}
+  refreshCounter?: number;
   isOffline?: boolean;
   isLive?: boolean;
   isPlayingLatestVideo?: boolean;
@@ -99,7 +117,176 @@ export interface Widget {
   customColor?: string;
   apiError?: boolean;
   isDeleting?: boolean;
+  // ── Clock Widget Fields ───────────────────────────────────────────────────
+  // Used exclusively by widgets with type === 'clock'.
+  // clockUse24Hour toggles between 12-hour (default) and 24-hour display.
+  clockUse24Hour?: boolean;
 }
+
+// ─── ClockWidget ──────────────────────────────────────────────────────────────
+// Self-contained clock component rendered inside the dashboard grid cell.
+// Updates every second via setInterval. Supports 12h / 24h toggle.
+//
+// Styling: solid #0f172a background (slate-900) — no transparency so grid
+// lines never show through. Matches the Note widget's opaque look.
+//
+// The gear icon in the top-right corner toggles hour format in-place without
+// opening a modal. The format badge (12H / 24H) sits in the top-left corner.
+//
+// Dashboard integration:
+//   import { ClockWidget } from '@/App';
+//   ...
+//   if (widget.type === 'zoom') return null;   // ← hide zoom ghost boxes
+//   if (widget.type === 'clock') {
+//     return (
+//       <ClockWidget widget={widget} onToggle24Hour={onToggleClockFormat} />
+//     );
+//   }
+interface ClockWidgetProps {
+  widget: Widget;
+  onToggle24Hour: (widgetId: string) => void;
+}
+
+const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour }) => {
+  const [now, setNow] = useState(() => new Date());
+  const use24 = widget.clockUse24Hour ?? false;
+
+  // Tick every second
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // ── Time string (12h or 24h) ───────────────────────────────────────────
+  const timeString = now.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: !use24,
+  });
+
+  // ── Date string (e.g. "Sunday, February 22, 2026") ────────────────────
+  const dateString = now.toLocaleDateString([], {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        // Solid slate-900 — no alpha so the grid never bleeds through.
+        backgroundColor: '#0f172a',
+        borderRadius: '0.5rem',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        padding: '1rem',
+        userSelect: 'none',
+        overflow: 'hidden',
+      }}
+    >
+      {/* ── Format badge (top-left) ──────────────────────────────────────── */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '0.5rem',
+          left: '0.5rem',
+          fontSize: '0.6rem',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+          color: '#475569',
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          pointerEvents: 'none',
+        }}
+      >
+        {use24 ? '24H' : '12H'}
+      </div>
+
+      {/* ── Settings / format toggle (top-right) ─────────────────────────── */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle24Hour(widget.id);
+        }}
+        title={use24 ? 'Switch to 12-hour format' : 'Switch to 24-hour format'}
+        aria-label="Toggle time format"
+        style={{
+          position: 'absolute',
+          top: '0.4rem',
+          right: '0.4rem',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          color: '#475569',
+          padding: '0.3rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: '0.25rem',
+          transition: 'color 0.15s ease',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = '#94a3b8')}
+        onMouseLeave={(e) => (e.currentTarget.style.color = '#475569')}
+      >
+        {/* Gear / settings icon (inline SVG — no extra dependency) */}
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+      </button>
+
+      {/* ── Time display ─────────────────────────────────────────────────── */}
+      {/* clamp() keeps it readable at any widget size: min 1.5rem, max 3.75rem */}
+      <div
+        style={{
+          fontSize: 'clamp(1.5rem, 4vw, 3.75rem)',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+          fontWeight: 700,
+          color: '#f1f5f9',
+          letterSpacing: '-0.02em',
+          lineHeight: 1,
+          textAlign: 'center',
+        }}
+      >
+        {timeString}
+      </div>
+
+      {/* ── Date display ─────────────────────────────────────────────────── */}
+      <div
+        style={{
+          marginTop: '0.5rem',
+          fontSize: 'clamp(0.6rem, 1.1vw, 0.875rem)',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+          color: '#64748b',
+          textAlign: 'center',
+          letterSpacing: '0.02em',
+          lineHeight: 1.3,
+        }}
+      >
+        {dateString}
+      </div>
+    </div>
+  );
+};
+
+// Export ClockWidget so dashboard.tsx can import and render it directly.
+export { ClockWidget };
 
 const GRID_COLS = 12;
 
@@ -107,10 +294,14 @@ function generateWidgetId(): string {
   return `widget-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
-// ─── fetchYouTubeTitle ────────────────────────────────────────────────────
-// Resolves a human-readable title for a YouTube video using the noembed
-// oEmbed endpoint (no API key required). Falls back to the videoId string
-// so the saved library entry is always at least uniquely identifiable.
+// ─── fetchYouTubeTitle ────────────────────────────────────────────────────────
+// Resolves a human-readable title for a YouTube video via the noembed oEmbed
+// endpoint (no API key required).
+//
+// Title Cleanup Rules:
+//   • NEVER prefixes the returned string with "YouTube:" or any platform label.
+//   • Falls back to the videoId string so the saved library entry is at least
+//     uniquely identifiable.
 async function fetchYouTubeTitle(videoId: string): Promise<string> {
   try {
     const res = await fetch(
@@ -124,8 +315,19 @@ async function fetchYouTubeTitle(videoId: string): Promise<string> {
   } catch (err) {
     console.warn('[fetchYouTubeTitle] Could not fetch title for', videoId, err);
   }
-  // Fallback: use the video ID so the label is at least unique
   return videoId;
+}
+
+// ─── stripLegacyPrefix ───────────────────────────────────────────────────────
+// Removes any legacy "YouTube: " / "Twitch: " / "Kick: " prefix that may have
+// been written to channelName in old widget state or in localStorage.
+function stripLegacyPrefix(name: string | undefined): string | undefined {
+  if (!name) return name;
+  return name
+    .replace(/^YouTube:\s*/i, '')
+    .replace(/^Twitch:\s*/i, '')
+    .replace(/^Kick:\s*/i, '')
+    .trim() || undefined;
 }
 
 // Inner App component that uses hooks requiring QueryClientProvider
@@ -145,7 +347,6 @@ function AppContent() {
 
   const { user, isAuthenticated, logout } = useAuth();
 
-
   useEffect(() => {
     if (location === '/auth/reset-password') {
       setLoginDefaultMode('reset');
@@ -163,6 +364,11 @@ function AppContent() {
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const ghostPositionRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const ghostValidRef = useRef<boolean>(true);
+
+  // ── widgetsRef ────────────────────────────────────────────────────────────
+  // Mutable ref kept in sync with the latest widgets state so async callbacks
+  // can read current data without stale-closure issues.
+  const widgetsRef = useRef<Widget[]>([]);
 
   useEffect(() => {
     activeWidgetIdRef.current = activeWidgetId;
@@ -202,9 +408,15 @@ function AppContent() {
           y: w.y ?? 0,
           w: w.w ?? 3,
           h: w.h ?? 2,
-          iframeKey: w.iframeKey ?? 0,
-          // Ensure noteContent is always a string for note widgets loaded from storage
+          // ── Nuclear Refresh Fix ──────────────────────────────────────────
+          // Migrate old iframeKey values into refreshCounter on load.
+          refreshCounter: (w as any).refreshCounter ?? (w as any).iframeKey ?? 0,
+          // Title Cleanup: strip any legacy "YouTube: " prefix from stored names
+          channelName: stripLegacyPrefix(w.channelName),
+          // Ensure noteContent is always a string for note widgets
           noteContent: w.type === 'note' ? (w.noteContent ?? '') : w.noteContent,
+          // Clock widget defaults
+          clockUse24Hour: w.clockUse24Hour ?? false,
         }));
       } catch {
         return getDefaultWidgets();
@@ -212,6 +424,11 @@ function AppContent() {
     }
     return getDefaultWidgets();
   });
+
+  // Keep widgetsRef in sync with latest state
+  useEffect(() => {
+    widgetsRef.current = widgets;
+  }, [widgets]);
 
   const { ad, skipAd, triggerAd, isAdActive } = useViralAds(false, widgets, setWidgets);
 
@@ -244,7 +461,7 @@ function AppContent() {
 
   // ─── findSmartPosition ────────────────────────────────────────────────────
   // Solid 3x2 grid collision — ads and widgets are treated identically.
-  // First scans for a perfect fit, then shrinks to the largest slot available.
+  // First scans for a perfect fit, then shrinks to the largest available slot.
   const findSmartPosition = useCallback((requestedW: number, requestedH: number, currentWidgets: Widget[]): { x: number; y: number; w: number; h: number } | null => {
     const GRID_ROWS = 6;
 
@@ -259,7 +476,6 @@ function AppContent() {
           return false;
         }
       }
-      // Guard against ad block overlap
       if (ad) {
         const adRight = ad.x + ad.w;
         const adBottom = ad.y + ad.h;
@@ -280,7 +496,7 @@ function AppContent() {
       }
     }
 
-    // Shrink to fit if no exact slot available
+    // Shrink to fit if no exact slot is available
     for (let tryH = requestedH; tryH >= 1; tryH--) {
       for (let tryW = requestedW; tryW >= 1; tryW--) {
         if (tryW === requestedW && tryH === requestedH) continue;
@@ -325,10 +541,12 @@ function AppContent() {
   }, [widgets, ad]);
 
   // ─── addWidget ────────────────────────────────────────────────────────────
-  // Handles all widget types including 'note'.
-  // For 'note' widgets: auto-initializes noteContent to '' so the editor
-  // always has a controlled string value.  extraData can override this.
-  // Grid collision treats note blocks identically to video/image (AABB on x,y,w,h).
+  // Handles all widget types:
+  //   'note'  → auto-inits noteContent: ''
+  //   'clock' → auto-inits clockUse24Hour: false
+  //   'zoom'  → type preserved for backwards-compat; dashboard renders null
+  //
+  // Grid collision treats all block types identically (AABB on x, y, w, h).
   const addWidget = useCallback((type: WidgetType, w = 3, h = 2, extraData?: Partial<Widget>) => {
     const widgetId = generateWidgetId();
     setWidgets(prev => {
@@ -351,15 +569,12 @@ function AppContent() {
         volume: 0,
         previousVolume: 50,
         isOffline: false,
-        iframeKey: 0,
-        // ── Note widget defaults ──────────────────────────────────────────
-        // Always initialize noteContent for note widgets so the controlled
-        // textarea never receives undefined as its value.
-        // Theme-aware background is handled in the note widget component
-        // (white in light mode, dark in dark mode) via CSS classes.
-        ...(type === 'note' && { noteContent: '' }),
-        // extraData is applied last so callers can override any default,
-        // including noteContent if pre-populating with existing text.
+        // ── Nuclear Refresh Fix ─────────────────────────────────────────────
+        refreshCounter: 0,
+        // ── Type-specific defaults ───────────────────────────────────────────
+        ...(type === 'note'  && { noteContent: '' }),
+        ...(type === 'clock' && { clockUse24Hour: false }),
+        // extraData is applied last so callers can override any default.
         ...extraData,
       };
       return [...prev, newWidget];
@@ -368,24 +583,55 @@ function AppContent() {
   }, [findSmartPosition]);
 
   // ─── handleRefreshWidget ─────────────────────────────────────────────────
-  // Increments `iframeKey` on a single widget, which causes only that
-  // widget's iframe to remount. No other widget is affected and the page
-  // does not reload.  The dashboard component should call this when the
-  // user presses the refresh button on an individual widget.
+  // Nuclear Refresh Fix:
+  // Increments `refreshCounter` on a single widget. The dashboard MUST use
+  // this counter as part of the React key on the iframe element:
+  //
+  //   <iframe
+  //     key={`${widget.id}-${widget.refreshCounter ?? 0}`}   ← REQUIRED
+  //     src={buildEmbedUrl(widget)}
+  //     ...
+  //   />
+  //
+  // Changing the key causes React to fully unmount and remount the DOM node,
+  // which is the only reliable way to restart a stubborn YouTube player.
   const handleRefreshWidget = useCallback((widgetId: string) => {
     setWidgets(prev =>
       prev.map(w =>
         w.id === widgetId
-          ? { ...w, iframeKey: (w.iframeKey ?? 0) + 1, lastRefresh: Date.now() }
+          ? {
+              ...w,
+              // ── Nuclear Refresh Fix ──────────────────────────────────────
+              refreshCounter: (w.refreshCounter ?? 0) + 1,
+              lastRefresh: Date.now(),
+              error: null,
+              embedBlocked: false,
+              apiError: false,
+              isPaused: false,
+              usePureIframe: false,
+            }
+          : w
+      )
+    );
+  }, []);
+
+  // ─── handleToggleClockFormat ──────────────────────────────────────────────
+  // Toggles the clockUse24Hour flag on a specific clock widget.
+  // Called by ClockWidget's settings gear icon button via the dashboardProps
+  // onToggleClockFormat callback.
+  const handleToggleClockFormat = useCallback((widgetId: string) => {
+    setWidgets(prev =>
+      prev.map(w =>
+        w.id === widgetId
+          ? { ...w, clockUse24Hour: !(w.clockUse24Hour ?? false) }
           : w
       )
     );
   }, []);
 
   // ─── addVideoWidget ───────────────────────────────────────────────────────
-  // Adds a video widget from a TrendingChannel. Ensures channelName and
-  // channelHandle are always stored on the widget so the Personal Library
-  // can display the correct name instead of a generic fallback.
+  // Adds a video widget from a TrendingChannel. Always stores channelName and
+  // channelHandle so the Personal Library renders the correct label.
   const addVideoWidget = useCallback((channel: TrendingChannel, w = 3, h = 2) => {
     const videoId = channel.videoId || extractYouTubeId(channel.url);
     const youtubeChannelId = channel.channelId || extractYouTubeChannelId(channel.url);
@@ -398,32 +644,21 @@ function AppContent() {
       isYouTube: channel.platform === 'youtube',
       videoId,
       youtubeChannelId,
-      // Always persist human-readable name and handle so saved streams
-      // render the correct title in the Personal Library sidebar.
-      channelName: channel.name || undefined,
+      // Always persist human-readable name (stripped of any legacy prefix).
+      channelName: stripLegacyPrefix(channel.name) || undefined,
       channelHandle: channel.channelId || null,
       isTwitch: channel.platform === 'twitch',
       twitchChannel,
       isKick: channel.platform === 'kick',
       kickChannel,
       isLive: isLiveStream,
-      lastRefresh: Date.now()
+      lastRefresh: Date.now(),
     });
   }, [addWidget]);
 
-  // ─── resolveChannelNameForUrl ─────────────────────────────────────────────
-  // For direct URL submissions (not from the channel list), attempts to
-  // resolve a meaningful display name:
-  //   1. YouTube video  → fetch title via noembed oEmbed (no API key needed)
-  //   2. Twitch channel → use the channel slug
-  //   3. Kick channel   → use the channel slug
-  //   4. Other URL      → derive hostname as the label
-  //
-  // BUG FIX: The previous version guarded with `!w.channelName`, which
-  // prevented the real title from replacing the videoId placeholder because
-  // the placeholder was already set as channelName (truthy string).
-  // Now we always write the resolved name for the target widget ID so
-  // YouTube video titles are never stuck showing the raw video ID.
+  // ─── resolveAndPatchChannelName ───────────────────────────────────────────
+  // For direct URL submissions, asynchronously resolves a meaningful display
+  // name and patches it onto the widget.
   const resolveAndPatchChannelName = useCallback(async (
     widgetId: string,
     finalUrl: string,
@@ -434,8 +669,8 @@ function AppContent() {
     let resolvedName: string | undefined;
 
     if (youtubeId) {
-      // Fetch the actual video/channel title; fall back to the video ID
-      resolvedName = await fetchYouTubeTitle(youtubeId);
+      const rawTitle = await fetchYouTubeTitle(youtubeId);
+      resolvedName = stripLegacyPrefix(rawTitle);
     } else if (twitchChannel) {
       resolvedName = twitchChannel;
     } else if (kickChannel) {
@@ -451,12 +686,7 @@ function AppContent() {
     if (resolvedName) {
       setWidgets(prev =>
         prev.map(w =>
-          // Always patch the target widget — no `!w.channelName` guard.
-          // This ensures the real YouTube title replaces the videoId placeholder
-          // that was set synchronously while the fetch was in-flight.
-          w.id === widgetId
-            ? { ...w, channelName: resolvedName }
-            : w
+          w.id === widgetId ? { ...w, channelName: resolvedName } : w
         )
       );
     }
@@ -474,18 +704,14 @@ function AppContent() {
     const kickChannel = extractKickChannel(finalUrl);
     const currentActiveWidgetId = activeWidgetIdRef.current;
 
-    // ── Derive an immediate best-effort name ─────────────────────────────
-    // This prevents a blank label while the async title fetch is in-flight.
-    // For YouTube videos the videoId is used as a placeholder; the
-    // resolveAndPatchChannelName call below will always replace it with the
-    // real fetched title (the `!w.channelName` guard has been removed).
+    // Immediate best-effort name (placeholder while async fetch is in-flight)
     let immediateName: string | undefined;
     if (twitchChannel) {
       immediateName = twitchChannel;
     } else if (kickChannel) {
       immediateName = kickChannel;
     } else if (youtubeId) {
-      immediateName = youtubeId; // placeholder — replaced async below
+      immediateName = youtubeId; // replaced async below
     } else {
       try {
         immediateName = new URL(finalUrl).hostname.replace(/^www\./, '');
@@ -503,8 +729,6 @@ function AppContent() {
           isYouTube: !!youtubeId || !!youtubeChannelId,
           videoId: youtubeId,
           youtubeChannelId,
-          // Seed with the immediate placeholder; resolveAndPatchChannelName
-          // will unconditionally overwrite it with the real title once fetched.
           channelName: w.channelName || immediateName,
           isTwitch: !!twitchChannel,
           twitchChannel,
@@ -517,14 +741,12 @@ function AppContent() {
           isMuted: true,
           volume: 0,
           isOffline: false,
-          // ── Iframe Refresh Fix ──────────────────────────────────────────
-          // Bumping lastRefresh forces the widget component to remount its
-          // iframe, which is the only reliable way to reload an embedded page.
-          lastRefresh: Date.now()
+          // ── Nuclear Refresh Fix ──────────────────────────────────────────
+          refreshCounter: (w.refreshCounter ?? 0) + 1,
+          lastRefresh: Date.now(),
         } : w
       ));
 
-      // Async: always replace channelName with the real fetched title
       resolveAndPatchChannelName(currentActiveWidgetId, finalUrl, youtubeId, twitchChannel, kickChannel);
     } else {
       const newWidgetId = addWidget('video', 3, 2, {
@@ -538,10 +760,9 @@ function AppContent() {
         isKick: !!kickChannel,
         kickChannel,
         isLive: false,
-        lastRefresh: Date.now()
+        lastRefresh: Date.now(),
       });
 
-      // Async: always replace channelName with the real fetched title
       if (newWidgetId) {
         resolveAndPatchChannelName(newWidgetId, finalUrl, youtubeId, twitchChannel, kickChannel);
       }
@@ -567,14 +788,13 @@ function AppContent() {
     const twitchChannel = extractTwitchChannel(finalUrl);
     const kickChannel = extractKickChannel(finalUrl);
 
-    // Immediate best-effort name (same logic as handleSubmitUrl)
     let immediateName: string | undefined;
     if (twitchChannel) {
       immediateName = twitchChannel;
     } else if (kickChannel) {
       immediateName = kickChannel;
     } else if (youtubeId) {
-      immediateName = youtubeId; // placeholder — replaced async below
+      immediateName = youtubeId;
     } else {
       try {
         immediateName = new URL(finalUrl).hostname.replace(/^www\./, '');
@@ -603,12 +823,12 @@ function AppContent() {
         isMuted: true,
         volume: 0,
         isOffline: false,
-        // ── Iframe Refresh Fix ────────────────────────────────────────────
-        lastRefresh: Date.now()
+        // ── Nuclear Refresh Fix ────────────────────────────────────────────
+        refreshCounter: (w.refreshCounter ?? 0) + 1,
+        lastRefresh: Date.now(),
       } : w
     ));
 
-    // Async: always replace channelName with the real fetched title
     resolveAndPatchChannelName(widgetId, finalUrl, youtubeId, twitchChannel, kickChannel);
   }, [resolveAndPatchChannelName]);
 
@@ -926,9 +1146,7 @@ function AppContent() {
           videoId: immediateVideoId,
           youtubeChannelId: channel.channelId,
           channelHandle: channel.channelId,
-          // Preserve the human-readable channel name so the Personal Library
-          // can display it correctly when this widget is saved.
-          channelName: channel.name || undefined,
+          channelName: stripLegacyPrefix(channel.name) || undefined,
           isTwitch: false,
           twitchChannel: null,
           isKick: false,
@@ -942,14 +1160,21 @@ function AppContent() {
           apiError: false,
           error: null,
           embedBlocked: false,
-          // ── Iframe Refresh Fix ──────────────────────────────────────────
+          // ── Nuclear Refresh Fix ──────────────────────────────────────────
           lastRefresh: Date.now(),
         };
 
         if (currentActiveWidgetId) {
           setWidgets(prev => prev.map(w =>
             w.id === currentActiveWidgetId ? {
-              ...w, type: 'video', ...widgetData, isPaused: false, isMuted: true, volume: 0,
+              ...w,
+              type: 'video',
+              ...widgetData,
+              isPaused: false,
+              isMuted: true,
+              volume: 0,
+              // Nuclear Refresh Fix: bump counter to force iframe remount
+              refreshCounter: (w.refreshCounter ?? 0) + 1,
             } : w
           ));
         } else {
@@ -957,13 +1182,13 @@ function AppContent() {
         }
 
         if (channel.isManualOverride) {
-          console.log(`[ChannelClick] MANUAL OVERRIDE detected for @${channel.channelId} - skipping ALL background checks`);
+          console.log(`[ChannelClick] MANUAL OVERRIDE for @${channel.channelId} — skipping ALL background checks`);
           return;
         }
 
         searchChannelLiveStream(channel.channelId, false).then(result => {
           if (result.liveVideoId && result.liveVideoId !== immediateVideoId) {
-            console.log(`[Background] NEW live ID discovered: ${result.liveVideoId} -> updating videoId immediately`);
+            console.log(`[Background] NEW live ID discovered: ${result.liveVideoId} \u2192 updating immediately`);
             setWidgets(prev => prev.map(w =>
               w.channelHandle === channel.channelId ? {
                 ...w,
@@ -972,7 +1197,8 @@ function AppContent() {
                 isLive: true,
                 isOffline: false,
                 isPlayingLatestVideo: false,
-                // ── Iframe Refresh Fix ────────────────────────────────────
+                // ── Nuclear Refresh Fix ────────────────────────────────────
+                refreshCounter: (w.refreshCounter ?? 0) + 1,
                 lastRefresh: Date.now(),
               } : w
             ));
@@ -985,7 +1211,7 @@ function AppContent() {
         return;
       }
 
-      console.log(`[ChannelClick] No saved videoId, searching for @${channel.channelId}`);
+      console.log(`[ChannelClick] No saved videoId \u2014 searching for @${channel.channelId}`);
 
       try {
         const result = await searchChannelLiveStream(channel.channelId, false);
@@ -1003,9 +1229,7 @@ function AppContent() {
           videoId: videoId,
           youtubeChannelId: result.channelId || channel.channelId,
           channelHandle: channel.channelId,
-          // Always store the human-readable channel name so saved streams
-          // show the correct title in the Personal Library.
-          channelName: channel.name || undefined,
+          channelName: stripLegacyPrefix(channel.name) || undefined,
           isTwitch: false,
           twitchChannel: null,
           isKick: false,
@@ -1017,7 +1241,7 @@ function AppContent() {
           apiError: false,
           error: null,
           embedBlocked: false,
-          // ── Iframe Refresh Fix ──────────────────────────────────────────
+          // ── Nuclear Refresh Fix ──────────────────────────────────────────
           lastRefresh: Date.now(),
         };
 
@@ -1030,6 +1254,8 @@ function AppContent() {
               isPaused: false,
               isMuted: true,
               volume: 0,
+              // Nuclear Refresh Fix: bump counter to force iframe remount
+              refreshCounter: (w.refreshCounter ?? 0) + 1,
             } : w
           ));
         } else {
@@ -1066,7 +1292,8 @@ function AppContent() {
 
   // ─── handleTemplateClick ──────────────────────────────────────────────────
   // Passes template directly to addWidget, which handles type-specific
-  // initialization (e.g. noteContent: '' for 'note' widgets).
+  // initialization (noteContent: '' for 'note', clockUse24Hour: false for
+  // 'clock', etc.).
   const handleTemplateClick = useCallback((template: WidgetTemplate) => {
     addWidget(template.widgetType, template.w || 3, template.h || 2);
     setSidebarOpen(false);
@@ -1084,7 +1311,7 @@ function AppContent() {
           isYouTube: false,
           videoId: null,
           isTwitch: false,
-          twitchChannel: null
+          twitchChannel: null,
         } : w
       ));
     } else {
@@ -1096,7 +1323,45 @@ function AppContent() {
   }, [addWidget]);
 
   // ─── Shared dashboard props ───────────────────────────────────────────────
-  // Extracted to avoid repetition across the two Route renders below.
+  //
+  // ── Nuclear Refresh Fix — REQUIRED in dashboard iframe rendering ──────────
+  // Every <iframe> rendered for a video widget MUST use refreshCounter in its
+  // React key so only the targeted widget remounts on refresh:
+  //
+  //   <iframe
+  //     key={`${widget.id}-${widget.refreshCounter ?? 0}`}   ← REQUIRED
+  //     src={buildEmbedUrl(widget)}
+  //     ...
+  //   />
+  //
+  // ── Zoom Widget — ghost box removal ──────────────────────────────────────
+  // In dashboard.tsx's widget render switch / map, add this guard at the top
+  // of the render function for each widget:
+  //
+  //   if (widget.type === 'zoom') return null;
+  //
+  // This hides zoom widgets stored in localStorage cleanly, without deleting
+  // them. The grid stays clean — no empty space, no ghost boxes appear.
+  //
+  // ── Clock Widget — dashboard rendering requirement ────────────────────────
+  // Import ClockWidget from this file and use it in the widget render switch:
+  //
+  //   import { ClockWidget } from '@/App';
+  //
+  //   // Inside the widget render switch / map:
+  //   if (widget.type === 'zoom')  return null;      // ← hide ghost boxes
+  //   if (widget.type === 'clock') {
+  //     return (
+  //       <ClockWidget
+  //         key={widget.id}
+  //         widget={widget}
+  //         onToggle24Hour={onToggleClockFormat}
+  //       />
+  //     );
+  //   }
+  //
+  // onToggleClockFormat below maps to handleToggleClockFormat, which flips
+  // widget.clockUse24Hour and persists to localStorage via setWidgets.
   const dashboardProps = {
     widgets,
     setWidgets,
@@ -1121,8 +1386,12 @@ function AppContent() {
     skipAd,
     triggerAd,
     isAdActive,
-    // ── Bug 3 fix: expose per-widget iframe refresh to the dashboard ──────
+    // ── Nuclear Refresh Fix ───────────────────────────────────────────────
+    // Dashboard MUST use widget.refreshCounter in every iframe's React key.
     onRefreshWidget: handleRefreshWidget,
+    // ── Clock Widget callback ─────────────────────────────────────────────
+    // Flip between 12h and 24h display. Pass as onToggle24Hour to ClockWidget.
+    onToggleClockFormat: handleToggleClockFormat,
   };
 
   return (
@@ -1193,7 +1462,7 @@ function AppContent() {
                 height: '8rem',
                 opacity: 0.9,
                 zIndex: 1000000,
-                pointerEvents: 'none'
+                pointerEvents: 'none',
               }}
             >
               <div className="flex items-center justify-center h-full">

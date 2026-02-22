@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import { createHmac } from "crypto";
 import { storage } from "./storage";
 import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from "./link-refresher";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
@@ -17,6 +18,72 @@ const ADMIN_EMAILS = [
 const isAdminEmail = (email: string): boolean => {
   return ADMIN_EMAILS.includes(email?.toLowerCase() || '');
 };
+
+// ─── generateZoomSignature ────────────────────────────────────────────────────
+// Generates a Zoom Meeting SDK JWT signature for client-side SDK initialization.
+// Uses HMAC-SHA256 with the ZOOM_CLIENT_SECRET to sign a structured payload
+// containing the SDK key, meeting number, role, and expiry timestamps.
+//
+// Algorithm (Zoom Meeting SDK Web v3+):
+//   1. Build a base64url-encoded JWT header  → { alg: "HS256", typ: "JWT" }
+//   2. Build a base64url-encoded JWT payload → { sdkKey, appKey, mn, role, iat, exp, tokenExp }
+//   3. Sign  header.payload  with HMAC-SHA256 using ZOOM_CLIENT_SECRET
+//   4. Return  header.payload.signature  as the complete JWT
+//
+// role: 0 = attendee, 1 = host
+//
+// Required env vars:
+//   ZOOM_CLIENT_ID      – your Zoom Meeting SDK App's Client ID (SDK Key)
+//   ZOOM_CLIENT_SECRET  – your Zoom Meeting SDK App's Client Secret
+//
+// Required Zoom App scopes:
+//   meeting:read:meeting
+//   meeting:write:meeting
+function generateZoomSignature(
+  meetingNumber: string,
+  role: 0 | 1,
+  clientId: string,
+  clientSecret: string
+): string {
+  const iat = Math.floor(Date.now() / 1000);
+  // Token valid for 2 hours
+  const exp = iat + 7200;
+
+  // base64url encoding helper (no padding, URL-safe chars)
+  const toBase64Url = (input: string): string =>
+    Buffer.from(input)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+  const header = toBase64Url(
+    JSON.stringify({ alg: 'HS256', typ: 'JWT' })
+  );
+
+  const payload = toBase64Url(
+    JSON.stringify({
+      sdkKey:   clientId,     // Zoom Meeting SDK v3+ uses sdkKey
+      appKey:   clientId,     // Legacy alias — include both for compatibility
+      mn:       meetingNumber,
+      role:     role,
+      iat:      iat,
+      exp:      exp,
+      tokenExp: exp,          // Zoom Web SDK checks tokenExp
+    })
+  );
+
+  const signingInput = `${header}.${payload}`;
+
+  const signature = createHmac('sha256', clientSecret)
+    .update(signingInput)
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  return `${header}.${payload}.${signature}`;
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -88,7 +155,7 @@ export async function registerRoutes(
         }
 
         console.log('[Signup Debug] User created successfully:', email);
-        res.json({ 
+        res.json({
           user: data.user,
           session: data.session,
           message: 'Signup successful'
@@ -103,8 +170,8 @@ export async function registerRoutes(
         }
 
         console.error('[Signup Debug] Error details:', fetchError);
-        return res.status(500).json({ 
-          error: fetchError.message || 'Network error during signup' 
+        return res.status(500).json({
+          error: fetchError.message || 'Network error during signup'
         });
       }
 
@@ -115,8 +182,117 @@ export async function registerRoutes(
         stack: error.stack,
         email: email
       });
-      return res.status(500).json({ 
-        error: error.message || 'An unexpected error occurred during signup' 
+      return res.status(500).json({
+        error: error.message || 'An unexpected error occurred during signup'
+      });
+    }
+  });
+
+  // ─── POST /api/zoom/signature ─────────────────────────────────────────────
+  // Generates a Zoom Meeting SDK JWT signature for use in the browser-side
+  // Zoom Web SDK (@zoom/meetingsdk-embedded or @zoom/meetingsdk-web).
+  //
+  // The ZOOM_CLIENT_SECRET never leaves the server — the client only receives
+  // the signed JWT, which Zoom validates on its own servers during join().
+  //
+  // Request body (JSON):
+  //   meetingNumber  {string}  Zoom meeting ID — digits only, spaces/hyphens
+  //                            are stripped automatically (e.g. "123 456 7890"
+  //                            or "12345678901" are both accepted)
+  //   role           {0|1}     0 = attendee (default), 1 = host/co-host
+  //
+  // Response (JSON):
+  //   {
+  //     signature:  string,  // JWT to pass to ZoomMtg.init() / join()
+  //     sdkKey:     string,  // clientId — pass as sdkKey in join()
+  //     expiresAt:  number,  // Unix timestamp; regenerate a new token before this
+  //   }
+  //
+  // Usage on the client (Zoom Web SDK v3):
+  //   const { signature, sdkKey } = await fetch('/api/zoom/signature', {
+  //     method: 'POST',
+  //     headers: { 'Content-Type': 'application/json' },
+  //     body: JSON.stringify({ meetingNumber, role: 0 }),
+  //   }).then(r => r.json());
+  //
+  //   ZoomMtg.join({ signature, sdkKey, meetingNumber, userName, passWord });
+  //
+  // Security:
+  //   • Role 1 (host) grants elevated privileges — add your own auth guard
+  //     before issuing host tokens in production.
+  //   • Tokens expire after 2 hours. The client should request a fresh
+  //     signature for each new session rather than caching it long-term.
+  //
+  // Required env vars:
+  //   ZOOM_CLIENT_ID      (your Meeting SDK App's Client ID / SDK Key)
+  //   ZOOM_CLIENT_SECRET  (your Meeting SDK App's Client Secret)
+  //
+  // Required Zoom App scopes:
+  //   meeting:read:meeting
+  //   meeting:write:meeting
+  app.post("/api/zoom/signature", async (req: Request, res: Response) => {
+    const { meetingNumber, role } = req.body;
+
+    // ── Input validation ──────────────────────────────────────────────────
+    if (!meetingNumber || typeof meetingNumber !== 'string') {
+      return res.status(400).json({
+        error: "meetingNumber is required and must be a string (numeric meeting ID, spaces/hyphens are stripped automatically)"
+      });
+    }
+
+    // Strip whitespace and hyphens — users often copy IDs formatted as
+    // "123 456 7890" or "123-456-7890" from the Zoom invite.
+    const cleanMeetingNumber = meetingNumber.replace(/[\s\-]/g, '');
+
+    if (!/^\d{9,11}$/.test(cleanMeetingNumber)) {
+      return res.status(400).json({
+        error: "meetingNumber must be 9–11 digits after stripping spaces and hyphens"
+      });
+    }
+
+    // Role defaults to 0 (attendee). Only 0 or 1 are valid Zoom SDK roles.
+    const parsedRole = role !== undefined ? Number(role) : 0;
+    if (![0, 1].includes(parsedRole)) {
+      return res.status(400).json({
+        error: "role must be 0 (attendee) or 1 (host)"
+      });
+    }
+
+    // ── Read credentials from environment ─────────────────────────────────
+    const clientId     = process.env.ZOOM_CLIENT_ID;
+    const clientSecret = process.env.ZOOM_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      console.error('[Zoom Signature] ZOOM_CLIENT_ID or ZOOM_CLIENT_SECRET not set in environment');
+      return res.status(503).json({
+        error: "Zoom credentials are not configured on the server. Add ZOOM_CLIENT_ID and ZOOM_CLIENT_SECRET to your Replit Secrets (or .env file)."
+      });
+    }
+
+    // ── Generate the JWT and return it ────────────────────────────────────
+    try {
+      const signature = generateZoomSignature(
+        cleanMeetingNumber,
+        parsedRole as 0 | 1,
+        clientId,
+        clientSecret
+      );
+
+      // 2-hour window — same as the token expiry inside generateZoomSignature
+      const expiresAt = Math.floor(Date.now() / 1000) + 7200;
+
+      console.log(`[Zoom Signature] Issued token for meeting=${cleanMeetingNumber} role=${parsedRole}`);
+
+      res.json({
+        signature,
+        sdkKey:    clientId,  // The client passes this alongside the signature
+        expiresAt,            // Unix timestamp — client should refresh before this
+      });
+
+    } catch (error: any) {
+      console.error('[Zoom Signature] Error generating signature:', error);
+      res.status(500).json({
+        error: error.message || 'Failed to generate Zoom signature'
       });
     }
   });
@@ -233,9 +409,9 @@ export async function registerRoutes(
     const apiKey = process.env.YOUTUBE_API_KEY;
 
     if (!apiKey) {
-      return res.status(503).json({ 
+      return res.status(503).json({
         isLive: null,
-        error: "YouTube API key not configured" 
+        error: "YouTube API key not configured"
       });
     }
 
@@ -250,11 +426,11 @@ export async function registerRoutes(
       });
     } catch (error) {
       console.error('[YouTube Live Check] Error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         channelId,
         isLive: null,
         apiError: true,
-        error: String(error) 
+        error: String(error)
       });
     }
   });
@@ -266,9 +442,9 @@ export async function registerRoutes(
     const apiKey = process.env.YOUTUBE_API_KEY;
 
     if (!apiKey) {
-      return res.status(503).json({ 
+      return res.status(503).json({
         isLive: null,
-        error: "YouTube API key not configured" 
+        error: "YouTube API key not configured"
       });
     }
 
@@ -284,11 +460,11 @@ export async function registerRoutes(
       });
     } catch (error) {
       console.error('[YouTube Video Live Check] Error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         videoId,
         isLive: null,
         apiError: true,
-        error: String(error) 
+        error: String(error)
       });
     }
   });
@@ -299,9 +475,9 @@ export async function registerRoutes(
     const apiKey = process.env.YOUTUBE_API_KEY;
 
     if (!apiKey) {
-      return res.status(503).json({ 
+      return res.status(503).json({
         isLive: false,
-        error: "YouTube API key not configured" 
+        error: "YouTube API key not configured"
       });
     }
 
@@ -318,12 +494,12 @@ export async function registerRoutes(
       });
     } catch (error) {
       console.error('[YouTube Search Live] Error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         channelHandle,
         isLive: false,
         latestVideoId: null,
         apiError: true,
-        error: String(error) 
+        error: String(error)
       });
     }
   });
@@ -344,9 +520,9 @@ export async function registerRoutes(
     const apiKey = process.env.YOUTUBE_API_KEY;
 
     if (!apiKey) {
-      return res.status(503).json({ 
-        success: false, 
-        error: "YouTube API key not configured" 
+      return res.status(503).json({
+        success: false,
+        error: "YouTube API key not configured"
       });
     }
 
@@ -372,9 +548,9 @@ export async function registerRoutes(
 
       res.json(result);
     } catch (error) {
-      res.status(500).json({ 
-        success: false, 
-        error: String(error) 
+      res.status(500).json({
+        success: false,
+        error: String(error)
       });
     }
   });
@@ -388,9 +564,9 @@ export async function registerRoutes(
     }
 
     if (!apiKey) {
-      return res.status(503).json({ 
+      return res.status(503).json({
         error: "YouTube API key not configured",
-        videoId: null 
+        videoId: null
       });
     }
 
@@ -398,22 +574,22 @@ export async function registerRoutes(
       const result = await healStream(channelId, channelId, apiKey);
 
       if (result.success && result.newVideoId) {
-        res.json({ 
+        res.json({
           videoId: result.newVideoId,
           channelId,
           isLive: true
         });
       } else {
-        res.json({ 
+        res.json({
           videoId: null,
           channelId,
           reason: result.reason || "No live stream found"
         });
       }
     } catch (error) {
-      res.status(500).json({ 
+      res.status(500).json({
         error: String(error),
-        videoId: null 
+        videoId: null
       });
     }
   });
@@ -446,7 +622,7 @@ export async function registerRoutes(
 
       if (!response.ok) {
         // Kick blocks server requests - return unknown status, player will show actual state
-        return res.json({ 
+        return res.json({
           isLive: null,
           viewerCount: 0,
           channelId: channelId,
@@ -494,8 +670,8 @@ export async function registerRoutes(
         return res.json({ valid: false, reason: "Not embeddable" });
       }
 
-      res.json({ 
-        valid: true, 
+      res.json({
+        valid: true,
         channelId: details.channelId,
         isLive: details.liveBroadcastContent === 'live'
       });
@@ -789,8 +965,8 @@ export async function registerRoutes(
       const feedbackEmail = validation.data.userEmail;
 
       // Get client IP for rate limiting
-      const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() 
-        || req.socket.remoteAddress 
+      const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+        || req.socket.remoteAddress
         || 'unknown';
 
       // ✅ 15-MINUTE COOLDOWN CHECK
@@ -799,7 +975,7 @@ export async function registerRoutes(
 
       if (!cooldownCheck.allowed) {
         const minutesLeft = Math.ceil(cooldownCheck.minutesRemaining || 0);
-        return res.status(429).json({ 
+        return res.status(429).json({
           error: `Please wait ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''} before submitting more feedback.`,
           retryAfter: cooldownCheck.minutesRemaining
         });
