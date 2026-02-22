@@ -85,6 +85,10 @@ export interface Widget {
   noteContent?: string;          // Note widget text content ('' = empty note)
   imageUrl?: string;
   lastRefresh?: number;
+  // ── Per-widget iframe key ─────────────────────────────────────────────────
+  // Incrementing iframeKey forces a hard remount of the iframe for that
+  // specific widget without affecting any other widget on the board.
+  iframeKey?: number;
   isOffline?: boolean;
   isLive?: boolean;
   isPlayingLatestVideo?: boolean;
@@ -101,6 +105,27 @@ const GRID_COLS = 12;
 
 function generateWidgetId(): string {
   return `widget-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+}
+
+// ─── fetchYouTubeTitle ────────────────────────────────────────────────────
+// Resolves a human-readable title for a YouTube video using the noembed
+// oEmbed endpoint (no API key required). Falls back to the videoId string
+// so the saved library entry is always at least uniquely identifiable.
+async function fetchYouTubeTitle(videoId: string): Promise<string> {
+  try {
+    const res = await fetch(
+      `https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`
+    );
+    if (!res.ok) throw new Error(`noembed ${res.status}`);
+    const data = await res.json();
+    if (data?.title && typeof data.title === 'string' && data.title.trim()) {
+      return data.title.trim();
+    }
+  } catch (err) {
+    console.warn('[fetchYouTubeTitle] Could not fetch title for', videoId, err);
+  }
+  // Fallback: use the video ID so the label is at least unique
+  return videoId;
 }
 
 // Inner App component that uses hooks requiring QueryClientProvider
@@ -177,6 +202,7 @@ function AppContent() {
           y: w.y ?? 0,
           w: w.w ?? 3,
           h: w.h ?? 2,
+          iframeKey: w.iframeKey ?? 0,
           // Ensure noteContent is always a string for note widgets loaded from storage
           noteContent: w.type === 'note' ? (w.noteContent ?? '') : w.noteContent,
         }));
@@ -325,6 +351,7 @@ function AppContent() {
         volume: 0,
         previousVolume: 50,
         isOffline: false,
+        iframeKey: 0,
         // ── Note widget defaults ──────────────────────────────────────────
         // Always initialize noteContent for note widgets so the controlled
         // textarea never receives undefined as its value.
@@ -340,6 +367,25 @@ function AppContent() {
     return widgetId;
   }, [findSmartPosition]);
 
+  // ─── handleRefreshWidget ─────────────────────────────────────────────────
+  // Increments `iframeKey` on a single widget, which causes only that
+  // widget's iframe to remount. No other widget is affected and the page
+  // does not reload.  The dashboard component should call this when the
+  // user presses the refresh button on an individual widget.
+  const handleRefreshWidget = useCallback((widgetId: string) => {
+    setWidgets(prev =>
+      prev.map(w =>
+        w.id === widgetId
+          ? { ...w, iframeKey: (w.iframeKey ?? 0) + 1, lastRefresh: Date.now() }
+          : w
+      )
+    );
+  }, []);
+
+  // ─── addVideoWidget ───────────────────────────────────────────────────────
+  // Adds a video widget from a TrendingChannel. Ensures channelName and
+  // channelHandle are always stored on the widget so the Personal Library
+  // can display the correct name instead of a generic fallback.
   const addVideoWidget = useCallback((channel: TrendingChannel, w = 3, h = 2) => {
     const videoId = channel.videoId || extractYouTubeId(channel.url);
     const youtubeChannelId = channel.channelId || extractYouTubeChannelId(channel.url);
@@ -352,6 +398,10 @@ function AppContent() {
       isYouTube: channel.platform === 'youtube',
       videoId,
       youtubeChannelId,
+      // Always persist human-readable name and handle so saved streams
+      // render the correct title in the Personal Library sidebar.
+      channelName: channel.name || undefined,
+      channelHandle: channel.channelId || null,
       isTwitch: channel.platform === 'twitch',
       twitchChannel,
       isKick: channel.platform === 'kick',
@@ -360,6 +410,57 @@ function AppContent() {
       lastRefresh: Date.now()
     });
   }, [addWidget]);
+
+  // ─── resolveChannelNameForUrl ─────────────────────────────────────────────
+  // For direct URL submissions (not from the channel list), attempts to
+  // resolve a meaningful display name:
+  //   1. YouTube video  → fetch title via noembed oEmbed (no API key needed)
+  //   2. Twitch channel → use the channel slug
+  //   3. Kick channel   → use the channel slug
+  //   4. Other URL      → derive hostname as the label
+  //
+  // BUG FIX: The previous version guarded with `!w.channelName`, which
+  // prevented the real title from replacing the videoId placeholder because
+  // the placeholder was already set as channelName (truthy string).
+  // Now we always write the resolved name for the target widget ID so
+  // YouTube video titles are never stuck showing the raw video ID.
+  const resolveAndPatchChannelName = useCallback(async (
+    widgetId: string,
+    finalUrl: string,
+    youtubeId: string | null,
+    twitchChannel: string | null,
+    kickChannel: string | null,
+  ) => {
+    let resolvedName: string | undefined;
+
+    if (youtubeId) {
+      // Fetch the actual video/channel title; fall back to the video ID
+      resolvedName = await fetchYouTubeTitle(youtubeId);
+    } else if (twitchChannel) {
+      resolvedName = twitchChannel;
+    } else if (kickChannel) {
+      resolvedName = kickChannel;
+    } else {
+      try {
+        resolvedName = new URL(finalUrl).hostname.replace(/^www\./, '');
+      } catch {
+        resolvedName = finalUrl;
+      }
+    }
+
+    if (resolvedName) {
+      setWidgets(prev =>
+        prev.map(w =>
+          // Always patch the target widget — no `!w.channelName` guard.
+          // This ensures the real YouTube title replaces the videoId placeholder
+          // that was set synchronously while the fetch was in-flight.
+          w.id === widgetId
+            ? { ...w, channelName: resolvedName }
+            : w
+        )
+      );
+    }
+  }, [setWidgets]);
 
   const handleSubmitUrl = useCallback((url: string) => {
     if (!url.trim()) return;
@@ -373,6 +474,26 @@ function AppContent() {
     const kickChannel = extractKickChannel(finalUrl);
     const currentActiveWidgetId = activeWidgetIdRef.current;
 
+    // ── Derive an immediate best-effort name ─────────────────────────────
+    // This prevents a blank label while the async title fetch is in-flight.
+    // For YouTube videos the videoId is used as a placeholder; the
+    // resolveAndPatchChannelName call below will always replace it with the
+    // real fetched title (the `!w.channelName` guard has been removed).
+    let immediateName: string | undefined;
+    if (twitchChannel) {
+      immediateName = twitchChannel;
+    } else if (kickChannel) {
+      immediateName = kickChannel;
+    } else if (youtubeId) {
+      immediateName = youtubeId; // placeholder — replaced async below
+    } else {
+      try {
+        immediateName = new URL(finalUrl).hostname.replace(/^www\./, '');
+      } catch {
+        immediateName = finalUrl;
+      }
+    }
+
     if (currentActiveWidgetId) {
       setWidgets(prev => prev.map(w =>
         w.id === currentActiveWidgetId ? {
@@ -382,6 +503,9 @@ function AppContent() {
           isYouTube: !!youtubeId || !!youtubeChannelId,
           videoId: youtubeId,
           youtubeChannelId,
+          // Seed with the immediate placeholder; resolveAndPatchChannelName
+          // will unconditionally overwrite it with the real title once fetched.
+          channelName: w.channelName || immediateName,
           isTwitch: !!twitchChannel,
           twitchChannel,
           isKick: !!kickChannel,
@@ -393,15 +517,22 @@ function AppContent() {
           isMuted: true,
           volume: 0,
           isOffline: false,
+          // ── Iframe Refresh Fix ──────────────────────────────────────────
+          // Bumping lastRefresh forces the widget component to remount its
+          // iframe, which is the only reliable way to reload an embedded page.
           lastRefresh: Date.now()
         } : w
       ));
+
+      // Async: always replace channelName with the real fetched title
+      resolveAndPatchChannelName(currentActiveWidgetId, finalUrl, youtubeId, twitchChannel, kickChannel);
     } else {
-      addWidget('video', 3, 2, {
+      const newWidgetId = addWidget('video', 3, 2, {
         url: finalUrl,
         isYouTube: !!youtubeId || !!youtubeChannelId,
         videoId: youtubeId,
         youtubeChannelId,
+        channelName: immediateName,
         isTwitch: !!twitchChannel,
         twitchChannel,
         isKick: !!kickChannel,
@@ -409,14 +540,22 @@ function AppContent() {
         isLive: false,
         lastRefresh: Date.now()
       });
+
+      // Async: always replace channelName with the real fetched title
+      if (newWidgetId) {
+        resolveAndPatchChannelName(newWidgetId, finalUrl, youtubeId, twitchChannel, kickChannel);
+      }
     }
 
     setUrlInputValue('');
     setSidebarOpen(false);
     activeWidgetIdRef.current = null;
     setActiveWidgetId(null);
-  }, [addWidget]);
+  }, [addWidget, resolveAndPatchChannelName]);
 
+  // ─── handleInlineUrlSubmit ────────────────────────────────────────────────
+  // Same title-resolution logic as handleSubmitUrl but targets a specific
+  // existing widget by ID (used by the inline URL bar inside a widget slot).
   const handleInlineUrlSubmit = useCallback((widgetId: string, url: string) => {
     if (!url.trim()) return;
     let finalUrl = url.trim();
@@ -428,6 +567,22 @@ function AppContent() {
     const twitchChannel = extractTwitchChannel(finalUrl);
     const kickChannel = extractKickChannel(finalUrl);
 
+    // Immediate best-effort name (same logic as handleSubmitUrl)
+    let immediateName: string | undefined;
+    if (twitchChannel) {
+      immediateName = twitchChannel;
+    } else if (kickChannel) {
+      immediateName = kickChannel;
+    } else if (youtubeId) {
+      immediateName = youtubeId; // placeholder — replaced async below
+    } else {
+      try {
+        immediateName = new URL(finalUrl).hostname.replace(/^www\./, '');
+      } catch {
+        immediateName = finalUrl;
+      }
+    }
+
     setWidgets(prev => prev.map(w =>
       w.id === widgetId ? {
         ...w,
@@ -436,6 +591,7 @@ function AppContent() {
         isYouTube: !!youtubeId || !!youtubeChannelId,
         videoId: youtubeId,
         youtubeChannelId,
+        channelName: w.channelName || immediateName,
         isTwitch: !!twitchChannel,
         twitchChannel,
         isKick: !!kickChannel,
@@ -447,10 +603,14 @@ function AppContent() {
         isMuted: true,
         volume: 0,
         isOffline: false,
+        // ── Iframe Refresh Fix ────────────────────────────────────────────
         lastRefresh: Date.now()
       } : w
     ));
-  }, []);
+
+    // Async: always replace channelName with the real fetched title
+    resolveAndPatchChannelName(widgetId, finalUrl, youtubeId, twitchChannel, kickChannel);
+  }, [resolveAndPatchChannelName]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id);
@@ -766,7 +926,9 @@ function AppContent() {
           videoId: immediateVideoId,
           youtubeChannelId: channel.channelId,
           channelHandle: channel.channelId,
-          channelName: channel.name,
+          // Preserve the human-readable channel name so the Personal Library
+          // can display it correctly when this widget is saved.
+          channelName: channel.name || undefined,
           isTwitch: false,
           twitchChannel: null,
           isKick: false,
@@ -780,6 +942,7 @@ function AppContent() {
           apiError: false,
           error: null,
           embedBlocked: false,
+          // ── Iframe Refresh Fix ──────────────────────────────────────────
           lastRefresh: Date.now(),
         };
 
@@ -809,6 +972,7 @@ function AppContent() {
                 isLive: true,
                 isOffline: false,
                 isPlayingLatestVideo: false,
+                // ── Iframe Refresh Fix ────────────────────────────────────
                 lastRefresh: Date.now(),
               } : w
             ));
@@ -839,7 +1003,9 @@ function AppContent() {
           videoId: videoId,
           youtubeChannelId: result.channelId || channel.channelId,
           channelHandle: channel.channelId,
-          channelName: channel.name,
+          // Always store the human-readable channel name so saved streams
+          // show the correct title in the Personal Library.
+          channelName: channel.name || undefined,
           isTwitch: false,
           twitchChannel: null,
           isKick: false,
@@ -851,6 +1017,7 @@ function AppContent() {
           apiError: false,
           error: null,
           embedBlocked: false,
+          // ── Iframe Refresh Fix ──────────────────────────────────────────
           lastRefresh: Date.now(),
         };
 
@@ -954,6 +1121,8 @@ function AppContent() {
     skipAd,
     triggerAd,
     isAdActive,
+    // ── Bug 3 fix: expose per-widget iframe refresh to the dashboard ──────
+    onRefreshWidget: handleRefreshWidget,
   };
 
   return (
