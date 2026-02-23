@@ -94,26 +94,37 @@ export interface Widget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  ClockWidget
+//  ClockWidget — "Time Tool Suite"
 //
-//  Defined here so WidgetRenderer (below) can reference it without a forward
-//  declaration. Exported so dashboard.tsx can import it directly if desired.
-//
-//  Key implementation details:
-//    • useState<Date> + setInterval(1 000 ms) — ticks every second
-//    • backgroundColor: '#0f172a' (slate-900) is FULLY OPAQUE — the grid never
-//      bleeds through, so there is never a "ghost box" effect
-//    • 12h / 24h toggle button in the top-right corner
-//
-//  Usage in dashboard.tsx
-//  ──────────────────────
-//    import { WidgetRenderer } from '@/App';
-//
-//    // Call at the VERY TOP of your widget-cell render function:
-//    const early = WidgetRenderer({ widget, onToggle24Hour: onToggleClockFormat });
-//    if (early !== false) return early;   // null | JSX — already handled
-//    // ... continue with your existing video / note / spacer / image rendering
+//  Four tabs: Clock | World | Timer | Stopwatch
+//  All state is internal — timer/stopwatch keep running when switching tabs.
+//  Solid bg-slate-900 (#0f172a) — never transparent.
 // ─────────────────────────────────────────────────────────────────────────────
+
+type ClockTab = 'clock' | 'world' | 'timer' | 'stopwatch';
+
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+
+const WORLD_ZONES: { city: string; tz: string }[] = [
+  { city: 'New York', tz: 'America/New_York' },
+  { city: 'Los Angeles', tz: 'America/Los_Angeles' },
+  { city: 'Chicago', tz: 'America/Chicago' },
+  { city: 'London', tz: 'Europe/London' },
+  { city: 'Paris', tz: 'Europe/Paris' },
+  { city: 'Berlin', tz: 'Europe/Berlin' },
+  { city: 'Moscow', tz: 'Europe/Moscow' },
+  { city: 'Dubai', tz: 'Asia/Dubai' },
+  { city: 'Mumbai', tz: 'Asia/Kolkata' },
+  { city: 'Singapore', tz: 'Asia/Singapore' },
+  { city: 'Tokyo', tz: 'Asia/Tokyo' },
+  { city: 'Sydney', tz: 'Australia/Sydney' },
+  { city: 'Auckland', tz: 'Pacific/Auckland' },
+  { city: 'Honolulu', tz: 'Pacific/Honolulu' },
+  { city: 'S\u00E3o Paulo', tz: 'America/Sao_Paulo' },
+  { city: 'Cairo', tz: 'Africa/Cairo' },
+];
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
 
 interface ClockWidgetProps {
   widget: Widget;
@@ -121,127 +132,279 @@ interface ClockWidgetProps {
 }
 
 export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour }) => {
-  const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
+  const [tab, setTab] = useState<ClockTab>('clock');
+  const [now, setNow] = useState<Date>(() => new Date());
   const use24 = widget.clockUse24Hour ?? false;
 
-  // Tick every second — cleaned up automatically on unmount
+  const [worldZone, setWorldZone] = useState(WORLD_ZONES[0].tz);
+
+  const [timerTotal, setTimerTotal] = useState(300);
+  const [timerLeft, setTimerLeft] = useState(300);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerSetMin, setTimerSetMin] = useState('5');
+  const [timerSetSec, setTimerSetSec] = useState('0');
+
+  const [swElapsed, setSwElapsed] = useState(0);
+  const [swRunning, setSwRunning] = useState(false);
+  const swStartRef = useRef<number>(0);
+
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1_000);
-    return () => clearInterval(timer);
+    const id = setInterval(() => setNow(new Date()), 1_000);
+    return () => clearInterval(id);
   }, []);
 
-  const timeString = currentTime.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: !use24,
+  useEffect(() => {
+    if (!timerRunning) return;
+    const id = setInterval(() => {
+      setTimerLeft(prev => {
+        if (prev <= 1) { setTimerRunning(false); return 0; }
+        return prev - 1;
+      });
+    }, 1_000);
+    return () => clearInterval(id);
+  }, [timerRunning]);
+
+  useEffect(() => {
+    if (!swRunning) return;
+    swStartRef.current = Date.now() - swElapsed;
+    const id = setInterval(() => {
+      setSwElapsed(Date.now() - swStartRef.current);
+    }, 47);
+    return () => clearInterval(id);
+  }, [swRunning]);
+
+  const fmtTime = (d: Date, tz?: string) => {
+    const opts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: !use24 };
+    if (tz) opts.timeZone = tz;
+    return d.toLocaleTimeString([], opts);
+  };
+
+  const fmtDate = (d: Date, tz?: string) => {
+    const opts: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    if (tz) opts.timeZone = tz;
+    return d.toLocaleDateString([], opts);
+  };
+
+  const fmtTimer = (s: number) => `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
+
+  const fmtSw = (ms: number) => {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const cs = Math.floor((ms % 1000) / 10);
+    return h > 0
+      ? `${pad2(h)}:${pad2(m)}:${pad2(s)}.${pad2(cs)}`
+      : `${pad2(m)}:${pad2(s)}.${pad2(cs)}`;
+  };
+
+  const tabStyle = (t: ClockTab): React.CSSProperties => ({
+    flex: 1,
+    padding: '0.2rem 0',
+    fontSize: 'clamp(0.5rem, 1vw, 0.7rem)',
+    fontFamily: MONO,
+    fontWeight: tab === t ? 700 : 500,
+    color: tab === t ? '#38bdf8' : '#64748b',
+    background: tab === t ? 'rgba(56,189,248,0.1)' : 'transparent',
+    border: 'none',
+    borderBottom: tab === t ? '2px solid #38bdf8' : '2px solid transparent',
+    cursor: 'pointer',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    transition: 'all 0.15s ease',
   });
 
-  const dateString = currentTime.toLocaleDateString([], {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
+  const btnStyle = (active?: boolean): React.CSSProperties => ({
+    padding: '0.25rem 0.6rem',
+    fontSize: 'clamp(0.5rem, 0.9vw, 0.7rem)',
+    fontFamily: MONO,
+    fontWeight: 600,
+    color: active ? '#0f172a' : '#94a3b8',
+    background: active ? '#38bdf8' : 'rgba(148,163,184,0.15)',
+    border: 'none',
+    borderRadius: '0.25rem',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
   });
+
+  const startTimer = () => {
+    const mins = Math.max(0, Math.min(99, parseInt(timerSetMin) || 0));
+    const secs = Math.max(0, Math.min(59, parseInt(timerSetSec) || 0));
+    const total = mins * 60 + secs;
+    if (total <= 0) return;
+    setTimerTotal(total);
+    setTimerLeft(total);
+    setTimerRunning(true);
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '2.5rem',
+    padding: '0.2rem 0.3rem',
+    fontSize: 'clamp(0.6rem, 1vw, 0.8rem)',
+    fontFamily: MONO,
+    fontWeight: 600,
+    color: '#f1f5f9',
+    background: 'rgba(148,163,184,0.12)',
+    border: '1px solid #334155',
+    borderRadius: '0.25rem',
+    textAlign: 'center' as const,
+    outline: 'none',
+  };
 
   return (
     <div
       style={{
         width: '100%',
         height: '100%',
-        // Solid slate-900 — NEVER transparent; grid never bleeds through
         backgroundColor: '#0f172a',
         borderRadius: '0.5rem',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
         position: 'relative',
-        padding: '1rem',
         userSelect: 'none',
         overflow: 'hidden',
         boxSizing: 'border-box',
       }}
+      data-testid={`clock-widget-${widget.id}`}
     >
-      {/* 12H / 24H label — top-left */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '0.5rem',
-          left: '0.5rem',
-          fontSize: '0.6rem',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-          color: '#475569',
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          pointerEvents: 'none',
-        }}
-      >
-        {use24 ? '24H' : '12H'}
+      <div style={{ display: 'flex', borderBottom: '1px solid #1e293b', flexShrink: 0 }}>
+        <button style={tabStyle('clock')} onClick={(e) => { e.stopPropagation(); setTab('clock'); }} data-testid="tab-clock">Clock</button>
+        <button style={tabStyle('world')} onClick={(e) => { e.stopPropagation(); setTab('world'); }} data-testid="tab-world">World</button>
+        <button style={tabStyle('timer')} onClick={(e) => { e.stopPropagation(); setTab('timer'); }} data-testid="tab-timer">Timer{timerRunning ? ' \u23F1' : ''}</button>
+        <button style={tabStyle('stopwatch')} onClick={(e) => { e.stopPropagation(); setTab('stopwatch'); }} data-testid="tab-stopwatch">Stop{swRunning ? ' \u23F1' : ''}</button>
       </div>
 
-      {/* Format toggle — top-right */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onToggle24Hour(widget.id); }}
-        title={use24 ? 'Switch to 12-hour' : 'Switch to 24-hour'}
-        aria-label="Toggle time format"
-        style={{
-          position: 'absolute',
-          top: '0.4rem',
-          right: '0.4rem',
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: '#475569',
-          padding: '0.3rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: '0.25rem',
-          transition: 'color 0.15s ease',
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.color = '#94a3b8')}
-        onMouseLeave={(e) => (e.currentTarget.style.color = '#475569')}
-      >
-        {/* Settings / gear icon */}
-        <svg
-          width="15" height="15" viewBox="0 0 24 24"
-          fill="none" stroke="currentColor" strokeWidth="2"
-          strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-        >
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-        </svg>
-      </button>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0.5rem 0.75rem', gap: '0.4rem', minHeight: 0 }}>
 
-      {/* Time — clamp() scales gracefully inside small cells */}
-      <div
-        style={{
-          fontSize: 'clamp(1.25rem, 5.5vw, 4.5rem)',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-          fontWeight: 700,
-          color: '#f1f5f9',
-          letterSpacing: '-0.02em',
-          lineHeight: 1,
-          textAlign: 'center',
-        }}
-      >
-        {timeString}
-      </div>
+        {tab === 'clock' && (
+          <>
+            <div style={{ position: 'absolute', top: '0.3rem', right: '0.4rem' }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggle24Hour(widget.id); }}
+                title={use24 ? 'Switch to 12-hour' : 'Switch to 24-hour'}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', fontSize: '0.6rem', fontFamily: MONO, padding: '0.15rem 0.3rem', borderRadius: '0.2rem', transition: 'color 0.15s' }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#94a3b8')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '#475569')}
+                data-testid="btn-toggle-24h"
+              >
+                {use24 ? '24H' : '12H'}
+              </button>
+            </div>
+            <div style={{ fontSize: 'clamp(1.25rem, 5.5vw, 3.5rem)', fontFamily: MONO, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>
+              {fmtTime(now)}
+            </div>
+            <div style={{ fontSize: 'clamp(0.5rem, 1.1vw, 0.8rem)', fontFamily: MONO, color: '#64748b', textAlign: 'center', letterSpacing: '0.02em', lineHeight: 1.3 }}>
+              {fmtDate(now)}
+            </div>
+          </>
+        )}
 
-      {/* Date */}
-      <div
-        style={{
-          marginTop: '0.75rem',
-          fontSize: 'clamp(0.55rem, 1.2vw, 0.875rem)',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-          color: '#64748b',
-          textAlign: 'center',
-          letterSpacing: '0.02em',
-          lineHeight: 1.3,
-        }}
-      >
-        {dateString}
+        {tab === 'world' && (
+          <>
+            <select
+              value={worldZone}
+              onChange={(e) => { e.stopPropagation(); setWorldZone(e.target.value); }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                padding: '0.25rem 0.4rem',
+                fontSize: 'clamp(0.5rem, 0.9vw, 0.7rem)',
+                fontFamily: MONO,
+                fontWeight: 600,
+                color: '#f1f5f9',
+                background: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: '0.25rem',
+                cursor: 'pointer',
+                outline: 'none',
+                maxWidth: '90%',
+              }}
+              data-testid="select-timezone"
+            >
+              {WORLD_ZONES.map(z => (
+                <option key={z.tz} value={z.tz}>{z.city}</option>
+              ))}
+            </select>
+            <div style={{ fontSize: 'clamp(1.1rem, 4.5vw, 3rem)', fontFamily: MONO, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>
+              {fmtTime(now, worldZone)}
+            </div>
+            <div style={{ fontSize: 'clamp(0.45rem, 1vw, 0.7rem)', fontFamily: MONO, color: '#64748b', textAlign: 'center', lineHeight: 1.3 }}>
+              {fmtDate(now, worldZone)}
+            </div>
+          </>
+        )}
+
+        {tab === 'timer' && (
+          <>
+            <div style={{
+              fontSize: timerRunning || timerLeft !== timerTotal ? 'clamp(1.25rem, 5vw, 3.5rem)' : 'clamp(1rem, 3vw, 2rem)',
+              fontFamily: MONO, fontWeight: 700,
+              color: timerLeft === 0 ? '#f87171' : timerRunning ? '#38bdf8' : '#f1f5f9',
+              lineHeight: 1, textAlign: 'center',
+              animation: timerLeft === 0 ? 'none' : undefined,
+            }}>
+              {timerLeft === 0 && !timerRunning ? 'TIME UP!' : fmtTimer(timerLeft)}
+            </div>
+
+            {!timerRunning && timerLeft === timerTotal && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.2rem' }}>
+                <input
+                  type="number" min="0" max="99"
+                  value={timerSetMin}
+                  onChange={(e) => setTimerSetMin(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  style={inputStyle}
+                  data-testid="input-timer-min"
+                />
+                <span style={{ color: '#64748b', fontFamily: MONO, fontSize: '0.7rem' }}>m</span>
+                <input
+                  type="number" min="0" max="59"
+                  value={timerSetSec}
+                  onChange={(e) => setTimerSetSec(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  style={inputStyle}
+                  data-testid="input-timer-sec"
+                />
+                <span style={{ color: '#64748b', fontFamily: MONO, fontSize: '0.7rem' }}>s</span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.3rem' }}>
+              {!timerRunning && timerLeft === timerTotal && (
+                <button style={btnStyle(true)} onClick={(e) => { e.stopPropagation(); startTimer(); }} data-testid="btn-timer-start">Start</button>
+              )}
+              {timerRunning && (
+                <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); setTimerRunning(false); }} data-testid="btn-timer-pause">Pause</button>
+              )}
+              {!timerRunning && timerLeft < timerTotal && timerLeft > 0 && (
+                <button style={btnStyle(true)} onClick={(e) => { e.stopPropagation(); setTimerRunning(true); }} data-testid="btn-timer-resume">Resume</button>
+              )}
+              {(timerLeft < timerTotal) && (
+                <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); setTimerRunning(false); setTimerLeft(timerTotal); }} data-testid="btn-timer-reset">Reset</button>
+              )}
+            </div>
+          </>
+        )}
+
+        {tab === 'stopwatch' && (
+          <>
+            <div style={{ fontSize: 'clamp(1.1rem, 4.5vw, 3rem)', fontFamily: MONO, fontWeight: 700, color: swRunning ? '#4ade80' : '#f1f5f9', lineHeight: 1, textAlign: 'center' }}>
+              {fmtSw(swElapsed)}
+            </div>
+            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.3rem' }}>
+              {!swRunning ? (
+                <button style={btnStyle(true)} onClick={(e) => { e.stopPropagation(); setSwRunning(true); }} data-testid="btn-sw-start">
+                  {swElapsed > 0 ? 'Resume' : 'Start'}
+                </button>
+              ) : (
+                <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); setSwRunning(false); }} data-testid="btn-sw-stop">Stop</button>
+              )}
+              {swElapsed > 0 && !swRunning && (
+                <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); setSwElapsed(0); }} data-testid="btn-sw-reset">Reset</button>
+              )}
+            </div>
+          </>
+        )}
+
       </div>
     </div>
   );
