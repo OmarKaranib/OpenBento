@@ -132,6 +132,10 @@ interface ClockWidgetProps {
 }
 
 export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [cw, setCw] = useState(240);
+  const [ch, setCh] = useState(160);
+
   const [tab, setTab] = useState<ClockTab>('clock');
   const [now, setNow] = useState<Date>(() => new Date());
   const use24 = widget.clockUse24Hour ?? false;
@@ -147,6 +151,19 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
   const [swElapsed, setSwElapsed] = useState(0);
   const [swRunning, setSwRunning] = useState(false);
   const swStartRef = useRef<number>(0);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (r) { setCw(r.width); setCh(r.height); }
+    });
+    ro.observe(el);
+    setCw(el.offsetWidth);
+    setCh(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1_000);
@@ -173,6 +190,27 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
     return () => clearInterval(id);
   }, [swRunning]);
 
+  const s = Math.min(cw, ch);
+  const sz = {
+    tabFont: Math.max(9, s * 0.055),
+    tabPad: Math.max(3, s * 0.025),
+    bigTime: Math.max(18, Math.min(s * 0.28, cw * 0.16)),
+    dateFont: Math.max(9, s * 0.07),
+    btnFont: Math.max(10, s * 0.065),
+    btnPadV: Math.max(4, s * 0.03),
+    btnPadH: Math.max(8, s * 0.06),
+    btnRadius: Math.max(4, s * 0.025),
+    btnGap: Math.max(6, s * 0.035),
+    inputW: Math.max(32, s * 0.14),
+    inputFont: Math.max(11, s * 0.07),
+    inputPad: Math.max(3, s * 0.02),
+    labelFont: Math.max(9, s * 0.055),
+    selectFont: Math.max(10, s * 0.06),
+    selectPad: Math.max(4, s * 0.025),
+    contentGap: Math.max(4, s * 0.04),
+    toggleFont: Math.max(9, s * 0.05),
+  };
+
   const fmtTime = (d: Date, tz?: string) => {
     const opts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: !use24 };
     if (tz) opts.timeZone = tz;
@@ -185,23 +223,23 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
     return d.toLocaleDateString([], opts);
   };
 
-  const fmtTimer = (s: number) => `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
+  const fmtTimer = (sec: number) => `${pad2(Math.floor(sec / 60))}:${pad2(sec % 60)}`;
 
   const fmtSw = (ms: number) => {
     const totalSec = Math.floor(ms / 1000);
     const h = Math.floor(totalSec / 3600);
     const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
+    const sec = totalSec % 60;
     const cs = Math.floor((ms % 1000) / 10);
     return h > 0
-      ? `${pad2(h)}:${pad2(m)}:${pad2(s)}.${pad2(cs)}`
-      : `${pad2(m)}:${pad2(s)}.${pad2(cs)}`;
+      ? `${pad2(h)}:${pad2(m)}:${pad2(sec)}.${pad2(cs)}`
+      : `${pad2(m)}:${pad2(sec)}.${pad2(cs)}`;
   };
 
   const tabStyle = (t: ClockTab): React.CSSProperties => ({
     flex: 1,
-    padding: '0.2rem 0',
-    fontSize: 'clamp(0.5rem, 1vw, 0.7rem)',
+    padding: `${sz.tabPad}px 0`,
+    fontSize: `${sz.tabFont}px`,
     fontFamily: MONO,
     fontWeight: tab === t ? 700 : 500,
     color: tab === t ? '#38bdf8' : '#64748b',
@@ -215,14 +253,14 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
   });
 
   const btnStyle = (active?: boolean): React.CSSProperties => ({
-    padding: '0.25rem 0.6rem',
-    fontSize: 'clamp(0.5rem, 0.9vw, 0.7rem)',
+    padding: `${sz.btnPadV}px ${sz.btnPadH}px`,
+    fontSize: `${sz.btnFont}px`,
     fontFamily: MONO,
     fontWeight: 600,
     color: active ? '#0f172a' : '#94a3b8',
     background: active ? '#38bdf8' : 'rgba(148,163,184,0.15)',
     border: 'none',
-    borderRadius: '0.25rem',
+    borderRadius: `${sz.btnRadius}px`,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   });
@@ -238,21 +276,22 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
   };
 
   const inputStyle: React.CSSProperties = {
-    width: '2.5rem',
-    padding: '0.2rem 0.3rem',
-    fontSize: 'clamp(0.6rem, 1vw, 0.8rem)',
+    width: `${sz.inputW}px`,
+    padding: `${sz.inputPad}px ${sz.inputPad * 1.5}px`,
+    fontSize: `${sz.inputFont}px`,
     fontFamily: MONO,
     fontWeight: 600,
     color: '#f1f5f9',
     background: 'rgba(148,163,184,0.12)',
     border: '1px solid #334155',
-    borderRadius: '0.25rem',
+    borderRadius: `${sz.btnRadius}px`,
     textAlign: 'center' as const,
     outline: 'none',
   };
 
   return (
     <div
+      ref={containerRef}
       style={{
         width: '100%',
         height: '100%',
@@ -274,15 +313,15 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
         <button style={tabStyle('stopwatch')} onClick={(e) => { e.stopPropagation(); setTab('stopwatch'); }} data-testid="tab-stopwatch">Stop{swRunning ? ' \u23F1' : ''}</button>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0.5rem 0.75rem', gap: '0.4rem', minHeight: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: `${Math.max(6, s * 0.04)}px ${Math.max(8, s * 0.05)}px`, gap: `${sz.contentGap}px`, minHeight: 0 }}>
 
         {tab === 'clock' && (
           <>
-            <div style={{ position: 'absolute', top: '0.3rem', right: '0.4rem' }}>
+            <div style={{ position: 'absolute', top: `${sz.tabPad + sz.tabFont + 8}px`, right: `${Math.max(6, s * 0.03)}px` }}>
               <button
                 onClick={(e) => { e.stopPropagation(); onToggle24Hour(widget.id); }}
                 title={use24 ? 'Switch to 12-hour' : 'Switch to 24-hour'}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', fontSize: '0.6rem', fontFamily: MONO, padding: '0.15rem 0.3rem', borderRadius: '0.2rem', transition: 'color 0.15s' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', fontSize: `${sz.toggleFont}px`, fontFamily: MONO, padding: `${Math.max(2, s * 0.012)}px ${Math.max(4, s * 0.02)}px`, borderRadius: '0.2rem', transition: 'color 0.15s' }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = '#94a3b8')}
                 onMouseLeave={(e) => (e.currentTarget.style.color = '#475569')}
                 data-testid="btn-toggle-24h"
@@ -290,10 +329,10 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
                 {use24 ? '24H' : '12H'}
               </button>
             </div>
-            <div style={{ fontSize: 'clamp(1.25rem, 5.5vw, 3.5rem)', fontFamily: MONO, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: `${sz.bigTime}px`, fontFamily: MONO, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>
               {fmtTime(now)}
             </div>
-            <div style={{ fontSize: 'clamp(0.5rem, 1.1vw, 0.8rem)', fontFamily: MONO, color: '#64748b', textAlign: 'center', letterSpacing: '0.02em', lineHeight: 1.3 }}>
+            <div style={{ fontSize: `${sz.dateFont}px`, fontFamily: MONO, color: '#64748b', textAlign: 'center', letterSpacing: '0.02em', lineHeight: 1.3 }}>
               {fmtDate(now)}
             </div>
           </>
@@ -306,14 +345,14 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
               onChange={(e) => { e.stopPropagation(); setWorldZone(e.target.value); }}
               onClick={(e) => e.stopPropagation()}
               style={{
-                padding: '0.25rem 0.4rem',
-                fontSize: 'clamp(0.5rem, 0.9vw, 0.7rem)',
+                padding: `${sz.selectPad}px ${sz.selectPad * 2}px`,
+                fontSize: `${sz.selectFont}px`,
                 fontFamily: MONO,
                 fontWeight: 600,
                 color: '#f1f5f9',
                 background: '#1e293b',
                 border: '1px solid #334155',
-                borderRadius: '0.25rem',
+                borderRadius: `${sz.btnRadius}px`,
                 cursor: 'pointer',
                 outline: 'none',
                 maxWidth: '90%',
@@ -324,10 +363,10 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
                 <option key={z.tz} value={z.tz}>{z.city}</option>
               ))}
             </select>
-            <div style={{ fontSize: 'clamp(1.1rem, 4.5vw, 3rem)', fontFamily: MONO, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: `${sz.bigTime * 0.9}px`, fontFamily: MONO, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>
               {fmtTime(now, worldZone)}
             </div>
-            <div style={{ fontSize: 'clamp(0.45rem, 1vw, 0.7rem)', fontFamily: MONO, color: '#64748b', textAlign: 'center', lineHeight: 1.3 }}>
+            <div style={{ fontSize: `${sz.dateFont}px`, fontFamily: MONO, color: '#64748b', textAlign: 'center', lineHeight: 1.3 }}>
               {fmtDate(now, worldZone)}
             </div>
           </>
@@ -336,17 +375,16 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
         {tab === 'timer' && (
           <>
             <div style={{
-              fontSize: timerRunning || timerLeft !== timerTotal ? 'clamp(1.25rem, 5vw, 3.5rem)' : 'clamp(1rem, 3vw, 2rem)',
+              fontSize: `${timerRunning || timerLeft !== timerTotal ? sz.bigTime : sz.bigTime * 0.65}px`,
               fontFamily: MONO, fontWeight: 700,
               color: timerLeft === 0 ? '#f87171' : timerRunning ? '#38bdf8' : '#f1f5f9',
               lineHeight: 1, textAlign: 'center',
-              animation: timerLeft === 0 ? 'none' : undefined,
             }}>
               {timerLeft === 0 && !timerRunning ? 'TIME UP!' : fmtTimer(timerLeft)}
             </div>
 
             {!timerRunning && timerLeft === timerTotal && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: `${sz.btnGap * 0.6}px`, marginTop: `${sz.contentGap * 0.5}px` }}>
                 <input
                   type="number" min="0" max="99"
                   value={timerSetMin}
@@ -355,7 +393,7 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
                   style={inputStyle}
                   data-testid="input-timer-min"
                 />
-                <span style={{ color: '#64748b', fontFamily: MONO, fontSize: '0.7rem' }}>m</span>
+                <span style={{ color: '#64748b', fontFamily: MONO, fontSize: `${sz.labelFont}px` }}>m</span>
                 <input
                   type="number" min="0" max="59"
                   value={timerSetSec}
@@ -364,11 +402,11 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
                   style={inputStyle}
                   data-testid="input-timer-sec"
                 />
-                <span style={{ color: '#64748b', fontFamily: MONO, fontSize: '0.7rem' }}>s</span>
+                <span style={{ color: '#64748b', fontFamily: MONO, fontSize: `${sz.labelFont}px` }}>s</span>
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.3rem' }}>
+            <div style={{ display: 'flex', gap: `${sz.btnGap}px`, marginTop: `${sz.contentGap * 0.5}px` }}>
               {!timerRunning && timerLeft === timerTotal && (
                 <button style={btnStyle(true)} onClick={(e) => { e.stopPropagation(); startTimer(); }} data-testid="btn-timer-start">Start</button>
               )}
@@ -387,10 +425,10 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
 
         {tab === 'stopwatch' && (
           <>
-            <div style={{ fontSize: 'clamp(1.1rem, 4.5vw, 3rem)', fontFamily: MONO, fontWeight: 700, color: swRunning ? '#4ade80' : '#f1f5f9', lineHeight: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: `${sz.bigTime * 0.9}px`, fontFamily: MONO, fontWeight: 700, color: swRunning ? '#4ade80' : '#f1f5f9', lineHeight: 1, textAlign: 'center' }}>
               {fmtSw(swElapsed)}
             </div>
-            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.3rem' }}>
+            <div style={{ display: 'flex', gap: `${sz.btnGap}px`, marginTop: `${sz.contentGap * 0.5}px` }}>
               {!swRunning ? (
                 <button style={btnStyle(true)} onClick={(e) => { e.stopPropagation(); setSwRunning(true); }} data-testid="btn-sw-start">
                   {swElapsed > 0 ? 'Resume' : 'Start'}
