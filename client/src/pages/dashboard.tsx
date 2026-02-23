@@ -5,7 +5,7 @@ import { ADMIN_EMAIL } from '@/pages/admin';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Widget, WidgetType } from '@/App';
+import { Widget, WidgetType, WidgetRenderer } from '@/App';
 import { YouTubePlayer } from '@/components/youtube-player';
 import { SavedChannel, loadPersonalLibrary, savePersonalLibrary } from '@/components/widget-sidebar';
 import { useStreamHealing } from '@/hooks/use-stream-healing';
@@ -259,6 +259,12 @@ const MasterControlDashboard = ({
       w.id === widgetId ? { ...w, customColor: color } : w
     ));
     setColorPickerWidget(null);
+  }, [setWidgets]);
+
+  const toggleClock24Hour = useCallback((widgetId: string) => {
+    setWidgets(prev => prev.map(w =>
+      w.id === widgetId ? { ...w, clockUse24Hour: !w.clockUse24Hour } : w
+    ));
   }, [setWidgets]);
 
   // Save widget to Personal Library
@@ -1271,6 +1277,9 @@ const MasterControlDashboard = ({
   const renderWidgetContent = (widget: Widget) => {
     const isSeekMode = seekModeWidgets.has(widget.id);
 
+    const early = WidgetRenderer({ widget, onToggle24Hour: toggleClock24Hour });
+    if (early !== false) return early;
+
     switch (widget.type) {
       case 'video':
         // ARCHITECTURE PIVOT: Force Embed - If videoId exists, render immediately
@@ -1510,7 +1519,25 @@ const MasterControlDashboard = ({
         );
 
       default:
-        return null;
+        return (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: '#0f172a',
+              borderRadius: '0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#94a3b8',
+              fontSize: '0.875rem',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            }}
+            data-testid={`unknown-widget-${widget.id}`}
+          >
+            Unknown Widget: {widget.type}
+          </div>
+        );
     }
   };
 
