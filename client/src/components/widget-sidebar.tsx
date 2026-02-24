@@ -197,7 +197,7 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
   { id: 'template-spacer', name: 'Spacer',        widgetType: 'spacer', w: 2, h: 1, icon: 'spacer', color: 'slate'  },
   { id: 'template-image',  name: 'Photo',         widgetType: 'image',  w: 3, h: 2, icon: 'image',  color: 'purple' },
   { id: 'template-zoom',   name: 'Zoom Meeting',  widgetType: 'zoom',   w: 3, h: 2, icon: 'zoom',   color: 'blue'   },
-  { id: 'template-clock',  name: 'World Clock',   widgetType: 'clock',  w: 3, h: 2, icon: 'clock',  color: 'cyan'   },
+  { id: 'template-clock',  name: 'Clock',   widgetType: 'clock',  w: 3, h: 2, icon: 'clock',  color: 'cyan'   },
 ];
 
 // ─── localStorage helpers ─────────────────────────────────────────────────────
@@ -584,7 +584,7 @@ export function WidgetSidebar({
     },
     {
       id: 'clock',
-      label: 'World Clock',
+      label: 'Clock',
       description: 'Live time & date display',
       icon: <Clock className="w-[2rem] h-[2rem] text-cyan-400" />,
       iconBg: 'bg-cyan-500/15',
@@ -593,7 +593,7 @@ export function WidgetSidebar({
       badgeColor: 'text-cyan-400 bg-cyan-500/15 border-cyan-500/40',
       template: {
         id: 'template-clock',
-        name: 'World Clock',
+        name: 'Clock',
         widgetType: 'clock' as WidgetType, // lowercase — matches case 'clock' in WidgetRenderer
         w: 3,
         h: 2,
@@ -909,7 +909,7 @@ export function WidgetSidebar({
                 <p className="text-[0.95rem] font-bold text-slate-500 uppercase tracking-[0.1em] mb-[1rem]">Available</p>
 
                 {/*
-                  Two widget buttons: Note and World Clock.
+                  Two widget buttons: Note and Clock.
                   Zoom is intentionally absent — it renders as null (ghost-box fix).
 
                   Each button calls onTemplateClick(w.template) which passes a
