@@ -94,11 +94,110 @@ export interface Widget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  Clock color presets
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CLOCK_COLOR_PRESETS: { name: string; bg: string }[] = [
+  { name: 'Slate',    bg: '#0f172a' },
+  { name: 'Navy',     bg: '#0d1b2a' },
+  { name: 'Emerald',  bg: '#052e16' },
+  { name: 'Purple',   bg: '#1e0a2e' },
+  { name: 'Crimson',  bg: '#1c0808' },
+  { name: 'Charcoal', bg: '#18181b' },
+  { name: 'White',    bg: '#f8fafc' },
+  { name: 'Sand',     bg: '#fef9f0' },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Adaptive text colour helpers
+//
+//  All text/border colours inside ClockWidget are derived from the background
+//  via WCAG relative luminance so light presets (White, Sand) automatically
+//  receive dark text without any manual override.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const clean = hex.replace('#', '');
+  const full  = clean.length === 3
+    ? clean.split('').map(c => c + c).join('')
+    : clean;
+  if (full.length !== 6) return null;
+  return {
+    r: parseInt(full.slice(0, 2), 16),
+    g: parseInt(full.slice(2, 4), 16),
+    b: parseInt(full.slice(4, 6), 16),
+  };
+}
+
+function getRelativeLuminance(hex: string): number {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return 0;
+  const toLinear = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * toLinear(rgb.r) + 0.7152 * toLinear(rgb.g) + 0.0722 * toLinear(rgb.b);
+}
+
+/** Returns true when bg is light enough to need dark foreground text. */
+function isLightBg(hex: string): boolean {
+  return getRelativeLuminance(hex) > 0.35;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  playTimerChime — Web Audio API ascending 3-note ding on countdown zero.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function playTimerChime(): void {
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx   = new AudioCtx();
+    const notes = [523.25, 659.25, 783.99];       // C5 → E5 → G5
+    notes.forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      const t = ctx.currentTime + i * 0.28;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.45, t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
+      osc.start(t);
+      osc.stop(t + 1.2);
+    });
+    setTimeout(() => ctx.close().catch(() => {}), 2500);
+  } catch (err) {
+    console.warn('[ClockWidget] Timer chime failed:', err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  ClockWidget — "Time Tool Suite"
 //
-//  Four tabs: Clock | World | Timer | Stopwatch
-//  All state is internal — timer/stopwatch keep running when switching tabs.
-//  Solid bg-slate-900 (#0f172a) — never transparent.
+//  Props
+//  ─────
+//  onToggle24Hour  required
+//
+//  Background colour is controlled exclusively by the universal widget-header
+//  colour picker in the dashboard (onColorChange in dashboardProps). The
+//  internal palette button and showColorPicker state have been removed to
+//  prevent icon overlap with dashboard widget-settings controls.
+//
+//  Remaining fixes
+//  ───────────────
+//  1. Adaptive text    — every colour token (primary, secondary, border…) is
+//                        derived from the bg via isLightBg() so White/Sand
+//                        presets render dark readable text automatically.
+//  2. Timer inputs     — no lineHeight hack; vertical centring uses a flex
+//                        wrapper div with align-items:center around each input.
+//  3. Ghost navbar     — reserved height even when invisible to prevent layout
+//                        jump; sits at the top ABOVE the floating controls.
+//  4. Scaling          — bigTime clamped against s, cw, and ch simultaneously.
 // ─────────────────────────────────────────────────────────────────────────────
 
 type ClockTab = 'clock' | 'world' | 'timer' | 'stopwatch';
@@ -106,22 +205,22 @@ type ClockTab = 'clock' | 'world' | 'timer' | 'stopwatch';
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
 
 const WORLD_ZONES: { city: string; tz: string }[] = [
-  { city: 'New York', tz: 'America/New_York' },
+  { city: 'New York',    tz: 'America/New_York' },
   { city: 'Los Angeles', tz: 'America/Los_Angeles' },
-  { city: 'Chicago', tz: 'America/Chicago' },
-  { city: 'London', tz: 'Europe/London' },
-  { city: 'Paris', tz: 'Europe/Paris' },
-  { city: 'Berlin', tz: 'Europe/Berlin' },
-  { city: 'Moscow', tz: 'Europe/Moscow' },
-  { city: 'Dubai', tz: 'Asia/Dubai' },
-  { city: 'Mumbai', tz: 'Asia/Kolkata' },
-  { city: 'Singapore', tz: 'Asia/Singapore' },
-  { city: 'Tokyo', tz: 'Asia/Tokyo' },
-  { city: 'Sydney', tz: 'Australia/Sydney' },
-  { city: 'Auckland', tz: 'Pacific/Auckland' },
-  { city: 'Honolulu', tz: 'Pacific/Honolulu' },
-  { city: 'S\u00E3o Paulo', tz: 'America/Sao_Paulo' },
-  { city: 'Cairo', tz: 'Africa/Cairo' },
+  { city: 'Chicago',     tz: 'America/Chicago' },
+  { city: 'London',      tz: 'Europe/London' },
+  { city: 'Paris',       tz: 'Europe/Paris' },
+  { city: 'Berlin',      tz: 'Europe/Berlin' },
+  { city: 'Moscow',      tz: 'Europe/Moscow' },
+  { city: 'Dubai',       tz: 'Asia/Dubai' },
+  { city: 'Mumbai',      tz: 'Asia/Kolkata' },
+  { city: 'Singapore',   tz: 'Asia/Singapore' },
+  { city: 'Tokyo',       tz: 'Asia/Tokyo' },
+  { city: 'Sydney',      tz: 'Australia/Sydney' },
+  { city: 'Auckland',    tz: 'Pacific/Auckland' },
+  { city: 'Honolulu',    tz: 'Pacific/Honolulu' },
+  { city: 'São Paulo',   tz: 'America/Sao_Paulo' },
+  { city: 'Cairo',       tz: 'Africa/Cairo' },
 ];
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -131,10 +230,30 @@ interface ClockWidgetProps {
   onToggle24Hour: (widgetId: string) => void;
 }
 
-export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour }) => {
+export const ClockWidget: React.FC<ClockWidgetProps> = ({
+  widget,
+  onToggle24Hour,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [cw, setCw] = useState(240);
-  const [ch, setCh] = useState(160);
+  const [cw, setCw]  = useState(240);
+  const [ch, setCh]  = useState(160);
+
+  const [isHovered, setIsHovered] = useState(false);
+
+  const bgColor = widget.customColor ?? CLOCK_COLOR_PRESETS[0].bg;
+
+  // ── Adaptive colour tokens derived from background luminance ──────────────
+  const light = isLightBg(bgColor);
+
+  const clrPrimary    = light ? '#0f172a' : '#f1f5f9';
+  const clrSecondary  = light ? '#334155' : '#94a3b8';
+  const clrSubtle     = light ? '#64748b' : '#475569';
+  const clrAccent     = light ? '#0284c7' : '#38bdf8';
+  const clrBorder     = light ? 'rgba(0,0,0,0.12)' : '#1e293b';
+  const clrInputBg    = light ? 'rgba(0,0,0,0.06)' : 'rgba(148,163,184,0.12)';
+  const clrInputBdr   = light ? '#94a3b8' : '#334155';
+  const clrBtnPassive = light ? 'rgba(0,0,0,0.07)' : 'rgba(148,163,184,0.15)';
+  const clrSelectBg   = light ? '#e2e8f0' : '#1e293b';
 
   const [tab, setTab] = useState<ClockTab>('clock');
   const [now, setNow] = useState<Date>(() => new Date());
@@ -142,16 +261,17 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
 
   const [worldZone, setWorldZone] = useState(WORLD_ZONES[0].tz);
 
-  const [timerTotal, setTimerTotal] = useState(300);
-  const [timerLeft, setTimerLeft] = useState(300);
+  const [timerTotal,   setTimerTotal]   = useState(300);
+  const [timerLeft,    setTimerLeft]    = useState(300);
   const [timerRunning, setTimerRunning] = useState(false);
-  const [timerSetMin, setTimerSetMin] = useState('5');
-  const [timerSetSec, setTimerSetSec] = useState('0');
+  const [timerSetMin,  setTimerSetMin]  = useState('5');
+  const [timerSetSec,  setTimerSetSec]  = useState('0');
 
   const [swElapsed, setSwElapsed] = useState(0);
   const [swRunning, setSwRunning] = useState(false);
   const swStartRef = useRef<number>(0);
 
+  // ── ResizeObserver ────────────────────────────────────────────────────────
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -165,60 +285,74 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
     return () => ro.disconnect();
   }, []);
 
+  // ── Wall-clock tick ───────────────────────────────────────────────────────
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1_000);
     return () => clearInterval(id);
   }, []);
 
+  // ── Countdown with chime ──────────────────────────────────────────────────
   useEffect(() => {
     if (!timerRunning) return;
     const id = setInterval(() => {
       setTimerLeft(prev => {
-        if (prev <= 1) { setTimerRunning(false); return 0; }
+        if (prev <= 1) { setTimerRunning(false); playTimerChime(); return 0; }
         return prev - 1;
       });
     }, 1_000);
     return () => clearInterval(id);
   }, [timerRunning]);
 
+  // ── Stopwatch ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!swRunning) return;
     swStartRef.current = Date.now() - swElapsed;
-    const id = setInterval(() => {
-      setSwElapsed(Date.now() - swStartRef.current);
-    }, 47);
+    const id = setInterval(() => setSwElapsed(Date.now() - swStartRef.current), 47);
     return () => clearInterval(id);
   }, [swRunning]);
 
+  // ── Responsive scale ─────────────────────────────────────────────────────
   const s = Math.min(cw, ch);
+
   const sz = {
-    tabFont: Math.max(9, s * 0.055),
-    tabPad: Math.max(3, s * 0.025),
-    bigTime: Math.max(18, Math.min(s * 0.28, cw * 0.16)),
-    dateFont: Math.max(9, s * 0.07),
-    btnFont: Math.max(10, s * 0.065),
-    btnPadV: Math.max(4, s * 0.03),
-    btnPadH: Math.max(8, s * 0.06),
-    btnRadius: Math.max(4, s * 0.025),
-    btnGap: Math.max(6, s * 0.035),
-    inputW: Math.max(32, s * 0.14),
-    inputFont: Math.max(11, s * 0.07),
-    inputPad: Math.max(3, s * 0.02),
-    labelFont: Math.max(9, s * 0.055),
+    tabFont:    Math.max(9,  s * 0.055),
+    tabPad:     Math.max(3,  s * 0.025),
+    // Clamp bigTime against all three dimensions (auto-scaling fix)
+    bigTime:    Math.max(18, Math.min(s * 0.28, cw * 0.155, ch * 0.36)),
+    dateFont:   Math.max(9,  s * 0.065),
+    btnFont:    Math.max(10, s * 0.065),
+    btnPadV:    Math.max(4,  s * 0.03),
+    btnPadH:    Math.max(8,  s * 0.06),
+    btnRadius:  Math.max(4,  s * 0.025),
+    btnGap:     Math.max(6,  s * 0.035),
+    // Explicit dimensions; centring via flex wrapper, NOT lineHeight
+    inputW:     Math.max(48, s * 0.17),
+    inputH:     Math.max(34, s * 0.14),
+    inputFont:  Math.max(13, s * 0.078),
+    inputPadH:  Math.max(6,  s * 0.03),
+    labelFont:  Math.max(9,  s * 0.055),
     selectFont: Math.max(10, s * 0.06),
-    selectPad: Math.max(4, s * 0.025),
-    contentGap: Math.max(4, s * 0.04),
-    toggleFont: Math.max(9, s * 0.05),
+    selectPad:  Math.max(4,  s * 0.025),
+    contentGap: Math.max(4,  s * 0.04),
+    toggleFont: Math.max(9,  s * 0.052),
   };
 
+  // approximate rendered height of the tab bar row
+  const tabRowH = sz.tabPad * 2 + sz.tabFont + 6;
+
+  // ── Formatters ────────────────────────────────────────────────────────────
   const fmtTime = (d: Date, tz?: string) => {
-    const opts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: !use24 };
+    const opts: Intl.DateTimeFormatOptions = {
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: !use24,
+    };
     if (tz) opts.timeZone = tz;
     return d.toLocaleTimeString([], opts);
   };
 
   const fmtDate = (d: Date, tz?: string) => {
-    const opts: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const opts: Intl.DateTimeFormatOptions = {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    };
     if (tz) opts.timeZone = tz;
     return d.toLocaleDateString([], opts);
   };
@@ -227,25 +361,26 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
 
   const fmtSw = (ms: number) => {
     const totalSec = Math.floor(ms / 1000);
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
+    const h   = Math.floor(totalSec / 3600);
+    const m   = Math.floor((totalSec % 3600) / 60);
     const sec = totalSec % 60;
-    const cs = Math.floor((ms % 1000) / 10);
+    const cs  = Math.floor((ms % 1000) / 10);
     return h > 0
       ? `${pad2(h)}:${pad2(m)}:${pad2(sec)}.${pad2(cs)}`
       : `${pad2(m)}:${pad2(sec)}.${pad2(cs)}`;
   };
 
+  // ── Style factories ───────────────────────────────────────────────────────
   const tabStyle = (t: ClockTab): React.CSSProperties => ({
     flex: 1,
     padding: `${sz.tabPad}px 0`,
     fontSize: `${sz.tabFont}px`,
     fontFamily: MONO,
     fontWeight: tab === t ? 700 : 500,
-    color: tab === t ? '#38bdf8' : '#64748b',
-    background: tab === t ? 'rgba(56,189,248,0.1)' : 'transparent',
+    color: tab === t ? clrAccent : clrSubtle,
+    background: tab === t ? (light ? 'rgba(2,132,199,0.1)' : 'rgba(56,189,248,0.1)') : 'transparent',
     border: 'none',
-    borderBottom: tab === t ? '2px solid #38bdf8' : '2px solid transparent',
+    borderBottom: tab === t ? `2px solid ${clrAccent}` : '2px solid transparent',
     cursor: 'pointer',
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
@@ -253,21 +388,21 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
   });
 
   const btnStyle = (active?: boolean): React.CSSProperties => ({
-    padding: `${sz.btnPadV}px ${sz.btnPadH}px`,
-    fontSize: `${sz.btnFont}px`,
-    fontFamily: MONO,
-    fontWeight: 600,
-    color: active ? '#0f172a' : '#94a3b8',
-    background: active ? '#38bdf8' : 'rgba(148,163,184,0.15)',
-    border: 'none',
+    padding:      `${sz.btnPadV}px ${sz.btnPadH}px`,
+    fontSize:     `${sz.btnFont}px`,
+    fontFamily:   MONO,
+    fontWeight:   600,
+    color:        active ? (light ? '#ffffff' : '#0f172a') : clrSecondary,
+    background:   active ? clrAccent : clrBtnPassive,
+    border:       'none',
     borderRadius: `${sz.btnRadius}px`,
-    cursor: 'pointer',
-    transition: 'all 0.15s ease',
+    cursor:       'pointer',
+    transition:   'all 0.15s ease',
   });
 
   const startTimer = () => {
-    const mins = Math.max(0, Math.min(99, parseInt(timerSetMin) || 0));
-    const secs = Math.max(0, Math.min(59, parseInt(timerSetSec) || 0));
+    const mins  = Math.max(0, Math.min(99, parseInt(timerSetMin) || 0));
+    const secs  = Math.max(0, Math.min(59, parseInt(timerSetSec) || 0));
     const total = mins * 60 + secs;
     if (total <= 0) return;
     setTimerTotal(total);
@@ -275,69 +410,99 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
     setTimerRunning(true);
   };
 
+  // Input style: explicit height + no lineHeight; centering done by a flex
+  // wrapper div around each <input>.
   const inputStyle: React.CSSProperties = {
-    width: `${sz.inputW}px`,
-    padding: `${sz.inputPad}px ${sz.inputPad * 1.5}px`,
-    fontSize: `${sz.inputFont}px`,
-    fontFamily: MONO,
-    fontWeight: 600,
-    color: '#f1f5f9',
-    background: 'rgba(148,163,184,0.12)',
-    border: '1px solid #334155',
+    width:        `${sz.inputW}px`,
+    height:       `${sz.inputH}px`,
+    padding:      `0 ${sz.inputPadH}px`,
+    fontSize:     `${sz.inputFont}px`,
+    fontFamily:   MONO,
+    fontWeight:   600,
+    color:        clrPrimary,
+    background:   clrInputBg,
+    border:       `1px solid ${clrInputBdr}`,
     borderRadius: `${sz.btnRadius}px`,
-    textAlign: 'center' as const,
-    outline: 'none',
+    textAlign:    'center' as const,
+    outline:      'none',
+    boxSizing:    'border-box' as const,
+    MozAppearance: 'textfield' as const,
+    appearance:   'textfield' as const,
   };
 
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div
       ref={containerRef}
       style={{
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#0f172a',
-        borderRadius: '0.5rem',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        userSelect: 'none',
-        overflow: 'hidden',
-        boxSizing: 'border-box',
+        width:           '100%',
+        height:          '100%',
+        backgroundColor: bgColor,
+        borderRadius:    '0.5rem',
+        display:         'flex',
+        flexDirection:   'column',
+        position:        'relative',
+        userSelect:      'none',
+        overflow:        'hidden',
+        boxSizing:       'border-box',
+        transition:      'background-color 0.3s ease',
       }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       data-testid={`clock-widget-${widget.id}`}
     >
-      <div style={{ display: 'flex', borderBottom: '1px solid #1e293b', flexShrink: 0 }}>
-        <button style={tabStyle('clock')} onClick={(e) => { e.stopPropagation(); setTab('clock'); }} data-testid="tab-clock">Clock</button>
-        <button style={tabStyle('world')} onClick={(e) => { e.stopPropagation(); setTab('world'); }} data-testid="tab-world">World</button>
-        <button style={tabStyle('timer')} onClick={(e) => { e.stopPropagation(); setTab('timer'); }} data-testid="tab-timer">Timer{timerRunning ? ' \u23F1' : ''}</button>
-        <button style={tabStyle('stopwatch')} onClick={(e) => { e.stopPropagation(); setTab('stopwatch'); }} data-testid="tab-stopwatch">Stop{swRunning ? ' \u23F1' : ''}</button>
+
+      {/* ── Ghost Navbar ─────────────────────────────────────────────────────
+           Reserves its own height in the flex column even when invisible so
+           the content area below never jumps on hover.                      */}
+      <div
+        style={{
+          display:       'flex',
+          borderBottom:  `1px solid ${clrBorder}`,
+          flexShrink:    0,
+          minHeight:     `${tabRowH}px`,
+          opacity:       isHovered ? 1 : 0,
+          pointerEvents: isHovered ? 'auto' : 'none',
+          transition:    'opacity 0.2s ease',
+        }}
+      >
+        <button style={tabStyle('clock')}     onClick={(e) => { e.stopPropagation(); setTab('clock'); }}     data-testid="tab-clock">Clock</button>
+        <button style={tabStyle('world')}     onClick={(e) => { e.stopPropagation(); setTab('world'); }}     data-testid="tab-world">World</button>
+        <button style={tabStyle('timer')}     onClick={(e) => { e.stopPropagation(); setTab('timer'); }}     data-testid="tab-timer">Timer{timerRunning ? ' ⏱' : ''}</button>
+        <button style={tabStyle('stopwatch')} onClick={(e) => { e.stopPropagation(); setTab('stopwatch'); }} data-testid="tab-stopwatch">Stop{swRunning ? ' ⏱' : ''}</button>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: `${Math.max(6, s * 0.04)}px ${Math.max(8, s * 0.05)}px`, gap: `${sz.contentGap}px`, minHeight: 0 }}>
+      {/* ── Main content area ─────────────────────────────────────────────── */}
+      <div
+        style={{
+          flex:           1,
+          display:        'flex',
+          flexDirection:  'column',
+          alignItems:     'center',
+          justifyContent: 'center',
+          padding:        `${Math.max(6, s * 0.04)}px ${Math.max(8, s * 0.05)}px`,
+          // Extra bottom space reserved for the 12h/24h toggle (clock tab only)
+          paddingBottom:  tab === 'clock'
+            ? `${Math.max(28, s * 0.13)}px`
+            : `${Math.max(6, s * 0.04)}px`,
+          gap:            `${sz.contentGap}px`,
+          minHeight:      0,
+        }}
+      >
 
+        {/* ─── CLOCK TAB ──────────────────────────────────────────────────── */}
         {tab === 'clock' && (
           <>
-            <div style={{ position: 'absolute', top: `${sz.tabPad + sz.tabFont + 8}px`, right: `${Math.max(6, s * 0.03)}px` }}>
-              <button
-                onClick={(e) => { e.stopPropagation(); onToggle24Hour(widget.id); }}
-                title={use24 ? 'Switch to 12-hour' : 'Switch to 24-hour'}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', fontSize: `${sz.toggleFont}px`, fontFamily: MONO, padding: `${Math.max(2, s * 0.012)}px ${Math.max(4, s * 0.02)}px`, borderRadius: '0.2rem', transition: 'color 0.15s' }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#94a3b8')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#475569')}
-                data-testid="btn-toggle-24h"
-              >
-                {use24 ? '24H' : '12H'}
-              </button>
-            </div>
-            <div style={{ fontSize: `${sz.bigTime}px`, fontFamily: MONO, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: `${sz.bigTime}px`, fontFamily: MONO, fontWeight: 700, color: clrPrimary, letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>
               {fmtTime(now)}
             </div>
-            <div style={{ fontSize: `${sz.dateFont}px`, fontFamily: MONO, color: '#64748b', textAlign: 'center', letterSpacing: '0.02em', lineHeight: 1.3 }}>
+            <div style={{ fontSize: `${sz.dateFont}px`, fontFamily: MONO, color: clrSubtle, textAlign: 'center', letterSpacing: '0.02em', lineHeight: 1.3 }}>
               {fmtDate(now)}
             </div>
           </>
         )}
 
+        {/* ─── WORLD TAB ──────────────────────────────────────────────────── */}
         {tab === 'world' && (
           <>
             <select
@@ -347,62 +512,64 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
               style={{
                 padding: `${sz.selectPad}px ${sz.selectPad * 2}px`,
                 fontSize: `${sz.selectFont}px`,
-                fontFamily: MONO,
-                fontWeight: 600,
-                color: '#f1f5f9',
-                background: '#1e293b',
-                border: '1px solid #334155',
+                fontFamily: MONO, fontWeight: 600,
+                color: clrPrimary, background: clrSelectBg,
+                border: `1px solid ${clrInputBdr}`,
                 borderRadius: `${sz.btnRadius}px`,
-                cursor: 'pointer',
-                outline: 'none',
-                maxWidth: '90%',
+                cursor: 'pointer', outline: 'none', maxWidth: '90%',
               }}
               data-testid="select-timezone"
             >
-              {WORLD_ZONES.map(z => (
-                <option key={z.tz} value={z.tz}>{z.city}</option>
-              ))}
+              {WORLD_ZONES.map(z => <option key={z.tz} value={z.tz}>{z.city}</option>)}
             </select>
-            <div style={{ fontSize: `${sz.bigTime * 0.9}px`, fontFamily: MONO, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: `${sz.bigTime * 0.9}px`, fontFamily: MONO, fontWeight: 700, color: clrPrimary, letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>
               {fmtTime(now, worldZone)}
             </div>
-            <div style={{ fontSize: `${sz.dateFont}px`, fontFamily: MONO, color: '#64748b', textAlign: 'center', lineHeight: 1.3 }}>
+            <div style={{ fontSize: `${sz.dateFont}px`, fontFamily: MONO, color: clrSubtle, textAlign: 'center', lineHeight: 1.3 }}>
               {fmtDate(now, worldZone)}
             </div>
           </>
         )}
 
+        {/* ─── TIMER TAB ──────────────────────────────────────────────────── */}
         {tab === 'timer' && (
           <>
-            <div style={{
-              fontSize: `${timerRunning || timerLeft !== timerTotal ? sz.bigTime : sz.bigTime * 0.65}px`,
-              fontFamily: MONO, fontWeight: 700,
-              color: timerLeft === 0 ? '#f87171' : timerRunning ? '#38bdf8' : '#f1f5f9',
-              lineHeight: 1, textAlign: 'center',
-            }}>
+            <div
+              style={{
+                fontSize:   `${timerRunning || timerLeft !== timerTotal ? sz.bigTime : sz.bigTime * 0.65}px`,
+                fontFamily: MONO, fontWeight: 700, lineHeight: 1, textAlign: 'center',
+                color: timerLeft === 0 ? '#f87171' : timerRunning ? clrAccent : clrPrimary,
+              }}
+            >
               {timerLeft === 0 && !timerRunning ? 'TIME UP!' : fmtTimer(timerLeft)}
             </div>
 
+            {/* Flex wrapper provides vertical centering; input uses explicit
+                height only, NOT lineHeight.                                 */}
             {!timerRunning && timerLeft === timerTotal && (
               <div style={{ display: 'flex', alignItems: 'center', gap: `${sz.btnGap * 0.6}px`, marginTop: `${sz.contentGap * 0.5}px` }}>
-                <input
-                  type="number" min="0" max="99"
-                  value={timerSetMin}
-                  onChange={(e) => setTimerSetMin(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  style={inputStyle}
-                  data-testid="input-timer-min"
-                />
-                <span style={{ color: '#64748b', fontFamily: MONO, fontSize: `${sz.labelFont}px` }}>m</span>
-                <input
-                  type="number" min="0" max="59"
-                  value={timerSetSec}
-                  onChange={(e) => setTimerSetSec(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  style={inputStyle}
-                  data-testid="input-timer-sec"
-                />
-                <span style={{ color: '#64748b', fontFamily: MONO, fontSize: `${sz.labelFont}px` }}>s</span>
+                <div style={{ display: 'flex', alignItems: 'center', height: `${sz.inputH}px` }}>
+                  <input
+                    type="number" min="0" max="99"
+                    value={timerSetMin}
+                    onChange={(e) => setTimerSetMin(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={inputStyle}
+                    data-testid="input-timer-min"
+                  />
+                </div>
+                <span style={{ color: clrSubtle, fontFamily: MONO, fontSize: `${sz.labelFont}px`, lineHeight: 1 }}>m</span>
+                <div style={{ display: 'flex', alignItems: 'center', height: `${sz.inputH}px` }}>
+                  <input
+                    type="number" min="0" max="59"
+                    value={timerSetSec}
+                    onChange={(e) => setTimerSetSec(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={inputStyle}
+                    data-testid="input-timer-sec"
+                  />
+                </div>
+                <span style={{ color: clrSubtle, fontFamily: MONO, fontSize: `${sz.labelFont}px`, lineHeight: 1 }}>s</span>
               </div>
             )}
 
@@ -416,16 +583,17 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
               {!timerRunning && timerLeft < timerTotal && timerLeft > 0 && (
                 <button style={btnStyle(true)} onClick={(e) => { e.stopPropagation(); setTimerRunning(true); }} data-testid="btn-timer-resume">Resume</button>
               )}
-              {(timerLeft < timerTotal) && (
+              {timerLeft < timerTotal && (
                 <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); setTimerRunning(false); setTimerLeft(timerTotal); }} data-testid="btn-timer-reset">Reset</button>
               )}
             </div>
           </>
         )}
 
+        {/* ─── STOPWATCH TAB ──────────────────────────────────────────────── */}
         {tab === 'stopwatch' && (
           <>
-            <div style={{ fontSize: `${sz.bigTime * 0.9}px`, fontFamily: MONO, fontWeight: 700, color: swRunning ? '#4ade80' : '#f1f5f9', lineHeight: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: `${sz.bigTime * 0.9}px`, fontFamily: MONO, fontWeight: 700, color: swRunning ? '#4ade80' : clrPrimary, lineHeight: 1, textAlign: 'center' }}>
               {fmtSw(swElapsed)}
             </div>
             <div style={{ display: 'flex', gap: `${sz.btnGap}px`, marginTop: `${sz.contentGap * 0.5}px` }}>
@@ -444,6 +612,48 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
         )}
 
       </div>
+
+      {/* ── 12h/24h toggle: BOTTOM-CENTER, clock tab only ────────────────────
+           Placed at bottom-center so it never competes with external
+           dashboard widget-settings icons in the top-right corner.          */}
+      {tab === 'clock' && (
+        <div
+          style={{
+            position:      'absolute',
+            bottom:        `${Math.max(5, s * 0.026)}px`,
+            left:          '50%',
+            transform:     'translateX(-50%)',
+            opacity:       isHovered ? 1 : 0,
+            pointerEvents: isHovered ? 'auto' : 'none',
+            transition:    'opacity 0.2s ease',
+            zIndex:        10,
+          }}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggle24Hour(widget.id); }}
+            title={use24 ? 'Switch to 12-hour' : 'Switch to 24-hour'}
+            style={{
+              background:    light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+              border:        `1px solid ${clrInputBdr}`,
+              cursor:        'pointer',
+              color:         clrSecondary,
+              fontSize:      `${sz.toggleFont}px`,
+              fontFamily:    MONO,
+              fontWeight:    600,
+              padding:       `${Math.max(2, s * 0.012)}px ${Math.max(8, s * 0.045)}px`,
+              borderRadius:  `${sz.btnRadius}px`,
+              transition:    'color 0.15s, background 0.15s',
+              letterSpacing: '0.06em',
+              whiteSpace:    'nowrap',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = clrPrimary)}
+            onMouseLeave={(e) => (e.currentTarget.style.color = clrSecondary)}
+            data-testid="btn-toggle-24h"
+          >
+            {use24 ? '24H' : '12H'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -451,41 +661,35 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({ widget, onToggle24Hour
 // ─────────────────────────────────────────────────────────────────────────────
 //  WidgetRenderer
 //
-//  Central switch statement for ALL widget types.
-//
-//  Call this at the VERY TOP of dashboard.tsx's widget-cell render function:
+//  Usage in dashboard.tsx (top of widget-cell render function):
 //
 //    import { WidgetRenderer } from '@/App';
 //
-//    const early = WidgetRenderer({ widget, onToggle24Hour: onToggleClockFormat });
-//    if (early !== false) return early;   // null | JSX — handled here
-//    // ... continue with your existing video / note / spacer / image rendering
-//
-//  Return values
-//  ─────────────
-//    null    → render nothing at all       ('zoom' ghost-box fix)
-//    JSX     → render the returned element ('clock')
-//    false   → dashboard renders this type ('video', 'note', 'spacer', 'image')
-//    <div>   → Unknown Widget Type debug tile for any unrecognised type string
-//              (solid slate-900 background — never a transparent ghost box)
+//    const early = WidgetRenderer({
+//      widget,
+//      onToggle24Hour: onToggleClockFormat,
+//      onColorChange,
+//    });
+//    if (early !== false) return early;
+//    // ... video / note / spacer / image rendering continues
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface WidgetRendererProps {
   widget: Widget;
   onToggle24Hour: (widgetId: string) => void;
+  /** Optional — forwarded from dashboardProps; used by the universal widget-header colour picker */
+  onColorChange?: (widgetId: string, color: string) => void;
 }
 
 export function WidgetRenderer({
   widget,
   onToggle24Hour,
+  onColorChange,
 }: WidgetRendererProps): React.ReactElement | null | false {
   switch (widget.type) {
-
-    // ── 'zoom': backwards-compat — render nothing at all (kills ghost box) ──
     case 'zoom':
       return null;
 
-    // ── 'clock': live ticking clock with solid opaque background ────────────
     case 'clock':
       return (
         <ClockWidget
@@ -495,54 +699,26 @@ export function WidgetRenderer({
         />
       );
 
-    // ── Known dashboard-rendered types: signal the caller to handle these ───
     case 'video':
     case 'note':
     case 'spacer':
     case 'image':
       return false;
 
-    // ── Default: unknown / future type — visible debug tile ─────────────────
-    // Solid background ensures there is NEVER a transparent ghost box.
     default:
       return (
         <div
           style={{
-            width: '100%',
-            height: '100%',
-            backgroundColor: '#0f172a', // solid slate-900 — never transparent
-            borderRadius: '0.5rem',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '1.5rem',
-            boxSizing: 'border-box',
-            border: '1px dashed #334155',
+            width: '100%', height: '100%', backgroundColor: '#0f172a',
+            borderRadius: '0.5rem', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            padding: '1.5rem', boxSizing: 'border-box', border: '1px dashed #334155',
           }}
         >
-          <p
-            style={{
-              color: '#f87171',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              textAlign: 'center',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              marginBottom: '0.35rem',
-            }}
-          >
+          <p style={{ color: '#f87171', fontSize: '0.85rem', fontWeight: 700, textAlign: 'center', fontFamily: MONO, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
             Unknown Widget Type
           </p>
-          <p
-            style={{
-              color: '#475569',
-              fontSize: '0.75rem',
-              textAlign: 'center',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-            }}
-          >
+          <p style={{ color: '#475569', fontSize: '0.75rem', textAlign: 'center', fontFamily: MONO }}>
             type: &quot;{(widget as Widget).type}&quot;
           </p>
         </div>
@@ -629,19 +805,18 @@ function AppContent() {
         const parsed = JSON.parse(saved);
         return parsed.map((w: Widget) => ({
           ...w,
-          isMuted: w.isMuted ?? true,
-          isPaused: w.isPaused ?? false,
-          volume: w.volume ?? 0,
+          isMuted:        w.isMuted        ?? true,
+          isPaused:       w.isPaused       ?? false,
+          volume:         w.volume         ?? 0,
           previousVolume: w.previousVolume ?? 50,
-          isOffline: w.isOffline ?? false,
-          x: w.x ?? 0,
-          y: w.y ?? 0,
-          w: w.w ?? 3,
-          h: w.h ?? 2,
-          // Nuclear Refresh Fix: migrate legacy iframeKey field
+          isOffline:      w.isOffline      ?? false,
+          x:              w.x              ?? 0,
+          y:              w.y              ?? 0,
+          w:              w.w              ?? 3,
+          h:              w.h              ?? 2,
           refreshCounter: (w as any).refreshCounter ?? (w as any).iframeKey ?? 0,
-          channelName: stripLegacyPrefix(w.channelName),
-          noteContent: w.type === 'note' ? (w.noteContent ?? '') : w.noteContent,
+          channelName:    stripLegacyPrefix(w.channelName),
+          noteContent:    w.type === 'note' ? (w.noteContent ?? '') : w.noteContent,
           clockUse24Hour: w.clockUse24Hour ?? false,
         }));
       } catch {
@@ -684,7 +859,6 @@ function AppContent() {
   const findSmartPosition = useCallback(
     (requestedW: number, requestedH: number, currentWidgets: Widget[]): { x: number; y: number; w: number; h: number } | null => {
       const GRID_ROWS = 6;
-
       const isPositionFree = (x: number, y: number, w: number, h: number): boolean => {
         if (x + w > GRID_COLS || y + h > GRID_ROWS) return false;
         for (const widget of currentWidgets) {
@@ -695,7 +869,6 @@ function AppContent() {
         }
         return true;
       };
-
       for (let y = 0; y <= GRID_ROWS - requestedH; y++) {
         for (let x = 0; x <= GRID_COLS - requestedW; x++) {
           if (isPositionFree(x, y, requestedW, requestedH)) return { x, y, w: requestedW, h: requestedH };
@@ -722,7 +895,9 @@ function AppContent() {
       for (let x = 0; x < GRID_COLS; x++) {
         let cellFree = true;
         for (const widget of widgets) {
-          if (x < widget.x + widget.w && x + 1 > widget.x && y < widget.y + widget.h && y + 1 > widget.y) { cellFree = false; break; }
+          if (x < widget.x + widget.w && x + 1 > widget.x && y < widget.y + widget.h && y + 1 > widget.y) {
+            cellFree = false; break;
+          }
         }
         if (cellFree && ad) {
           if (x < ad.x + ad.w && x + 1 > ad.x && y < ad.y + ad.h && y + 1 > ad.y) cellFree = false;
@@ -746,7 +921,6 @@ function AppContent() {
           w: smartResult.w, h: smartResult.h,
           isMuted: true, isPaused: false, volume: 0, previousVolume: 50, isOffline: false,
           refreshCounter: 0,
-          // Initialise type-specific fields so these widgets always have solid backgrounds
           ...(type === 'note'  && { noteContent: '' }),
           ...(type === 'clock' && { clockUse24Hour: false }),
           ...extraData,
@@ -759,8 +933,9 @@ function AppContent() {
   );
 
   // ── Nuclear Refresh Fix ─────────────────────────────────────────────────────
-  // Increment refreshCounter → React sees a new key → fully unmounts & remounts
-  // the iframe. In dashboard.tsx use: key={`${widget.id}-${widget.refreshCounter ?? 0}`}
+  // Use in JSX: key={`${widget.id}-${widget.refreshCounter ?? 0}`}
+  // Incrementing refreshCounter forces React to fully unmount + remount the
+  // iframe/embed, providing a true "hard reset" without touching the URL.
   const handleRefreshWidget = useCallback((widgetId: string) => {
     setWidgets(prev =>
       prev.map(w =>
@@ -772,13 +947,19 @@ function AppContent() {
   }, []);
 
   // ── Clock 12h / 24h toggle ──────────────────────────────────────────────────
-  // Passed through dashboardProps as onToggleClockFormat, then forwarded into
-  // WidgetRenderer({ widget, onToggle24Hour: onToggleClockFormat }).
   const handleToggleClockFormat = useCallback((widgetId: string) => {
     setWidgets(prev =>
-      prev.map(w =>
-        w.id === widgetId ? { ...w, clockUse24Hour: !(w.clockUse24Hour ?? false) } : w
-      )
+      prev.map(w => w.id === widgetId ? { ...w, clockUse24Hour: !(w.clockUse24Hour ?? false) } : w)
+    );
+  }, []);
+
+  // ── Clock background colour ─────────────────────────────────────────────────
+  // Canonical handler — called by the universal widget-header colour picker in
+  // dashboard.tsx. Writes widget.customColor which ClockWidget reads via
+  // widget.customColor ?? CLOCK_COLOR_PRESETS[0].bg.
+  const handleClockColorChange = useCallback((widgetId: string, color: string) => {
+    setWidgets(prev =>
+      prev.map(w => w.id === widgetId ? { ...w, customColor: color } : w)
     );
   }, []);
 
@@ -846,7 +1027,8 @@ function AppContent() {
           channelName: w.channelName || immediateName,
           isTwitch: !!twitchChannel, twitchChannel,
           isKick: !!kickChannel, kickChannel,
-          isLive: false, error: null, embedBlocked: false, isPaused: false, isMuted: true, volume: 0, isOffline: false,
+          isLive: false, error: null, embedBlocked: false, isPaused: false,
+          isMuted: true, volume: 0, isOffline: false,
           refreshCounter: (w.refreshCounter ?? 0) + 1,
           lastRefresh: Date.now(),
         } : w
@@ -894,7 +1076,8 @@ function AppContent() {
         channelName: w.channelName || immediateName,
         isTwitch: !!twitchChannel, twitchChannel,
         isKick: !!kickChannel, kickChannel,
-        isLive: false, error: null, embedBlocked: false, isPaused: false, isMuted: true, volume: 0, isOffline: false,
+        isLive: false, error: null, embedBlocked: false, isPaused: false,
+        isMuted: true, volume: 0, isOffline: false,
         refreshCounter: (w.refreshCounter ?? 0) + 1,
         lastRefresh: Date.now(),
       } : w
@@ -931,9 +1114,11 @@ function AppContent() {
     const translated = event.active.rect.current.translated;
     const initial    = event.active.rect.current.initial;
 
-    if (translated) { dragX = translated.left; dragY = translated.top; }
-    else if (initial && event.delta) { dragX = initial.left + event.delta.x; dragY = initial.top + event.delta.y; }
-    else return;
+    if (translated) {
+      dragX = translated.left; dragY = translated.top;
+    } else if (initial && event.delta) {
+      dragX = initial.left + event.delta.x; dragY = initial.top + event.delta.y;
+    } else return;
 
     const cellWidth  = gridRect.width  / GRID_COLS;
     const cellHeight = gridRect.height / 6;
@@ -968,9 +1153,13 @@ function AppContent() {
                   let collision = false;
                   for (const other of allWidgets) {
                     if (excludeIds.includes(other.id)) continue;
-                    if (x < other.x + other.w && x + w.w > other.x && y < other.y + other.h && y + w.h > other.y) { collision = true; break; }
+                    if (x < other.x + other.w && x + w.w > other.x && y < other.y + other.h && y + w.h > other.y) {
+                      collision = true; break;
+                    }
                   }
-                  if (!collision && x < clampedX + previewW && x + w.w > clampedX && y < clampedY + previewH && y + w.h > clampedY) collision = true;
+                  if (!collision && x < clampedX + previewW && x + w.w > clampedX && y < clampedY + previewH && y + w.h > clampedY) {
+                    collision = true;
+                  }
                   if (!collision) return { x, y };
                 }
               }
@@ -993,8 +1182,13 @@ function AppContent() {
           ghostValidRef.current = true;
         }
 
-        if (!ghostValidRef.current) { ghostPositionRef.current = null; setGhostPosition(null); }
-        else { ghostPositionRef.current = { x: clampedX, y: clampedY, w: previewW, h: previewH }; setGhostPosition(ghostPositionRef.current); }
+        if (!ghostValidRef.current) {
+          ghostPositionRef.current = null;
+          setGhostPosition(null);
+        } else {
+          ghostPositionRef.current = { x: clampedX, y: clampedY, w: previewW, h: previewH };
+          setGhostPosition(ghostPositionRef.current);
+        }
         return;
       }
     }
@@ -1007,7 +1201,8 @@ function AppContent() {
     (x: number, y: number, w: number, h: number, excludeId: string, currentWidgets: Widget[]): Widget[] =>
       currentWidgets.filter(widget => {
         if (widget.id === excludeId) return false;
-        return x < widget.x + widget.w && x + w > widget.x && y < widget.y + widget.h && y + h > widget.y;
+        return x < widget.x + widget.w && x + w > widget.x &&
+               y < widget.y + widget.h && y + h > widget.y;
       }),
     []
   );
@@ -1020,7 +1215,9 @@ function AppContent() {
           let collision = false;
           for (const other of allWidgets) {
             if (excludeIds.includes(other.id)) continue;
-            if (x < other.x + other.w && x + widget.w > other.x && y < other.y + other.h && y + widget.h > other.y) { collision = true; break; }
+            if (x < other.x + other.w && x + widget.w > other.x && y < other.y + other.h && y + widget.h > other.y) {
+              collision = true; break;
+            }
           }
           if (!collision && ad) {
             if (x < ad.x + ad.w && x + widget.w > ad.x && y < ad.y + ad.h && y + widget.h > ad.y) collision = true;
@@ -1081,7 +1278,9 @@ function AppContent() {
         for (const collidingWidget of collidingWidgets) {
           const newSlot = findNextAvailableSlot(collidingWidget, updatedWidgets, [collidingWidget.id]);
           if (newSlot === null) return currentWidgets;
-          updatedWidgets = updatedWidgets.map(w => w.id === collidingWidget.id ? { ...w, x: newSlot.x, y: newSlot.y } : w);
+          updatedWidgets = updatedWidgets.map(w =>
+            w.id === collidingWidget.id ? { ...w, x: newSlot.x, y: newSlot.y } : w
+          );
         }
         return updatedWidgets;
       });
@@ -1098,9 +1297,9 @@ function AppContent() {
     setUrlInputValue('');
 
     if (channel.platform === 'youtube' && channel.channelId) {
-      const verifiedChannel  = getVerifiedChannel(channel.channelId);
-      const staticVideoId    = getStaticLiveId(channel.channelId);
-      const fallbackVideoId  = getFallbackVideoId(channel.channelId);
+      const verifiedChannel = getVerifiedChannel(channel.channelId);
+      const staticVideoId   = getStaticLiveId(channel.channelId);
+      const fallbackVideoId = getFallbackVideoId(channel.channelId);
 
       const immediateVideoId  = verifiedChannel?.liveId || channel.verifiedLiveId || staticVideoId || channel.videoId || null;
       const channelFallbackId = verifiedChannel?.fallbackId || fallbackVideoId || channel.latestVideoId || null;
@@ -1113,9 +1312,10 @@ function AppContent() {
           channelName: stripLegacyPrefix(channel.name) || undefined,
           isTwitch: false, twitchChannel: null, isKick: false, kickChannel: null,
           isLive: true, isOffline: false,
-          verifiedLiveId: verifiedChannel?.liveId || channel.verifiedLiveId || null,
-          latestVideoId: channelFallbackId, isPlayingLatestVideo: false,
-          isManualOverride: channel.isManualOverride || false,
+          verifiedLiveId:       verifiedChannel?.liveId || channel.verifiedLiveId || null,
+          latestVideoId:        channelFallbackId,
+          isPlayingLatestVideo: false,
+          isManualOverride:     channel.isManualOverride || false,
           apiError: false, error: null, embedBlocked: false, lastRefresh: Date.now(),
         };
 
@@ -1142,7 +1342,9 @@ function AppContent() {
               } : w
             ));
           } else if (result.liveVideoId) {
-            setWidgets(prev => prev.map(w => w.channelHandle === channel.channelId ? { ...w, isLive: true } : w));
+            setWidgets(prev => prev.map(w =>
+              w.channelHandle === channel.channelId ? { ...w, isLive: true } : w
+            ));
           }
         }).catch(err => console.warn('[Background] Status check failed (non-blocking):', err));
         return;
@@ -1224,14 +1426,6 @@ function AppContent() {
   }, [addWidget]);
 
   // ─── dashboardProps ───────────────────────────────────────────────────────
-  // onToggleClockFormat is forwarded into WidgetRenderer via:
-  //
-  //   import { WidgetRenderer } from '@/App';
-  //
-  //   // In dashboard.tsx, at the TOP of your widget-cell render function:
-  //   const early = WidgetRenderer({ widget, onToggle24Hour: onToggleClockFormat });
-  //   if (early !== false) return early;  // null | JSX — handled
-  //   // ... rest of video / note / spacer / image rendering
   const dashboardProps = {
     widgets,
     setWidgets,
@@ -1240,7 +1434,7 @@ function AppContent() {
     sidebarOpen: sidebarOpen && !isFullscreen,
     activeId,
     handleOpenSidebar,
-    onInlineUrlSubmit: handleInlineUrlSubmit,
+    onInlineUrlSubmit:          handleInlineUrlSubmit,
     handleOpenSidebarToContent,
     addWidget,
     isFullscreen,
@@ -1249,16 +1443,19 @@ function AppContent() {
     gridContainerRef,
     isGridFull,
     user,
-    onLogout: logout,
+    onLogout:            logout,
     isAuthenticated,
     openLoginModal,
     ad,
     skipAd,
     triggerAd,
     isAdActive,
-    onRefreshWidget: handleRefreshWidget,
-    // Clock 12h/24h toggle — wire into WidgetRenderer({ onToggle24Hour: onToggleClockFormat })
+    onRefreshWidget:     handleRefreshWidget,
     onToggleClockFormat: handleToggleClockFormat,
+    // Canonical clock colour handler — used by the universal widget-header
+    // colour picker in dashboard.tsx. ClockWidget reads customColor from
+    // widget state; it no longer has its own internal colour picker.
+    onColorChange:       handleClockColorChange,
   };
 
   return (
@@ -1310,9 +1507,9 @@ function AppContent() {
             <Route path="/auth/reset-password">
               {() => <MasterControlDashboard {...dashboardProps} />}
             </Route>
-            <Route path="/admin" component={Admin} />
-            <Route path="/terms" component={Terms} />
-            <Route path="/privacy" component={Privacy} />
+            <Route path="/admin"    component={Admin} />
+            <Route path="/terms"    component={Terms} />
+            <Route path="/privacy"  component={Privacy} />
             <Route path="/feedback" component={Feedback} />
             <Route component={NotFound} />
           </Switch>

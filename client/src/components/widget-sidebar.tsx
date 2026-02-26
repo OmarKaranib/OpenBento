@@ -112,8 +112,6 @@ import { useQuery } from '@tanstack/react-query';
 const PERSONAL_LIBRARY_KEY = 'openBentoPersonalLibrary';
 const BLOCKED_CHANNELS_KEY = 'openBentoBlockedChannels';
 
-// ─── Exported interfaces ──────────────────────────────────────────────────────
-
 export interface SavedChannel {
   id: string;
   name: string;
@@ -171,36 +169,24 @@ export interface LiveStatus {
   apiError?: boolean;
 }
 
-// ── WidgetTemplate ─────────────────────────────────────────────────────────────
-// CRITICAL: widgetType MUST be strictly lowercase to exactly match the cases
-// in the WidgetRenderer switch in App.tsx:
-//   'video' | 'note' | 'spacer' | 'image' | 'zoom' | 'clock'
-// A case mismatch (e.g. 'Clock' vs 'clock') lands in the default branch and
-// renders the "Unknown Widget Type" debug tile instead of the real widget.
 export interface WidgetTemplate {
   id: string;
   name: string;
-  widgetType: WidgetType; // strictly lowercase — must match App.tsx switch cases
+  widgetType: WidgetType;
   w: number;
   h: number;
   icon: 'video' | 'note' | 'spacer' | 'image' | 'zoom' | 'clock';
   color: string;
 }
 
-// ── WIDGET_TEMPLATES registry ─────────────────────────────────────────────────
-// 'zoom' is kept for backwards-compat with saved grid data but is NOT shown in
-// the sidebar UI (it's absent from availableWidgets below).
-// All widgetType values are lowercase — the switch in App.tsx is case-sensitive.
 export const WIDGET_TEMPLATES: WidgetTemplate[] = [
-  { id: 'template-video',  name: 'Video',        widgetType: 'video',  w: 3, h: 2, icon: 'video',  color: 'cyan'   },
-  { id: 'template-note',   name: 'Note',          widgetType: 'note',   w: 3, h: 2, icon: 'note',   color: 'yellow' },
-  { id: 'template-spacer', name: 'Spacer',        widgetType: 'spacer', w: 2, h: 1, icon: 'spacer', color: 'slate'  },
-  { id: 'template-image',  name: 'Photo',         widgetType: 'image',  w: 3, h: 2, icon: 'image',  color: 'purple' },
-  { id: 'template-zoom',   name: 'Zoom Meeting',  widgetType: 'zoom',   w: 3, h: 2, icon: 'zoom',   color: 'blue'   },
-  { id: 'template-clock',  name: 'Clock',   widgetType: 'clock',  w: 3, h: 2, icon: 'clock',  color: 'cyan'   },
+  { id: 'template-video',  name: 'Video',       widgetType: 'video',  w: 3, h: 2, icon: 'video',  color: 'cyan'   },
+  { id: 'template-note',   name: 'Note',         widgetType: 'note',   w: 3, h: 2, icon: 'note',   color: 'yellow' },
+  { id: 'template-spacer', name: 'Spacer',       widgetType: 'spacer', w: 2, h: 1, icon: 'spacer', color: 'slate'  },
+  { id: 'template-image',  name: 'Photo',        widgetType: 'image',  w: 3, h: 2, icon: 'image',  color: 'purple' },
+  { id: 'template-zoom',   name: 'Zoom Meeting', widgetType: 'zoom',   w: 3, h: 2, icon: 'zoom',   color: 'blue'   },
+  { id: 'template-clock',  name: 'Clock',        widgetType: 'clock',  w: 3, h: 2, icon: 'clock',  color: 'cyan'   },
 ];
-
-// ─── localStorage helpers ─────────────────────────────────────────────────────
 
 function loadPersonalLibrary(): SavedChannel[] {
   try {
@@ -228,8 +214,6 @@ function saveBlockedChannels(channels: BlockedChannel[]): void {
   } catch (e) { console.error('[Blocked Channels] Save error:', e); }
 }
 
-// ─── Internal types ───────────────────────────────────────────────────────────
-
 type SidebarTab      = 'streams' | 'widgets';
 type ContentCategory = 'all' | 'news' | 'gaming' | 'personal' | 'blocked';
 
@@ -240,8 +224,6 @@ interface LinksApiResponse {
   lastRefresh: number;
   origin: string;
 }
-
-// ─── DraggableChannel ─────────────────────────────────────────────────────────
 
 interface DraggableChannelProps {
   channel: TrendingChannel | SavedChannel | BlockedChannel;
@@ -254,11 +236,21 @@ interface DraggableChannelProps {
   onBlock?: () => void;
   onUnblock?: () => void;
   showSaveButton?: boolean;
+  /**
+   * showTrashButton — defaults to true.
+   * Pass showTrashButton={false} in the Personal Library section to hide
+   * the trash/block icon while keeping the star (unsave) button.
+   * All other lists (All / News / Gaming / Blocked) omit this prop so it
+   * stays true and renders the trash icon as normal.
+   */
+  showTrashButton?: boolean;
 }
 
 function DraggableChannel({
   channel, onClick, isLive, isSaved, isBlocked,
-  onSave, onRemove, onBlock, onUnblock, showSaveButton,
+  onSave, onRemove, onBlock, onUnblock,
+  showSaveButton,
+  showTrashButton = true,
 }: DraggableChannelProps) {
   const [logoError, setLogoError] = useState(false);
 
@@ -273,8 +265,27 @@ function DraggableChannel({
     cursor: isDragging ? 'grabbing' : 'grab',
   };
 
-  const handleSaveClick  = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); isSaved && onRemove ? onRemove() : onSave?.(); };
-  const handleBlockClick = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); isBlocked && onUnblock ? onUnblock() : onBlock?.(); };
+  const handleSaveClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (isSaved && onRemove) {
+      onRemove();
+    } else {
+      onSave?.();
+    }
+  };
+
+  const handleTrashClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (isBlocked && onUnblock) {
+      onUnblock();
+    } else if (isSaved && onRemove) {
+      onRemove();
+    } else {
+      onBlock?.();
+    }
+  };
 
   const getLogoUrl = () => {
     if ('logoUrl' in channel && (channel as TrendingChannel).logoUrl) {
@@ -298,12 +309,15 @@ function DraggableChannel({
       className="channel-item flex items-center gap-[1rem] p-[1rem] bg-slate-800/50 hover:bg-slate-700/50 slot-button cursor-grab active:cursor-grabbing transition-all duration-200 border border-slate-700/50 hover:border-cyan-500/50"
       data-testid={`draggable-channel-${channel.id}`}
     >
-      {/* Logo / fallback */}
       <div className="w-[3.2rem] h-[3.2rem] rounded-lg bg-slate-700 flex items-center justify-center relative overflow-hidden flex-shrink-0">
         {showLogo ? (
           <img
             src={logoUrl} alt={channel.name} className="w-full h-full object-cover rounded-lg"
-            onError={(e) => { e.currentTarget.src = '/default-icon.png'; if (logoUrl) failedLogoCache.add(logoUrl); setLogoError(true); }}
+            onError={(e) => {
+              e.currentTarget.src = '/default-icon.png';
+              if (logoUrl) failedLogoCache.add(logoUrl);
+              setLogoError(true);
+            }}
           />
         ) : (
           <div className={`w-full h-full ${fallbackBg} flex items-center justify-center rounded-lg`}>
@@ -315,7 +329,6 @@ function DraggableChannel({
         )}
       </div>
 
-      {/* Name + meta */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-[0.6rem]">
           <p className="text-[1.2rem] font-semibold text-slate-200 truncate">{channel.name}</p>
@@ -335,11 +348,16 @@ function DraggableChannel({
         </p>
       </div>
 
-      {/* Save */}
+      {/* Star — save / unsave */}
       {showSaveButton && (
         <button
-          onClick={handleSaveClick} onPointerDown={(e) => e.stopPropagation()}
-          className={`p-[0.6rem] rounded-lg transition-colors ${isSaved ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400' : 'hover:bg-slate-700 text-slate-500 hover:text-amber-400'}`}
+          onClick={handleSaveClick}
+          onPointerDown={(e) => e.stopPropagation()}
+          className={`p-[0.6rem] rounded-lg transition-colors ${
+            isSaved
+              ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400'
+              : 'hover:bg-slate-700 text-slate-500 hover:text-amber-400'
+          }`}
           title={isSaved ? 'Remove from Personal Library' : 'Save to Personal Library'}
           data-testid={`save-channel-${channel.id}`}
         >
@@ -347,12 +365,22 @@ function DraggableChannel({
         </button>
       )}
 
-      {/* Block */}
-      {showSaveButton && (
+      {/*
+        Trash button — hidden in the Personal Library via showTrashButton={false}.
+        Visible in All / News / Gaming lists (block channel) and in the
+        Blocked list (unblock channel). showTrashButton defaults to true so
+        all other call-sites need no change.
+      */}
+      {showSaveButton && showTrashButton && (
         <button
-          onClick={handleBlockClick} onPointerDown={(e) => e.stopPropagation()}
-          className={`p-[0.6rem] rounded-lg transition-colors ${isBlocked ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400' : 'hover:bg-slate-700 text-slate-500 hover:text-red-400'}`}
-          title={isBlocked ? 'Unblock channel' : 'Block channel'}
+          onClick={handleTrashClick}
+          onPointerDown={(e) => e.stopPropagation()}
+          className={`p-[0.6rem] rounded-lg transition-colors ${
+            isBlocked
+              ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
+              : 'hover:bg-slate-700 text-slate-500 hover:text-red-400'
+          }`}
+          title={isBlocked ? 'Unblock channel' : isSaved ? 'Remove from Personal Library' : 'Block channel'}
           data-testid={`block-channel-${channel.id}`}
         >
           <Trash2 className={`w-[1.4rem] h-[1.4rem] ${isBlocked ? 'fill-red-400' : ''}`} />
@@ -363,8 +391,6 @@ function DraggableChannel({
     </div>
   );
 }
-
-// ─── WidgetSidebar ────────────────────────────────────────────────────────────
 
 interface WidgetSidebarProps {
   isOpen: boolean;
@@ -400,21 +426,18 @@ export function WidgetSidebar({
   const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
   const [blockedChannels, setBlockedChannels] = useState<BlockedChannel[]>(() => loadBlockedChannels());
 
-  // Sync personalLibrary across tabs/events
   useEffect(() => {
     const h = () => setPersonalLibrary(loadPersonalLibrary());
     window.addEventListener('personalLibraryUpdated', h);
     return () => window.removeEventListener('personalLibraryUpdated', h);
   }, []);
 
-  // Sync blockedChannels across tabs/events
   useEffect(() => {
     const h = () => setBlockedChannels(loadBlockedChannels());
     window.addEventListener('blockedChannelsUpdated', h);
     return () => window.removeEventListener('blockedChannelsUpdated', h);
   }, []);
 
-  // ── Library actions ─────────────────────────────────────────────────────────
   const saveToPersonalLibrary = useCallback((channel: TrendingChannel) => {
     if (!isAuthenticated) {
       openLoginModal?.('Sign Up Required: Please log in or sign up to save channels to your library.');
@@ -477,7 +500,6 @@ export function WidgetSidebar({
 
   const isChannelBlocked = useCallback((id: string) => blockedChannels.some(c => c.id === id), [blockedChannels]);
 
-  // ── API ─────────────────────────────────────────────────────────────────────
   const { data: linksData, isLoading: isLoadingLinks, refetch: refetchLinks } = useQuery<LinksApiResponse>({
     queryKey: ['/api/links'],
     staleTime: 5 * 60 * 1000,
@@ -486,7 +508,6 @@ export function WidgetSidebar({
 
   const channels: TrendingChannel[] = linksData?.channels?.length ? linksData.channels : FALLBACK_CHANNELS;
 
-  // ── Live status ─────────────────────────────────────────────────────────────
   const checkKickLiveStatus = useCallback(async (channelId: string): Promise<boolean> => {
     try {
       const r = await fetch(`/api/kick/channel/${channelId}`);
@@ -517,7 +538,6 @@ export function WidgetSidebar({
   const liveStatusesRef = useRef<Record<string, LiveStatus>>({});
   useEffect(() => { liveStatusesRef.current = liveStatuses; }, [liveStatuses]);
 
-  // ── Filtered lists ──────────────────────────────────────────────────────────
   const filteredChannels = useMemo(() => {
     let f = channels.filter(c => c.category !== 'Lofi/Music' && c.category !== 'Music');
     if (activeCategory !== 'blocked') f = f.filter(c => !isChannelBlocked(c.id));
@@ -556,12 +576,6 @@ export function WidgetSidebar({
     );
   }, [searchQuery, blockedChannels]);
 
-  // ── Widget button definitions ──────────────────────────────────────────────
-  // ONLY 'note' and 'clock' are surfaced in the UI.
-  // 'zoom' is intentionally omitted — it renders as null (ghost-box fix).
-  //
-  // widgetType is strictly lowercase — must match App.tsx WidgetType union and
-  // the switch cases inside WidgetRenderer exactly.
   const availableWidgets = [
     {
       id: 'note',
@@ -575,9 +589,8 @@ export function WidgetSidebar({
       template: {
         id: 'template-note',
         name: 'Note',
-        widgetType: 'note' as WidgetType, // lowercase — matches case 'note' in WidgetRenderer
-        w: 3,
-        h: 2,
+        widgetType: 'note' as WidgetType,
+        w: 3, h: 2,
         icon: 'note' as const,
         color: 'yellow',
       },
@@ -594,19 +607,16 @@ export function WidgetSidebar({
       template: {
         id: 'template-clock',
         name: 'Clock',
-        widgetType: 'clock' as WidgetType, // lowercase — matches case 'clock' in WidgetRenderer
-        w: 3,
-        h: 2,
+        widgetType: 'clock' as WidgetType,
+        w: 3, h: 2,
         icon: 'clock' as const,
         color: 'cyan',
       },
     },
   ] as const;
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Backdrop */}
       <div
         className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-[99] transition-opacity duration-300 ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -617,7 +627,6 @@ export function WidgetSidebar({
         data-testid="sidebar-overlay"
       />
 
-      {/* Panel */}
       <div
         className="fixed left-0 h-[calc(100vh-var(--header-height)-1rem)] bg-slate-900 border-r border-slate-700/80 flex flex-col overflow-hidden shadow-2xl transition-all duration-300"
         style={{
@@ -632,7 +641,7 @@ export function WidgetSidebar({
         }}
         data-testid="widget-sidebar"
       >
-        {/* ── Header ── */}
+        {/* Header */}
         <div className="p-[1.6rem] pb-0 border-b border-slate-700/80 flex-shrink-0">
           <div className="flex items-center justify-between mb-[1.4rem]">
             <h2 className="text-[1.8rem] font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent flex items-center gap-[0.8rem]">
@@ -648,7 +657,6 @@ export function WidgetSidebar({
             </button>
           </div>
 
-          {/* Segmented control */}
           <div
             className="flex gap-[0.3rem] bg-slate-800/70 border border-slate-700/60 p-[0.35rem] rounded-xl mb-[1.4rem]"
             role="tablist"
@@ -665,11 +673,7 @@ export function WidgetSidebar({
                   : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'
               }`}
             >
-              <Radio
-                className={`w-[1.3rem] h-[1.3rem] flex-shrink-0 transition-colors ${
-                  activeTab === 'streams' ? 'text-cyan-400' : 'text-slate-500'
-                }`}
-              />
+              <Radio className={`w-[1.3rem] h-[1.3rem] flex-shrink-0 transition-colors ${activeTab === 'streams' ? 'text-cyan-400' : 'text-slate-500'}`} />
               Streams
               {activeTab === 'streams' && (
                 <span className="absolute bottom-[0.3rem] left-1/2 -translate-x-1/2 w-[1.4rem] h-[0.2rem] rounded-full bg-cyan-400 opacity-80" />
@@ -686,11 +690,7 @@ export function WidgetSidebar({
                   : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'
               }`}
             >
-              <LayoutGrid
-                className={`w-[1.3rem] h-[1.3rem] flex-shrink-0 transition-colors ${
-                  activeTab === 'widgets' ? 'text-purple-400' : 'text-slate-500'
-                }`}
-              />
+              <LayoutGrid className={`w-[1.3rem] h-[1.3rem] flex-shrink-0 transition-colors ${activeTab === 'widgets' ? 'text-purple-400' : 'text-slate-500'}`} />
               Widgets
               {activeTab === 'widgets' && (
                 <span className="absolute bottom-[0.3rem] left-1/2 -translate-x-1/2 w-[1.4rem] h-[0.2rem] rounded-full bg-purple-400 opacity-80" />
@@ -698,7 +698,6 @@ export function WidgetSidebar({
             </button>
           </div>
 
-          {/* URL input — streams tab only */}
           {activeTab === 'streams' && (
             <div className="pb-[1.4rem]">
               <label className="block text-[1rem] font-semibold mb-[0.5rem] text-cyan-400 uppercase tracking-wider">
@@ -733,14 +732,13 @@ export function WidgetSidebar({
           {activeTab === 'widgets' && <div className="pb-[0.4rem]" />}
         </div>
 
-        {/* ── Scrollable body ── */}
+        {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto">
 
-          {/* ════ STREAMS TAB ════ */}
+          {/* STREAMS TAB */}
           {activeTab === 'streams' && (
             <div className="p-[1.6rem] space-y-[1.4rem]">
 
-              {/* Search */}
               <div className="relative">
                 <Search className="absolute left-[1rem] top-1/2 -translate-y-1/2 w-[1.6rem] h-[1.6rem] text-slate-500" />
                 <input
@@ -753,7 +751,6 @@ export function WidgetSidebar({
                 />
               </div>
 
-              {/* Category pills */}
               <div className="flex flex-wrap gap-[0.4rem]">
                 {([
                   { id: 'all',      label: 'All',     Icon: Layers,   active: 'bg-cyan-600'  },
@@ -788,7 +785,7 @@ export function WidgetSidebar({
                 ))}
               </div>
 
-              {/* All / News / Gaming lists */}
+              {/* All / News / Gaming — showTrashButton not passed, defaults true */}
               {activeCategory !== 'personal' && activeCategory !== 'blocked' && (
                 <div>
                   <div className="flex items-center justify-between mb-[1rem]">
@@ -815,9 +812,13 @@ export function WidgetSidebar({
                   <div className="space-y-[0.8rem]">
                     {filteredChannels.map(ch => (
                       <DraggableChannel
-                        key={ch.id} channel={ch} onClick={() => onChannelClick?.(ch)}
-                        isLive={liveStatuses[ch.id]?.isLive} showSaveButton
-                        isSaved={isInPersonalLibrary(ch.id)} isBlocked={isChannelBlocked(ch.id)}
+                        key={ch.id}
+                        channel={ch}
+                        onClick={() => onChannelClick?.(ch)}
+                        isLive={liveStatuses[ch.id]?.isLive}
+                        showSaveButton
+                        isSaved={isInPersonalLibrary(ch.id)}
+                        isBlocked={isChannelBlocked(ch.id)}
                         onSave={() => saveToPersonalLibrary(ch)}
                         onRemove={() => removeFromPersonalLibrary(ch.id)}
                         onBlock={() => blockChannel(ch)}
@@ -831,7 +832,12 @@ export function WidgetSidebar({
                 </div>
               )}
 
-              {/* Personal Library */}
+              {/*
+                Personal Library — showTrashButton={false} removes the trash
+                icon from every row in this list. The amber star still calls
+                onRemove to unsave the channel. Row alignment is clean because
+                only logo | name+meta | star | grip are rendered.
+              */}
               {activeCategory === 'personal' && (
                 <div>
                   <h3 className="text-[1.4rem] font-semibold text-amber-400 flex items-center gap-[0.6rem] mb-[0.6rem]">
@@ -845,10 +851,15 @@ export function WidgetSidebar({
                     <div className="space-y-[0.8rem]">
                       {filteredPersonalLibrary.map(ch => (
                         <DraggableChannel
-                          key={ch.id} channel={ch as TrendingChannel}
+                          key={ch.id}
+                          channel={ch as TrendingChannel}
                           onClick={() => onChannelClick?.(ch as TrendingChannel)}
-                          isLive={liveStatuses[ch.id]?.isLive} showSaveButton isSaved
+                          isLive={liveStatuses[ch.id]?.isLive}
+                          showSaveButton
+                          isSaved
+                          isBlocked={false}
                           onRemove={() => removeFromPersonalLibrary(ch.id)}
+                          showTrashButton={false}
                         />
                       ))}
                     </div>
@@ -862,7 +873,7 @@ export function WidgetSidebar({
                 </div>
               )}
 
-              {/* Blocked Channels */}
+              {/* Blocked Channels — showTrashButton not passed, defaults true */}
               {activeCategory === 'blocked' && (
                 <div>
                   <h3 className="text-[1.4rem] font-semibold text-red-400 flex items-center gap-[0.6rem] mb-[0.6rem]">
@@ -876,9 +887,13 @@ export function WidgetSidebar({
                     <div className="space-y-[0.8rem]">
                       {filteredBlockedChannels.map(ch => (
                         <DraggableChannel
-                          key={ch.id} channel={ch}
+                          key={ch.id}
+                          channel={ch}
                           onClick={() => onChannelClick?.(ch as TrendingChannel)}
-                          isLive={false} showSaveButton isSaved={false} isBlocked
+                          isLive={false}
+                          showSaveButton
+                          isSaved={false}
+                          isBlocked
                           onUnblock={() => unblockChannel(ch.id)}
                         />
                       ))}
@@ -895,7 +910,7 @@ export function WidgetSidebar({
             </div>
           )}
 
-          {/* ════ WIDGETS TAB ════ */}
+          {/* WIDGETS TAB */}
           {activeTab === 'widgets' && (
             <div className="p-[1.6rem] space-y-[2rem]">
               <div>
@@ -907,23 +922,6 @@ export function WidgetSidebar({
 
               <div>
                 <p className="text-[0.95rem] font-bold text-slate-500 uppercase tracking-[0.1em] mb-[1rem]">Available</p>
-
-                {/*
-                  Two widget buttons: Note and Clock.
-                  Zoom is intentionally absent — it renders as null (ghost-box fix).
-
-                  Each button calls onTemplateClick(w.template) which passes a
-                  WidgetTemplate with widgetType: 'note' | 'clock' (strictly
-                  lowercase). App.tsx's addWidget() receives this string and the
-                  WidgetRenderer switch dispatches it to the correct renderer.
-
-                  Ghost-box root cause explained:
-                    If widgetType were 'Clock' (capital C), the switch in
-                    WidgetRenderer would miss both 'clock' and 'zoom' cases and
-                    fall through to the default branch, which returns the
-                    "Unknown Widget Type" debug tile — which previously appeared
-                    as a transparent ghost box before the default case was added.
-                */}
                 <div className="grid grid-cols-2 gap-[0.8rem]">
                   {availableWidgets.map((w) => (
                     <button
@@ -932,23 +930,14 @@ export function WidgetSidebar({
                       className={`group relative flex flex-col items-center justify-center gap-[0.8rem] p-[1.4rem] rounded-xl border ${w.border} ${w.cardBg} transition-all duration-200 hover:scale-[1.03] hover:shadow-lg active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500`}
                       data-testid={`widget-library-${w.id}`}
                     >
-                      {/* Icon container */}
-                      <div
-                        className={`w-[4rem] h-[4rem] rounded-xl ${w.iconBg} border border-slate-700/50 flex items-center justify-center group-hover:border-slate-600 transition-colors`}
-                      >
+                      <div className={`w-[4rem] h-[4rem] rounded-xl ${w.iconBg} border border-slate-700/50 flex items-center justify-center group-hover:border-slate-600 transition-colors`}>
                         {w.icon}
                       </div>
-
-                      {/* Labels */}
                       <div className="text-center">
                         <p className="text-[1.15rem] font-semibold text-slate-200 leading-tight">{w.label}</p>
                         <p className="text-[0.95rem] text-slate-500 mt-[0.2rem] leading-snug">{w.description}</p>
                       </div>
-
-                      {/* ADD badge */}
-                      <span
-                        className={`absolute top-[0.7rem] right-[0.7rem] text-[0.8rem] font-bold px-[0.55rem] py-[0.2rem] rounded-full border ${w.badgeColor}`}
-                      >
+                      <span className={`absolute top-[0.7rem] right-[0.7rem] text-[0.8rem] font-bold px-[0.55rem] py-[0.2rem] rounded-full border ${w.badgeColor}`}>
                         ADD
                       </span>
                     </button>
@@ -959,7 +948,7 @@ export function WidgetSidebar({
           )}
         </div>
 
-        {/* ── Footer ── */}
+        {/* Footer */}
         <div className="p-[1.6rem] border-t border-slate-700/80 flex-shrink-0">
           <a
             href="https://buymeacoffee.com/openbento"
