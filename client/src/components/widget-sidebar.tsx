@@ -855,7 +855,7 @@ export function WidgetSidebar({
                           channel={ch as TrendingChannel}
                           onClick={() => onChannelClick?.(ch as TrendingChannel)}
                           isLive={liveStatuses[ch.id]?.isLive}
-                          showSaveButton={false}
+                          showSaveButton
                           isSaved
                           isBlocked={false}
                           onRemove={() => removeFromPersonalLibrary(ch.id)}
