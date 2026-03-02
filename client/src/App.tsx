@@ -5,21 +5,9 @@ import { MobileGuard } from '@/components/mobile-guard';
 import { useViralAds, AdBlockData } from '@/components/ad-block';
 import { searchChannelLiveStream } from '@/lib/stream-api';
 import { getVerifiedChannel, getStaticLiveId, getFallbackVideoId } from '@/lib/channel-constants';
-
-// ─── Static background ────────────────────────────────────────────────────────
-const StaticBackground = () => {
-  useEffect(() => {
-    const body = document.body;
-    body.style.backgroundColor = '#F8F9FA';
-    body.style.backgroundImage = 'none';
-    body.style.backgroundSize = 'cover';
-    body.style.backgroundPosition = 'center';
-    body.style.backgroundAttachment = 'fixed';
-    body.style.minHeight = '100vh';
-  }, []);
-  return null;
-};
-
+import {
+  Sun, Cloud, CloudRain, CloudSnow, CloudLightning, Wind, CloudDrizzle, Cloudy,
+} from 'lucide-react';
 import { Switch, Route, useLocation } from 'wouter';
 import { queryClient } from './lib/queryClient';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -38,17 +26,32 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 
+// ─── Static background ────────────────────────────────────────────────────────
+const StaticBackground = () => {
+  useEffect(() => {
+    const body = document.body;
+    body.style.backgroundColor = '#F8F9FA';
+    body.style.backgroundImage = 'none';
+    body.style.backgroundSize = 'cover';
+    body.style.backgroundPosition = 'center';
+    body.style.backgroundAttachment = 'fixed';
+    body.style.minHeight = '100vh';
+  }, []);
+  return null;
+};
+
 // ─── WidgetType ───────────────────────────────────────────────────────────────
 // ALL values are strictly lowercase. Must exactly match widgetType strings used
 // in widget-sidebar.tsx — a case mismatch is the root cause of ghost-box widgets.
-//
-//   'zoom'   → rendered as null  (ghost-box fix; kept for backwards-compat only)
-//   'clock'  → rendered as <ClockWidget>  (live ticking clock, solid background)
-//   'note'   → dashboard renders with solid bg-slate-900
-//   'video'  → dashboard renders iframe/embed
-//   'spacer' → dashboard renders transparent spacer
-//   'image'  → dashboard renders <img>
-export type WidgetType = 'video' | 'note' | 'spacer' | 'image' | 'zoom' | 'clock';
+export type WidgetType =
+  | 'video'
+  | 'note'
+  | 'spacer'
+  | 'image'
+  | 'zoom'
+  | 'clock'
+  | 'crisis_ticker'
+  | 'weather';
 
 // ─── Widget Interface ─────────────────────────────────────────────────────────
 export interface Widget {
@@ -110,10 +113,6 @@ const CLOCK_COLOR_PRESETS: { name: string; bg: string }[] = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Adaptive text colour helpers
-//
-//  All text/border colours inside ClockWidget are derived from the background
-//  via WCAG relative luminance so light presets (White, Sand) automatically
-//  receive dark text without any manual override.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -178,26 +177,6 @@ function playTimerChime(): void {
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ClockWidget — "Time Tool Suite"
-//
-//  Props
-//  ─────
-//  onToggle24Hour  required
-//
-//  Background colour is controlled exclusively by the universal widget-header
-//  colour picker in the dashboard (onColorChange in dashboardProps). The
-//  internal palette button and showColorPicker state have been removed to
-//  prevent icon overlap with dashboard widget-settings controls.
-//
-//  Remaining fixes
-//  ───────────────
-//  1. Adaptive text    — every colour token (primary, secondary, border…) is
-//                        derived from the bg via isLightBg() so White/Sand
-//                        presets render dark readable text automatically.
-//  2. Timer inputs     — no lineHeight hack; vertical centring uses a flex
-//                        wrapper div with align-items:center around each input.
-//  3. Ghost navbar     — reserved height even when invisible to prevent layout
-//                        jump; sits at the top ABOVE the floating controls.
-//  4. Scaling          — bigTime clamped against s, cw, and ch simultaneously.
 // ─────────────────────────────────────────────────────────────────────────────
 
 type ClockTab = 'clock' | 'world' | 'timer' | 'stopwatch';
@@ -317,7 +296,6 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
   const sz = {
     tabFont:    Math.max(9,  s * 0.055),
     tabPad:     Math.max(3,  s * 0.025),
-    // Clamp bigTime against all three dimensions (auto-scaling fix)
     bigTime:    Math.max(18, Math.min(s * 0.28, cw * 0.155, ch * 0.36)),
     dateFont:   Math.max(9,  s * 0.065),
     btnFont:    Math.max(10, s * 0.065),
@@ -325,7 +303,6 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
     btnPadH:    Math.max(8,  s * 0.06),
     btnRadius:  Math.max(4,  s * 0.025),
     btnGap:     Math.max(6,  s * 0.035),
-    // Explicit dimensions; centring via flex wrapper, NOT lineHeight
     inputW:     Math.max(48, s * 0.17),
     inputH:     Math.max(34, s * 0.14),
     inputFont:  Math.max(13, s * 0.078),
@@ -337,7 +314,6 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
     toggleFont: Math.max(9,  s * 0.052),
   };
 
-  // approximate rendered height of the tab bar row
   const tabRowH = sz.tabPad * 2 + sz.tabFont + 6;
 
   // ── Formatters ────────────────────────────────────────────────────────────
@@ -410,8 +386,6 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
     setTimerRunning(true);
   };
 
-  // Input style: explicit height + no lineHeight; centering done by a flex
-  // wrapper div around each <input>.
   const inputStyle: React.CSSProperties = {
     width:        `${sz.inputW}px`,
     height:       `${sz.inputH}px`,
@@ -451,10 +425,7 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
       onMouseLeave={() => setIsHovered(false)}
       data-testid={`clock-widget-${widget.id}`}
     >
-
-      {/* ── Ghost Navbar ─────────────────────────────────────────────────────
-           Reserves its own height in the flex column even when invisible so
-           the content area below never jumps on hover.                      */}
+      {/* ── Ghost Navbar ───────────────────────────────────────────────────── */}
       <div
         style={{
           display:       'flex',
@@ -481,7 +452,6 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
           alignItems:     'center',
           justifyContent: 'center',
           padding:        `${Math.max(6, s * 0.04)}px ${Math.max(8, s * 0.05)}px`,
-          // Extra bottom space reserved for the 12h/24h toggle (clock tab only)
           paddingBottom:  tab === 'clock'
             ? `${Math.max(28, s * 0.13)}px`
             : `${Math.max(6, s * 0.04)}px`,
@@ -489,8 +459,7 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
           minHeight:      0,
         }}
       >
-
-        {/* ─── CLOCK TAB ──────────────────────────────────────────────────── */}
+        {/* ─── CLOCK TAB ────────────────────────────────────────────────── */}
         {tab === 'clock' && (
           <>
             <div style={{ fontSize: `${sz.bigTime}px`, fontFamily: MONO, fontWeight: 700, color: clrPrimary, letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>
@@ -502,7 +471,7 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
           </>
         )}
 
-        {/* ─── WORLD TAB ──────────────────────────────────────────────────── */}
+        {/* ─── WORLD TAB ────────────────────────────────────────────────── */}
         {tab === 'world' && (
           <>
             <select
@@ -531,7 +500,7 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
           </>
         )}
 
-        {/* ─── TIMER TAB ──────────────────────────────────────────────────── */}
+        {/* ─── TIMER TAB ────────────────────────────────────────────────── */}
         {tab === 'timer' && (
           <>
             <div
@@ -544,8 +513,6 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
               {timerLeft === 0 && !timerRunning ? 'TIME UP!' : fmtTimer(timerLeft)}
             </div>
 
-            {/* Flex wrapper provides vertical centering; input uses explicit
-                height only, NOT lineHeight.                                 */}
             {!timerRunning && timerLeft === timerTotal && (
               <div style={{ display: 'flex', alignItems: 'center', gap: `${sz.btnGap * 0.6}px`, marginTop: `${sz.contentGap * 0.5}px` }}>
                 <div style={{ display: 'flex', alignItems: 'center', height: `${sz.inputH}px` }}>
@@ -590,7 +557,7 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
           </>
         )}
 
-        {/* ─── STOPWATCH TAB ──────────────────────────────────────────────── */}
+        {/* ─── STOPWATCH TAB ────────────────────────────────────────────── */}
         {tab === 'stopwatch' && (
           <>
             <div style={{ fontSize: `${sz.bigTime * 0.9}px`, fontFamily: MONO, fontWeight: 700, color: swRunning ? '#4ade80' : clrPrimary, lineHeight: 1, textAlign: 'center' }}>
@@ -610,12 +577,9 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
             </div>
           </>
         )}
-
       </div>
 
-      {/* ── 12h/24h toggle: BOTTOM-CENTER, clock tab only ────────────────────
-           Placed at bottom-center so it never competes with external
-           dashboard widget-settings icons in the top-right corner.          */}
+      {/* ── 12h/24h toggle: BOTTOM-CENTER, clock tab only ──────────────────── */}
       {tab === 'clock' && (
         <div
           style={{
@@ -659,25 +623,491 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  CrisisTickerWidget — vertically scrolling breaking-news feed
+//
+//  • Solid bg-slate-900 (#0f172a) background.
+//  • Blinking red "LIVE INTEL" badge in the header.
+//  • Headlines containing 'Crisis' or 'Alert' render in red; others in slate-100.
+//  • Smooth infinite scroll; resets seamlessly.
+//  • All font sizes and icon sizes scale with container dimensions.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CRISIS_HEADLINES = [
+  { id: 1,  text: 'BREAKING: Major earthquake strikes Pacific Rim — tsunami Alert issued for coastal regions' },
+  { id: 2,  text: 'Markets surge 3% on surprise Fed rate hold; tech sector leads gains' },
+  { id: 3,  text: 'Crisis declared in southern provinces as flooding displaces 40,000 residents' },
+  { id: 4,  text: 'International summit agrees on new climate finance framework' },
+  { id: 5,  text: 'Cyber Alert: Critical zero-day vulnerability found in widely-used enterprise software' },
+  { id: 6,  text: 'Space agency confirms successful orbital rendezvous — crew safe aboard station' },
+  { id: 7,  text: 'Health Crisis: Novel respiratory pathogen detected in three countries — WHO monitoring' },
+  { id: 8,  text: 'Energy grid restored after major blackout affecting 2 million homes' },
+  { id: 9,  text: 'Alert: Geomagnetic storm forecast to disrupt GPS and HF radio communications tonight' },
+  { id: 10, text: 'Trade agreement ratified by 34-nation bloc; tariffs to drop by Q2' },
+  { id: 11, text: 'Wildfire Crisis expands across dry northern corridor — evacuation orders widen' },
+  { id: 12, text: 'Diplomatic breakthrough: Ceasefire announced following weeks of negotiations' },
+];
+
+const isCrisisHeadline = (text: string) =>
+  /crisis|alert/i.test(text);
+
+interface CrisisTickerWidgetProps {
+  widget: Widget;
+}
+
+export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef    = useRef<HTMLDivElement>(null);
+  const [cw, setCw]  = useState(320);
+  const [ch, setCh]  = useState(200);
+  const [blink, setBlink] = useState(true);
+
+  // ── ResizeObserver ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (r) { setCw(r.width); setCh(r.height); }
+    });
+    ro.observe(el);
+    setCw(el.offsetWidth);
+    setCh(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
+
+  // ── Blinking LIVE dot ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const id = setInterval(() => setBlink(b => !b), 700);
+    return () => clearInterval(id);
+  }, []);
+
+  // ── Infinite scroll animation via CSS animation ───────────────────────────
+  // We render the list twice so the animation loops seamlessly.
+  const s = Math.min(cw, ch);
+
+  const headerH   = Math.max(24, s * 0.12);
+  const rowH      = Math.max(28, s * 0.14);
+  const fontSize  = Math.max(10, Math.min(s * 0.07, cw * 0.038));
+  const badgeFont = Math.max(8,  s * 0.056);
+  const dotSize   = Math.max(6,  s * 0.045);
+
+  // Duration scales with number of items & row height so it looks consistent
+  const scrollDuration = CRISIS_HEADLINES.length * Math.max(2.5, rowH * 0.08);
+
+  const headlines = [...CRISIS_HEADLINES, ...CRISIS_HEADLINES]; // doubled for seamless loop
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        width: '100%', height: '100%',
+        backgroundColor: '#0f172a',
+        borderRadius: '0.5rem',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+        userSelect: 'none',
+        position: 'relative',
+      }}
+      data-testid={`crisis-ticker-widget-${widget.id}`}
+    >
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div style={{
+        height:          `${headerH}px`,
+        minHeight:       `${headerH}px`,
+        flexShrink:      0,
+        display:         'flex',
+        alignItems:      'center',
+        gap:             `${Math.max(6, s * 0.03)}px`,
+        padding:         `0 ${Math.max(8, s * 0.045)}px`,
+        borderBottom:    '1px solid #1e293b',
+        backgroundColor: '#0a0f1a',
+      }}>
+        {/* Blinking red dot */}
+        <span style={{
+          width:           `${dotSize}px`,
+          height:          `${dotSize}px`,
+          borderRadius:    '50%',
+          backgroundColor: blink ? '#ef4444' : 'transparent',
+          border:          '2px solid #ef4444',
+          display:         'inline-block',
+          flexShrink:      0,
+          transition:      'background-color 0.15s ease',
+          boxShadow:       blink ? '0 0 6px 2px rgba(239,68,68,0.6)' : 'none',
+        }} />
+        <span style={{
+          fontFamily:    MONO,
+          fontWeight:    700,
+          fontSize:      `${badgeFont}px`,
+          color:         '#ef4444',
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          lineHeight:    1,
+        }}>
+          Live Intel
+        </span>
+        <span style={{
+          marginLeft:    'auto',
+          fontFamily:    MONO,
+          fontSize:      `${Math.max(8, s * 0.048)}px`,
+          color:         '#334155',
+          letterSpacing: '0.05em',
+        }}>
+          {new Date().toUTCString().slice(0, 16)} UTC
+        </span>
+      </div>
+
+      {/* ── Scrolling feed ──────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        {/* Top fade */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0,
+          height: `${Math.max(16, rowH * 0.5)}px`,
+          background: 'linear-gradient(to bottom, #0f172a, transparent)',
+          zIndex: 2, pointerEvents: 'none',
+        }} />
+        {/* Bottom fade */}
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          height: `${Math.max(16, rowH * 0.5)}px`,
+          background: 'linear-gradient(to top, #0f172a, transparent)',
+          zIndex: 2, pointerEvents: 'none',
+        }} />
+
+        <style>{`
+          @keyframes crisis-scroll-${widget.id} {
+            0%   { transform: translateY(0); }
+            100% { transform: translateY(-50%); }
+          }
+        `}</style>
+
+        <div
+          ref={scrollRef}
+          style={{
+            animation:      `crisis-scroll-${widget.id} ${scrollDuration}s linear infinite`,
+            willChange:     'transform',
+          }}
+        >
+          {headlines.map((h, idx) => (
+            <div
+              key={`${h.id}-${idx}`}
+              style={{
+                height:      `${rowH}px`,
+                display:     'flex',
+                alignItems:  'center',
+                padding:     `0 ${Math.max(8, s * 0.045)}px`,
+                borderBottom: '1px solid rgba(30,41,59,0.5)',
+                gap:          `${Math.max(6, s * 0.03)}px`,
+              }}
+            >
+              {/* Accent bar */}
+              <span style={{
+                width:           '2px',
+                height:          `${Math.max(12, rowH * 0.45)}px`,
+                borderRadius:    '1px',
+                backgroundColor: isCrisisHeadline(h.text) ? '#ef4444' : '#1e40af',
+                flexShrink:      0,
+              }} />
+              <span style={{
+                fontFamily:   MONO,
+                fontSize:     `${fontSize}px`,
+                fontWeight:   isCrisisHeadline(h.text) ? 600 : 400,
+                color:        isCrisisHeadline(h.text) ? '#fca5a5' : '#cbd5e1',
+                lineHeight:   1.35,
+                overflow:     'hidden',
+                whiteSpace:   'nowrap',
+                textOverflow: 'ellipsis',
+                letterSpacing: '0.01em',
+              }}>
+                {h.text}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  WeatherWidget — mock weather display with lucide-react icons
+//
+//  • Solid bg-slate-900 background.
+//  • Shows: city name, large temperature, condition label, and a scaled icon.
+//  • Mock data cycles through several conditions every 8 s for demo purposes.
+//  • All sizes scale proportionally with container dimensions.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface MockWeatherEntry {
+  city:       string;
+  tempC:      number;
+  tempF:      number;
+  condition:  string;
+  icon:       'sun' | 'cloud' | 'cloud-rain' | 'cloud-snow' | 'cloud-lightning' | 'wind' | 'cloud-drizzle' | 'cloudy';
+  humidity:   number;
+  windKph:    number;
+}
+
+const MOCK_WEATHER_DATA: MockWeatherEntry[] = [
+  { city: 'London',      tempC: 15, tempF: 59,  condition: 'Cloudy',        icon: 'cloudy',         humidity: 74, windKph: 22 },
+  { city: 'New York',    tempC: 22, tempF: 72,  condition: 'Sunny',         icon: 'sun',             humidity: 48, windKph: 14 },
+  { city: 'Tokyo',       tempC: 28, tempF: 82,  condition: 'Partly Cloudy', icon: 'cloud',           humidity: 65, windKph: 18 },
+  { city: 'Sydney',      tempC: 19, tempF: 66,  condition: 'Light Rain',    icon: 'cloud-drizzle',   humidity: 82, windKph: 26 },
+  { city: 'Dubai',       tempC: 38, tempF: 100, condition: 'Sunny',         icon: 'sun',             humidity: 28, windKph: 11 },
+  { city: 'Moscow',      tempC: -4, tempF: 25,  condition: 'Snow',          icon: 'cloud-snow',      humidity: 88, windKph: 31 },
+  { city: 'Miami',       tempC: 31, tempF: 88,  condition: 'Thunderstorm',  icon: 'cloud-lightning', humidity: 91, windKph: 44 },
+  { city: 'Chicago',     tempC: 12, tempF: 54,  condition: 'Windy',         icon: 'wind',            humidity: 56, windKph: 52 },
+  { city: 'Mumbai',      tempC: 33, tempF: 91,  condition: 'Heavy Rain',    icon: 'cloud-rain',      humidity: 95, windKph: 19 },
+  { city: 'Reykjavik',   tempC: 3,  tempF: 37,  condition: 'Overcast',      icon: 'cloudy',          humidity: 83, windKph: 37 },
+];
+
+const WeatherIcon: React.FC<{ icon: MockWeatherEntry['icon']; size: number; color: string }> = ({ icon, size, color }) => {
+  const props = { size, color, strokeWidth: 1.8 };
+  switch (icon) {
+    case 'sun':             return <Sun             {...props} />;
+    case 'cloud':           return <Cloud           {...props} />;
+    case 'cloud-rain':      return <CloudRain       {...props} />;
+    case 'cloud-snow':      return <CloudSnow       {...props} />;
+    case 'cloud-lightning': return <CloudLightning  {...props} />;
+    case 'wind':            return <Wind            {...props} />;
+    case 'cloud-drizzle':   return <CloudDrizzle    {...props} />;
+    case 'cloudy':          return <Cloudy          {...props} />;
+    default:                return <Sun             {...props} />;
+  }
+};
+
+const weatherIconColor = (icon: MockWeatherEntry['icon']): string => {
+  switch (icon) {
+    case 'sun':             return '#fbbf24';
+    case 'cloud':           return '#94a3b8';
+    case 'cloud-rain':      return '#60a5fa';
+    case 'cloud-snow':      return '#bae6fd';
+    case 'cloud-lightning': return '#facc15';
+    case 'wind':            return '#a5b4fc';
+    case 'cloud-drizzle':   return '#7dd3fc';
+    case 'cloudy':          return '#94a3b8';
+    default:                return '#f1f5f9';
+  }
+};
+
+interface WeatherWidgetProps {
+  widget: Widget;
+}
+
+export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
+  const containerRef    = useRef<HTMLDivElement>(null);
+  const [cw, setCw]     = useState(280);
+  const [ch, setCh]     = useState(200);
+  const [idx, setIdx]   = useState(0);
+  const [useFahrenheit, setUseFahrenheit] = useState(false);
+  const [isHovered, setIsHovered]         = useState(false);
+
+  const data = MOCK_WEATHER_DATA[idx % MOCK_WEATHER_DATA.length];
+
+  // ── ResizeObserver ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (r) { setCw(r.width); setCh(r.height); }
+    });
+    ro.observe(el);
+    setCw(el.offsetWidth);
+    setCh(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
+
+  // ── Cycle mock cities every 8s ───────────────────────────────────────────
+  useEffect(() => {
+    const id = setInterval(() => setIdx(i => (i + 1) % MOCK_WEATHER_DATA.length), 8_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // ── Responsive scale ──────────────────────────────────────────────────────
+  const s = Math.min(cw, ch);
+
+  const iconSize    = Math.max(24, Math.min(s * 0.28, cw * 0.22, ch * 0.30));
+  const tempFont    = Math.max(22, Math.min(s * 0.25, cw * 0.18, ch * 0.27));
+  const cityFont    = Math.max(10, Math.min(s * 0.075, cw * 0.055));
+  const condFont    = Math.max(9,  Math.min(s * 0.065, cw * 0.048));
+  const metaFont    = Math.max(8,  Math.min(s * 0.055, cw * 0.040));
+  const toggleFont  = Math.max(8,  s * 0.05);
+  const gap         = Math.max(4,  s * 0.035);
+  const padV        = Math.max(8,  s * 0.06);
+  const padH        = Math.max(10, s * 0.065);
+  const iconColor   = weatherIconColor(data.icon);
+  const temp        = useFahrenheit ? `${data.tempF}°F` : `${data.tempC}°C`;
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        width: '100%', height: '100%',
+        backgroundColor: '#0f172a',
+        borderRadius: '0.5rem',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+        userSelect: 'none',
+        position: 'relative',
+        padding: `${padV}px ${padH}px`,
+        gap: `${gap}px`,
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      data-testid={`weather-widget-${widget.id}`}
+    >
+      {/* ── Background gradient accent ───────────────────────────────────── */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: `radial-gradient(ellipse at 50% 0%, ${iconColor}18 0%, transparent 65%)`,
+        borderRadius: '0.5rem',
+        pointerEvents: 'none',
+      }} />
+
+      {/* ── City name ───────────────────────────────────────────────────────── */}
+      <div style={{
+        fontFamily:    MONO,
+        fontSize:      `${cityFont}px`,
+        fontWeight:    700,
+        color:         '#94a3b8',
+        letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+        lineHeight:    1,
+        textAlign:     'center',
+        zIndex:        1,
+      }}>
+        {data.city}
+      </div>
+
+      {/* ── Icon ──────────────────────────────────────────────────────────── */}
+      <div style={{ zIndex: 1, lineHeight: 0, filter: `drop-shadow(0 0 ${Math.max(4, iconSize * 0.12)}px ${iconColor}88)` }}>
+        <WeatherIcon icon={data.icon} size={iconSize} color={iconColor} />
+      </div>
+
+      {/* ── Temperature ──────────────────────────────────────────────────── */}
+      <div style={{
+        fontFamily:    MONO,
+        fontSize:      `${tempFont}px`,
+        fontWeight:    700,
+        color:         '#f1f5f9',
+        letterSpacing: '-0.03em',
+        lineHeight:    1,
+        zIndex:        1,
+        textAlign:     'center',
+      }}>
+        {temp}
+      </div>
+
+      {/* ── Condition label ───────────────────────────────────────────────── */}
+      <div style={{
+        fontFamily:    MONO,
+        fontSize:      `${condFont}px`,
+        fontWeight:    500,
+        color:         iconColor,
+        letterSpacing: '0.04em',
+        lineHeight:    1,
+        zIndex:        1,
+        textAlign:     'center',
+      }}>
+        {data.condition}
+      </div>
+
+      {/* ── Meta row: humidity + wind ─────────────────────────────────────── */}
+      <div style={{
+        display:        'flex',
+        gap:            `${Math.max(8, s * 0.06)}px`,
+        alignItems:     'center',
+        justifyContent: 'center',
+        zIndex:         1,
+      }}>
+        <span style={{ fontFamily: MONO, fontSize: `${metaFont}px`, color: '#475569' }}>
+          💧 {data.humidity}%
+        </span>
+        <span style={{ fontFamily: MONO, fontSize: `${metaFont}px`, color: '#475569' }}>
+          💨 {data.windKph} km/h
+        </span>
+      </div>
+
+      {/* ── °C / °F toggle (visible on hover) ───────────────────────────── */}
+      <div style={{
+        position:      'absolute',
+        bottom:        `${Math.max(5, s * 0.025)}px`,
+        left:          '50%',
+        transform:     'translateX(-50%)',
+        opacity:       isHovered ? 1 : 0,
+        pointerEvents: isHovered ? 'auto' : 'none',
+        transition:    'opacity 0.2s ease',
+        zIndex:        10,
+      }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); setUseFahrenheit(f => !f); }}
+          style={{
+            background:    'rgba(255,255,255,0.08)',
+            border:        '1px solid #334155',
+            cursor:        'pointer',
+            color:         '#94a3b8',
+            fontSize:      `${toggleFont}px`,
+            fontFamily:    MONO,
+            fontWeight:    600,
+            padding:       `${Math.max(2, s * 0.01)}px ${Math.max(8, s * 0.045)}px`,
+            borderRadius:  '4px',
+            letterSpacing: '0.06em',
+            whiteSpace:    'nowrap',
+          }}
+          data-testid="btn-toggle-unit"
+        >
+          {useFahrenheit ? '°F → °C' : '°C → °F'}
+        </button>
+      </div>
+
+      {/* ── City cycle dots ──────────────────────────────────────────────── */}
+      <div style={{
+        position:      'absolute',
+        top:           `${Math.max(5, s * 0.025)}px`,
+        right:         `${Math.max(6, s * 0.03)}px`,
+        display:       'flex',
+        gap:           '3px',
+        opacity:       isHovered ? 1 : 0,
+        pointerEvents: isHovered ? 'auto' : 'none',
+        transition:    'opacity 0.2s ease',
+        zIndex:        10,
+      }}>
+        {MOCK_WEATHER_DATA.map((_, i) => (
+          <button
+            key={i}
+            onClick={(e) => { e.stopPropagation(); setIdx(i); }}
+            style={{
+              width:         `${Math.max(5, s * 0.025)}px`,
+              height:        `${Math.max(5, s * 0.025)}px`,
+              borderRadius:  '50%',
+              border:        'none',
+              cursor:        'pointer',
+              padding:       0,
+              backgroundColor: i === (idx % MOCK_WEATHER_DATA.length)
+                ? '#38bdf8'
+                : '#1e293b',
+              transition:    'background-color 0.15s',
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  WidgetRenderer
-//
-//  Usage in dashboard.tsx (top of widget-cell render function):
-//
-//    import { WidgetRenderer } from '@/App';
-//
-//    const early = WidgetRenderer({
-//      widget,
-//      onToggle24Hour: onToggleClockFormat,
-//      onColorChange,
-//    });
-//    if (early !== false) return early;
-//    // ... video / note / spacer / image rendering continues
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface WidgetRendererProps {
   widget: Widget;
   onToggle24Hour: (widgetId: string) => void;
-  /** Optional — forwarded from dashboardProps; used by the universal widget-header colour picker */
   onColorChange?: (widgetId: string, color: string) => void;
 }
 
@@ -696,6 +1126,22 @@ export function WidgetRenderer({
           key={widget.id}
           widget={widget}
           onToggle24Hour={onToggle24Hour}
+        />
+      );
+
+    case 'crisis_ticker':
+      return (
+        <CrisisTickerWidget
+          key={widget.id}
+          widget={widget}
+        />
+      );
+
+    case 'weather':
+      return (
+        <WeatherWidget
+          key={widget.id}
+          widget={widget}
         />
       );
 
@@ -830,7 +1276,7 @@ function AppContent() {
 
   const { ad, skipAd, triggerAd, isAdActive } = useViralAds(false, widgets, setWidgets);
 
-  // ── URL extractors ──────────────────────────────────────────────────────────
+  // ── URL extractors ────────────────────────────────────────────────────────
   const extractYouTubeId = (url: string): string | null => {
     const regExp = /^.*((youtu\.be\/)|(youtube(-nocookie)?\.com\/(v\/|u\/\w\/|embed\/|watch\?)))\??v?=?([^#&?]*).*/;
     const match  = url.match(regExp);
@@ -855,7 +1301,7 @@ function AppContent() {
     return m ? m[1] : null;
   };
 
-  // ── findSmartPosition ───────────────────────────────────────────────────────
+  // ── findSmartPosition ─────────────────────────────────────────────────────
   const findSmartPosition = useCallback(
     (requestedW: number, requestedH: number, currentWidgets: Widget[]): { x: number; y: number; w: number; h: number } | null => {
       const GRID_ROWS = 6;
@@ -868,7 +1314,7 @@ function AppContent() {
           if (x < ad.x + ad.w && x + w > ad.x && y < ad.y + ad.h && y + h > ad.y) return false;
         }
         return true;
-      };
+      }
       for (let y = 0; y <= GRID_ROWS - requestedH; y++) {
         for (let x = 0; x <= GRID_COLS - requestedW; x++) {
           if (isPositionFree(x, y, requestedW, requestedH)) return { x, y, w: requestedW, h: requestedH };
@@ -908,7 +1354,7 @@ function AppContent() {
     return true;
   }, [widgets, ad]);
 
-  // ── addWidget ───────────────────────────────────────────────────────────────
+  // ── addWidget ──────────────────────────────────────────────────────────────
   const addWidget = useCallback(
     (type: WidgetType, w = 3, h = 2, extraData?: Partial<Widget>) => {
       const widgetId = generateWidgetId();
@@ -932,10 +1378,7 @@ function AppContent() {
     [findSmartPosition]
   );
 
-  // ── Nuclear Refresh Fix ─────────────────────────────────────────────────────
-  // Use in JSX: key={`${widget.id}-${widget.refreshCounter ?? 0}`}
-  // Incrementing refreshCounter forces React to fully unmount + remount the
-  // iframe/embed, providing a true "hard reset" without touching the URL.
+  // ── Nuclear Refresh Fix ───────────────────────────────────────────────────
   const handleRefreshWidget = useCallback((widgetId: string) => {
     setWidgets(prev =>
       prev.map(w =>
@@ -946,24 +1389,21 @@ function AppContent() {
     );
   }, []);
 
-  // ── Clock 12h / 24h toggle ──────────────────────────────────────────────────
+  // ── Clock 12h / 24h toggle ─────────────────────────────────────────────────
   const handleToggleClockFormat = useCallback((widgetId: string) => {
     setWidgets(prev =>
       prev.map(w => w.id === widgetId ? { ...w, clockUse24Hour: !(w.clockUse24Hour ?? false) } : w)
     );
   }, []);
 
-  // ── Clock background colour ─────────────────────────────────────────────────
-  // Canonical handler — called by the universal widget-header colour picker in
-  // dashboard.tsx. Writes widget.customColor which ClockWidget reads via
-  // widget.customColor ?? CLOCK_COLOR_PRESETS[0].bg.
+  // ── Clock background colour ────────────────────────────────────────────────
   const handleClockColorChange = useCallback((widgetId: string, color: string) => {
     setWidgets(prev =>
       prev.map(w => w.id === widgetId ? { ...w, customColor: color } : w)
     );
   }, []);
 
-  // ── addVideoWidget ──────────────────────────────────────────────────────────
+  // ── addVideoWidget ─────────────────────────────────────────────────────────
   const addVideoWidget = useCallback((channel: TrendingChannel, w = 3, h = 2) => {
     const videoId          = channel.videoId || extractYouTubeId(channel.url);
     const youtubeChannelId = channel.channelId || extractYouTubeChannelId(channel.url);
@@ -1052,304 +1492,16 @@ function AppContent() {
     setActiveWidgetId(null);
   }, [addWidget, resolveAndPatchChannelName]);
 
-  // ── handleInlineUrlSubmit ───────────────────────────────────────────────────
   const handleInlineUrlSubmit = useCallback((widgetId: string, url: string) => {
-    if (!url.trim()) return;
-    let finalUrl = url.trim();
-    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) finalUrl = 'https://' + finalUrl;
+    activeWidgetIdRef.current = widgetId;
+    setActiveWidgetId(widgetId);
+    handleSubmitUrl(url);
+  }, [handleSubmitUrl]);
 
-    const youtubeId        = extractYouTubeId(finalUrl);
-    const youtubeChannelId = extractYouTubeChannelId(finalUrl);
-    const twitchChannel    = extractTwitchChannel(finalUrl);
-    const kickChannel      = extractKickChannel(finalUrl);
-
-    let immediateName: string | undefined;
-    if (twitchChannel) immediateName = twitchChannel;
-    else if (kickChannel) immediateName = kickChannel;
-    else if (youtubeId) immediateName = youtubeId;
-    else { try { immediateName = new URL(finalUrl).hostname.replace(/^www\./, ''); } catch { immediateName = finalUrl; } }
-
-    setWidgets(prev => prev.map(w =>
-      w.id === widgetId ? {
-        ...w, type: 'video', url: finalUrl,
-        isYouTube: !!youtubeId || !!youtubeChannelId, videoId: youtubeId, youtubeChannelId,
-        channelName: w.channelName || immediateName,
-        isTwitch: !!twitchChannel, twitchChannel,
-        isKick: !!kickChannel, kickChannel,
-        isLive: false, error: null, embedBlocked: false, isPaused: false,
-        isMuted: true, volume: 0, isOffline: false,
-        refreshCounter: (w.refreshCounter ?? 0) + 1,
-        lastRefresh: Date.now(),
-      } : w
-    ));
-    resolveAndPatchChannelName(widgetId, finalUrl, youtubeId, twitchChannel, kickChannel);
-  }, [resolveAndPatchChannelName]);
-
-  // ── Drag handlers ───────────────────────────────────────────────────────────
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    setActiveId(event.active.id);
-    const activeData = event.active.data.current;
-    let ghostPos: { x: number; y: number; w: number; h: number };
-
-    if (activeData?.type === 'channel' || activeData?.type === 'widget-template') {
-      const template = activeData.template as WidgetTemplate | undefined;
-      ghostPos = { x: 0, y: 0, w: template?.w || 3, h: template?.h || 2 };
-    } else if (activeData?.type === 'sortable-widget') {
-      const widget = activeData.widget as Widget;
-      ghostPos = { x: widget.x, y: widget.y, w: widget.w, h: widget.h };
-    } else {
-      const widget = widgets.find(w => w.id === event.active.id);
-      ghostPos = widget ? { x: widget.x, y: widget.y, w: widget.w, h: widget.h } : { x: 0, y: 0, w: 3, h: 2 };
-    }
-
-    ghostPositionRef.current = ghostPos;
-    setGhostPosition(ghostPos);
-  }, [widgets]);
-
-  const handleDragMove = useCallback((event: DragMoveEvent) => {
-    if (!gridContainerRef.current || !ghostPositionRef.current) return;
-
-    const gridRect = gridContainerRef.current.getBoundingClientRect();
-    let dragX = 0, dragY = 0;
-    const translated = event.active.rect.current.translated;
-    const initial    = event.active.rect.current.initial;
-
-    if (translated) {
-      dragX = translated.left; dragY = translated.top;
-    } else if (initial && event.delta) {
-      dragX = initial.left + event.delta.x; dragY = initial.top + event.delta.y;
-    } else return;
-
-    const cellWidth  = gridRect.width  / GRID_COLS;
-    const cellHeight = gridRect.height / 6;
-    const gridX = Math.max(0, Math.min(GRID_COLS - 1, Math.floor((dragX - gridRect.left) / cellWidth)));
-    const gridY = Math.max(0, Math.min(5,             Math.floor((dragY - gridRect.top)  / cellHeight)));
-
-    const activeData      = event.active.data.current;
-    const draggedWidgetId = event.active.id as string;
-
-    if (activeData?.type === 'sortable-widget') {
-      const draggedWidget = widgets.find(w => w.id === draggedWidgetId);
-      if (draggedWidget) {
-        const previewW = draggedWidget.w;
-        const previewH = draggedWidget.h;
-        const clampedX = Math.max(0, Math.min(GRID_COLS - previewW, gridX));
-        const clampedY = Math.max(0, Math.min(5 - previewH + 1, gridY));
-
-        const collidingWidgets = widgets.filter(widget => {
-          if (widget.id === draggedWidgetId) return false;
-          return clampedX < widget.x + widget.w && clampedX + previewW > widget.x &&
-                 clampedY < widget.y + widget.h && clampedY + previewH > widget.y;
-        });
-
-        if (collidingWidgets.length > 0) {
-          setWidgets(currentWidgets => {
-            let updatedWidgets = [...currentWidgets];
-            const GRID_ROWS = 6;
-
-            const findSlot = (w: Widget, allWidgets: Widget[], excludeIds: string[]): { x: number; y: number } | null => {
-              for (let y = 0; y <= GRID_ROWS - w.h; y++) {
-                for (let x = 0; x <= GRID_COLS - w.w; x++) {
-                  let collision = false;
-                  for (const other of allWidgets) {
-                    if (excludeIds.includes(other.id)) continue;
-                    if (x < other.x + other.w && x + w.w > other.x && y < other.y + other.h && y + w.h > other.y) {
-                      collision = true; break;
-                    }
-                  }
-                  if (!collision && x < clampedX + previewW && x + w.w > clampedX && y < clampedY + previewH && y + w.h > clampedY) {
-                    collision = true;
-                  }
-                  if (!collision) return { x, y };
-                }
-              }
-              return null;
-            };
-
-            let invalid = false;
-            for (const collidingWidget of collidingWidgets) {
-              const newSlot = findSlot(collidingWidget, updatedWidgets, [collidingWidget.id, draggedWidgetId]);
-              if (newSlot) {
-                updatedWidgets = updatedWidgets.map(w => w.id === collidingWidget.id ? { ...w, x: newSlot.x, y: newSlot.y } : w);
-              } else { invalid = true; break; }
-            }
-
-            if (invalid) { ghostValidRef.current = false; return currentWidgets; }
-            ghostValidRef.current = true;
-            return updatedWidgets;
-          });
-        } else {
-          ghostValidRef.current = true;
-        }
-
-        if (!ghostValidRef.current) {
-          ghostPositionRef.current = null;
-          setGhostPosition(null);
-        } else {
-          ghostPositionRef.current = { x: clampedX, y: clampedY, w: previewW, h: previewH };
-          setGhostPosition(ghostPositionRef.current);
-        }
-        return;
-      }
-    }
-
-    ghostPositionRef.current = { ...ghostPositionRef.current, x: gridX, y: gridY };
-    setGhostPosition(ghostPositionRef.current);
-  }, [widgets, setWidgets]);
-
-  const findCollidingWidgets = useCallback(
-    (x: number, y: number, w: number, h: number, excludeId: string, currentWidgets: Widget[]): Widget[] =>
-      currentWidgets.filter(widget => {
-        if (widget.id === excludeId) return false;
-        return x < widget.x + widget.w && x + w > widget.x &&
-               y < widget.y + widget.h && y + h > widget.y;
-      }),
-    []
-  );
-
-  const findNextAvailableSlot = useCallback(
-    (widget: Widget, allWidgets: Widget[], excludeIds: string[]): { x: number; y: number } | null => {
-      const GRID_ROWS = 6;
-      for (let y = 0; y <= GRID_ROWS - widget.h; y++) {
-        for (let x = 0; x <= GRID_COLS - widget.w; x++) {
-          let collision = false;
-          for (const other of allWidgets) {
-            if (excludeIds.includes(other.id)) continue;
-            if (x < other.x + other.w && x + widget.w > other.x && y < other.y + other.h && y + widget.h > other.y) {
-              collision = true; break;
-            }
-          }
-          if (!collision && ad) {
-            if (x < ad.x + ad.w && x + widget.w > ad.x && y < ad.y + ad.h && y + widget.h > ad.y) collision = true;
-          }
-          if (!collision) return { x, y };
-        }
-      }
-      return null;
-    },
-    [ad]
-  );
-
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active }         = event;
-    const finalGhostPosition = ghostPositionRef.current;
-
-    setActiveId(null);
-    setGhostPosition(null);
-    ghostPositionRef.current = null;
-
-    const activeData = active.data.current;
-
-    if (activeData?.type === 'channel') {
-      addVideoWidget(activeData.channel as TrendingChannel, 3, 2);
-      setSidebarOpen(false);
-      return;
-    } else if (activeData?.type === 'widget-template') {
-      const template = activeData.template as WidgetTemplate;
-      addWidget(template.widgetType, template.w || 3, template.h || 2);
-      setSidebarOpen(false);
-      return;
-    }
-
-    if (activeData?.type === 'sortable-widget' && finalGhostPosition) {
-      const widgetId = active.id as string;
-      setWidgets(currentWidgets => {
-        const widgetIndex = currentWidgets.findIndex(w => w.id === widgetId);
-        if (widgetIndex === -1) return currentWidgets;
-
-        const widget  = currentWidgets[widgetIndex];
-        const targetX = finalGhostPosition.x;
-        const targetY = finalGhostPosition.y;
-
-        if (ad) {
-          if (targetX < ad.x + ad.w && targetX + widget.w > ad.x && targetY < ad.y + ad.h && targetY + widget.h > ad.y) return currentWidgets;
-        }
-
-        const collidingWidgets = findCollidingWidgets(targetX, targetY, widget.w, widget.h, widgetId, currentWidgets);
-
-        if (collidingWidgets.length === 0) {
-          const updatedWidgets = [...currentWidgets];
-          updatedWidgets[widgetIndex] = { ...widget, x: targetX, y: targetY };
-          return updatedWidgets;
-        }
-
-        let updatedWidgets = [...currentWidgets];
-        updatedWidgets[widgetIndex] = { ...widget, x: targetX, y: targetY };
-        for (const collidingWidget of collidingWidgets) {
-          const newSlot = findNextAvailableSlot(collidingWidget, updatedWidgets, [collidingWidget.id]);
-          if (newSlot === null) return currentWidgets;
-          updatedWidgets = updatedWidgets.map(w =>
-            w.id === collidingWidget.id ? { ...w, x: newSlot.x, y: newSlot.y } : w
-          );
-        }
-        return updatedWidgets;
-      });
-    }
-  }, [addVideoWidget, addWidget, setWidgets, findCollidingWidgets, findNextAvailableSlot, ad]);
-
-  // ── handleChannelClick ──────────────────────────────────────────────────────
   const handleChannelClick = useCallback(async (channel: TrendingChannel) => {
     const currentActiveWidgetId = activeWidgetIdRef.current;
 
-    setSidebarOpen(false);
-    activeWidgetIdRef.current = null;
-    setActiveWidgetId(null);
-    setUrlInputValue('');
-
     if (channel.platform === 'youtube' && channel.channelId) {
-      const verifiedChannel = getVerifiedChannel(channel.channelId);
-      const staticVideoId   = getStaticLiveId(channel.channelId);
-      const fallbackVideoId = getFallbackVideoId(channel.channelId);
-
-      const immediateVideoId  = verifiedChannel?.liveId || channel.verifiedLiveId || staticVideoId || channel.videoId || null;
-      const channelFallbackId = verifiedChannel?.fallbackId || fallbackVideoId || channel.latestVideoId || null;
-
-      if (immediateVideoId) {
-        const widgetData: Partial<Widget> = {
-          url: `https://www.youtube.com/watch?v=${immediateVideoId}`,
-          isYouTube: true, videoId: immediateVideoId,
-          youtubeChannelId: channel.channelId, channelHandle: channel.channelId,
-          channelName: stripLegacyPrefix(channel.name) || undefined,
-          isTwitch: false, twitchChannel: null, isKick: false, kickChannel: null,
-          isLive: true, isOffline: false,
-          verifiedLiveId:       verifiedChannel?.liveId || channel.verifiedLiveId || null,
-          latestVideoId:        channelFallbackId,
-          isPlayingLatestVideo: false,
-          isManualOverride:     channel.isManualOverride || false,
-          apiError: false, error: null, embedBlocked: false, lastRefresh: Date.now(),
-        };
-
-        if (currentActiveWidgetId) {
-          setWidgets(prev => prev.map(w =>
-            w.id === currentActiveWidgetId
-              ? { ...w, type: 'video', ...widgetData, isPaused: false, isMuted: true, volume: 0, refreshCounter: (w.refreshCounter ?? 0) + 1 }
-              : w
-          ));
-        } else {
-          addWidget('video', 3, 2, widgetData);
-        }
-
-        if (channel.isManualOverride) return;
-
-        searchChannelLiveStream(channel.channelId, false).then(result => {
-          if (result.liveVideoId && result.liveVideoId !== immediateVideoId) {
-            setWidgets(prev => prev.map(w =>
-              w.channelHandle === channel.channelId ? {
-                ...w, videoId: result.liveVideoId,
-                url: `https://www.youtube.com/watch?v=${result.liveVideoId}`,
-                isLive: true, isOffline: false, isPlayingLatestVideo: false,
-                refreshCounter: (w.refreshCounter ?? 0) + 1, lastRefresh: Date.now(),
-              } : w
-            ));
-          } else if (result.liveVideoId) {
-            setWidgets(prev => prev.map(w =>
-              w.channelHandle === channel.channelId ? { ...w, isLive: true } : w
-            ));
-          }
-        }).catch(err => console.warn('[Background] Status check failed (non-blocking):', err));
-        return;
-      }
-
       try {
         const result               = await searchChannelLiveStream(channel.channelId, false);
         const videoId              = result.liveVideoId || result.latestVideoId || null;
@@ -1425,7 +1577,6 @@ function AppContent() {
     setActiveWidgetId(null);
   }, [addWidget]);
 
-  // ─── dashboardProps ───────────────────────────────────────────────────────
   const dashboardProps = {
     widgets,
     setWidgets,
@@ -1452,9 +1603,6 @@ function AppContent() {
     isAdActive,
     onRefreshWidget:     handleRefreshWidget,
     onToggleClockFormat: handleToggleClockFormat,
-    // Canonical clock colour handler — used by the universal widget-header
-    // colour picker in dashboard.tsx. ClockWidget reads customColor from
-    // widget state; it no longer has its own internal colour picker.
     onColorChange:       handleClockColorChange,
   };
 
