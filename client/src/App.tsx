@@ -1105,8 +1105,8 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
         right:         `${Math.max(8, s * 0.04)}px`,
         display:       'flex',
         gap:           `${Math.max(4, s * 0.02)}px`,
-        opacity:       isHovered ? 1 : 0.4,
-        pointerEvents: 'auto',
+        opacity:       isHovered ? 1 : 0,
+        pointerEvents: isHovered ? 'auto' : 'none',
         transition:    'opacity 0.2s ease',
         zIndex:        10,
       }}>
