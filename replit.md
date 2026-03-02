@@ -71,5 +71,5 @@ The dashboard is built on a 12-column magnetic grid.
 - **localStorage:** Browser API for client-side data persistence.
 - **Supabase:** Backend for authentication and PostgreSQL database.
 - **Stripe:** For managing recurring subscriptions.
-- **OpenWeatherMap API:** Live weather data for WeatherWidget (10 cities, fetched per city on demand via `GET /api/weather?city=`). Falls back to static data on error.
+- **OpenWeatherMap API:** Live weather data for WeatherWidget (custom city list, fetched per city on demand via `GET /api/weather?city=`). Falls back to static data on error. Cities persisted in localStorage (`weather_widget_cities`). Hover-activated search input to add cities, × delete buttons on city dots, duplicate/not-found error handling. Controls stay visible while search is focused.
 - **NewsAPI.org:** Live breaking news headlines for CrisisTickerWidget (fetched via `GET /api/news`, refreshes every 10 minutes). Falls back to static headlines on error.

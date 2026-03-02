@@ -883,20 +883,38 @@ interface WeatherEntry {
   windKph:    number;
 }
 
-const WEATHER_CITIES = ['London', 'New York', 'Tokyo', 'Sydney', 'Dubai', 'Moscow', 'Miami', 'Chicago', 'Mumbai', 'Reykjavik'];
+const DEFAULT_WEATHER_CITIES = ['London', 'New York', 'Tokyo', 'Sydney', 'Dubai', 'Moscow', 'Miami', 'Chicago', 'Mumbai', 'Reykjavik'];
+const WEATHER_CITIES_LS_KEY = 'weather_widget_cities';
 
-const FALLBACK_WEATHER: WeatherEntry[] = [
-  { city: 'London',      tempC: 15, tempF: 59,  condition: 'Cloudy',        icon: 'cloudy',         humidity: 74, windKph: 22 },
-  { city: 'New York',    tempC: 22, tempF: 72,  condition: 'Sunny',         icon: 'sun',             humidity: 48, windKph: 14 },
-  { city: 'Tokyo',       tempC: 28, tempF: 82,  condition: 'Partly Cloudy', icon: 'cloud',           humidity: 65, windKph: 18 },
-  { city: 'Sydney',      tempC: 19, tempF: 66,  condition: 'Light Rain',    icon: 'cloud-drizzle',   humidity: 82, windKph: 26 },
-  { city: 'Dubai',       tempC: 38, tempF: 100, condition: 'Sunny',         icon: 'sun',             humidity: 28, windKph: 11 },
-  { city: 'Moscow',      tempC: -4, tempF: 25,  condition: 'Snow',          icon: 'cloud-snow',      humidity: 88, windKph: 31 },
-  { city: 'Miami',       tempC: 31, tempF: 88,  condition: 'Thunderstorm',  icon: 'cloud-lightning', humidity: 91, windKph: 44 },
-  { city: 'Chicago',     tempC: 12, tempF: 54,  condition: 'Windy',         icon: 'wind',            humidity: 56, windKph: 52 },
-  { city: 'Mumbai',      tempC: 33, tempF: 91,  condition: 'Heavy Rain',    icon: 'cloud-rain',      humidity: 95, windKph: 19 },
-  { city: 'Reykjavik',   tempC: 3,  tempF: 37,  condition: 'Overcast',      icon: 'cloudy',          humidity: 83, windKph: 37 },
-];
+const loadWeatherCities = (): string[] => {
+  if (typeof window === 'undefined') return [...DEFAULT_WEATHER_CITIES];
+  try {
+    const stored = localStorage.getItem(WEATHER_CITIES_LS_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return [...DEFAULT_WEATHER_CITIES];
+};
+
+const saveWeatherCities = (cities: string[]) => {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(WEATHER_CITIES_LS_KEY, JSON.stringify(cities)); } catch {}
+};
+
+const FALLBACK_WEATHER: Record<string, WeatherEntry> = {
+  'London':    { city: 'London',    tempC: 15, tempF: 59,  condition: 'Cloudy',        icon: 'cloudy',         humidity: 74, windKph: 22 },
+  'New York':  { city: 'New York',  tempC: 22, tempF: 72,  condition: 'Sunny',         icon: 'sun',            humidity: 48, windKph: 14 },
+  'Tokyo':     { city: 'Tokyo',     tempC: 28, tempF: 82,  condition: 'Partly Cloudy', icon: 'cloud',          humidity: 65, windKph: 18 },
+  'Sydney':    { city: 'Sydney',    tempC: 19, tempF: 66,  condition: 'Light Rain',    icon: 'cloud-drizzle',  humidity: 82, windKph: 26 },
+  'Dubai':     { city: 'Dubai',     tempC: 38, tempF: 100, condition: 'Sunny',         icon: 'sun',            humidity: 28, windKph: 11 },
+  'Moscow':    { city: 'Moscow',    tempC: -4, tempF: 25,  condition: 'Snow',          icon: 'cloud-snow',     humidity: 88, windKph: 31 },
+  'Miami':     { city: 'Miami',     tempC: 31, tempF: 88,  condition: 'Thunderstorm',  icon: 'cloud-lightning', humidity: 91, windKph: 44 },
+  'Chicago':   { city: 'Chicago',   tempC: 12, tempF: 54,  condition: 'Windy',         icon: 'wind',           humidity: 56, windKph: 52 },
+  'Mumbai':    { city: 'Mumbai',    tempC: 33, tempF: 91,  condition: 'Heavy Rain',    icon: 'cloud-rain',     humidity: 95, windKph: 19 },
+  'Reykjavik': { city: 'Reykjavik', tempC: 3,  tempF: 37,  condition: 'Overcast',      icon: 'cloudy',         humidity: 83, windKph: 37 },
+};
 
 const WeatherIcon: React.FC<{ icon: WeatherIconType; size: number; color: string }> = ({ icon, size, color }) => {
   const props = { size, color, strokeWidth: 1.8 };
@@ -947,6 +965,7 @@ interface WeatherWidgetProps {
 
 export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
   const containerRef    = useRef<HTMLDivElement>(null);
+  const searchRef       = useRef<HTMLInputElement>(null);
   const [cw, setCw]     = useState(280);
   const [ch, setCh]     = useState(200);
   const [idx, setIdx]   = useState(0);
@@ -954,11 +973,18 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
   const [isHovered, setIsHovered]         = useState(false);
   const [liveWeather, setLiveWeather]     = useState<Record<string, WeatherEntry>>({});
   const [weatherError, setWeatherError]   = useState(false);
+  const [cities, setCities]               = useState<string[]>(loadWeatherCities);
+  const [searchVal, setSearchVal]         = useState('');
+  const [searchErr, setSearchErr]         = useState('');
+  const [isSearching, setIsSearching]     = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
-  const cityName = WEATHER_CITIES[idx % WEATHER_CITIES.length];
-  const data: WeatherEntry = liveWeather[cityName] || FALLBACK_WEATHER[idx % FALLBACK_WEATHER.length];
+  const showControls = isHovered || isSearchFocused;
+  const safeIdx   = cities.length > 0 ? idx % cities.length : 0;
+  const cityName  = cities[safeIdx] || 'London';
+  const fallback: WeatherEntry = FALLBACK_WEATHER[cityName] || { city: cityName, tempC: 0, tempF: 32, condition: 'Unknown', icon: 'sun', humidity: 0, windKph: 0 };
+  const data: WeatherEntry = liveWeather[cityName] || fallback;
 
-  // ── ResizeObserver ────────────────────────────────────────────────────────
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -972,7 +998,6 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
     return () => ro.disconnect();
   }, []);
 
-  // ── Fetch live weather when city changes ────────────────────────────────
   useEffect(() => {
     if (liveWeather[cityName]) return;
     let mounted = true;
@@ -993,13 +1018,54 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
     return () => { mounted = false; };
   }, [cityName, liveWeather]);
 
-  // ── Cycle cities every 20s ─────────────────────────────────────────────
   useEffect(() => {
-    const id = setInterval(() => setIdx(i => (i + 1) % WEATHER_CITIES.length), 20_000);
+    if (cities.length === 0) return;
+    const id = setInterval(() => setIdx(i => (i + 1) % cities.length), 20_000);
     return () => clearInterval(id);
-  }, []);
+  }, [cities.length]);
 
-  // ── Responsive scale ──────────────────────────────────────────────────────
+  const handleAddCity = async () => {
+    const trimmed = searchVal.trim();
+    if (!trimmed) return;
+    if (cities.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      setSearchErr('Already in list');
+      setTimeout(() => setSearchErr(''), 2000);
+      return;
+    }
+    setIsSearching(true);
+    setSearchErr('');
+    try {
+      const resp = await fetch(`/api/weather?city=${encodeURIComponent(trimmed)}`);
+      if (!resp.ok) {
+        setSearchErr('City not found');
+        setTimeout(() => setSearchErr(''), 2500);
+        return;
+      }
+      const w = await resp.json() as WeatherEntry;
+      const resolvedName = w.city || trimmed;
+      const updated = [...cities, resolvedName];
+      setCities(updated);
+      saveWeatherCities(updated);
+      setLiveWeather(prev => ({ ...prev, [resolvedName]: w }));
+      setIdx(updated.length - 1);
+      setSearchVal('');
+    } catch {
+      setSearchErr('City not found');
+      setTimeout(() => setSearchErr(''), 2500);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleDeleteCity = (e: React.MouseEvent, i: number) => {
+    e.stopPropagation();
+    if (cities.length <= 1) return;
+    const updated = cities.filter((_, ci) => ci !== i);
+    setCities(updated);
+    saveWeatherCities(updated);
+    if (idx >= updated.length) setIdx(0);
+  };
+
   const s = Math.min(cw, ch);
 
   const iconSize    = Math.max(24, Math.min(s * 0.28, cw * 0.22, ch * 0.30));
@@ -1014,7 +1080,9 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
   const padH        = Math.max(10, s * 0.065);
   const iconColor   = weatherIconColor(data.icon);
   const bgGradient  = weatherGradient(data.icon);
-  const temp        = useFahrenheit ? `${data.tempF}°F` : `${data.tempC}°C`;
+  const temp        = useFahrenheit ? `${data.tempF}\u00B0F` : `${data.tempC}\u00B0C`;
+  const dotSize     = Math.max(10, s * 0.045);
+  const searchH     = Math.max(24, s * 0.12);
 
   return (
     <div
@@ -1042,6 +1110,71 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
       onMouseLeave={() => setIsHovered(false)}
       data-testid={`weather-widget-${widget.id}`}
     >
+
+      {/* ── Search input (hover-only) ─────────────────────────────────────── */}
+      <div style={{
+        position:      'absolute',
+        top:           `${Math.max(6, s * 0.03)}px`,
+        left:          `${Math.max(8, s * 0.04)}px`,
+        right:         `${Math.max(8, s * 0.04)}px`,
+        opacity:       showControls ? 1 : 0,
+        pointerEvents: showControls ? 'auto' : 'none',
+        transition:    'opacity 0.2s ease',
+        zIndex:        20,
+        display:       'flex',
+        gap:           '4px',
+        alignItems:    'center',
+      }}>
+        <input
+          ref={searchRef}
+          type="text"
+          value={searchVal}
+          onChange={(e) => { setSearchVal(e.target.value); setSearchErr(''); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCity(); } }}
+          onFocus={() => setIsSearchFocused(true)}
+          onBlur={() => setIsSearchFocused(false)}
+          placeholder="Add city\u2026"
+          style={{
+            flex:            1,
+            height:          `${searchH}px`,
+            background:      'rgba(15,23,42,0.75)',
+            backdropFilter:  'blur(8px)',
+            border:          searchErr ? '1px solid #ef4444' : '1px solid rgba(148,163,184,0.25)',
+            borderRadius:    '6px',
+            color:           '#e2e8f0',
+            fontFamily:      MONO,
+            fontSize:        `${Math.max(10, s * 0.055)}px`,
+            fontWeight:      500,
+            padding:         `0 ${Math.max(6, s * 0.035)}px`,
+            outline:         'none',
+            letterSpacing:   '0.03em',
+            boxSizing:       'border-box',
+          }}
+          onClick={(e) => e.stopPropagation()}
+          data-testid="weather-city-search"
+        />
+        {isSearching && (
+          <div style={{
+            width: `${Math.max(14, s * 0.06)}px`, height: `${Math.max(14, s * 0.06)}px`,
+            border: '2px solid rgba(148,163,184,0.3)', borderTopColor: '#60a5fa',
+            borderRadius: '50%', animation: 'spin 0.6s linear infinite',
+          }} />
+        )}
+      </div>
+
+      {searchErr && showControls && (
+        <div style={{
+          position: 'absolute',
+          top: `${Math.max(6, s * 0.03) + searchH + 4}px`,
+          left: `${Math.max(8, s * 0.04)}px`,
+          fontFamily: MONO, fontSize: `${Math.max(9, s * 0.05)}px`,
+          color: '#ef4444', letterSpacing: '0.03em', zIndex: 20,
+        }}>
+          {searchErr}
+        </div>
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* ── City name ───────────────────────────────────────────────────────── */}
       <div style={{
@@ -1132,8 +1265,8 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
         bottom:        `${Math.max(5, s * 0.025)}px`,
         left:          '50%',
         transform:     'translateX(-50%)',
-        opacity:       isHovered ? 1 : 0,
-        pointerEvents: isHovered ? 'auto' : 'none',
+        opacity:       showControls ? 1 : 0,
+        pointerEvents: showControls ? 'auto' : 'none',
         transition:    'opacity 0.2s ease',
         zIndex:        10,
       }}>
@@ -1154,44 +1287,81 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
           }}
           data-testid="btn-toggle-unit"
         >
-          {useFahrenheit ? '°F → °C' : '°C → °F'}
+          {useFahrenheit ? '\u00B0F \u2192 \u00B0C' : '\u00B0C \u2192 \u00B0F'}
         </button>
       </div>
 
-      {/* ── City cycle dots ──────────────────────────────────────────────── */}
+      {/* ── City cycle dots with delete ─────────────────────────────────── */}
       <div style={{
         position:      'absolute',
-        top:           `${Math.max(6, s * 0.03)}px`,
-        right:         `${Math.max(8, s * 0.04)}px`,
+        bottom:        `${Math.max(22, s * 0.11)}px`,
+        left:          '50%',
+        transform:     'translateX(-50%)',
         display:       'flex',
-        gap:           `${Math.max(4, s * 0.02)}px`,
-        opacity:       isHovered ? 1 : 0,
-        pointerEvents: isHovered ? 'auto' : 'none',
+        gap:           `${Math.max(6, s * 0.03)}px`,
+        opacity:       showControls ? 1 : 0,
+        pointerEvents: showControls ? 'auto' : 'none',
         transition:    'opacity 0.2s ease',
         zIndex:        10,
+        flexWrap:      'wrap',
+        justifyContent: 'center',
+        maxWidth:      '90%',
       }}>
-        {WEATHER_CITIES.map((_, i) => (
-          <button
-            key={i}
-            onClick={(e) => { e.stopPropagation(); setIdx(i); }}
-            style={{
-              width:         `${Math.max(12, s * 0.055)}px`,
-              height:        `${Math.max(12, s * 0.055)}px`,
-              borderRadius:  '50%',
-              border:        i === (idx % WEATHER_CITIES.length)
-                ? `2px solid ${iconColor}`
-                : '1px solid rgba(148,163,184,0.3)',
-              cursor:        'pointer',
-              padding:       0,
-              backgroundColor: i === (idx % WEATHER_CITIES.length)
-                ? iconColor
-                : 'rgba(30,41,59,0.6)',
-              transition:    'all 0.2s ease',
-              boxShadow:     i === (idx % WEATHER_CITIES.length)
-                ? `0 0 6px ${iconColor}66`
-                : 'none',
-            }}
-          />
+        {cities.map((c, i) => (
+          <div key={`${c}-${i}`} style={{ position: 'relative', display: 'inline-flex' }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); setIdx(i); }}
+              title={c}
+              style={{
+                width:         `${dotSize}px`,
+                height:        `${dotSize}px`,
+                borderRadius:  '50%',
+                border:        i === safeIdx
+                  ? `2px solid ${iconColor}`
+                  : '1px solid rgba(148,163,184,0.3)',
+                cursor:        'pointer',
+                padding:       0,
+                backgroundColor: i === safeIdx
+                  ? iconColor
+                  : 'rgba(30,41,59,0.6)',
+                transition:    'all 0.2s ease',
+                boxShadow:     i === safeIdx
+                  ? `0 0 6px ${iconColor}66`
+                  : 'none',
+              }}
+              data-testid={`weather-dot-${i}`}
+            />
+            {cities.length > 1 && (
+              <button
+                onClick={(e) => handleDeleteCity(e, i)}
+                style={{
+                  position:        'absolute',
+                  top:             `${-Math.max(5, dotSize * 0.4)}px`,
+                  right:           `${-Math.max(5, dotSize * 0.4)}px`,
+                  width:           `${Math.max(12, dotSize * 0.8)}px`,
+                  height:          `${Math.max(12, dotSize * 0.8)}px`,
+                  borderRadius:    '50%',
+                  background:      'rgba(239,68,68,0.85)',
+                  border:          'none',
+                  cursor:          'pointer',
+                  color:           '#fff',
+                  fontFamily:      MONO,
+                  fontWeight:      700,
+                  fontSize:        `${Math.max(8, dotSize * 0.55)}px`,
+                  lineHeight:      1,
+                  display:         'flex',
+                  alignItems:      'center',
+                  justifyContent:  'center',
+                  padding:         0,
+                  transition:      'transform 0.15s ease',
+                }}
+                title={`Remove ${c}`}
+                data-testid={`weather-delete-${i}`}
+              >
+                {'\u00D7'}
+              </button>
+            )}
+          </div>
         ))}
       </div>
     </div>
