@@ -633,23 +633,17 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
 //  • All font sizes and icon sizes scale with container dimensions.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CRISIS_HEADLINES = [
-  { id: 1,  text: 'BREAKING: Major earthquake strikes Pacific Rim — tsunami Alert issued for coastal regions' },
+const FALLBACK_HEADLINES = [
+  { id: 1,  text: 'BREAKING: Major earthquake strikes Pacific Rim \u2014 tsunami Alert issued for coastal regions' },
   { id: 2,  text: 'Markets surge 3% on surprise Fed rate hold; tech sector leads gains' },
   { id: 3,  text: 'Crisis declared in southern provinces as flooding displaces 40,000 residents' },
   { id: 4,  text: 'International summit agrees on new climate finance framework' },
   { id: 5,  text: 'Cyber Alert: Critical zero-day vulnerability found in widely-used enterprise software' },
-  { id: 6,  text: 'Space agency confirms successful orbital rendezvous — crew safe aboard station' },
-  { id: 7,  text: 'Health Crisis: Novel respiratory pathogen detected in three countries — WHO monitoring' },
-  { id: 8,  text: 'Energy grid restored after major blackout affecting 2 million homes' },
-  { id: 9,  text: 'Alert: Geomagnetic storm forecast to disrupt GPS and HF radio communications tonight' },
-  { id: 10, text: 'Trade agreement ratified by 34-nation bloc; tariffs to drop by Q2' },
-  { id: 11, text: 'Wildfire Crisis expands across dry northern corridor — evacuation orders widen' },
-  { id: 12, text: 'Diplomatic breakthrough: Ceasefire announced following weeks of negotiations' },
+  { id: 6,  text: 'Space agency confirms successful orbital rendezvous \u2014 crew safe aboard station' },
 ];
 
 const isCrisisHeadline = (text: string) =>
-  /crisis|alert/i.test(text);
+  /crisis|alert|breaking|urgent|emergency/i.test(text);
 
 interface CrisisTickerWidgetProps {
   widget: Widget;
@@ -662,6 +656,31 @@ export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget }
   const [ch, setCh]  = useState(200);
   const [blink, setBlink] = useState(true);
   const [hovered, setHovered] = useState(false);
+  const [liveHeadlines, setLiveHeadlines] = useState<{ id: number; text: string }[] | null>(null);
+  const [newsError, setNewsError] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchNews = async () => {
+      try {
+        const resp = await fetch('/api/news');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (mounted && data.articles?.length > 0) {
+          setLiveHeadlines(data.articles);
+          setNewsError(false);
+        }
+      } catch (err) {
+        console.warn('[CrisisTickerWidget] News fetch failed, using fallback:', err);
+        if (mounted) setNewsError(true);
+      }
+    };
+    fetchNews();
+    const interval = setInterval(fetchNews, 10 * 60 * 1000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
+  const CRISIS_HEADLINES = liveHeadlines || FALLBACK_HEADLINES;
 
   // ── ResizeObserver ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -758,10 +777,10 @@ export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget }
           marginLeft:    'auto',
           fontFamily:    MONO,
           fontSize:      `${Math.max(8, s * 0.048)}px`,
-          color:         '#334155',
+          color:         newsError ? '#f59e0b' : '#334155',
           letterSpacing: '0.05em',
         }}>
-          {new Date().toUTCString().slice(0, 16)} UTC
+          {newsError ? 'Fallback Mode' : (liveHeadlines ? 'LIVE' : new Date().toUTCString().slice(0, 16) + ' UTC')}
         </span>
       </div>
 
@@ -792,9 +811,12 @@ export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget }
         <div
           ref={scrollRef}
           style={{
-            animation:           `crisis-scroll-${widget.id} ${scrollDuration}s linear infinite`,
-            animationPlayState:  hovered ? 'paused' : 'running',
-            willChange:          'transform',
+            animationName:           `crisis-scroll-${widget.id}`,
+            animationDuration:       `${scrollDuration}s`,
+            animationTimingFunction: 'linear',
+            animationIterationCount: 'infinite' as any,
+            animationPlayState:      hovered ? 'paused' : 'running',
+            willChange:              'transform',
           }}
         >
           {headlines.map((h, idx) => (
@@ -849,17 +871,21 @@ export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget }
 //  • All sizes scale proportionally with container dimensions.
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface MockWeatherEntry {
+type WeatherIconType = 'sun' | 'cloud' | 'cloud-rain' | 'cloud-snow' | 'cloud-lightning' | 'wind' | 'cloud-drizzle' | 'cloudy';
+
+interface WeatherEntry {
   city:       string;
   tempC:      number;
   tempF:      number;
   condition:  string;
-  icon:       'sun' | 'cloud' | 'cloud-rain' | 'cloud-snow' | 'cloud-lightning' | 'wind' | 'cloud-drizzle' | 'cloudy';
+  icon:       WeatherIconType;
   humidity:   number;
   windKph:    number;
 }
 
-const MOCK_WEATHER_DATA: MockWeatherEntry[] = [
+const WEATHER_CITIES = ['London', 'New York', 'Tokyo', 'Sydney', 'Dubai', 'Moscow', 'Miami', 'Chicago', 'Mumbai', 'Reykjavik'];
+
+const FALLBACK_WEATHER: WeatherEntry[] = [
   { city: 'London',      tempC: 15, tempF: 59,  condition: 'Cloudy',        icon: 'cloudy',         humidity: 74, windKph: 22 },
   { city: 'New York',    tempC: 22, tempF: 72,  condition: 'Sunny',         icon: 'sun',             humidity: 48, windKph: 14 },
   { city: 'Tokyo',       tempC: 28, tempF: 82,  condition: 'Partly Cloudy', icon: 'cloud',           humidity: 65, windKph: 18 },
@@ -872,7 +898,7 @@ const MOCK_WEATHER_DATA: MockWeatherEntry[] = [
   { city: 'Reykjavik',   tempC: 3,  tempF: 37,  condition: 'Overcast',      icon: 'cloudy',          humidity: 83, windKph: 37 },
 ];
 
-const WeatherIcon: React.FC<{ icon: MockWeatherEntry['icon']; size: number; color: string }> = ({ icon, size, color }) => {
+const WeatherIcon: React.FC<{ icon: WeatherIconType; size: number; color: string }> = ({ icon, size, color }) => {
   const props = { size, color, strokeWidth: 1.8 };
   switch (icon) {
     case 'sun':             return <Sun             {...props} />;
@@ -887,7 +913,7 @@ const WeatherIcon: React.FC<{ icon: MockWeatherEntry['icon']; size: number; colo
   }
 };
 
-const weatherIconColor = (icon: MockWeatherEntry['icon']): string => {
+const weatherIconColor = (icon: WeatherIconType): string => {
   switch (icon) {
     case 'sun':             return '#fbbf24';
     case 'cloud':           return '#94a3b8';
@@ -901,7 +927,7 @@ const weatherIconColor = (icon: MockWeatherEntry['icon']): string => {
   }
 };
 
-const weatherGradient = (icon: MockWeatherEntry['icon']): string => {
+const weatherGradient = (icon: WeatherIconType): string => {
   switch (icon) {
     case 'sun':             return 'radial-gradient(ellipse at 50% 30%, rgba(251,191,36,0.25) 0%, rgba(234,88,12,0.08) 50%, rgba(15,23,42,0.95) 100%)';
     case 'cloud':           return 'radial-gradient(ellipse at 50% 30%, rgba(148,163,184,0.18) 0%, rgba(51,65,85,0.10) 50%, rgba(15,23,42,0.95) 100%)';
@@ -926,8 +952,11 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
   const [idx, setIdx]   = useState(0);
   const [useFahrenheit, setUseFahrenheit] = useState(false);
   const [isHovered, setIsHovered]         = useState(false);
+  const [liveWeather, setLiveWeather]     = useState<Record<string, WeatherEntry>>({});
+  const [weatherError, setWeatherError]   = useState(false);
 
-  const data = MOCK_WEATHER_DATA[idx % MOCK_WEATHER_DATA.length];
+  const cityName = WEATHER_CITIES[idx % WEATHER_CITIES.length];
+  const data: WeatherEntry = liveWeather[cityName] || FALLBACK_WEATHER[idx % FALLBACK_WEATHER.length];
 
   // ── ResizeObserver ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -943,9 +972,30 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
     return () => ro.disconnect();
   }, []);
 
-  // ── Cycle mock cities every 20s ──────────────────────────────────────────
+  // ── Fetch live weather when city changes ────────────────────────────────
   useEffect(() => {
-    const id = setInterval(() => setIdx(i => (i + 1) % MOCK_WEATHER_DATA.length), 20_000);
+    if (liveWeather[cityName]) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const resp = await fetch(`/api/weather?city=${encodeURIComponent(cityName)}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const w = await resp.json();
+        if (mounted) {
+          setLiveWeather(prev => ({ ...prev, [cityName]: w as WeatherEntry }));
+          setWeatherError(false);
+        }
+      } catch (err) {
+        console.warn(`[WeatherWidget] Failed to fetch weather for ${cityName}:`, err);
+        if (mounted) setWeatherError(true);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [cityName, liveWeather]);
+
+  // ── Cycle cities every 20s ─────────────────────────────────────────────
+  useEffect(() => {
+    const id = setInterval(() => setIdx(i => (i + 1) % WEATHER_CITIES.length), 20_000);
     return () => clearInterval(id);
   }, []);
 
@@ -1008,6 +1058,16 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
       }}>
         {data.city}
       </div>
+
+      {weatherError && !liveWeather[cityName] && (
+        <div style={{
+          fontFamily: MONO, fontSize: `${Math.max(8, s * 0.045)}px`,
+          color: '#f59e0b', letterSpacing: '0.04em', zIndex: 1,
+          textAlign: 'center', lineHeight: 1,
+        }}>
+          Service temporarily unavailable
+        </div>
+      )}
 
       {/* ── Icon ──────────────────────────────────────────────────────────── */}
       <div style={{ zIndex: 1, lineHeight: 0, filter: `drop-shadow(0 0 ${Math.max(4, iconSize * 0.12)}px ${iconColor}88)` }}>
@@ -1110,7 +1170,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
         transition:    'opacity 0.2s ease',
         zIndex:        10,
       }}>
-        {MOCK_WEATHER_DATA.map((_, i) => (
+        {WEATHER_CITIES.map((_, i) => (
           <button
             key={i}
             onClick={(e) => { e.stopPropagation(); setIdx(i); }}
@@ -1118,16 +1178,16 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
               width:         `${Math.max(12, s * 0.055)}px`,
               height:        `${Math.max(12, s * 0.055)}px`,
               borderRadius:  '50%',
-              border:        i === (idx % MOCK_WEATHER_DATA.length)
+              border:        i === (idx % WEATHER_CITIES.length)
                 ? `2px solid ${iconColor}`
                 : '1px solid rgba(148,163,184,0.3)',
               cursor:        'pointer',
               padding:       0,
-              backgroundColor: i === (idx % MOCK_WEATHER_DATA.length)
+              backgroundColor: i === (idx % WEATHER_CITIES.length)
                 ? iconColor
                 : 'rgba(30,41,59,0.6)',
               transition:    'all 0.2s ease',
-              boxShadow:     i === (idx % MOCK_WEATHER_DATA.length)
+              boxShadow:     i === (idx % WEATHER_CITIES.length)
                 ? `0 0 6px ${iconColor}66`
                 : 'none',
             }}

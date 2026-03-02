@@ -1136,6 +1136,81 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Weather API (OpenWeatherMap) ──────────────────────────────────────────
+  app.get('/api/weather', async (req: Request, res: Response) => {
+    const city = (req.query.city as string) || 'London';
+    const apiKey = process.env.WEATHER_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({ error: 'Weather API key not configured' });
+    }
+    try {
+      const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`;
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        const body = await resp.text();
+        console.error(`[Weather] OpenWeatherMap error ${resp.status}: ${body}`);
+        return res.status(resp.status).json({ error: 'Weather service error' });
+      }
+      const data = await resp.json();
+      const mapped = {
+        city: data.name,
+        tempC: Math.round(data.main.temp),
+        tempF: Math.round(data.main.temp * 9 / 5 + 32),
+        condition: data.weather?.[0]?.main || 'Unknown',
+        description: data.weather?.[0]?.description || '',
+        icon: mapOwmIcon(data.weather?.[0]?.icon || '01d'),
+        humidity: data.main.humidity,
+        windKph: Math.round((data.wind?.speed || 0) * 3.6),
+      };
+      res.json(mapped);
+    } catch (err) {
+      console.error('[Weather] Fetch error:', err);
+      res.status(503).json({ error: 'Service temporarily unavailable' });
+    }
+  });
+
+  function mapOwmIcon(owmIcon: string): string {
+    if (owmIcon.startsWith('01')) return 'sun';
+    if (owmIcon.startsWith('02') || owmIcon.startsWith('03')) return 'cloud';
+    if (owmIcon.startsWith('04')) return 'cloudy';
+    if (owmIcon.startsWith('09')) return 'cloud-drizzle';
+    if (owmIcon.startsWith('10')) return 'cloud-rain';
+    if (owmIcon.startsWith('11')) return 'cloud-lightning';
+    if (owmIcon.startsWith('13')) return 'cloud-snow';
+    if (owmIcon.startsWith('50')) return 'wind';
+    return 'sun';
+  }
+
+  // ─── News API (NewsAPI.org) ───────────────────────────────────────────────
+  app.get('/api/news', async (_req: Request, res: Response) => {
+    const apiKey = process.env.NEWS_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({ error: 'News API key not configured' });
+    }
+    try {
+      const url = `https://newsapi.org/v2/top-headlines?language=en&apiKey=${apiKey}`;
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        const body = await resp.text();
+        console.error(`[News] NewsAPI error ${resp.status}: ${body}`);
+        return res.status(resp.status).json({ error: 'News service error' });
+      }
+      const data = await resp.json();
+      const articles = (data.articles || [])
+        .filter((a: any) => a.title && a.title !== '[Removed]')
+        .slice(0, 20)
+        .map((a: any, i: number) => ({
+          id: i + 1,
+          text: a.title,
+          source: a.source?.name || '',
+        }));
+      res.json({ articles });
+    } catch (err) {
+      console.error('[News] Fetch error:', err);
+      res.status(503).json({ error: 'Service temporarily unavailable' });
+    }
+  });
+
   // Auto-import channels on startup (runs once)
   async function autoImportChannels() {
     try {
