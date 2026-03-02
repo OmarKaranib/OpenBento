@@ -625,9 +625,10 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
 // ─────────────────────────────────────────────────────────────────────────────
 //  CrisisTickerWidget — vertically scrolling breaking-news feed
 //
-//  • Solid bg-slate-900 (#0f172a) background.
+//  • Glassmorphism background with backdrop-blur.
 //  • Blinking red "LIVE INTEL" badge in the header.
 //  • Headlines containing 'Crisis' or 'Alert' render in red; others in slate-100.
+//  • Pause-on-hover: animation-play-state paused when mouse is over widget.
 //  • Smooth infinite scroll; resets seamlessly.
 //  • All font sizes and icon sizes scale with container dimensions.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -660,6 +661,7 @@ export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget }
   const [cw, setCw]  = useState(320);
   const [ch, setCh]  = useState(200);
   const [blink, setBlink] = useState(true);
+  const [hovered, setHovered] = useState(false);
 
   // ── ResizeObserver ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -685,11 +687,11 @@ export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget }
   // We render the list twice so the animation loops seamlessly.
   const s = Math.min(cw, ch);
 
-  const headerH   = Math.max(24, s * 0.12);
-  const rowH      = Math.max(28, s * 0.14);
-  const fontSize  = Math.max(10, Math.min(s * 0.07, cw * 0.038));
-  const badgeFont = Math.max(8,  s * 0.056);
-  const dotSize   = Math.max(6,  s * 0.045);
+  const headerH   = Math.max(26, s * 0.13);
+  const rowH      = Math.max(32, s * 0.16);
+  const fontSize  = Math.max(11, Math.min(s * 0.08, cw * 0.044));
+  const badgeFont = Math.max(9,  s * 0.06);
+  const dotSize   = Math.max(7,  s * 0.05);
 
   // Duration scales with number of items & row height so it looks consistent
   const scrollDuration = CRISIS_HEADLINES.length * Math.max(2.5, rowH * 0.08);
@@ -699,9 +701,14 @@ export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget }
   return (
     <div
       ref={containerRef}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         width: '100%', height: '100%',
-        backgroundColor: '#0f172a',
+        background: 'linear-gradient(135deg, rgba(15,23,42,0.92) 0%, rgba(30,41,59,0.88) 100%)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid rgba(148,163,184,0.12)',
         borderRadius: '0.5rem',
         display: 'flex',
         flexDirection: 'column',
@@ -721,8 +728,8 @@ export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget }
         alignItems:      'center',
         gap:             `${Math.max(6, s * 0.03)}px`,
         padding:         `0 ${Math.max(8, s * 0.045)}px`,
-        borderBottom:    '1px solid #1e293b',
-        backgroundColor: '#0a0f1a',
+        borderBottom:    '1px solid rgba(30,41,59,0.6)',
+        backgroundColor: 'rgba(10,15,26,0.7)',
       }}>
         {/* Blinking red dot */}
         <span style={{
@@ -764,14 +771,14 @@ export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget }
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0,
           height: `${Math.max(16, rowH * 0.5)}px`,
-          background: 'linear-gradient(to bottom, #0f172a, transparent)',
+          background: 'linear-gradient(to bottom, rgba(15,23,42,0.95), transparent)',
           zIndex: 2, pointerEvents: 'none',
         }} />
         {/* Bottom fade */}
         <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
           height: `${Math.max(16, rowH * 0.5)}px`,
-          background: 'linear-gradient(to top, #0f172a, transparent)',
+          background: 'linear-gradient(to top, rgba(15,23,42,0.95), transparent)',
           zIndex: 2, pointerEvents: 'none',
         }} />
 
@@ -785,8 +792,9 @@ export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget }
         <div
           ref={scrollRef}
           style={{
-            animation:      `crisis-scroll-${widget.id} ${scrollDuration}s linear infinite`,
-            willChange:     'transform',
+            animation:           `crisis-scroll-${widget.id} ${scrollDuration}s linear infinite`,
+            animationPlayState:  hovered ? 'paused' : 'running',
+            willChange:          'transform',
           }}
         >
           {headlines.map((h, idx) => (
@@ -833,9 +841,11 @@ export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget }
 // ─────────────────────────────────────────────────────────────────────────────
 //  WeatherWidget — mock weather display with lucide-react icons
 //
-//  • Solid bg-slate-900 background.
+//  • Glassmorphism background with backdrop-blur and weather-adaptive gradient.
 //  • Shows: city name, large temperature, condition label, and a scaled icon.
-//  • Mock data cycles through several conditions every 8 s for demo purposes.
+//  • Mock data cycles through several conditions every 20s for demo purposes.
+//  • Enlarged city dots (12px+) always clickable; full opacity on hover.
+//  • Humidity/wind 50% larger with bold weight for high visibility.
 //  • All sizes scale proportionally with container dimensions.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -891,6 +901,20 @@ const weatherIconColor = (icon: MockWeatherEntry['icon']): string => {
   }
 };
 
+const weatherGradient = (icon: MockWeatherEntry['icon']): string => {
+  switch (icon) {
+    case 'sun':             return 'radial-gradient(ellipse at 50% 30%, rgba(251,191,36,0.25) 0%, rgba(234,88,12,0.08) 50%, rgba(15,23,42,0.95) 100%)';
+    case 'cloud':           return 'radial-gradient(ellipse at 50% 30%, rgba(148,163,184,0.18) 0%, rgba(51,65,85,0.10) 50%, rgba(15,23,42,0.95) 100%)';
+    case 'cloud-rain':      return 'radial-gradient(ellipse at 50% 30%, rgba(37,99,235,0.22) 0%, rgba(30,58,138,0.10) 50%, rgba(15,23,42,0.95) 100%)';
+    case 'cloud-snow':      return 'radial-gradient(ellipse at 50% 30%, rgba(186,230,253,0.20) 0%, rgba(125,211,252,0.08) 50%, rgba(15,23,42,0.95) 100%)';
+    case 'cloud-lightning': return 'radial-gradient(ellipse at 50% 30%, rgba(250,204,21,0.22) 0%, rgba(161,98,7,0.08) 50%, rgba(15,23,42,0.95) 100%)';
+    case 'wind':            return 'radial-gradient(ellipse at 50% 30%, rgba(165,180,252,0.18) 0%, rgba(99,102,241,0.08) 50%, rgba(15,23,42,0.95) 100%)';
+    case 'cloud-drizzle':   return 'radial-gradient(ellipse at 50% 30%, rgba(125,211,252,0.20) 0%, rgba(56,189,248,0.08) 50%, rgba(15,23,42,0.95) 100%)';
+    case 'cloudy':          return 'radial-gradient(ellipse at 50% 30%, rgba(148,163,184,0.18) 0%, rgba(71,85,105,0.08) 50%, rgba(15,23,42,0.95) 100%)';
+    default:                return 'radial-gradient(ellipse at 50% 30%, rgba(241,245,249,0.12) 0%, rgba(15,23,42,0.95) 100%)';
+  }
+};
+
 interface WeatherWidgetProps {
   widget: Widget;
 }
@@ -919,9 +943,9 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
     return () => ro.disconnect();
   }, []);
 
-  // ── Cycle mock cities every 8s ───────────────────────────────────────────
+  // ── Cycle mock cities every 20s ──────────────────────────────────────────
   useEffect(() => {
-    const id = setInterval(() => setIdx(i => (i + 1) % MOCK_WEATHER_DATA.length), 8_000);
+    const id = setInterval(() => setIdx(i => (i + 1) % MOCK_WEATHER_DATA.length), 20_000);
     return () => clearInterval(id);
   }, []);
 
@@ -930,14 +954,16 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
 
   const iconSize    = Math.max(24, Math.min(s * 0.28, cw * 0.22, ch * 0.30));
   const tempFont    = Math.max(22, Math.min(s * 0.25, cw * 0.18, ch * 0.27));
-  const cityFont    = Math.max(10, Math.min(s * 0.075, cw * 0.055));
+  const cityFont    = Math.max(12, Math.min(s * 0.095, cw * 0.07));
   const condFont    = Math.max(9,  Math.min(s * 0.065, cw * 0.048));
-  const metaFont    = Math.max(8,  Math.min(s * 0.055, cw * 0.040));
+  const metaFont    = Math.max(12, Math.min(s * 0.082, cw * 0.06));
+  const metaIconSz  = Math.max(14, Math.min(s * 0.09, cw * 0.065));
   const toggleFont  = Math.max(8,  s * 0.05);
   const gap         = Math.max(4,  s * 0.035);
   const padV        = Math.max(8,  s * 0.06);
   const padH        = Math.max(10, s * 0.065);
   const iconColor   = weatherIconColor(data.icon);
+  const bgGradient  = weatherGradient(data.icon);
   const temp        = useFahrenheit ? `${data.tempF}°F` : `${data.tempC}°C`;
 
   return (
@@ -945,7 +971,10 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
       ref={containerRef}
       style={{
         width: '100%', height: '100%',
-        backgroundColor: '#0f172a',
+        background: bgGradient,
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        border: '1px solid rgba(255,255,255,0.12)',
         borderRadius: '0.5rem',
         display: 'flex',
         flexDirection: 'column',
@@ -957,30 +986,25 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
         position: 'relative',
         padding: `${padV}px ${padH}px`,
         gap: `${gap}px`,
+        transition: 'background 0.6s ease',
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       data-testid={`weather-widget-${widget.id}`}
     >
-      {/* ── Background gradient accent ───────────────────────────────────── */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: `radial-gradient(ellipse at 50% 0%, ${iconColor}18 0%, transparent 65%)`,
-        borderRadius: '0.5rem',
-        pointerEvents: 'none',
-      }} />
 
       {/* ── City name ───────────────────────────────────────────────────────── */}
       <div style={{
         fontFamily:    MONO,
         fontSize:      `${cityFont}px`,
         fontWeight:    700,
-        color:         '#94a3b8',
-        letterSpacing: '0.1em',
+        color:         '#e2e8f0',
+        letterSpacing: '0.12em',
         textTransform: 'uppercase',
         lineHeight:    1,
         textAlign:     'center',
         zIndex:        1,
+        textShadow:    '0 1px 4px rgba(0,0,0,0.4)',
       }}>
         {data.city}
       </div>
@@ -1021,16 +1045,24 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
       {/* ── Meta row: humidity + wind ─────────────────────────────────────── */}
       <div style={{
         display:        'flex',
-        gap:            `${Math.max(8, s * 0.06)}px`,
+        gap:            `${Math.max(12, s * 0.08)}px`,
         alignItems:     'center',
         justifyContent: 'center',
         zIndex:         1,
       }}>
-        <span style={{ fontFamily: MONO, fontSize: `${metaFont}px`, color: '#475569' }}>
-          💧 {data.humidity}%
+        <span style={{
+          fontFamily: MONO, fontSize: `${metaFont}px`, fontWeight: 700,
+          color: '#93c5fd', letterSpacing: '0.03em',
+          display: 'flex', alignItems: 'center', gap: `${Math.max(3, metaIconSz * 0.2)}px`,
+        }}>
+          <span style={{ fontSize: `${metaIconSz}px`, lineHeight: 1 }}>{'\uD83D\uDCA7'}</span> {data.humidity}%
         </span>
-        <span style={{ fontFamily: MONO, fontSize: `${metaFont}px`, color: '#475569' }}>
-          💨 {data.windKph} km/h
+        <span style={{
+          fontFamily: MONO, fontSize: `${metaFont}px`, fontWeight: 700,
+          color: '#a5b4fc', letterSpacing: '0.03em',
+          display: 'flex', alignItems: 'center', gap: `${Math.max(3, metaIconSz * 0.2)}px`,
+        }}>
+          <span style={{ fontSize: `${metaIconSz}px`, lineHeight: 1 }}>{'\uD83D\uDCA8'}</span> {data.windKph} km/h
         </span>
       </div>
 
@@ -1069,12 +1101,12 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
       {/* ── City cycle dots ──────────────────────────────────────────────── */}
       <div style={{
         position:      'absolute',
-        top:           `${Math.max(5, s * 0.025)}px`,
-        right:         `${Math.max(6, s * 0.03)}px`,
+        top:           `${Math.max(6, s * 0.03)}px`,
+        right:         `${Math.max(8, s * 0.04)}px`,
         display:       'flex',
-        gap:           '3px',
-        opacity:       isHovered ? 1 : 0,
-        pointerEvents: isHovered ? 'auto' : 'none',
+        gap:           `${Math.max(4, s * 0.02)}px`,
+        opacity:       isHovered ? 1 : 0.4,
+        pointerEvents: 'auto',
         transition:    'opacity 0.2s ease',
         zIndex:        10,
       }}>
@@ -1083,16 +1115,21 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
             key={i}
             onClick={(e) => { e.stopPropagation(); setIdx(i); }}
             style={{
-              width:         `${Math.max(5, s * 0.025)}px`,
-              height:        `${Math.max(5, s * 0.025)}px`,
+              width:         `${Math.max(12, s * 0.055)}px`,
+              height:        `${Math.max(12, s * 0.055)}px`,
               borderRadius:  '50%',
-              border:        'none',
+              border:        i === (idx % MOCK_WEATHER_DATA.length)
+                ? `2px solid ${iconColor}`
+                : '1px solid rgba(148,163,184,0.3)',
               cursor:        'pointer',
               padding:       0,
               backgroundColor: i === (idx % MOCK_WEATHER_DATA.length)
-                ? '#38bdf8'
-                : '#1e293b',
-              transition:    'background-color 0.15s',
+                ? iconColor
+                : 'rgba(30,41,59,0.6)',
+              transition:    'all 0.2s ease',
+              boxShadow:     i === (idx % MOCK_WEATHER_DATA.length)
+                ? `0 0 6px ${iconColor}66`
+                : 'none',
             }}
           />
         ))}
