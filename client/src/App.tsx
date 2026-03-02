@@ -1498,6 +1498,208 @@ function AppContent() {
     handleSubmitUrl(url);
   }, [handleSubmitUrl]);
 
+  // ── Drag handlers ───────────────────────────────────────────────────────────
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id);
+    const activeData = event.active.data.current;
+    let ghostPos: { x: number; y: number; w: number; h: number };
+
+    if (activeData?.type === 'channel' || activeData?.type === 'widget-template') {
+      const template = activeData.template as WidgetTemplate | undefined;
+      ghostPos = { x: 0, y: 0, w: template?.w || 3, h: template?.h || 2 };
+    } else if (activeData?.type === 'sortable-widget') {
+      const widget = activeData.widget as Widget;
+      ghostPos = { x: widget.x, y: widget.y, w: widget.w, h: widget.h };
+    } else {
+      const widget = widgets.find(w => w.id === event.active.id);
+      ghostPos = widget ? { x: widget.x, y: widget.y, w: widget.w, h: widget.h } : { x: 0, y: 0, w: 3, h: 2 };
+    }
+
+    ghostPositionRef.current = ghostPos;
+    setGhostPosition(ghostPos);
+  }, [widgets]);
+
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    if (!gridContainerRef.current || !ghostPositionRef.current) return;
+
+    const gridRect = gridContainerRef.current.getBoundingClientRect();
+    let dragX = 0, dragY = 0;
+    const translated = event.active.rect.current.translated;
+    const initial    = event.active.rect.current.initial;
+
+    if (translated) {
+      dragX = translated.left; dragY = translated.top;
+    } else if (initial && event.delta) {
+      dragX = initial.left + event.delta.x; dragY = initial.top + event.delta.y;
+    } else return;
+
+    const cellWidth  = gridRect.width  / GRID_COLS;
+    const cellHeight = gridRect.height / 6;
+    const gridX = Math.max(0, Math.min(GRID_COLS - 1, Math.floor((dragX - gridRect.left) / cellWidth)));
+    const gridY = Math.max(0, Math.min(5,             Math.floor((dragY - gridRect.top)  / cellHeight)));
+
+    const activeData      = event.active.data.current;
+    const draggedWidgetId = event.active.id as string;
+
+    if (activeData?.type === 'sortable-widget') {
+      const draggedWidget = widgets.find(w => w.id === draggedWidgetId);
+      if (draggedWidget) {
+        const previewW = draggedWidget.w;
+        const previewH = draggedWidget.h;
+        const clampedX = Math.max(0, Math.min(GRID_COLS - previewW, gridX));
+        const clampedY = Math.max(0, Math.min(5 - previewH + 1, gridY));
+
+        const collidingWidgets = widgets.filter(widget => {
+          if (widget.id === draggedWidgetId) return false;
+          return clampedX < widget.x + widget.w && clampedX + previewW > widget.x &&
+                 clampedY < widget.y + widget.h && clampedY + previewH > widget.y;
+        });
+
+        if (collidingWidgets.length > 0) {
+          setWidgets(currentWidgets => {
+            let updatedWidgets = [...currentWidgets];
+            const GRID_ROWS = 6;
+
+            const findSlot = (w: Widget, allWidgets: Widget[], excludeIds: string[]): { x: number; y: number } | null => {
+              for (let y = 0; y <= GRID_ROWS - w.h; y++) {
+                for (let x = 0; x <= GRID_COLS - w.w; x++) {
+                  let collision = false;
+                  for (const other of allWidgets) {
+                    if (excludeIds.includes(other.id)) continue;
+                    if (x < other.x + other.w && x + w.w > other.x && y < other.y + other.h && y + w.h > other.y) {
+                      collision = true; break;
+                    }
+                  }
+                  if (!collision && x < clampedX + previewW && x + w.w > clampedX && y < clampedY + previewH && y + w.h > clampedY) {
+                    collision = true;
+                  }
+                  if (!collision) return { x, y };
+                }
+              }
+              return null;
+            };
+
+            let invalid = false;
+            for (const collidingWidget of collidingWidgets) {
+              const newSlot = findSlot(collidingWidget, updatedWidgets, [collidingWidget.id, draggedWidgetId]);
+              if (newSlot) {
+                updatedWidgets = updatedWidgets.map(w => w.id === collidingWidget.id ? { ...w, x: newSlot.x, y: newSlot.y } : w);
+              } else { invalid = true; break; }
+            }
+
+            if (invalid) { ghostValidRef.current = false; return currentWidgets; }
+            ghostValidRef.current = true;
+            return updatedWidgets;
+          });
+        } else {
+          ghostValidRef.current = true;
+        }
+
+        if (!ghostValidRef.current) {
+          ghostPositionRef.current = null;
+          setGhostPosition(null);
+        } else {
+          ghostPositionRef.current = { x: clampedX, y: clampedY, w: previewW, h: previewH };
+          setGhostPosition(ghostPositionRef.current);
+        }
+        return;
+      }
+    }
+
+    ghostPositionRef.current = { ...ghostPositionRef.current, x: gridX, y: gridY };
+    setGhostPosition(ghostPositionRef.current);
+  }, [widgets, setWidgets]);
+
+  const findCollidingWidgets = useCallback(
+    (x: number, y: number, w: number, h: number, excludeId: string, currentWidgets: Widget[]): Widget[] =>
+      currentWidgets.filter(widget => {
+        if (widget.id === excludeId) return false;
+        return x < widget.x + widget.w && x + w > widget.x &&
+               y < widget.y + widget.h && y + h > widget.y;
+      }),
+    []
+  );
+
+  const findNextAvailableSlot = useCallback(
+    (widget: Widget, allWidgets: Widget[], excludeIds: string[]): { x: number; y: number } | null => {
+      const GRID_ROWS = 6;
+      for (let y = 0; y <= GRID_ROWS - widget.h; y++) {
+        for (let x = 0; x <= GRID_COLS - widget.w; x++) {
+          let collision = false;
+          for (const other of allWidgets) {
+            if (excludeIds.includes(other.id)) continue;
+            if (x < other.x + other.w && x + widget.w > other.x && y < other.y + other.h && y + widget.h > other.y) {
+              collision = true; break;
+            }
+          }
+          if (!collision && ad) {
+            if (x < ad.x + ad.w && x + widget.w > ad.x && y < ad.y + ad.h && y + widget.h > ad.y) collision = true;
+          }
+          if (!collision) return { x, y };
+        }
+      }
+      return null;
+    },
+    [ad]
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active }         = event;
+    const finalGhostPosition = ghostPositionRef.current;
+
+    setActiveId(null);
+    setGhostPosition(null);
+    ghostPositionRef.current = null;
+
+    const activeData = active.data.current;
+
+    if (activeData?.type === 'channel') {
+      addVideoWidget(activeData.channel as TrendingChannel, 3, 2);
+      setSidebarOpen(false);
+      return;
+    } else if (activeData?.type === 'widget-template') {
+      const template = activeData.template as WidgetTemplate;
+      addWidget(template.widgetType, template.w || 3, template.h || 2);
+      setSidebarOpen(false);
+      return;
+    }
+
+    if (activeData?.type === 'sortable-widget' && finalGhostPosition) {
+      const widgetId = active.id as string;
+      setWidgets(currentWidgets => {
+        const widgetIndex = currentWidgets.findIndex(w => w.id === widgetId);
+        if (widgetIndex === -1) return currentWidgets;
+
+        const widget  = currentWidgets[widgetIndex];
+        const targetX = finalGhostPosition.x;
+        const targetY = finalGhostPosition.y;
+
+        if (ad) {
+          if (targetX < ad.x + ad.w && targetX + widget.w > ad.x && targetY < ad.y + ad.h && targetY + widget.h > ad.y) return currentWidgets;
+        }
+
+        const collidingWidgets = findCollidingWidgets(targetX, targetY, widget.w, widget.h, widgetId, currentWidgets);
+
+        if (collidingWidgets.length === 0) {
+          const updatedWidgets = [...currentWidgets];
+          updatedWidgets[widgetIndex] = { ...widget, x: targetX, y: targetY };
+          return updatedWidgets;
+        }
+
+        let updatedWidgets = [...currentWidgets];
+        updatedWidgets[widgetIndex] = { ...widget, x: targetX, y: targetY };
+        for (const collidingWidget of collidingWidgets) {
+          const newSlot = findNextAvailableSlot(collidingWidget, updatedWidgets, [collidingWidget.id]);
+          if (newSlot === null) return currentWidgets;
+          updatedWidgets = updatedWidgets.map(w =>
+            w.id === collidingWidget.id ? { ...w, x: newSlot.x, y: newSlot.y } : w
+          );
+        }
+        return updatedWidgets;
+      });
+    }
+  }, [addVideoWidget, addWidget, setWidgets, findCollidingWidgets, findNextAvailableSlot, ad]);
+
   const handleChannelClick = useCallback(async (channel: TrendingChannel) => {
     const currentActiveWidgetId = activeWidgetIdRef.current;
 
