@@ -2,7 +2,8 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   X, Search, Tv, LayoutGrid, Grip, Layers,
   Gamepad2, RefreshCw, Star,
-  Trash2, Globe, Heart, Radio, PenLine, Clock
+  Trash2, Globe, Heart, Radio, PenLine, Clock,
+  AlertCircle, CloudSun
 } from 'lucide-react';
 
 const failedLogoCache = new Set<string>();
@@ -185,7 +186,9 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
   { id: 'template-spacer', name: 'Spacer',       widgetType: 'spacer', w: 2, h: 1, icon: 'spacer', color: 'slate'  },
   { id: 'template-image',  name: 'Photo',        widgetType: 'image',  w: 3, h: 2, icon: 'image',  color: 'purple' },
   { id: 'template-zoom',   name: 'Zoom Meeting', widgetType: 'zoom',   w: 3, h: 2, icon: 'zoom',   color: 'blue'   },
-  { id: 'template-clock',  name: 'Clock',        widgetType: 'clock',  w: 3, h: 2, icon: 'clock',  color: 'cyan'   },
+  { id: 'template-clock',          name: 'Clock',          widgetType: 'clock',          w: 3, h: 2, icon: 'clock',          color: 'cyan'   },
+  { id: 'template-crisis-ticker', name: 'Crisis Intel',   widgetType: 'crisis_ticker',  w: 3, h: 2, icon: 'crisis_ticker',  color: 'red'    },
+  { id: 'template-weather',       name: 'Weather',        widgetType: 'weather',        w: 2, h: 2, icon: 'weather',        color: 'sky'    },
 ];
 
 function loadPersonalLibrary(): SavedChannel[] {
@@ -611,6 +614,42 @@ export function WidgetSidebar({
         w: 3, h: 2,
         icon: 'clock' as const,
         color: 'cyan',
+      },
+    },
+    {
+      id: 'crisis_ticker',
+      label: 'Crisis Intel',
+      description: 'Breaking news ticker',
+      icon: <AlertCircle className="w-[2rem] h-[2rem] text-red-400" />,
+      iconBg: 'bg-red-500/15',
+      border: 'border-red-500/30 hover:border-red-400/60',
+      cardBg: 'bg-slate-800/60',
+      badgeColor: 'text-red-400 bg-red-500/15 border-red-500/40',
+      template: {
+        id: 'template-crisis-ticker',
+        name: 'Crisis Intel',
+        widgetType: 'crisis_ticker' as WidgetType,
+        w: 3, h: 2,
+        icon: 'crisis_ticker' as const,
+        color: 'red',
+      },
+    },
+    {
+      id: 'weather',
+      label: 'Weather',
+      description: 'Local weather display',
+      icon: <CloudSun className="w-[2rem] h-[2rem] text-sky-400" />,
+      iconBg: 'bg-sky-500/15',
+      border: 'border-sky-500/30 hover:border-sky-400/60',
+      cardBg: 'bg-slate-800/60',
+      badgeColor: 'text-sky-400 bg-sky-500/15 border-sky-500/40',
+      template: {
+        id: 'template-weather',
+        name: 'Weather',
+        widgetType: 'weather' as WidgetType,
+        w: 2, h: 2,
+        icon: 'weather' as const,
+        color: 'sky',
       },
     },
   ] as const;
