@@ -6,7 +6,7 @@ import { useViralAds, AdBlockData } from '@/components/ad-block';
 import { searchChannelLiveStream } from '@/lib/stream-api';
 import { getVerifiedChannel, getStaticLiveId, getFallbackVideoId } from '@/lib/channel-constants';
 import {
-  Sun, Cloud, CloudRain, CloudSnow, CloudLightning, Wind, CloudDrizzle, Cloudy,
+  Sun, Cloud, CloudRain, CloudSnow, CloudLightning, Wind, CloudDrizzle, Cloudy, Search,
 } from 'lucide-react';
 import { Switch, Route, useLocation } from 'wouter';
 import { queryClient } from './lib/queryClient';
@@ -883,26 +883,6 @@ interface WeatherEntry {
   windKph:    number;
 }
 
-const DEFAULT_WEATHER_CITIES = ['London', 'New York', 'Tokyo', 'Sydney', 'Dubai', 'Moscow', 'Miami', 'Chicago', 'Mumbai', 'Reykjavik'];
-const WEATHER_CITIES_LS_KEY = 'weather_widget_cities';
-
-const loadWeatherCities = (): string[] => {
-  if (typeof window === 'undefined') return [...DEFAULT_WEATHER_CITIES];
-  try {
-    const stored = localStorage.getItem(WEATHER_CITIES_LS_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch {}
-  return [...DEFAULT_WEATHER_CITIES];
-};
-
-const saveWeatherCities = (cities: string[]) => {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem(WEATHER_CITIES_LS_KEY, JSON.stringify(cities)); } catch {}
-};
-
 const FALLBACK_WEATHER: Record<string, WeatherEntry> = {
   'London':    { city: 'London',    tempC: 15, tempF: 59,  condition: 'Cloudy',        icon: 'cloudy',         humidity: 74, windKph: 22 },
   'New York':  { city: 'New York',  tempC: 22, tempF: 72,  condition: 'Sunny',         icon: 'sun',            humidity: 48, windKph: 14 },
@@ -964,26 +944,20 @@ interface WeatherWidgetProps {
 }
 
 export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
-  const containerRef    = useRef<HTMLDivElement>(null);
-  const searchRef       = useRef<HTMLInputElement>(null);
-  const [cw, setCw]     = useState(280);
-  const [ch, setCh]     = useState(200);
-  const [idx, setIdx]   = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchRef    = useRef<HTMLInputElement>(null);
+  const [cw, setCw]  = useState(280);
+  const [ch, setCh]  = useState(200);
   const [useFahrenheit, setUseFahrenheit] = useState(false);
   const [isHovered, setIsHovered]         = useState(false);
-  const [liveWeather, setLiveWeather]     = useState<Record<string, WeatherEntry>>({});
-  const [weatherError, setWeatherError]   = useState(false);
-  const [cities, setCities]               = useState<string[]>(loadWeatherCities);
-  const [searchVal, setSearchVal]         = useState('');
-  const [searchErr, setSearchErr]         = useState('');
-  const [isSearching, setIsSearching]     = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [data, setData]           = useState<WeatherEntry>(FALLBACK_WEATHER['London']);
+  const [weatherError, setWeatherError] = useState(false);
+  const [searchVal, setSearchVal] = useState('');
+  const [searchErr, setSearchErr] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   const showControls = isHovered || isSearchFocused;
-  const safeIdx   = cities.length > 0 ? idx % cities.length : 0;
-  const cityName  = cities[safeIdx] || 'London';
-  const fallback: WeatherEntry = FALLBACK_WEATHER[cityName] || { city: cityName, tempC: 0, tempF: 32, condition: 'Unknown', icon: 'sun', humidity: 0, windKph: 0 };
-  const data: WeatherEntry = liveWeather[cityName] || fallback;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -999,39 +973,28 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
   }, []);
 
   useEffect(() => {
-    if (liveWeather[cityName]) return;
     let mounted = true;
     (async () => {
       try {
-        const resp = await fetch(`/api/weather?city=${encodeURIComponent(cityName)}`);
+        const resp = await fetch(`/api/weather?city=${encodeURIComponent(data.city)}`);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const w = await resp.json();
-        if (mounted) {
-          setLiveWeather(prev => ({ ...prev, [cityName]: w as WeatherEntry }));
-          setWeatherError(false);
-        }
+        if (mounted) { setData(w as WeatherEntry); setWeatherError(false); }
       } catch (err) {
-        console.warn(`[WeatherWidget] Failed to fetch weather for ${cityName}:`, err);
+        console.warn(`[WeatherWidget] Failed to fetch weather for ${data.city}:`, err);
         if (mounted) setWeatherError(true);
       }
     })();
     return () => { mounted = false; };
-  }, [cityName, liveWeather]);
+  }, []);
 
   useEffect(() => {
-    if (cities.length === 0) return;
-    const id = setInterval(() => setIdx(i => (i + 1) % cities.length), 20_000);
-    return () => clearInterval(id);
-  }, [cities.length]);
+    if (showControls && searchRef.current) searchRef.current.focus();
+  }, [showControls]);
 
-  const handleAddCity = async () => {
+  const handleSearch = async () => {
     const trimmed = searchVal.trim();
     if (!trimmed) return;
-    if (cities.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
-      setSearchErr('Already in list');
-      setTimeout(() => setSearchErr(''), 2000);
-      return;
-    }
     setIsSearching(true);
     setSearchErr('');
     try {
@@ -1042,12 +1005,8 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
         return;
       }
       const w = await resp.json() as WeatherEntry;
-      const resolvedName = w.city || trimmed;
-      const updated = [...cities, resolvedName];
-      setCities(updated);
-      saveWeatherCities(updated);
-      setLiveWeather(prev => ({ ...prev, [resolvedName]: w }));
-      setIdx(updated.length - 1);
+      setData(w);
+      setWeatherError(false);
       setSearchVal('');
     } catch {
       setSearchErr('City not found');
@@ -1055,15 +1014,6 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
     } finally {
       setIsSearching(false);
     }
-  };
-
-  const handleDeleteCity = (e: React.MouseEvent, i: number) => {
-    e.stopPropagation();
-    if (cities.length <= 1) return;
-    const updated = cities.filter((_, ci) => ci !== i);
-    setCities(updated);
-    saveWeatherCities(updated);
-    if (idx >= updated.length) setIdx(0);
   };
 
   const s = Math.min(cw, ch);
@@ -1081,8 +1031,8 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
   const iconColor   = weatherIconColor(data.icon);
   const bgGradient  = weatherGradient(data.icon);
   const temp        = useFahrenheit ? `${data.tempF}\u00B0F` : `${data.tempC}\u00B0C`;
-  const dotSize     = Math.max(10, s * 0.045);
-  const searchH     = Math.max(24, s * 0.12);
+  const searchH     = Math.max(26, s * 0.13);
+  const searchIcon  = Math.max(12, s * 0.065);
 
   return (
     <div
@@ -1111,7 +1061,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
       data-testid={`weather-widget-${widget.id}`}
     >
 
-      {/* ── Search input (hover-only) ─────────────────────────────────────── */}
+      {/* ── Glass search bar (hover-only) ─────────────────────────────────── */}
       <div style={{
         position:      'absolute',
         top:           `${Math.max(6, s * 0.03)}px`,
@@ -1119,60 +1069,66 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
         right:         `${Math.max(8, s * 0.04)}px`,
         opacity:       showControls ? 1 : 0,
         pointerEvents: showControls ? 'auto' : 'none',
-        transition:    'opacity 0.2s ease',
+        transition:    'opacity 0.25s ease',
         zIndex:        20,
-        display:       'flex',
-        gap:           '4px',
-        alignItems:    'center',
       }}>
-        <input
-          ref={searchRef}
-          type="text"
-          value={searchVal}
-          onChange={(e) => { setSearchVal(e.target.value); setSearchErr(''); }}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCity(); } }}
-          onFocus={() => setIsSearchFocused(true)}
-          onBlur={() => setIsSearchFocused(false)}
-          placeholder="Add city\u2026"
-          style={{
-            flex:            1,
-            height:          `${searchH}px`,
-            background:      'rgba(15,23,42,0.75)',
-            backdropFilter:  'blur(8px)',
-            border:          searchErr ? '1px solid #ef4444' : '1px solid rgba(148,163,184,0.25)',
-            borderRadius:    '6px',
-            color:           '#e2e8f0',
-            fontFamily:      MONO,
-            fontSize:        `${Math.max(10, s * 0.055)}px`,
-            fontWeight:      500,
-            padding:         `0 ${Math.max(6, s * 0.035)}px`,
-            outline:         'none',
-            letterSpacing:   '0.03em',
-            boxSizing:       'border-box',
-          }}
-          onClick={(e) => e.stopPropagation()}
-          data-testid="weather-city-search"
-        />
-        {isSearching && (
+        <div style={{
+          display:        'flex',
+          alignItems:     'center',
+          height:         `${searchH}px`,
+          background:     'rgba(255,255,255,0.10)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border:         searchErr ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.20)',
+          borderRadius:   '8px',
+          padding:        `0 ${Math.max(8, s * 0.04)}px`,
+          boxSizing:      'border-box',
+          gap:            `${Math.max(4, s * 0.025)}px`,
+        }}>
+          <Search size={searchIcon} color="#94a3b8" strokeWidth={2} style={{ flexShrink: 0 }} />
+          <input
+            ref={searchRef}
+            type="text"
+            value={searchVal}
+            onChange={(e) => { setSearchVal(e.target.value); setSearchErr(''); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearch(); } }}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setIsSearchFocused(false)}
+            placeholder="Search city\u2026"
+            style={{
+              flex:            1,
+              height:          '100%',
+              background:      'transparent',
+              border:          'none',
+              color:           '#e2e8f0',
+              fontFamily:      MONO,
+              fontSize:        `${Math.max(10, s * 0.055)}px`,
+              fontWeight:      500,
+              outline:         'none',
+              letterSpacing:   '0.03em',
+              minWidth:        0,
+            }}
+            onClick={(e) => e.stopPropagation()}
+            data-testid="weather-city-search"
+          />
+          {isSearching && (
+            <div style={{
+              width: `${Math.max(14, s * 0.06)}px`, height: `${Math.max(14, s * 0.06)}px`,
+              border: '2px solid rgba(148,163,184,0.3)', borderTopColor: '#60a5fa',
+              borderRadius: '50%', animation: 'spin 0.6s linear infinite', flexShrink: 0,
+            }} />
+          )}
+        </div>
+        {searchErr && (
           <div style={{
-            width: `${Math.max(14, s * 0.06)}px`, height: `${Math.max(14, s * 0.06)}px`,
-            border: '2px solid rgba(148,163,184,0.3)', borderTopColor: '#60a5fa',
-            borderRadius: '50%', animation: 'spin 0.6s linear infinite',
-          }} />
+            fontFamily: MONO, fontSize: `${Math.max(9, s * 0.05)}px`,
+            color: '#ef4444', letterSpacing: '0.03em', marginTop: '4px',
+            paddingLeft: `${Math.max(8, s * 0.04)}px`,
+          }}>
+            {searchErr}
+          </div>
         )}
       </div>
-
-      {searchErr && showControls && (
-        <div style={{
-          position: 'absolute',
-          top: `${Math.max(6, s * 0.03) + searchH + 4}px`,
-          left: `${Math.max(8, s * 0.04)}px`,
-          fontFamily: MONO, fontSize: `${Math.max(9, s * 0.05)}px`,
-          color: '#ef4444', letterSpacing: '0.03em', zIndex: 20,
-        }}>
-          {searchErr}
-        </div>
-      )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
@@ -1192,7 +1148,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
         {data.city}
       </div>
 
-      {weatherError && !liveWeather[cityName] && (
+      {weatherError && (
         <div style={{
           fontFamily: MONO, fontSize: `${Math.max(8, s * 0.045)}px`,
           color: '#f59e0b', letterSpacing: '0.04em', zIndex: 1,
@@ -1289,80 +1245,6 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
         >
           {useFahrenheit ? '\u00B0F \u2192 \u00B0C' : '\u00B0C \u2192 \u00B0F'}
         </button>
-      </div>
-
-      {/* ── City cycle dots with delete ─────────────────────────────────── */}
-      <div style={{
-        position:      'absolute',
-        bottom:        `${Math.max(22, s * 0.11)}px`,
-        left:          '50%',
-        transform:     'translateX(-50%)',
-        display:       'flex',
-        gap:           `${Math.max(6, s * 0.03)}px`,
-        opacity:       showControls ? 1 : 0,
-        pointerEvents: showControls ? 'auto' : 'none',
-        transition:    'opacity 0.2s ease',
-        zIndex:        10,
-        flexWrap:      'wrap',
-        justifyContent: 'center',
-        maxWidth:      '90%',
-      }}>
-        {cities.map((c, i) => (
-          <div key={`${c}-${i}`} style={{ position: 'relative', display: 'inline-flex' }}>
-            <button
-              onClick={(e) => { e.stopPropagation(); setIdx(i); }}
-              title={c}
-              style={{
-                width:         `${dotSize}px`,
-                height:        `${dotSize}px`,
-                borderRadius:  '50%',
-                border:        i === safeIdx
-                  ? `2px solid ${iconColor}`
-                  : '1px solid rgba(148,163,184,0.3)',
-                cursor:        'pointer',
-                padding:       0,
-                backgroundColor: i === safeIdx
-                  ? iconColor
-                  : 'rgba(30,41,59,0.6)',
-                transition:    'all 0.2s ease',
-                boxShadow:     i === safeIdx
-                  ? `0 0 6px ${iconColor}66`
-                  : 'none',
-              }}
-              data-testid={`weather-dot-${i}`}
-            />
-            {cities.length > 1 && (
-              <button
-                onClick={(e) => handleDeleteCity(e, i)}
-                style={{
-                  position:        'absolute',
-                  top:             `${-Math.max(5, dotSize * 0.4)}px`,
-                  right:           `${-Math.max(5, dotSize * 0.4)}px`,
-                  width:           `${Math.max(12, dotSize * 0.8)}px`,
-                  height:          `${Math.max(12, dotSize * 0.8)}px`,
-                  borderRadius:    '50%',
-                  background:      'rgba(239,68,68,0.85)',
-                  border:          'none',
-                  cursor:          'pointer',
-                  color:           '#fff',
-                  fontFamily:      MONO,
-                  fontWeight:      700,
-                  fontSize:        `${Math.max(8, dotSize * 0.55)}px`,
-                  lineHeight:      1,
-                  display:         'flex',
-                  alignItems:      'center',
-                  justifyContent:  'center',
-                  padding:         0,
-                  transition:      'transform 0.15s ease',
-                }}
-                title={`Remove ${c}`}
-                data-testid={`weather-delete-${i}`}
-              >
-                {'\u00D7'}
-              </button>
-            )}
-          </div>
-        ))}
       </div>
     </div>
   );
