@@ -52,6 +52,8 @@ export interface IStorage {
   // Feedback methods
   createFeedback(data: InsertFeedback): Promise<Feedback>;
   getAllFeedback(): Promise<Feedback[]>;
+  checkFeedbackCooldown(clientIp: string, cooldownMinutes: number): Promise<{ allowed: boolean; minutesRemaining?: number }>;
+  updateFeedbackCooldown(clientIp: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -232,6 +234,26 @@ export class DatabaseStorage implements IStorage {
     return await db.select()
       .from(feedback)
       .orderBy(desc(feedback.createdAt));
+  }
+
+  private feedbackCooldowns = new Map<string, number>();
+
+  async checkFeedbackCooldown(clientIp: string, cooldownMinutes: number): Promise<{ allowed: boolean; minutesRemaining?: number }> {
+    const lastSubmission = this.feedbackCooldowns.get(clientIp);
+    if (!lastSubmission) return { allowed: true };
+    const elapsed = (Date.now() - lastSubmission) / 60000;
+    if (elapsed >= cooldownMinutes) return { allowed: true };
+    return { allowed: false, minutesRemaining: cooldownMinutes - elapsed };
+  }
+
+  async updateFeedbackCooldown(clientIp: string): Promise<void> {
+    this.feedbackCooldowns.set(clientIp, Date.now());
+    if (this.feedbackCooldowns.size > 10000) {
+      const cutoff = Date.now() - 3600000;
+      for (const [ip, ts] of this.feedbackCooldowns) {
+        if (ts < cutoff) this.feedbackCooldowns.delete(ip);
+      }
+    }
   }
 }
 

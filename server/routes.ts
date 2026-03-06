@@ -969,23 +969,27 @@ export async function registerRoutes(
         || req.socket.remoteAddress
         || 'unknown';
 
-      // ✅ 15-MINUTE COOLDOWN CHECK
-      const COOLDOWN_MINUTES = 15;
-      const cooldownCheck = await storage.checkFeedbackCooldown(clientIp, COOLDOWN_MINUTES);
-
-      if (!cooldownCheck.allowed) {
-        const minutesLeft = Math.ceil(cooldownCheck.minutesRemaining || 0);
-        return res.status(429).json({
-          error: `Please wait ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''} before submitting more feedback.`,
-          retryAfter: cooldownCheck.minutesRemaining
-        });
+      try {
+        const COOLDOWN_MINUTES = 15;
+        const cooldownCheck = await storage.checkFeedbackCooldown(clientIp, COOLDOWN_MINUTES);
+        if (!cooldownCheck.allowed) {
+          const minutesLeft = Math.ceil(cooldownCheck.minutesRemaining || 0);
+          return res.status(429).json({
+            error: `Please wait ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''} before submitting more feedback.`,
+            retryAfter: cooldownCheck.minutesRemaining
+          });
+        }
+      } catch (cooldownErr) {
+        console.warn('[feedback] Cooldown check failed, allowing submission:', cooldownErr);
       }
 
-      // Save feedback to database
       const item = await storage.createFeedback(validation.data);
 
-      // Update cooldown tracker
-      await storage.updateFeedbackCooldown(clientIp);
+      try {
+        await storage.updateFeedbackCooldown(clientIp);
+      } catch (cooldownErr) {
+        console.warn('[feedback] Cooldown update failed:', cooldownErr);
+      }
 
       // Send email notification
       try {
