@@ -26,7 +26,7 @@ The dashboard is built on a 12-column magnetic grid.
 - **Viral Ad Mechanic (Free Users Only):** Non-premium users experience a single viral ad block that expands on the dashboard, pushing widgets aside.
 
 **Technical Implementations & Feature Specifications:**
-- **Dynamic Widget System:** Supports Video, Note, Spacer, and Image widget types.
+- **Dynamic Widget System:** Supports Video, Note, Spacer, Image, Clock, Crisis Ticker, Weather, and QR Portal widget types.
 - **Edit Layout Mode:** Toggles between locked and editable states for drag-to-resize, settings, and delete.
 - **Fullscreen Mode:** Uses browser Fullscreen API.
 - **TV Mode:** Iframes set to `pointer-events: none` with video controls via `postMessage` API.
@@ -60,7 +60,8 @@ The dashboard is built on a 12-column magnetic grid.
 - **Supabase Auth Hardening:** Client initialized with `autoRefreshToken: true` and `persistSession: true` to prevent session timeouts. Auth hook includes exponential retry (up to 3 attempts) for session fetch failures and safe cleanup on unmount to prevent 504 errors.
 - **Logo:** All logos use `/t.png` (stored in `client/public/t.png`).
 - **Promo:** Dual coupon strategy in pricing modal. Monthly: `BENTO2FREE` (2 Months Free on Monthly). Yearly: `FREE2BENTO` ($16 off first Yearly purchase). Stripe checkout has `allow_promotion_codes: true`.
-- **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core`, `lucide-react`.
+- **QR Portal Widget:** Instant QR code generator widget. Uses `qrcode.react` (QRCodeSVG) for client-side generation. Glassmorphism design with frosted dark background, violet accent glow, white QR code panel, and a glass input bar at the bottom. Shows "Paste link to teleport" placeholder when empty. Input capped at 2953 chars (QR level M max). ResizeObserver scales QR size to widget dimensions. Clear (×) button when input has text. Safe try/catch around QR value updates.
+- **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core`, `lucide-react`, `qrcode.react`.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.
