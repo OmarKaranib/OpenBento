@@ -3,7 +3,7 @@ import {
   X, Search, Tv, LayoutGrid, Grip, Layers,
   Gamepad2, RefreshCw, Star,
   Trash2, Globe, Heart, Radio, PenLine, Clock,
-  AlertCircle, CloudSun
+  AlertCircle, CloudSun, BookOpen
 } from 'lucide-react';
 
 const failedLogoCache = new Set<string>();
@@ -176,7 +176,7 @@ export interface WidgetTemplate {
   widgetType: WidgetType;
   w: number;
   h: number;
-  icon: 'video' | 'note' | 'spacer' | 'image' | 'zoom' | 'clock';
+  icon: 'video' | 'note' | 'spacer' | 'image' | 'zoom' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary';
   color: string;
 }
 
@@ -189,6 +189,7 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
   { id: 'template-clock',          name: 'Clock',          widgetType: 'clock',          w: 3, h: 2, icon: 'clock',          color: 'cyan'   },
   { id: 'template-crisis-ticker', name: 'Crisis Intel',   widgetType: 'crisis_ticker',  w: 3, h: 2, icon: 'crisis_ticker',  color: 'red'    },
   { id: 'template-weather',       name: 'Weather',        widgetType: 'weather',        w: 2, h: 2, icon: 'weather',        color: 'sky'    },
+  { id: 'template-dictionary',    name: 'Dictionary',     widgetType: 'dictionary',     w: 3, h: 2, icon: 'dictionary',     color: 'indigo' },
 ];
 
 function loadPersonalLibrary(): SavedChannel[] {
@@ -650,6 +651,24 @@ export function WidgetSidebar({
         w: 2, h: 2,
         icon: 'weather' as const,
         color: 'sky',
+      },
+    },
+    {
+      id: 'dictionary',
+      label: 'Dictionary',
+      description: 'Daily power word & definition',
+      icon: <BookOpen className="w-[2rem] h-[2rem] text-indigo-400" />,
+      iconBg: 'bg-indigo-500/15',
+      border: 'border-indigo-500/30 hover:border-indigo-400/60',
+      cardBg: 'bg-slate-800/60',
+      badgeColor: 'text-indigo-400 bg-indigo-500/15 border-indigo-500/40',
+      template: {
+        id: 'template-dictionary',
+        name: 'Dictionary',
+        widgetType: 'dictionary' as WidgetType,
+        w: 3, h: 2,
+        icon: 'dictionary' as const,
+        color: 'indigo',
       },
     },
   ] as const;

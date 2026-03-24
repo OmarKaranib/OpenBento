@@ -51,7 +51,8 @@ export type WidgetType =
   | 'zoom'
   | 'clock'
   | 'crisis_ticker'
-  | 'weather';
+  | 'weather'
+  | 'dictionary';
 
 // ─── Widget Interface ─────────────────────────────────────────────────────────
 export interface Widget {
@@ -1251,6 +1252,182 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  DictionaryWidget
+// ─────────────────────────────────────────────────────────────────────────────
+
+const POWER_WORDS = [
+  'ephemeral', 'perspicacious', 'sanguine', 'mellifluous', 'obfuscate',
+  'tenacious', 'eloquent', 'sagacious', 'inexorable', 'magnanimous',
+  'pernicious', 'soliloquy', 'sycophant', 'vicissitude', 'recalcitrant',
+  'loquacious', 'serendipity', 'equanimity', 'propitious', 'truculent',
+];
+
+const DictionaryWidget: React.FC<{ widget: Widget }> = ({ widget }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [cw, setCw] = useState(300);
+  const [ch, setCh] = useState(200);
+
+  const [wordIndex, setWordIndex] = useState<number>(() =>
+    Math.floor(Math.random() * POWER_WORDS.length)
+  );
+  const [definition, setDefinition] = useState<string | null>(null);
+  const [partOfSpeech, setPartOfSpeech] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  const word = POWER_WORDS[wordIndex];
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (r) { setCw(r.width); setCh(r.height); }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setError(false);
+    setDefinition(null);
+    setPartOfSpeech(null);
+    (async () => {
+      try {
+        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+        if (!res.ok) throw new Error('fetch failed');
+        const data = await res.json();
+        if (!mounted) return;
+        const meanings = data[0]?.meanings;
+        const firstMeaning = meanings?.[0];
+        const def = firstMeaning?.definitions?.[0]?.definition ?? null;
+        const pos = firstMeaning?.partOfSpeech ?? null;
+        setDefinition(def);
+        setPartOfSpeech(pos);
+      } catch {
+        if (mounted) setError(true);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [word]);
+
+  const handleRefresh = () => {
+    setWordIndex((prev) => {
+      let next = prev;
+      while (next === prev) next = Math.floor(Math.random() * POWER_WORDS.length);
+      return next;
+    });
+  };
+
+  const compact = cw < 240 || ch < 160;
+  const s = Math.min(cw, ch);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        width: '100%', height: '100%',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
+        borderRadius: 'var(--outer-radius)',
+        display: 'flex', flexDirection: 'column',
+        padding: compact ? '0.75rem' : '1.25rem',
+        boxSizing: 'border-box', overflow: 'hidden', position: 'relative',
+      }}
+    >
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: compact ? '0.5rem' : '0.75rem', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <span style={{ fontSize: compact ? '0.6rem' : '0.65rem', fontFamily: MONO, fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            Power Word
+          </span>
+          {partOfSpeech && (
+            <span style={{
+              fontSize: compact ? '0.55rem' : '0.6rem', fontFamily: MONO, color: '#64748b',
+              background: '#1e293b', border: '1px solid #334155',
+              borderRadius: '4px', padding: '1px 5px',
+            }}>
+              {partOfSpeech}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={loading}
+          style={{
+            background: 'none', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+            color: loading ? '#475569' : '#818cf8', padding: '2px',
+            transition: 'color 0.2s',
+            lineHeight: 0,
+          }}
+          title="New word"
+        >
+          <svg
+            width={compact ? 13 : 15}
+            height={compact ? 13 : 15}
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+            strokeLinecap="round" strokeLinejoin="round"
+            style={{ display: 'block', transition: 'transform 0.3s', transform: loading ? 'rotate(180deg)' : 'none' }}
+          >
+            <polyline points="23 4 23 10 17 10" />
+            <polyline points="1 20 1 14 7 14" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Word */}
+      <div style={{ flexShrink: 0, marginBottom: compact ? '0.4rem' : '0.6rem' }}>
+        <span style={{
+          fontFamily: MONO, fontWeight: 700,
+          fontSize: `${Math.max(0.9, Math.min(1.6, s * 0.055))}rem`,
+          color: '#e2e8f0', letterSpacing: '0.02em',
+          textTransform: 'capitalize',
+        }}>
+          {word}
+        </span>
+      </div>
+
+      {/* Definition */}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'flex-start' }}>
+        {loading && (
+          <span style={{ color: '#475569', fontFamily: MONO, fontSize: compact ? '0.7rem' : '0.78rem' }}>
+            Loading…
+          </span>
+        )}
+        {error && !loading && (
+          <span style={{ color: '#ef4444', fontFamily: MONO, fontSize: compact ? '0.7rem' : '0.78rem' }}>
+            Definition unavailable
+          </span>
+        )}
+        {definition && !loading && (
+          <p style={{
+            color: '#94a3b8', fontFamily: MONO,
+            fontSize: `${Math.max(0.68, Math.min(0.85, s * 0.028))}rem`,
+            lineHeight: 1.5, margin: 0,
+            display: '-webkit-box', WebkitLineClamp: compact ? 3 : 5,
+            WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>
+            {definition}
+          </p>
+        )}
+      </div>
+
+      {/* Bottom accent */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: '2px',
+        background: 'linear-gradient(90deg, #6366f1, #818cf8, #6366f1)',
+        opacity: 0.6,
+      }} />
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  WidgetRenderer
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1289,6 +1466,14 @@ export function WidgetRenderer({
     case 'weather':
       return (
         <WeatherWidget
+          key={widget.id}
+          widget={widget}
+        />
+      );
+
+    case 'dictionary':
+      return (
+        <DictionaryWidget
           key={widget.id}
           widget={widget}
         />
