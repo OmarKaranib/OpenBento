@@ -369,11 +369,13 @@
             }, []);
 
             // ── Wall-clock tick ───────────────────────────────────────────────────────
-            // When the analog face is shown on the Clock tab, drive the second hand
-            // with requestAnimationFrame for smooth motion. Otherwise a 1s setInterval
-            // is plenty (digital readout only changes once per second).
+            // The Clock tab always renders seconds (digital readout includes the
+            // ticking colon and the analog face has a sweeping second hand), so we
+            // drive ticks with requestAnimationFrame whenever that tab is visible —
+            // smooth seconds for both digital and analog. Other tabs (timer,
+            // stopwatch, world clocks aren't this widget) only need a 1s tick.
             useEffect(() => {
-              const useRaf = showAnalog && tab === 'clock';
+              const useRaf = tab === 'clock';
               if (useRaf) {
                 let raf = 0;
                 const tick = () => { setNow(new Date()); raf = requestAnimationFrame(tick); };
@@ -382,7 +384,7 @@
               }
               const id = setInterval(() => setNow(new Date()), 1_000);
               return () => clearInterval(id);
-            }, [showAnalog, tab]);
+            }, [tab]);
 
             // ── Countdown with chime + Pomodoro auto-cycle ────────────────────────────
             // When pomodoroPhase is set and the timer reaches 0, the chime plays and
@@ -987,9 +989,9 @@
           //  • Each cell shows city name, current local time, and a small dot
           //    coloured amber for day / indigo for night based on local hour.
           //  • Settings cog opens an in-widget panel: search the WORLD_ZONES
-          //    catalog and add/remove cities. Capped at 8 cities per widget.
+          //    catalog and add/remove cities. Capped at 6 cities per widget.
           // ─────────────────────────────────────────────────────────────────────────────
-          const WORLD_CLOCKS_MAX = 8;
+          const WORLD_CLOCKS_MAX = 6;
 
           interface WorldClocksWidgetProps {
             widget: Widget;

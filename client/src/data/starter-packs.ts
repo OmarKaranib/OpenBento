@@ -52,7 +52,7 @@ export const STARTER_PACKS: StarterPack[] = [
     description: 'A big stream plus clock, weather, QR and notes.',
     tiles: [
       { type: 'video', channelId: 'twitch-xqc', x: 0, y: 0, w: 8, h: 4 },
-      { type: 'clock',                          x: 8, y: 0, w: 4, h: 2 },
+      { type: 'world_clocks',                   x: 8, y: 0, w: 4, h: 2 },
       { type: 'weather',                        x: 8, y: 2, w: 4, h: 2 },
       { type: 'qr_generator',                   x: 0, y: 4, w: 8, h: 2 },
       {
@@ -72,7 +72,7 @@ export const STARTER_PACKS: StarterPack[] = [
       { type: 'video', channelId: 'cnbc-live',      x: 6, y: 0, w: 6, h: 4 },
       { type: 'markets_ticker',                     x: 0, y: 4, w: 4, h: 2 },
       { type: 'crisis_ticker',                      x: 4, y: 4, w: 5, h: 2 },
-      { type: 'clock',                              x: 9, y: 4, w: 3, h: 2 },
+      { type: 'countdown',                          x: 9, y: 4, w: 3, h: 2 },
     ],
   },
   {
