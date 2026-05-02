@@ -10,6 +10,7 @@ import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, v
 import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema, insertFeedbackSchema } from "@shared/schema";
 import { getUncachableResendClient } from "./services/resend-client";
 import { createMarketsService, parseSymbols as parseMarketsSymbols } from "./markets";
+import { LruTtlCache } from "./services/lruCache";
 
 // Admin email list - used for admin access only
 const ADMIN_EMAILS = [
@@ -1243,8 +1244,21 @@ export async function registerRoutes(
     fetchedAt: number;
   };
 
-  const GITHUB_CACHE = new Map<string, GitHubPulse>();
+  // Bounded LRU + per-key in-flight de-dup. With many widget copies open,
+  // this caps memory and collapses concurrent requests for the same repo
+  // into a single upstream call so we don't burn through GitHub's rate
+  // limit on dashboard load.
   const GITHUB_TTL_MS = 5 * 60 * 1000;
+  const GITHUB_CACHE = new LruTtlCache<GitHubPulse>({ max: 500, ttlMs: GITHUB_TTL_MS });
+
+  // Defined once at the closure level (not per-request) so that when
+  // dedupe() shares a single rejected promise across concurrent callers,
+  // every follower sees the same class identity and `instanceof` works.
+  class GhStatusError extends Error {
+    constructor(public status: number, public clientMessage: string) {
+      super(clientMessage);
+    }
+  }
   // Owner / repo segments accepted by the GitHub API: alphanumerics, dots,
   // dashes, underscores, max 100 chars. Reject anything else outright so we
   // never make an upstream request for obvious junk.
@@ -1257,11 +1271,12 @@ export async function registerRoutes(
       return res.status(400).json({ error: 'Invalid owner or repo name' });
     }
     const cacheKey = `${owner.toLowerCase()}/${repo.toLowerCase()}`;
-    const now = Date.now();
-    const cached = GITHUB_CACHE.get(cacheKey);
-    if (cached && now - cached.fetchedAt < GITHUB_TTL_MS) {
-      return res.json(cached);
+    const fresh = GITHUB_CACHE.get(cacheKey);
+    if (fresh) {
+      return res.json(fresh);
     }
+    // Stale entry kept around for fallback if upstream fails or rate-limits.
+    const stale = GITHUB_CACHE.get(cacheKey, true);
 
     const headers: Record<string, string> = {
       'Accept': 'application/vnd.github+json',
@@ -1273,6 +1288,8 @@ export async function registerRoutes(
     }
 
     try {
+      const pulse = await GITHUB_CACHE.dedupe(cacheKey, async () => {
+        const now = Date.now();
       // PR count uses the search API to get a real total without paging.
       const [repoResp, commitsResp, prResp, releaseResp] = await Promise.all([
         fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers }),
@@ -1282,16 +1299,13 @@ export async function registerRoutes(
       ]);
 
       if (repoResp.status === 404) {
-        return res.status(404).json({ error: 'Repository not found' });
+        throw new GhStatusError(404, 'Repository not found');
       }
-      // 403 / 5xx: prefer stale cache so the widget keeps showing real data.
       if (repoResp.status === 403) {
-        if (cached) return res.json(cached);
-        return res.status(429).json({ error: 'GitHub rate limit reached, try again shortly' });
+        throw new GhStatusError(429, 'GitHub rate limit reached, try again shortly');
       }
       if (!repoResp.ok) {
-        if (cached) return res.json(cached);
-        return res.status(502).json({ error: `GitHub error ${repoResp.status}` });
+        throw new GhStatusError(502, `GitHub error ${repoResp.status}`);
       }
 
       type GhRepoFull = {
@@ -1347,12 +1361,19 @@ export async function registerRoutes(
         fetchedAt: now,
       };
 
-      GITHUB_CACHE.set(cacheKey, pulse);
+        return pulse;
+      });
       res.json(pulse);
     } catch (err: unknown) {
+      if (err instanceof GhStatusError) {
+        // 404 is definitive — never fall back to stale data for a different
+        // repo name. Other status errors fall back to stale if we have it.
+        if (err.status !== 404 && stale) return res.json(stale);
+        return res.status(err.status).json({ error: err.clientMessage });
+      }
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[GitHub Pulse] Fetch failed:', msg);
-      if (cached) return res.json(cached);
+      if (stale) return res.json(stale);
       res.status(503).json({ error: 'GitHub temporarily unavailable' });
     }
   });
@@ -1374,7 +1395,7 @@ export async function registerRoutes(
     topRepos: { name: string; stars: number; htmlUrl: string; description: string | null }[];
     fetchedAt: number;
   };
-  const GITHUB_USER_CACHE = new Map<string, GitHubUserPulse>();
+  const GITHUB_USER_CACHE = new LruTtlCache<GitHubUserPulse>({ max: 500, ttlMs: GITHUB_TTL_MS });
 
   app.get('/api/github/user/:owner', async (req: Request, res: Response) => {
     const owner = String(req.params.owner ?? '').trim();
@@ -1382,11 +1403,9 @@ export async function registerRoutes(
       return res.status(400).json({ error: 'Invalid owner name' });
     }
     const cacheKey = owner.toLowerCase();
-    const now = Date.now();
-    const cached = GITHUB_USER_CACHE.get(cacheKey);
-    if (cached && now - cached.fetchedAt < GITHUB_TTL_MS) {
-      return res.json(cached);
-    }
+    const fresh = GITHUB_USER_CACHE.get(cacheKey);
+    if (fresh) return res.json(fresh);
+    const stale = GITHUB_USER_CACHE.get(cacheKey, true);
 
     const headers: Record<string, string> = {
       'Accept': 'application/vnd.github+json',
@@ -1398,20 +1417,20 @@ export async function registerRoutes(
     }
 
     try {
+      const pulse = await GITHUB_USER_CACHE.dedupe(cacheKey, async () => {
+        const now = Date.now();
       const [userResp, reposResp] = await Promise.all([
         fetch(`https://api.github.com/users/${owner}`, { headers }),
         fetch(`https://api.github.com/users/${owner}/repos?type=owner&sort=updated&per_page=30`, { headers }),
       ]);
       if (userResp.status === 404) {
-        return res.status(404).json({ error: 'User or organization not found' });
+        throw new GhStatusError(404, 'User or organization not found');
       }
       if (userResp.status === 403) {
-        if (cached) return res.json(cached);
-        return res.status(429).json({ error: 'GitHub rate limit reached, try again shortly' });
+        throw new GhStatusError(429, 'GitHub rate limit reached, try again shortly');
       }
       if (!userResp.ok) {
-        if (cached) return res.json(cached);
-        return res.status(502).json({ error: `GitHub error ${userResp.status}` });
+        throw new GhStatusError(502, `GitHub error ${userResp.status}`);
       }
       // Narrowly-typed shapes for the GitHub REST fields we actually consume.
       // Everything else from the upstream response is ignored.
@@ -1449,12 +1468,17 @@ export async function registerRoutes(
         topRepos,
         fetchedAt: now,
       };
-      GITHUB_USER_CACHE.set(cacheKey, pulse);
+        return pulse;
+      });
       res.json(pulse);
     } catch (err: unknown) {
+      if (err instanceof GhStatusError) {
+        if (err.status !== 404 && stale) return res.json(stale);
+        return res.status(err.status).json({ error: err.clientMessage });
+      }
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[GitHub Pulse user] Fetch failed:', msg);
-      if (cached) return res.json(cached);
+      if (stale) return res.json(stale);
       res.status(503).json({ error: 'GitHub temporarily unavailable' });
     }
   });
@@ -1469,9 +1493,30 @@ export async function registerRoutes(
     items: { title: string; url: string; pubDate: string; isoDate: string }[];
     fetchedAt: number;
   };
-  const RSS_CACHE = new Map<string, RssPayload>();
   const RSS_TTL_MS = 12 * 60 * 1000;
   const RSS_MAX_ITEMS = 30;
+  // Bounded LRU + in-flight de-dup. Many widgets pointed at the same feed
+  // share a single fetch; trivial URL variants (case in host, trailing
+  // fragments) collapse to the same cache entry via normalizeFeedUrl().
+  const RSS_CACHE = new LruTtlCache<RssPayload>({ max: 500, ttlMs: RSS_TTL_MS });
+
+  // Normalize a feed URL so trivially-different inputs reuse the same cache
+  // entry. We lowercase the protocol + host, strip the fragment (which is
+  // never sent on the wire anyway), and drop a redundant default port. The
+  // path/query are left intact — feeds are case-sensitive there.
+  function normalizeFeedUrl(u: URL): string {
+    const out = new URL(u.toString());
+    out.protocol = out.protocol.toLowerCase();
+    out.hostname = out.hostname.toLowerCase();
+    out.hash = '';
+    if (
+      (out.protocol === 'http:'  && out.port === '80') ||
+      (out.protocol === 'https:' && out.port === '443')
+    ) {
+      out.port = '';
+    }
+    return out.toString();
+  }
 
   // SSRF guard: reject loopback, private, link-local, CGNAT, multicast,
   // and other non-public addresses (incl. 169.254.169.254 metadata).
@@ -1561,12 +1606,12 @@ export async function registerRoutes(
       const msg = err instanceof Error ? err.message : 'Validation failed';
       return res.status(400).json({ error: msg });
     }
-    const cacheKey = parsedUrl.toString();
-    const now = Date.now();
-    const cached = RSS_CACHE.get(cacheKey);
-    if (cached && now - cached.fetchedAt < RSS_TTL_MS) {
-      return res.json(cached);
+    const cacheKey = normalizeFeedUrl(parsedUrl);
+    const fresh = RSS_CACHE.get(cacheKey);
+    if (fresh) {
+      return res.json(fresh);
     }
+    const stale = RSS_CACHE.get(cacheKey, true);
 
     // Manual fetch with per-hop SSRF re-validation: rss-parser's parseURL
     // follows redirects unconditionally, so a public host could 30x into a
@@ -1637,33 +1682,35 @@ export async function registerRoutes(
     };
 
     try {
-      // rss-parser is dynamically imported so the server boots even if the
-      // dep is missing at startup; treat that as a soft 503.
-      const Parser = (await import('rss-parser')).default;
-      const parser = new Parser({
-        timeout: 10_000,
-        headers: { 'User-Agent': 'OpenBento-Dashboard/1.0 (+https://openbento.app)' },
+      const payload = await RSS_CACHE.dedupe(cacheKey, async () => {
+        // rss-parser is dynamically imported so the server boots even if
+        // the dep is missing at startup; treat that as a soft 503.
+        const Parser = (await import('rss-parser')).default;
+        const parser = new Parser({
+          timeout: 10_000,
+          headers: { 'User-Agent': 'OpenBento-Dashboard/1.0 (+https://openbento.app)' },
+        });
+        const body = await safeFetchFeedBody(cacheKey);
+        const feed = await parser.parseString(body);
+        const items = (feed.items || []).slice(0, RSS_MAX_ITEMS).map(it => ({
+          title:   String(it.title    || '').trim(),
+          url:     String(it.link     || '').trim(),
+          pubDate: String(it.pubDate  || ''),
+          isoDate: String(it.isoDate  || ''),
+        })).filter(it => it.title.length > 0);
+        const out: RssPayload = {
+          title: String(feed.title || 'RSS Feed'),
+          link:  String(feed.link  || cacheKey),
+          items,
+          fetchedAt: Date.now(),
+        };
+        return out;
       });
-      const body = await safeFetchFeedBody(cacheKey);
-      const feed = await parser.parseString(body);
-      const items = (feed.items || []).slice(0, RSS_MAX_ITEMS).map(it => ({
-        title:   String(it.title    || '').trim(),
-        url:     String(it.link     || '').trim(),
-        pubDate: String(it.pubDate  || ''),
-        isoDate: String(it.isoDate  || ''),
-      })).filter(it => it.title.length > 0);
-      const payload: RssPayload = {
-        title: String(feed.title || 'RSS Feed'),
-        link:  String(feed.link  || cacheKey),
-        items,
-        fetchedAt: now,
-      };
-      RSS_CACHE.set(cacheKey, payload);
       res.json(payload);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[RSS] Fetch failed:', msg);
-      if (cached) return res.json(cached);
+      if (stale) return res.json(stale);
       res.status(502).json({ error: 'Could not parse feed' });
     }
   });
