@@ -6,6 +6,11 @@ function stripWidgetForCast(w: Widget): Record<string, unknown> {
   return rest as unknown as Record<string, unknown>;
 }
 
+// The dashboard has no separate background state — the visible bg is purely
+// theme-derived (see dashboard.tsx ~L1543). Resolving here keeps the TV
+// renderer self-contained and matches the laptop pixel-for-pixel. If a
+// custom background engine is added later, callers can pass `background`
+// explicitly to override.
 function resolveBackground(isDarkMode: boolean): string {
   return isDarkMode ? "#0f172a" : "#F8F9FA";
 }

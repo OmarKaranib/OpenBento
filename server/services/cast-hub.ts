@@ -1,5 +1,10 @@
 // Cast Hub: HTTP + WebSocket relay backing the "Cast to TV" feature.
-// Pairing codes live in-memory (60s TTL); rooms persist in cast_rooms.
+// Design (intentional, vs. spec's pairing_code/expires_at columns): pairing
+// codes are kept in-memory only (60s TTL). They never need to outlive a single
+// pair attempt and re-issuing on restart is harmless (the TV auto-fetches a
+// fresh code). Persisted rooms still live in `cast_rooms`. A 30s sweeper
+// deletes rooms whose pending code expired before pairing, so /codes spam
+// can't bloat the DB.
 // Anyone with a roomId can push to it (free-tier model — roomId is the secret).
 import type { Express, Request, Response } from "express";
 import type { Server as HttpServer } from "http";

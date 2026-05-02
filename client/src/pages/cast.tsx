@@ -177,6 +177,7 @@ export default function CastPage() {
   const [now, setNow] = useState<number>(Date.now());
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef<number>(0);
   const codeTimerRef = useRef<number | null>(null);
   const codeRetryRef = useRef<number | null>(null);
   const forgetHoldRef = useRef<number | null>(null);
@@ -269,6 +270,7 @@ export default function CastPage() {
 
     ws.onopen = () => {
       setConnected(true);
+      reconnectAttemptsRef.current = 0;
       if (reconnectRef.current) {
         window.clearTimeout(reconnectRef.current);
         reconnectRef.current = null;
@@ -322,11 +324,16 @@ export default function CastPage() {
       const nextTarget = persistedId || pendingPair?.roomId || null;
       if (stillRelevant && nextTarget) {
         if (reconnectRef.current) window.clearTimeout(reconnectRef.current);
+        // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s cap. Resets to 0 on
+        // successful onopen so transient drops recover fast but a dead server
+        // doesn't get hammered.
+        const attempt = reconnectAttemptsRef.current++;
+        const delay = Math.min(30_000, 1000 * Math.pow(2, attempt));
         reconnectRef.current = window.setTimeout(() => {
           reconnectRef.current = null;
           const t = getRoomId() || pairingRef.current?.roomId;
           if (t) openSocket(t);
-        }, 2500);
+        }, delay);
       }
     };
     ws.onerror = () => {
