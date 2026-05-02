@@ -183,7 +183,27 @@ export default function CastPage() {
   // Mirror live pairing state into a ref so closures inside ws callbacks
   // don't capture stale values when a code rotates.
   const pairingRef = useRef<PairingState | null>(null);
+  const cursorTimerRef = useRef<number | null>(null);
   const [forgetProgress, setForgetProgress] = useState(0);
+  const [cursorIdle, setCursorIdle] = useState(false);
+
+  // Idle-hide the cursor after 3s of mouse inactivity for a clean TV display.
+  useEffect(() => {
+    function ping() {
+      setCursorIdle(false);
+      if (cursorTimerRef.current) window.clearTimeout(cursorTimerRef.current);
+      cursorTimerRef.current = window.setTimeout(() => setCursorIdle(true), 3000);
+    }
+    ping();
+    window.addEventListener("mousemove", ping);
+    window.addEventListener("touchstart", ping);
+    return () => {
+      window.removeEventListener("mousemove", ping);
+      window.removeEventListener("touchstart", ping);
+      if (cursorTimerRef.current) window.clearTimeout(cursorTimerRef.current);
+      cursorTimerRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     pairingRef.current = pairing;
@@ -416,13 +436,29 @@ export default function CastPage() {
 
   return (
     <div
-      className="w-screen h-screen overflow-hidden flex flex-col"
+      className="w-screen h-screen overflow-hidden flex flex-col relative"
       style={{
         background,
         color: isDark ? "#f1f5f9" : "#1A1A1A",
+        cursor: cursorIdle ? "none" : "default",
       }}
       data-testid="cast-paired-screen"
     >
+      {/* Always-visible label badge so it's clear which TV this is. */}
+      <div
+        className={`absolute bottom-[1rem] right-[1rem] z-40 flex items-center gap-[0.4rem] px-[0.7rem] py-[0.3rem] rounded-full text-[0.8rem] font-semibold shadow-md backdrop-blur-md transition-opacity duration-500 pointer-events-none ${
+          isDark ? "bg-slate-900/60 text-slate-300" : "bg-white/70 text-gray-700"
+        } ${cursorIdle ? "opacity-30" : "opacity-90"}`}
+        data-testid="badge-tv-label"
+      >
+        <Cast className="w-[0.85rem] h-[0.85rem]" />
+        <span>{label}</span>
+        <span
+          className={`inline-block w-[0.45rem] h-[0.45rem] rounded-full ${
+            connected ? "bg-emerald-400" : "bg-amber-400"
+          }`}
+        />
+      </div>
       <div
         className="absolute top-0 left-0 right-0 z-50 group"
         style={{ height: "2.4rem" }}
@@ -472,6 +508,11 @@ export default function CastPage() {
             gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
             gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`,
             gridAutoFlow: "dense",
+            // TV is read-only: block all interaction with widgets so the
+            // remote/laptop is always the source of truth. Forget button +
+            // status bar live above this grid in z-order with their own
+            // pointer-events.
+            pointerEvents: "none",
           }}
           data-testid="cast-grid"
         >

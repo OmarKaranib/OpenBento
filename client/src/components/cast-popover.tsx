@@ -26,6 +26,7 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
   const [tvs, setTVs] = useState<PairedTV[]>(() => loadPairedTVs());
   const [code, setCode] = useState("");
   const [pairing, setPairing] = useState(false);
+  const [pairError, setPairError] = useState<string | null>(null);
   const [pushingRoom, setPushingRoom] = useState<string | null>(null);
   const [editingRoom, setEditingRoom] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
@@ -202,9 +203,10 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
   async function handlePair(): Promise<void> {
     const trimmed = code.replace(/\D/g, "").slice(0, 6);
     if (trimmed.length !== 6) {
-      toast({ title: "Enter the 6-digit code", variant: "destructive" });
+      setPairError("Enter all 6 digits.");
       return;
     }
+    setPairError(null);
     setPairing(true);
     try {
       const res = await apiRequest("POST", "/api/cast/pair", { code: trimmed });
@@ -220,11 +222,11 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
       setCode("");
       toast({ title: "TV paired", description: data.label || "TV" });
     } catch (err) {
-      toast({
-        title: "Pairing failed",
-        description: err instanceof Error ? err.message : "Try a fresh code",
-        variant: "destructive",
-      });
+      const msg =
+        err instanceof Error
+          ? err.message.replace(/^\d+:\s*/, "").replace(/^\{.*"error":"([^"]+)".*\}$/, "$1")
+          : "Code expired or invalid.";
+      setPairError(msg || "Code expired or invalid.");
     } finally {
       setPairing(false);
     }
@@ -370,14 +372,21 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
             <div className="flex gap-[0.5rem]">
               <input
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onChange={(e) => {
+                  setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                  if (pairError) setPairError(null);
+                }}
                 placeholder="123 456"
                 inputMode="numeric"
                 maxLength={6}
                 className={`flex-1 h-[2.6rem] px-[0.8rem] rounded-md border text-[1.2rem] tracking-[0.3em] font-mono text-center ${
-                  isDarkMode
-                    ? "bg-slate-800 border-slate-600 text-white"
-                    : "bg-gray-50 border-gray-300 text-gray-900"
+                  pairError
+                    ? "border-red-500 ring-1 ring-red-500/40"
+                    : isDarkMode
+                      ? "border-slate-600"
+                      : "border-gray-300"
+                } ${
+                  isDarkMode ? "bg-slate-800 text-white" : "bg-gray-50 text-gray-900"
                 }`}
                 data-testid="input-cast-code"
                 onKeyDown={(e) => {
@@ -402,6 +411,15 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
                 Pair
               </button>
             </div>
+            {pairError && (
+              <p
+                className="mt-[0.5rem] text-[0.85rem] text-red-400 font-medium"
+                data-testid="text-cast-pair-error"
+                role="alert"
+              >
+                {pairError}
+              </p>
+            )}
           </div>
 
           <div className="p-[1.2rem]">
