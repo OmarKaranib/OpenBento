@@ -606,11 +606,27 @@
                   }}
                 >
                   {/* ─── CLOCK TAB ────────────────────────────────────────────────── */}
-                  {tab === 'clock' && (
+                  {tab === 'clock' && !showAnalog && (
                     <>
                       <div style={{ fontSize: `${sz.bigTime}px`, fontFamily: MONO, fontWeight: 700, color: clrPrimary, letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>
                         {fmtTime(now)}
                       </div>
+                      <div style={{ fontSize: `${sz.dateFont}px`, fontFamily: MONO, color: clrSubtle, textAlign: 'center', letterSpacing: '0.02em', lineHeight: 1.3 }}>
+                        {fmtDate(now)}
+                      </div>
+                    </>
+                  )}
+
+                  {tab === 'clock' && showAnalog && (
+                    <>
+                      <AnalogClockFace
+                        date={now}
+                        size={Math.max(72, Math.min(s * 0.85, ch * 0.62, cw * 0.72))}
+                        primary={clrPrimary}
+                        secondary={clrSecondary}
+                        accent={clrAccent}
+                        ticks={clrSubtle}
+                      />
                       <div style={{ fontSize: `${sz.dateFont}px`, fontFamily: MONO, color: clrSubtle, textAlign: 'center', letterSpacing: '0.02em', lineHeight: 1.3 }}>
                         {fmtDate(now)}
                       </div>
@@ -649,6 +665,27 @@
                   {/* ─── TIMER TAB ────────────────────────────────────────────────── */}
                   {tab === 'timer' && (
                     <>
+                      {/* Pomodoro phase pill — visible whenever we're inside a pomo cycle. */}
+                      {pomodoroPhase && (
+                        <div style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '6px',
+                          padding: `${Math.max(2, s * 0.012)}px ${Math.max(8, s * 0.04)}px`,
+                          fontFamily: MONO, fontSize: `${sz.labelFont}px`, fontWeight: 700,
+                          color: pomodoroPhase === 'focus' ? '#f87171' : '#4ade80',
+                          background: pomodoroPhase === 'focus' ? 'rgba(248,113,113,0.12)' : 'rgba(74,222,128,0.12)',
+                          border: `1px solid ${pomodoroPhase === 'focus' ? 'rgba(248,113,113,0.35)' : 'rgba(74,222,128,0.35)'}`,
+                          borderRadius: '999px', textTransform: 'uppercase', letterSpacing: '0.08em',
+                        }}
+                        data-testid="pill-pomo-phase">
+                          <span style={{
+                            width: '6px', height: '6px', borderRadius: '50%',
+                            background: pomodoroPhase === 'focus' ? '#f87171' : '#4ade80',
+                            animation: timerRunning ? 'pomoPulse 1.6s ease-in-out infinite' : 'none',
+                          }} />
+                          {pomodoroPhase === 'focus' ? 'Focus 25' : 'Break 5'}
+                        </div>
+                      )}
+
                       <div
                         style={{
                           fontSize:   `${timerRunning || timerLeft !== timerTotal ? sz.bigTime : sz.bigTime * 0.65}px`,
@@ -659,7 +696,9 @@
                         {timerLeft === 0 && !timerRunning ? 'TIME UP!' : fmtTimer(timerLeft)}
                       </div>
 
-                      {!timerRunning && timerLeft === timerTotal && (
+                      <style>{`@keyframes pomoPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.35 } }`}</style>
+
+                      {!timerRunning && timerLeft === timerTotal && !pomodoroPhase && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: `${sz.btnGap * 0.6}px`, marginTop: `${sz.contentGap * 0.5}px` }}>
                           <div style={{ display: 'flex', alignItems: 'center', height: `${sz.inputH}px` }}>
                             <input
@@ -686,9 +725,12 @@
                         </div>
                       )}
 
-                      <div style={{ display: 'flex', gap: `${sz.btnGap}px`, marginTop: `${sz.contentGap * 0.5}px` }}>
-                        {!timerRunning && timerLeft === timerTotal && (
-                          <button style={btnStyle(true)} onClick={(e) => { e.stopPropagation(); startTimer(); }} data-testid="btn-timer-start">Start</button>
+                      <div style={{ display: 'flex', gap: `${sz.btnGap}px`, marginTop: `${sz.contentGap * 0.5}px`, flexWrap: 'wrap', justifyContent: 'center' }}>
+                        {!timerRunning && timerLeft === timerTotal && !pomodoroPhase && (
+                          <>
+                            <button style={btnStyle(true)} onClick={(e) => { e.stopPropagation(); startTimer(); }} data-testid="btn-timer-start">Start</button>
+                            <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); startPomodoro(); }} data-testid="btn-pomo-start" title="Start a 25/5 Pomodoro cycle">🍅 Pomodoro</button>
+                          </>
                         )}
                         {timerRunning && (
                           <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); setTimerRunning(false); }} data-testid="btn-timer-pause">Pause</button>
@@ -696,8 +738,11 @@
                         {!timerRunning && timerLeft < timerTotal && timerLeft > 0 && (
                           <button style={btnStyle(true)} onClick={(e) => { e.stopPropagation(); setTimerRunning(true); }} data-testid="btn-timer-resume">Resume</button>
                         )}
-                        {timerLeft < timerTotal && (
+                        {timerLeft < timerTotal && !pomodoroPhase && (
                           <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); setTimerRunning(false); setTimerLeft(timerTotal); }} data-testid="btn-timer-reset">Reset</button>
+                        )}
+                        {pomodoroPhase && (
+                          <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); stopPomodoro(); }} data-testid="btn-pomo-stop">End Pomodoro</button>
                         )}
                       </div>
                     </>
@@ -709,23 +754,72 @@
                       <div style={{ fontSize: `${sz.bigTime * 0.9}px`, fontFamily: MONO, fontWeight: 700, color: swRunning ? '#4ade80' : clrPrimary, lineHeight: 1, textAlign: 'center' }}>
                         {fmtSw(swElapsed)}
                       </div>
-                      <div style={{ display: 'flex', gap: `${sz.btnGap}px`, marginTop: `${sz.contentGap * 0.5}px` }}>
+                      <div style={{ display: 'flex', gap: `${sz.btnGap}px`, marginTop: `${sz.contentGap * 0.5}px`, flexWrap: 'wrap', justifyContent: 'center' }}>
                         {!swRunning ? (
                           <button style={btnStyle(true)} onClick={(e) => { e.stopPropagation(); setSwRunning(true); }} data-testid="btn-sw-start">
                             {swElapsed > 0 ? 'Resume' : 'Start'}
                           </button>
                         ) : (
-                          <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); setSwRunning(false); }} data-testid="btn-sw-stop">Stop</button>
+                          <>
+                            <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); setSwRunning(false); }} data-testid="btn-sw-stop">Stop</button>
+                            <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); recordLap(); }} data-testid="btn-sw-lap">Lap</button>
+                          </>
                         )}
                         {swElapsed > 0 && !swRunning && (
-                          <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); setSwElapsed(0); }} data-testid="btn-sw-reset">Reset</button>
+                          <button
+                            style={btnStyle()}
+                            onClick={(e) => { e.stopPropagation(); setSwElapsed(0); setSwLaps([]); }}
+                            data-testid="btn-sw-reset"
+                          >
+                            Reset
+                          </button>
                         )}
                       </div>
+
+                      {/* Last 5 laps — newest first; split = ms since previous lap. */}
+                      {swLaps.length > 0 && ch >= 180 && (
+                        <div
+                          style={{
+                            marginTop: `${sz.contentGap * 0.5}px`,
+                            width: '100%',
+                            maxWidth: `${Math.min(cw - 24, 320)}px`,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '2px',
+                            fontFamily: MONO,
+                            fontSize: `${Math.max(8, sz.labelFont * 0.92)}px`,
+                            color: clrSecondary,
+                          }}
+                          data-testid="list-sw-laps"
+                        >
+                          {swLaps.slice(-5).reverse().map((cum, idx, arr) => {
+                            const lapNumber = swLaps.length - idx;
+                            const prev = arr[idx + 1] ?? swLaps[swLaps.length - swLaps.slice(-5).length - 1] ?? 0;
+                            const split = cum - prev;
+                            return (
+                              <div
+                                key={`lap-${lapNumber}`}
+                                style={{
+                                  display: 'flex', justifyContent: 'space-between',
+                                  padding: '2px 6px',
+                                  background: idx === 0 ? clrBtnPassive : 'transparent',
+                                  borderRadius: '4px',
+                                }}
+                                data-testid={`lap-row-${lapNumber}`}
+                              >
+                                <span style={{ color: clrSubtle, fontWeight: 600 }}>L{lapNumber}</span>
+                                <span style={{ color: clrPrimary, fontWeight: 600 }}>{fmtSw(split)}</span>
+                                <span>{fmtSw(cum)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
 
-                {/* ── 12h/24h toggle: BOTTOM-CENTER, clock tab only ──────────────────── */}
+                {/* ── 12h/24h + Analog/Digital toggles: BOTTOM-CENTER, clock tab only ── */}
                 {tab === 'clock' && (
                   <div
                     style={{
@@ -737,6 +831,8 @@
                       pointerEvents: isHovered ? 'auto' : 'none',
                       transition:    'opacity 0.2s ease',
                       zIndex:        10,
+                      display:       'flex',
+                      gap:           `${Math.max(4, s * 0.025)}px`,
                     }}
                   >
                     <button
@@ -762,6 +858,34 @@
                     >
                       {use24 ? '24H' : '12H'}
                     </button>
+                    {onUpdate && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onUpdate(widget.id, { clockShowAnalog: !showAnalog });
+                        }}
+                        title={showAnalog ? 'Switch to digital face' : 'Switch to analog face'}
+                        style={{
+                          background:    light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+                          border:        `1px solid ${clrInputBdr}`,
+                          cursor:        'pointer',
+                          color:         clrSecondary,
+                          fontSize:      `${sz.toggleFont}px`,
+                          fontFamily:    MONO,
+                          fontWeight:    600,
+                          padding:       `${Math.max(2, s * 0.012)}px ${Math.max(8, s * 0.045)}px`,
+                          borderRadius:  `${sz.btnRadius}px`,
+                          transition:    'color 0.15s, background 0.15s',
+                          letterSpacing: '0.06em',
+                          whiteSpace:    'nowrap',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = clrPrimary)}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = clrSecondary)}
+                        data-testid="btn-toggle-analog"
+                      >
+                        {showAnalog ? 'DIGITAL' : 'ANALOG'}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
