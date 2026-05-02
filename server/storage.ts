@@ -43,11 +43,11 @@ export interface IStorage {
   updateChannel(id: string, updates: Partial<InsertChannel>): Promise<Channel | null>;
   deleteChannel(id: string): Promise<boolean>;
   
-  // Profile methods for premium/paywall
+  // Profile methods. The `profiles.is_premium` column is retained for legacy
+  // compatibility but no code path reads or writes it — OpenBento is fully free.
   getProfile(id: string): Promise<Profile | null>;
   getProfilesByIds(ids: string[]): Promise<Profile[]>;
   upsertProfile(data: InsertProfile): Promise<Profile>;
-  updateProfilePremium(id: string, isPremium: boolean): Promise<Profile | null>;
 
   // Feedback methods
   createFeedback(data: InsertFeedback): Promise<Feedback>;
@@ -188,7 +188,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  // Profile methods for premium/paywall
+  // Profile methods
   async getProfile(id: string): Promise<Profile | null> {
     const [profile] = await db.select()
       .from(profiles)
@@ -213,14 +213,6 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return inserted;
-  }
-
-  async updateProfilePremium(id: string, isPremium: boolean): Promise<Profile | null> {
-    const [updated] = await db.update(profiles)
-      .set({ isPremium, updatedAt: new Date() })
-      .where(eq(profiles.id, id))
-      .returning();
-    return updated || null;
   }
 
   async createFeedback(data: InsertFeedback): Promise<Feedback> {
