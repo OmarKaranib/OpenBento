@@ -6,6 +6,11 @@
           import { searchChannelLiveStream } from '@/lib/stream-api';
           import { getVerifiedChannel, getStaticLiveId, getFallbackVideoId } from '@/lib/channel-constants';
           import {
+            addSymbol as addSymbolHelper,
+            removeSymbol as removeSymbolHelper,
+            moveSymbol as moveSymbolHelper,
+          } from '@/lib/markets-symbols';
+          import {
             Sun, Cloud, CloudRain, CloudSnow, CloudLightning, Wind, CloudDrizzle, Cloudy, Search, QrCode,
             Settings as SettingsIcon, ExternalLink, TrendingUp, ArrowUp, ArrowDown, Plus as PlusIcon, X as XIcon,
             Globe, Hourglass, X,
@@ -2264,6 +2269,10 @@
           }
 
           const DEFAULT_MARKETS_SYMBOLS = ['BTC', 'ETH', 'SPY', 'AAPL'];
+          // Pure validation/dedupe/cap/reorder helpers live in
+          // `client/src/lib/markets-symbols.ts` so they can be unit tested
+          // without a DOM. Keep `MAX_SYMBOLS` and `SYMBOL_RE` aligned with
+          // the server-side `parseSymbols` regex.
 
           function formatPrice(price: number | null): string {
             if (price == null || !Number.isFinite(price)) return '—';
@@ -2369,23 +2378,25 @@
             const priceFs  = Math.max(11, s * 0.055);
             const badgeFs  = Math.max(9,  s * 0.06);
 
-            const moveSymbol = (idx: number, dir: -1 | 1) => {
-              const next = [...symbols];
-              const target = idx + dir;
-              if (target < 0 || target >= next.length) return;
-              [next[idx], next[target]] = [next[target], next[idx]];
+            const moveSymbolAt = (idx: number, dir: -1 | 1) => {
+              const next = moveSymbolHelper(symbols, idx, dir);
+              if (next === symbols) return;
               onUpdate?.(widget.id, { marketsSymbols: next });
             };
-            const removeSymbol = (sym: string) => {
-              const next = symbols.filter(x => x !== sym);
+            const removeSymbolAt = (sym: string) => {
+              const next = removeSymbolHelper(symbols, sym);
+              if (next === symbols) return;
               onUpdate?.(widget.id, { marketsSymbols: next });
             };
             const addSymbol = () => {
-              const sym = newSymbol.trim().toUpperCase();
-              if (!sym || !/^[A-Z0-9.\-]{1,8}$/.test(sym)) return;
-              if (symbols.includes(sym)) { setNewSymbol(''); return; }
-              if (symbols.length >= 12) return;
-              onUpdate?.(widget.id, { marketsSymbols: [...symbols, sym] });
+              const result = addSymbolHelper(symbols, newSymbol);
+              if (!result.ok) {
+                // Duplicates clear the input (matches prior UX); other
+                // rejections leave it intact so the user can edit.
+                if (result.reason === 'duplicate') setNewSymbol('');
+                return;
+              }
+              onUpdate?.(widget.id, { marketsSymbols: result.symbols });
               setNewSymbol('');
             };
 
@@ -2479,7 +2490,7 @@
                             {sym}
                           </span>
                           <button
-                            onClick={() => moveSymbol(i, -1)}
+                            onClick={() => moveSymbolAt(i, -1)}
                             disabled={i === 0}
                             title="Move up"
                             data-testid={`markets-move-up-${widget.id}-${sym}`}
@@ -2491,7 +2502,7 @@
                             <ArrowUp size={12} />
                           </button>
                           <button
-                            onClick={() => moveSymbol(i, 1)}
+                            onClick={() => moveSymbolAt(i, 1)}
                             disabled={i === symbols.length - 1}
                             title="Move down"
                             data-testid={`markets-move-down-${widget.id}-${sym}`}
@@ -2503,7 +2514,7 @@
                             <ArrowDown size={12} />
                           </button>
                           <button
-                            onClick={() => removeSymbol(sym)}
+                            onClick={() => removeSymbolAt(sym)}
                             title="Remove"
                             data-testid={`markets-remove-${widget.id}-${sym}`}
                             style={{

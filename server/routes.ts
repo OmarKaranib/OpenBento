@@ -9,6 +9,7 @@ import { setupCastHub } from "./services/cast-hub";
 import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, verifyVideoIsLive, searchChannelLiveStream, checkVideoLiveStatusById } from "./services/youtube-api";
 import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema, insertFeedbackSchema } from "@shared/schema";
 import { getUncachableResendClient } from "./services/resend-client";
+import { createMarketsService, parseSymbols as parseMarketsSymbols } from "./markets";
 
 // Admin email list - used for admin access only
 const ADMIN_EMAILS = [
@@ -1188,274 +1189,27 @@ export async function registerRoutes(
   // ─── Markets API (CoinGecko + Twelve Data) ────────────────────────────────
   // GET /api/markets?symbols=BTC,ETH,SPY,AAPL
   // Returns { symbols: [{ symbol, name, type, price, change24hPct, sparkline,
-  //   updatedAt, error? }] }. Symbols are detected by membership in the crypto
-  // map below (everything else is treated as a stock). Server caches each
-  // symbol's resolved payload in-memory for 60s and degrades gracefully on
-  // upstream failures by returning a per-symbol `error` field instead of 5xx.
-  type MarketEntry = {
-    symbol: string;
-    name: string;
-    type: 'crypto' | 'stock';
-    price: number | null;
-    change24hPct: number | null;
-    sparkline: number[];
-    updatedAt: number;
-    error?: string;
-  };
+  //   updatedAt, error? }] }. Implementation lives in `server/markets.ts` so
+  //   the cache, stale-fallback, and per-symbol error handling can be unit
+  //   tested in isolation; this handler stays thin and only owns request
+  //   parsing + the unexpected-error 5xx path.
+  const marketsService = createMarketsService();
+  // Re-exported for legacy references; kept for backward compatibility with
+  // anything that imported `MARKETS_CACHE` from this module.
+  const MARKETS_CACHE = marketsService.cache;
 
-  const CRYPTO_MAP: Record<string, { id: string; name: string }> = {
-    BTC:   { id: 'bitcoin',      name: 'Bitcoin'      },
-    ETH:   { id: 'ethereum',     name: 'Ethereum'     },
-    SOL:   { id: 'solana',       name: 'Solana'       },
-    ADA:   { id: 'cardano',      name: 'Cardano'      },
-    DOGE:  { id: 'dogecoin',     name: 'Dogecoin'     },
-    BNB:   { id: 'binancecoin',  name: 'BNB'          },
-    XRP:   { id: 'ripple',       name: 'XRP'          },
-    MATIC: { id: 'matic-network', name: 'Polygon'     },
-    DOT:   { id: 'polkadot',     name: 'Polkadot'     },
-    AVAX:  { id: 'avalanche-2',  name: 'Avalanche'    },
-    LTC:   { id: 'litecoin',     name: 'Litecoin'     },
-    LINK:  { id: 'chainlink',    name: 'Chainlink'    },
-  };
-
-  const MARKETS_CACHE = new Map<string, MarketEntry>();
-  const MARKETS_TTL_MS = 60 * 1000;
-
-  // Sample a series down to ~24 evenly spaced points for a tidy sparkline.
-  function sampleSeries(arr: number[], target = 24): number[] {
-    if (arr.length <= target) return arr.slice();
-    const step = (arr.length - 1) / (target - 1);
-    const out: number[] = [];
-    for (let i = 0; i < target; i++) out.push(arr[Math.round(i * step)]);
-    return out;
-  }
-
-  async function fetchCryptoEntry(symbol: string): Promise<MarketEntry> {
-    const meta = CRYPTO_MAP[symbol];
-    const updatedAt = Date.now();
-    if (!meta) {
-      return { symbol, name: symbol, type: 'crypto', price: null, change24hPct: null, sparkline: [], updatedAt, error: 'Unknown crypto symbol' };
-    }
-    try {
-      // Single call: market_chart returns price series; derive current price
-      // and 24h % change from it (avoids a second request).
-      const url = `https://api.coingecko.com/api/v3/coins/${meta.id}/market_chart?vs_currency=usd&days=1`;
-      const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
-      if (!resp.ok) throw new Error(`CoinGecko ${resp.status}`);
-      const data = await resp.json();
-      const prices: [number, number][] = data?.prices || [];
-      if (prices.length === 0) throw new Error('No price data');
-      const series = prices.map(p => p[1]);
-      const first = series[0];
-      const last = series[series.length - 1];
-      const change = first > 0 ? ((last - first) / first) * 100 : 0;
-      return {
-        symbol, name: meta.name, type: 'crypto',
-        price: last, change24hPct: change,
-        sparkline: sampleSeries(series, 24),
-        updatedAt,
-      };
-    } catch (err: any) {
-      console.warn(`[Markets] Crypto fetch failed for ${symbol}:`, err?.message || err);
-      return { symbol, name: meta.name, type: 'crypto', price: null, change24hPct: null, sparkline: [], updatedAt, error: 'Upstream unavailable' };
-    }
-  }
-
-  // Batched stock fetcher using Twelve Data (preferred) when TWELVE_DATA_API_KEY
-  // is set, otherwise falls back to Yahoo Finance per-symbol. Twelve Data's
-  // free tier allows 8 requests/minute and 800/day, so batching is essential
-  // when the dashboard tracks multiple tickers — both /quote and /time_series
-  // accept comma-separated symbols and respond as a symbol-keyed object (or a
-  // flat object when only one symbol is requested).
-  async function fetchStocksTwelveData(symbols: string[]): Promise<MarketEntry[]> {
-    const apiKey = process.env.TWELVE_DATA_API_KEY!;
-    const updatedAt = Date.now();
-    const symbolParam = encodeURIComponent(symbols.join(','));
-    const quoteUrl = `https://api.twelvedata.com/quote?symbol=${symbolParam}&apikey=${encodeURIComponent(apiKey)}`;
-    const seriesUrl = `https://api.twelvedata.com/time_series?symbol=${symbolParam}&interval=15min&outputsize=26&apikey=${encodeURIComponent(apiKey)}`;
-    const [quoteResp, seriesResp] = await Promise.all([
-      fetch(quoteUrl, { headers: { Accept: 'application/json' } }),
-      fetch(seriesUrl, { headers: { Accept: 'application/json' } }),
-    ]);
-    if (!quoteResp.ok) throw new Error(`Twelve Data quote ${quoteResp.status}`);
-    if (!seriesResp.ok) throw new Error(`Twelve Data time_series ${seriesResp.status}`);
-    const quoteData = await quoteResp.json();
-    const seriesData = await seriesResp.json();
-    // Detect a top-level error envelope (rate limit, bad key, etc.).
-    if (quoteData?.status === 'error') throw new Error(`Twelve Data quote: ${quoteData.message}`);
-    if (seriesData?.status === 'error') throw new Error(`Twelve Data time_series: ${seriesData.message}`);
-    // Normalize: single-symbol responses are flat objects; multi-symbol
-    // responses are keyed by symbol.
-    const quoteMap: Record<string, any> = symbols.length === 1
-      ? { [symbols[0]]: quoteData }
-      : (quoteData || {});
-    const seriesMap: Record<string, any> = symbols.length === 1
-      ? { [symbols[0]]: seriesData }
-      : (seriesData || {});
-
-    return symbols.map((symbol): MarketEntry => {
-      const q = quoteMap[symbol];
-      const s = seriesMap[symbol];
-      // Per-symbol error envelopes use { code, status:'error', message }.
-      const qBad = !q || q.status === 'error' || q.code;
-      if (qBad) {
-        const msg = (q && q.message) || 'Upstream unavailable';
-        console.warn(`[Markets] Twelve Data quote error for ${symbol}: ${msg}`);
-        return { symbol, name: symbol, type: 'stock', price: null, change24hPct: null, sparkline: [], updatedAt, error: 'Upstream unavailable' };
-      }
-      const price = parseFloat(q.close);
-      // percent_change is present in the live quote; fall back to deriving it
-      // from previous_close if Twelve Data omits it for any reason.
-      let change = parseFloat(q.percent_change);
-      if (!Number.isFinite(change)) {
-        const prev = parseFloat(q.previous_close);
-        change = Number.isFinite(prev) && prev > 0 ? ((price - prev) / prev) * 100 : NaN;
-      }
-      const name = (q.name as string) || symbol;
-      // time_series returns values newest-first; reverse for chronological
-      // sparkline data. If the time_series call errored for this symbol we
-      // still surface the live price/change but with an empty sparkline
-      // (rendered as a flat segment client-side).
-      let sparkline: number[] = [];
-      if (s && Array.isArray(s.values)) {
-        sparkline = s.values
-          .slice()
-          .reverse()
-          .map((v: any) => parseFloat(v.close))
-          .filter((n: number) => Number.isFinite(n));
-      }
-      return {
-        symbol,
-        name,
-        type: 'stock',
-        price: Number.isFinite(price) ? price : null,
-        change24hPct: Number.isFinite(change) ? change : null,
-        sparkline: sampleSeries(sparkline.length ? sparkline : (Number.isFinite(price) ? [price] : []), 24),
-        updatedAt,
-      };
-    });
-  }
-
-  async function fetchStockEntryYahoo(symbol: string): Promise<MarketEntry> {
-    const updatedAt = Date.now();
-    try {
-      // Yahoo Finance unofficial chart endpoint. range=1d/interval=15m gives
-      // enough points for a sparkline; meta.regularMarketPrice +
-      // chartPreviousClose drive the 24h delta when previousClose is present.
-      // NOTE: Yahoo rate-limits Replit / data-center IPs (HTTP 429), so this
-      // path is only used as a fallback when no TWELVE_DATA_API_KEY is set.
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=15m&range=1d&includePrePost=false`;
-      const resp = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'application/json',
-        },
-      });
-      if (!resp.ok) throw new Error(`Yahoo ${resp.status}`);
-      const data = await resp.json();
-      const result = data?.chart?.result?.[0];
-      if (!result) throw new Error('No chart result');
-      const meta = result.meta || {};
-      const closes: (number | null)[] = result.indicators?.quote?.[0]?.close || [];
-      const cleaned = closes.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-      if (cleaned.length === 0 && typeof meta.regularMarketPrice !== 'number') {
-        throw new Error('No price points');
-      }
-      const last = typeof meta.regularMarketPrice === 'number'
-        ? meta.regularMarketPrice
-        : cleaned[cleaned.length - 1];
-      const prev = typeof meta.chartPreviousClose === 'number'
-        ? meta.chartPreviousClose
-        : (typeof meta.previousClose === 'number' ? meta.previousClose : cleaned[0]);
-      const change = prev > 0 ? ((last - prev) / prev) * 100 : 0;
-      const name = (meta.shortName || meta.longName || symbol) as string;
-      return {
-        symbol, name, type: 'stock',
-        price: last, change24hPct: change,
-        sparkline: sampleSeries(cleaned.length ? cleaned : [last], 24),
-        updatedAt,
-      };
-    } catch (err: any) {
-      console.warn(`[Markets] Yahoo stock fetch failed for ${symbol}:`, err?.message || err);
-      return { symbol, name: symbol, type: 'stock', price: null, change24hPct: null, sparkline: [], updatedAt, error: 'Upstream unavailable' };
-    }
-  }
-
-  // Resolve all stock symbols. Prefers Twelve Data (single batched call) when
-  // the API key is configured; otherwise per-symbol Yahoo Finance fallback.
-  async function fetchStocks(symbols: string[]): Promise<MarketEntry[]> {
-    if (symbols.length === 0) return [];
-    if (process.env.TWELVE_DATA_API_KEY) {
-      try {
-        return await fetchStocksTwelveData(symbols);
-      } catch (err: any) {
-        console.warn('[Markets] Twelve Data batch failed, falling back to Yahoo:', err?.message || err);
-      }
-    }
-    return Promise.all(symbols.map(fetchStockEntryYahoo));
-  }
-
-  // Resolve a list of symbols: serves cached entries when fresh, fetches the
-  // rest (cryptos one-by-one against CoinGecko, stocks in a single batched
-  // Twelve Data request). Errored fetches reuse a not-too-stale cached value
-  // (≤ 5 min) when available, so transient upstream failures don't blank the
-  // ticker.
-  async function getMarketEntries(rawSymbols: string[]): Promise<MarketEntry[]> {
-    const now = Date.now();
-    const symbols = rawSymbols.map(s => s.trim().toUpperCase());
-    const fresh = new Map<string, MarketEntry>();
-    // Track symbols already queued for upstream fetch so duplicate inputs
-    // (e.g. ?symbols=AAPL,AAPL) don't trigger redundant API calls.
-    const queued = new Set<string>();
-    const cryptoToFetch: string[] = [];
-    const stocksToFetch: string[] = [];
-
-    for (const symbol of symbols) {
-      if (fresh.has(symbol) || queued.has(symbol)) continue;
-      const cached = MARKETS_CACHE.get(symbol);
-      if (cached && now - cached.updatedAt < MARKETS_TTL_MS && !cached.error) {
-        fresh.set(symbol, cached);
-        continue;
-      }
-      queued.add(symbol);
-      if (symbol in CRYPTO_MAP) cryptoToFetch.push(symbol);
-      else stocksToFetch.push(symbol);
-    }
-
-    const [cryptoEntries, stockEntries] = await Promise.all([
-      Promise.all(cryptoToFetch.map(fetchCryptoEntry)),
-      fetchStocks(stocksToFetch),
-    ]);
-
-    for (const entry of [...cryptoEntries, ...stockEntries]) {
-      if (!entry.error) {
-        MARKETS_CACHE.set(entry.symbol, entry);
-        fresh.set(entry.symbol, entry);
-      } else {
-        const cached = MARKETS_CACHE.get(entry.symbol);
-        if (cached && now - cached.updatedAt < 5 * 60 * 1000) {
-          fresh.set(entry.symbol, cached);
-        } else {
-          fresh.set(entry.symbol, entry);
-        }
-      }
-    }
-
-    return symbols.map(s => fresh.get(s)!).filter(Boolean);
-  }
+  // Legacy inline implementation removed — see `server/markets.ts`.
+  // Suppress unused-binding warning on the legacy alias preserved above.
+  void MARKETS_CACHE;
 
   app.get('/api/markets', async (req: Request, res: Response) => {
     const raw = typeof req.query.symbols === 'string' ? req.query.symbols : '';
-    const symbols = raw
-      .split(',')
-      .map(s => s.trim().toUpperCase())
-      .filter(s => /^[A-Z0-9.\-]{1,8}$/.test(s))
-      .slice(0, 20);
+    const symbols = parseMarketsSymbols(raw);
     if (symbols.length === 0) {
       return res.status(400).json({ error: 'No valid symbols provided' });
     }
     try {
-      const entries = await getMarketEntries(symbols);
+      const entries = await marketsService.getMarketEntries(symbols);
       res.json({ symbols: entries, fetchedAt: Date.now() });
     } catch (err) {
       console.error('[Markets] Unexpected error:', err);
