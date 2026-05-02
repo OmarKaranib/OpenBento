@@ -56,7 +56,9 @@
             | 'weather'
             | 'dictionary'
             | 'qr_generator'
-            | 'markets_ticker';
+            | 'markets_ticker'
+            | 'world_clocks'
+            | 'countdown';
 
           // ─── Widget Interface ─────────────────────────────────────────────────────────
           export interface Widget {
@@ -108,6 +110,19 @@
             // tech | markets | world | sports | all (mapped server-side).
             crisisSources?: string;
             crisisCategory?: string;
+            // Clock — per-widget analog/digital face toggle on the Clock tab.
+            // Defaults to false (digital). When true, an SVG analog clock with
+            // hour/minute/second hands renders in place of the digital readout.
+            clockShowAnalog?: boolean;
+            // World Clocks widget — list of IANA timezone identifiers to display.
+            // Defaults to ['America/New_York','Europe/London','Asia/Tokyo','Australia/Sydney']
+            // when undefined or empty.
+            worldClocksTzs?: string[];
+            // Countdown widget — target moment as ISO 8601 string, optional
+            // label (e.g. "Launch Day") and a single emoji (e.g. "🚀").
+            countdownTarget?: string;
+            countdownLabel?: string;
+            countdownEmoji?: string;
           }
 
           // ─────────────────────────────────────────────────────────────────────────────
@@ -198,34 +213,96 @@
           const MONO = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
 
           const WORLD_ZONES: { city: string; tz: string }[] = [
-            { city: 'New York',    tz: 'America/New_York' },
-            { city: 'Los Angeles', tz: 'America/Los_Angeles' },
-            { city: 'Chicago',     tz: 'America/Chicago' },
-            { city: 'London',      tz: 'Europe/London' },
-            { city: 'Paris',       tz: 'Europe/Paris' },
-            { city: 'Berlin',      tz: 'Europe/Berlin' },
-            { city: 'Moscow',      tz: 'Europe/Moscow' },
-            { city: 'Dubai',       tz: 'Asia/Dubai' },
-            { city: 'Mumbai',      tz: 'Asia/Kolkata' },
-            { city: 'Singapore',   tz: 'Asia/Singapore' },
-            { city: 'Tokyo',       tz: 'Asia/Tokyo' },
-            { city: 'Sydney',      tz: 'Australia/Sydney' },
-            { city: 'Auckland',    tz: 'Pacific/Auckland' },
-            { city: 'Honolulu',    tz: 'Pacific/Honolulu' },
-            { city: 'São Paulo',   tz: 'America/Sao_Paulo' },
-            { city: 'Cairo',       tz: 'Africa/Cairo' },
+            { city: 'New York',     tz: 'America/New_York' },
+            { city: 'Los Angeles',  tz: 'America/Los_Angeles' },
+            { city: 'Chicago',      tz: 'America/Chicago' },
+            { city: 'Toronto',      tz: 'America/Toronto' },
+            { city: 'Vancouver',    tz: 'America/Vancouver' },
+            { city: 'Mexico City',  tz: 'America/Mexico_City' },
+            { city: 'São Paulo',    tz: 'America/Sao_Paulo' },
+            { city: 'Buenos Aires', tz: 'America/Argentina/Buenos_Aires' },
+            { city: 'Reykjavik',    tz: 'Atlantic/Reykjavik' },
+            { city: 'London',       tz: 'Europe/London' },
+            { city: 'Paris',        tz: 'Europe/Paris' },
+            { city: 'Berlin',       tz: 'Europe/Berlin' },
+            { city: 'Madrid',       tz: 'Europe/Madrid' },
+            { city: 'Rome',         tz: 'Europe/Rome' },
+            { city: 'Stockholm',    tz: 'Europe/Stockholm' },
+            { city: 'Moscow',       tz: 'Europe/Moscow' },
+            { city: 'Istanbul',     tz: 'Europe/Istanbul' },
+            { city: 'Cairo',        tz: 'Africa/Cairo' },
+            { city: 'Lagos',        tz: 'Africa/Lagos' },
+            { city: 'Nairobi',      tz: 'Africa/Nairobi' },
+            { city: 'Cape Town',    tz: 'Africa/Johannesburg' },
+            { city: 'Tehran',       tz: 'Asia/Tehran' },
+            { city: 'Dubai',        tz: 'Asia/Dubai' },
+            { city: 'Karachi',      tz: 'Asia/Karachi' },
+            { city: 'Mumbai',       tz: 'Asia/Kolkata' },
+            { city: 'Bangkok',      tz: 'Asia/Bangkok' },
+            { city: 'Singapore',    tz: 'Asia/Singapore' },
+            { city: 'Jakarta',      tz: 'Asia/Jakarta' },
+            { city: 'Hong Kong',    tz: 'Asia/Hong_Kong' },
+            { city: 'Shanghai',     tz: 'Asia/Shanghai' },
+            { city: 'Manila',       tz: 'Asia/Manila' },
+            { city: 'Seoul',        tz: 'Asia/Seoul' },
+            { city: 'Tokyo',        tz: 'Asia/Tokyo' },
+            { city: 'Sydney',       tz: 'Australia/Sydney' },
+            { city: 'Auckland',     tz: 'Pacific/Auckland' },
+            { city: 'Honolulu',     tz: 'Pacific/Honolulu' },
+            { city: 'Anchorage',    tz: 'America/Anchorage' },
           ];
+
+          // Built once for O(1) lookup of city display name from a tz identifier.
+          const TZ_TO_CITY: Record<string, string> = WORLD_ZONES.reduce(
+            (acc, z) => { acc[z.tz] = z.city; return acc; },
+            {} as Record<string, string>,
+          );
+
+          // Default 4-city set used when worldClocksTzs is undefined or empty.
+          const DEFAULT_WORLD_CLOCK_TZS: string[] = [
+            'America/New_York',
+            'Europe/London',
+            'Asia/Tokyo',
+            'Australia/Sydney',
+          ];
+
+          // Returns the local hour (0-23) in a given IANA timezone using Intl.
+          // Used by World Clocks day/night dot and Clock-tab analog face.
+          function localHourIn(tz: string, d: Date = new Date()): number {
+            try {
+              const fmt = new Intl.DateTimeFormat('en-US', {
+                hour: 'numeric', hour12: false, timeZone: tz,
+              });
+              const parts = fmt.formatToParts(d);
+              const hourPart = parts.find(p => p.type === 'hour')?.value ?? '0';
+              const h = parseInt(hourPart, 10);
+              // Intl returns "24" at midnight in some runtimes — normalise.
+              return Number.isFinite(h) ? h % 24 : 0;
+            } catch {
+              return d.getHours();
+            }
+          }
+
+          /** Day if 6 ≤ local hour < 19, else night. Used for the day/night dot. */
+          function isDaytimeIn(tz: string, d: Date = new Date()): boolean {
+            const h = localHourIn(tz, d);
+            return h >= 6 && h < 19;
+          }
 
           const pad2 = (n: number) => String(n).padStart(2, '0');
 
           interface ClockWidgetProps {
             widget: Widget;
             onToggle24Hour: (widgetId: string) => void;
+            // Generic per-widget patcher — used here to persist clockShowAnalog
+            // (analog/digital face toggle) on the widget object.
+            onUpdate?: (widgetId: string, patch: Partial<Widget>) => void;
           }
 
           export const ClockWidget: React.FC<ClockWidgetProps> = ({
             widget,
             onToggle24Hour,
+            onUpdate,
           }) => {
             const containerRef = useRef<HTMLDivElement>(null);
             const [cw, setCw]  = useState(240);
@@ -250,7 +327,8 @@
 
             const [tab, setTab] = useState<ClockTab>('clock');
             const [now, setNow] = useState<Date>(() => new Date());
-            const use24 = widget.clockUse24Hour ?? false;
+            const use24       = widget.clockUse24Hour ?? false;
+            const showAnalog  = widget.clockShowAnalog ?? false;
 
             const [worldZone, setWorldZone] = useState(WORLD_ZONES[0].tz);
 
@@ -260,9 +338,20 @@
             const [timerSetMin,  setTimerSetMin]  = useState('5');
             const [timerSetSec,  setTimerSetSec]  = useState('0');
 
+            // Pomodoro state: null = not running pomodoro, otherwise the active phase.
+            // Focus = 25min, Break = 5min. When the countdown hits 0 in pomo mode the
+            // effect auto-flips the phase, plays the chime, and keeps the timer running.
+            const [pomodoroPhase, setPomodoroPhase] = useState<'focus' | 'break' | null>(null);
+            const POMO_FOCUS_SEC = 25 * 60;
+            const POMO_BREAK_SEC = 5 * 60;
+
             const [swElapsed, setSwElapsed] = useState(0);
             const [swRunning, setSwRunning] = useState(false);
             const swStartRef = useRef<number>(0);
+
+            // Stopwatch laps — each entry is the cumulative ms elapsed at lap time.
+            // Only the last 5 are rendered; oldest fall off the bottom of the list.
+            const [swLaps, setSwLaps] = useState<number[]>([]);
 
             // ── ResizeObserver ────────────────────────────────────────────────────────
             useEffect(() => {
@@ -279,22 +368,46 @@
             }, []);
 
             // ── Wall-clock tick ───────────────────────────────────────────────────────
+            // When the analog face is shown on the Clock tab, drive the second hand
+            // with requestAnimationFrame for smooth motion. Otherwise a 1s setInterval
+            // is plenty (digital readout only changes once per second).
             useEffect(() => {
+              const useRaf = showAnalog && tab === 'clock';
+              if (useRaf) {
+                let raf = 0;
+                const tick = () => { setNow(new Date()); raf = requestAnimationFrame(tick); };
+                raf = requestAnimationFrame(tick);
+                return () => cancelAnimationFrame(raf);
+              }
               const id = setInterval(() => setNow(new Date()), 1_000);
               return () => clearInterval(id);
-            }, []);
+            }, [showAnalog, tab]);
 
-            // ── Countdown with chime ──────────────────────────────────────────────────
+            // ── Countdown with chime + Pomodoro auto-cycle ────────────────────────────
+            // When pomodoroPhase is set and the timer reaches 0, the chime plays and
+            // the phase flips (focus⇄break) with the new duration loaded — the timer
+            // stays running. Outside pomodoro mode, behaviour is identical to before:
+            // chime + stop at 0.
             useEffect(() => {
               if (!timerRunning) return;
               const id = setInterval(() => {
                 setTimerLeft(prev => {
-                  if (prev <= 1) { setTimerRunning(false); playTimerChime(); return 0; }
-                  return prev - 1;
+                  if (prev > 1) return prev - 1;
+                  playTimerChime();
+                  if (pomodoroPhase) {
+                    const nextPhase: 'focus' | 'break' =
+                      pomodoroPhase === 'focus' ? 'break' : 'focus';
+                    const nextTotal = nextPhase === 'focus' ? POMO_FOCUS_SEC : POMO_BREAK_SEC;
+                    setPomodoroPhase(nextPhase);
+                    setTimerTotal(nextTotal);
+                    return nextTotal;
+                  }
+                  setTimerRunning(false);
+                  return 0;
                 });
               }, 1_000);
               return () => clearInterval(id);
-            }, [timerRunning]);
+            }, [timerRunning, pomodoroPhase, POMO_FOCUS_SEC, POMO_BREAK_SEC]);
 
             // ── Stopwatch ─────────────────────────────────────────────────────────────
             useEffect(() => {
@@ -395,9 +508,28 @@
               const secs  = Math.max(0, Math.min(59, parseInt(timerSetSec) || 0));
               const total = mins * 60 + secs;
               if (total <= 0) return;
+              setPomodoroPhase(null); // manual timer takes precedence over pomo
               setTimerTotal(total);
               setTimerLeft(total);
               setTimerRunning(true);
+            };
+
+            const startPomodoro = () => {
+              setPomodoroPhase('focus');
+              setTimerTotal(POMO_FOCUS_SEC);
+              setTimerLeft(POMO_FOCUS_SEC);
+              setTimerRunning(true);
+            };
+
+            const stopPomodoro = () => {
+              setPomodoroPhase(null);
+              setTimerRunning(false);
+              setTimerLeft(timerTotal);
+            };
+
+            const recordLap = () => {
+              if (!swRunning) return;
+              setSwLaps(prev => [...prev, swElapsed]);
             };
 
             const inputStyle: React.CSSProperties = {
