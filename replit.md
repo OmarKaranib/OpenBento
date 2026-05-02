@@ -50,7 +50,7 @@ The dashboard is built on a 12-column magnetic grid system.
 - **Feedback System:** `feedback` table for user submissions, supporting messages, types, and optional screenshots. Public POST `/api/feedback` and admin-only GET `/api/admin/feedback`.
 - **Supabase Auth Hardening:** Client initialized with `autoRefreshToken: true` and `persistSession: true` to prevent session timeouts.
 - **QR Portal Widget v2:** Five-mode QR generator (URL/WiFi/vCard/Email/Geo) with proper URI builders, optional logo overlay (upload or URL) using error-correction level H, foreground/background colors that track the widget color droplet by default with manual overrides, copy-as-PNG via canvas raster (with download fallback when the Async Clipboard API can't carry image/png), and a debounced 5-entry history strip with one-click recall and clear.
-- **GitHub Pulse Widget:** Owner/repo input plus a stat card showing star count, open PR count, last commit (sha + message + relative time), and latest release tag. Backed by `/api/github/repo/:owner/:repo` (5-minute in-memory cache, optional `GITHUB_TOKEN` for higher rate limits, stale-cache fallback on upstream errors). Auto-refetches every 5 minutes.
+- **GitHub Pulse Widget:** Owner-required + repo-optional input. With a repo, shows star count, open PR count, last commit (sha + message + relative time), and latest release tag (backed by `/api/github/repo/:owner/:repo`). With just an owner, switches to profile mode and shows the avatar, name, bio, public repos / followers / following counts, and top 5 repos by stars (backed by `/api/github/user/:owner`). Both routes use a 5-minute in-memory cache, honor `GITHUB_TOKEN` for higher rate limits, and serve stale cache on upstream errors. Auto-refetches every 5 minutes.
 - **RSS Headlines Widget:** Paste any RSS or Atom feed URL to render a scrolling list of headlines with link-out, relative timestamps, and graceful empty / bad-feed states. Backed by `/api/rss?url=` (12-minute cache, http(s)-only validation, dynamic `rss-parser` import).
 - **Dictionary Widget v2:** Search-first input that overrides the daily-seeded "Word of the Day" rotation (stable across reloads, rotates at midnight UTC). Surfaces phonetic spelling, audio playback (when `phonetics[].audio` exists), part of speech, definition, clickable synonym chips, and etymology. Star button + favorites dropdown persist up to 30 favorited words per widget via the `dictionaryFavorites` field.
 - **First-Time Onboarding:** An `OnboardingFlow` component guides new guest users through initial setup, offering starter packs and coachmarks.
@@ -64,6 +64,7 @@ The dashboard is built on a 12-column magnetic grid system.
 
 **Server Endpoints:**
 - `GET /api/github/repo/:owner/:repo` — Aggregated GitHub repo stats (5-minute in-memory cache).
+- `GET /api/github/user/:owner` — GitHub user/org profile + top repos by stars (5-minute in-memory cache, stale-on-error).
 - `GET /api/rss?url=` — Server-side RSS/Atom proxy with 12-minute cache and http(s)-only URL validation.
 
 ## External Dependencies

@@ -1468,6 +1468,96 @@ export async function registerRoutes(
     }
   });
 
+  // ─── GitHub Pulse — Owner / Profile Mode ───────────────────────────────────
+  // GET /api/github/user/:owner
+  // Returns the user/org profile plus top 5 public repos by stars. Same
+  // 5-min cache + stale-on-error behavior as the repo route. Used when the
+  // widget is configured with just an owner (no repo).
+  type GitHubUserPulse = {
+    login: string;
+    name: string | null;
+    htmlUrl: string;
+    avatarUrl: string;
+    bio: string | null;
+    publicRepos: number;
+    followers: number;
+    following: number;
+    topRepos: { name: string; stars: number; htmlUrl: string; description: string | null }[];
+    fetchedAt: number;
+  };
+  const GITHUB_USER_CACHE = new Map<string, GitHubUserPulse>();
+
+  app.get('/api/github/user/:owner', async (req: Request, res: Response) => {
+    const owner = String(req.params.owner ?? '').trim();
+    if (!GITHUB_NAME_RE.test(owner)) {
+      return res.status(400).json({ error: 'Invalid owner name' });
+    }
+    const cacheKey = owner.toLowerCase();
+    const now = Date.now();
+    const cached = GITHUB_USER_CACHE.get(cacheKey);
+    if (cached && now - cached.fetchedAt < GITHUB_TTL_MS) {
+      return res.json(cached);
+    }
+
+    const headers: Record<string, string> = {
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'OpenBento-Dashboard',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+    if (process.env.GITHUB_TOKEN) {
+      headers['Authorization'] = `Bearer ${process.env.GITHUB_TOKEN}`;
+    }
+
+    try {
+      const [userResp, reposResp] = await Promise.all([
+        fetch(`https://api.github.com/users/${owner}`, { headers }),
+        fetch(`https://api.github.com/users/${owner}/repos?type=owner&sort=updated&per_page=30`, { headers }),
+      ]);
+      if (userResp.status === 404) {
+        return res.status(404).json({ error: 'User or organization not found' });
+      }
+      if (userResp.status === 403) {
+        if (cached) return res.json(cached);
+        return res.status(429).json({ error: 'GitHub rate limit reached, try again shortly' });
+      }
+      if (!userResp.ok) {
+        if (cached) return res.json(cached);
+        return res.status(502).json({ error: `GitHub error ${userResp.status}` });
+      }
+      const userData = await userResp.json();
+      const reposData: any[] = reposResp.ok ? await reposResp.json() : [];
+      const topRepos = (Array.isArray(reposData) ? reposData : [])
+        .filter((r: any) => !r?.fork)
+        .sort((a: any, b: any) => Number(b?.stargazers_count ?? 0) - Number(a?.stargazers_count ?? 0))
+        .slice(0, 5)
+        .map((r: any) => ({
+          name:        String(r.name || ''),
+          stars:       Number(r.stargazers_count ?? 0),
+          htmlUrl:     String(r.html_url || ''),
+          description: typeof r.description === 'string' ? r.description : null,
+        }));
+
+      const pulse: GitHubUserPulse = {
+        login:       String(userData.login || owner),
+        name:        typeof userData.name === 'string' ? userData.name : null,
+        htmlUrl:     String(userData.html_url || `https://github.com/${owner}`),
+        avatarUrl:   String(userData.avatar_url || ''),
+        bio:         typeof userData.bio === 'string' ? userData.bio : null,
+        publicRepos: Number(userData.public_repos ?? 0),
+        followers:   Number(userData.followers ?? 0),
+        following:   Number(userData.following ?? 0),
+        topRepos,
+        fetchedAt: now,
+      };
+      GITHUB_USER_CACHE.set(cacheKey, pulse);
+      res.json(pulse);
+    } catch (err: any) {
+      console.error('[GitHub Pulse user] Fetch failed:', err?.message || err);
+      if (cached) return res.json(cached);
+      res.status(503).json({ error: 'GitHub temporarily unavailable' });
+    }
+  });
+
   // ─── RSS Headlines API ──────────────────────────────────────────────────────
   // GET /api/rss?url=<feed_url>
   // Returns { title, link, items:[{title, url, pubDate, isoDate}], fetchedAt }.

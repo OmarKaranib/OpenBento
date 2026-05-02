@@ -3566,7 +3566,7 @@
           // Rasterize the QR <svg> to a PNG and copy it to the clipboard. Falls
           // back to a download anchor when the Async Clipboard API can't handle
           // image/png (older Safari, locked-down browsers).
-          async function copyQRToClipboard(svg: SVGSVGElement, fgColor: string, bgColor: string): Promise<'copied' | 'downloaded' | 'failed'> {
+          async function copyQRToClipboard(svg: SVGSVGElement, bgColor: string): Promise<'copied' | 'downloaded' | 'failed'> {
             try {
               const xml = new XMLSerializer().serializeToString(svg);
               const svgUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
@@ -3585,12 +3585,16 @@
               ctx.fillStyle = bgColor;
               ctx.fillRect(0, 0, target, target);
               ctx.drawImage(img, 0, 0, target, target);
-              // Best-effort clipboard write
+              // Best-effort clipboard write — feature-detect ClipboardItem on
+              // window without `any` so older browsers fall through cleanly.
               const blob: Blob | null = await new Promise(r => canvas.toBlob(b => r(b), 'image/png'));
               if (!blob) return 'failed';
-              if (typeof (window as any).ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+              const ClipboardItemCtor = (
+                globalThis as { ClipboardItem?: typeof ClipboardItem }
+              ).ClipboardItem;
+              if (ClipboardItemCtor && navigator.clipboard?.write) {
                 try {
-                  await navigator.clipboard.write([new (window as any).ClipboardItem({ 'image/png': blob })]);
+                  await navigator.clipboard.write([new ClipboardItemCtor({ 'image/png': blob })]);
                   return 'copied';
                 } catch {
                   // fall through to download
@@ -3602,11 +3606,22 @@
               document.body.appendChild(a); a.click();
               setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 250);
               return 'downloaded';
-              void fgColor;
             } catch (err) {
               console.warn('[QR] copy/download failed:', err);
               return 'failed';
             }
+          }
+
+          // Relative luminance per WCAG 2.x; used to pick a contrast-safe QR
+          // foreground when the background tracks the widget color-droplet.
+          function hexLuminance(hex: string): number {
+            const m = hex.match(/^#?([0-9a-fA-F]{6})$/);
+            if (!m) return 1;
+            const r = parseInt(m[1].slice(0, 2), 16) / 255;
+            const g = parseInt(m[1].slice(2, 4), 16) / 255;
+            const b = parseInt(m[1].slice(4, 6), 16) / 255;
+            const lin = (c: number) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+            return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
           }
 
           interface QRGeneratorWidgetProps {
@@ -3637,11 +3652,15 @@
 
             const { value: qrValue, label: qrLabel } = useMemo(() => buildQRPayload(widget), [widget]);
 
-            // Color theme: tracks widget.customColor unless user explicitly overrode.
-            // Background defaults to white (so QR remains scannable when widget bg
-            // is dark — overriding bgColor is opt-in via Settings).
-            const fgColor = widget.qrFgColor || (widget.customColor ? widget.customColor : '#0f172a');
-            const bgColor = widget.qrBgColor || '#ffffff';
+            // Color theme: BOTH foreground and background track the widget
+            // color-droplet by default. Background takes the droplet's tint;
+            // foreground is auto-picked for WCAG-safe contrast against it.
+            // Per-widget manual overrides (qrFgColor / qrBgColor) win when set.
+            // Falls back to the classic dark-on-white when no droplet is set.
+            const dropletBg = widget.customColor ?? null;
+            const bgColor   = widget.qrBgColor || dropletBg || '#ffffff';
+            const fgColor   = widget.qrFgColor
+              || (dropletBg ? (hexLuminance(bgColor) > 0.5 ? '#0f172a' : '#ffffff') : '#0f172a');
 
             // Push current value into history (debounced + dedup) whenever the
             // payload changes and is non-empty.
@@ -3694,7 +3713,7 @@
             const handleCopy = async () => {
               const svg = svgWrapperRef.current?.querySelector('svg');
               if (!svg) { setCopyState('failed'); setTimeout(() => setCopyState('idle'), 1600); return; }
-              const result = await copyQRToClipboard(svg as SVGSVGElement, fgColor, bgColor);
+              const result = await copyQRToClipboard(svg as SVGSVGElement, bgColor);
               setCopyState(result);
               setTimeout(() => setCopyState('idle'), 1800);
             };
@@ -4229,6 +4248,25 @@
             fetchedAt: number;
           }
 
+          interface GitHubUserData {
+            login: string;
+            name: string | null;
+            htmlUrl: string;
+            avatarUrl: string;
+            bio: string | null;
+            publicRepos: number;
+            followers: number;
+            following: number;
+            topRepos: { name: string; stars: number; htmlUrl: string; description: string | null }[];
+            fetchedAt: number;
+          }
+
+          // Discriminated union so the widget can render either repo stats or
+          // an owner-profile card without juggling two parallel state slots.
+          type GitHubPayload =
+            | { kind: 'repo'; data: GitHubPulseData }
+            | { kind: 'user'; data: GitHubUserData };
+
           function timeAgo(iso: string): string {
             if (!iso) return '';
             const t = Date.parse(iso);
@@ -4245,10 +4283,15 @@
           export const GitHubPulseWidget: React.FC<GitHubPulseProps> = ({ widget, onUpdate }) => {
             const containerRef = useRef<HTMLDivElement>(null);
             const [size, setSize] = useState(280);
-            const [editing, setEditing] = useState<boolean>(!widget.githubOwner || !widget.githubRepo);
+            // `editing` is DERIVED from props (no owner ⇒ must edit) plus an
+            // explicit user-requested override. Deriving instead of a plain
+            // useState avoids races where setEditing(false) gets shadowed by
+            // a parent re-render that happened in the same React batch.
+            const [forceEdit, setForceEdit] = useState(false);
+            const editing = forceEdit || !widget.githubOwner;
             const [draftOwner, setDraftOwner] = useState(widget.githubOwner || '');
             const [draftRepo,  setDraftRepo]  = useState(widget.githubRepo  || '');
-            const [data, setData]   = useState<GitHubPulseData | null>(null);
+            const [payload, setPayload] = useState<GitHubPayload | null>(null);
             const [loading, setLoading] = useState(false);
             const [error, setError]   = useState<string | null>(null);
 
@@ -4265,20 +4308,27 @@
             const repo  = widget.githubRepo;
 
             useEffect(() => {
-              if (!owner || !repo) { setData(null); return; }
+              if (!owner) { setPayload(null); return; }
               let cancelled = false;
               const run = async () => {
                 setLoading(true);
                 setError(null);
                 try {
-                  const r = await fetch(`/api/github/repo/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`);
+                  // Branch on whether a repo was supplied: repo stats vs.
+                  // owner profile. Both routes share the 5-min cache window.
+                  const url = repo
+                    ? `/api/github/repo/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
+                    : `/api/github/user/${encodeURIComponent(owner)}`;
+                  const r = await fetch(url);
                   const body = await r.json();
                   if (cancelled) return;
                   if (!r.ok) {
                     setError(body?.error || `Error ${r.status}`);
-                    setData(null);
+                    setPayload(null);
+                  } else if (repo) {
+                    setPayload({ kind: 'repo', data: body as GitHubPulseData });
                   } else {
-                    setData(body);
+                    setPayload({ kind: 'user', data: body as GitHubUserData });
                   }
                 } catch (err: any) {
                   if (!cancelled) setError(err?.message || 'Network error');
@@ -4292,13 +4342,16 @@
             }, [owner, repo]);
 
             const compact = size < 240;
+            const repoData: GitHubPulseData | null = payload?.kind === 'repo' ? payload.data : null;
+            const userData: GitHubUserData  | null = payload?.kind === 'user' ? payload.data : null;
 
             const submitRepo = () => {
               const o = draftOwner.trim();
               const r = draftRepo.trim();
-              if (!o || !r) return;
-              onUpdate?.(widget.id, { githubOwner: o, githubRepo: r });
-              setEditing(false);
+              if (!o) return;
+              // Repo is optional — empty repo means "show owner profile".
+              onUpdate?.(widget.id, { githubOwner: o, githubRepo: r || undefined });
+              setForceEdit(false);
             };
 
             return (
@@ -4318,10 +4371,14 @@
                 {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexShrink: 0 }}>
                   <Github size={compact ? 14 : 16} color="#c9d1d9" />
-                  {!editing && owner && repo ? (
+                  {!editing && owner ? (
                     <>
                       <a
-                        href={data?.htmlUrl || `https://github.com/${owner}/${repo}`}
+                        href={
+                          repoData?.htmlUrl
+                          || userData?.htmlUrl
+                          || (repo ? `https://github.com/${owner}/${repo}` : `https://github.com/${owner}`)
+                        }
                         target="_blank" rel="noopener noreferrer"
                         style={{
                           flex: 1, color: '#58a6ff', fontFamily: MONO,
@@ -4331,12 +4388,12 @@
                         }}
                         data-testid={`github-link-${widget.id}`}
                       >
-                        {owner}/{repo}
+                        {repo ? `${owner}/${repo}` : `@${owner}`}
                       </a>
                       <button
-                        onClick={() => { setDraftOwner(owner); setDraftRepo(repo); setEditing(true); }}
+                        onClick={() => { setDraftOwner(owner); setDraftRepo(repo || ''); setForceEdit(true); }}
                         style={qrIconBtnStyle()}
-                        title="Change repo"
+                        title={repo ? 'Change repo' : 'Change profile'}
                       >
                         <SettingsIcon size={11} />
                       </button>
@@ -4356,6 +4413,7 @@
                         type="text"
                         value={draftOwner}
                         onChange={e => setDraftOwner(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { submitRepo(); } }}
                         placeholder="owner"
                         style={{ ...qrInputStyle(11), flex: 1 }}
                         data-testid={`github-input-owner-${widget.id}`}
@@ -4366,14 +4424,14 @@
                         value={draftRepo}
                         onChange={e => setDraftRepo(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter') { submitRepo(); } }}
-                        placeholder="repo"
+                        placeholder="repo (optional)"
                         style={{ ...qrInputStyle(11), flex: 1 }}
                         data-testid={`github-input-repo-${widget.id}`}
                       />
                     </div>
                     <button
                       onClick={submitRepo}
-                      disabled={!draftOwner.trim() || !draftRepo.trim()}
+                      disabled={!draftOwner.trim()}
                       style={{
                         padding: '6px 8px', borderRadius: 6,
                         background: 'rgba(56,139,253,0.2)',
@@ -4383,45 +4441,47 @@
                       }}
                       data-testid={`github-submit-${widget.id}`}
                     >
-                      Load repository
+                      {draftRepo.trim() ? 'Load repository' : 'Load profile'}
                     </button>
                     <p style={{ color: '#7d8590', fontFamily: MONO, fontSize: 10, margin: 0 }}>
-                      e.g. <code>facebook</code> / <code>react</code>
+                      Leave repo blank to show the owner's profile and top repos.
                     </p>
                   </div>
                 )}
 
                 {/* Body */}
                 {!editing && (
-                  <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {loading && !data && (
+                  <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {loading && !payload && (
                       <span style={{ color: '#7d8590', fontFamily: MONO, fontSize: 11 }}>Loading…</span>
                     )}
-                    {error && !data && (
+                    {error && !payload && (
                       <span style={{ color: '#f85149', fontFamily: MONO, fontSize: 11 }}>{error}</span>
                     )}
-                    {data && (
+
+                    {/* ── Repo mode ────────────────────────────────────────── */}
+                    {repoData && (
                       <>
-                        {data.description && !compact && (
+                        {repoData.description && !compact && (
                           <p style={{
                             color: '#8b949e', fontFamily: MONO, fontSize: 10.5,
                             margin: 0, lineHeight: 1.4, display: '-webkit-box',
                             WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                             overflow: 'hidden',
                           }}>
-                            {data.description}
+                            {repoData.description}
                           </p>
                         )}
                         <div style={{
                           display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6,
                           flexShrink: 0,
                         }}>
-                          <GitHubStat icon={<Star size={11} />} label="Stars" value={data.stars.toLocaleString()} color="#d29922" />
-                          <GitHubStat icon={<GitPullRequest size={11} />} label="Open PRs" value={data.openPRs.toLocaleString()} color="#3fb950" />
+                          <GitHubStat icon={<Star size={11} />} label="Stars" value={repoData.stars.toLocaleString()} color="#d29922" />
+                          <GitHubStat icon={<GitPullRequest size={11} />} label="Open PRs" value={repoData.openPRs.toLocaleString()} color="#3fb950" />
                         </div>
-                        {data.lastCommit && (
+                        {repoData.lastCommit && (
                           <a
-                            href={data.lastCommit.url}
+                            href={repoData.lastCommit.url}
                             target="_blank" rel="noopener noreferrer"
                             style={{
                               display: 'flex', flexDirection: 'column', gap: 2,
@@ -4435,23 +4495,23 @@
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                               <GitCommit size={11} color="#58a6ff" />
                               <span style={{ color: '#58a6ff', fontFamily: MONO, fontSize: 10, fontWeight: 700 }}>
-                                {data.lastCommit.sha}
+                                {repoData.lastCommit.sha}
                               </span>
                               <span style={{ color: '#7d8590', fontFamily: MONO, fontSize: 9.5, marginLeft: 'auto' }}>
-                                {timeAgo(data.lastCommit.authoredAt)}
+                                {timeAgo(repoData.lastCommit.authoredAt)}
                               </span>
                             </div>
                             <span style={{
                               color: '#c9d1d9', fontFamily: MONO, fontSize: 10.5,
                               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                             }}>
-                              {data.lastCommit.message}
+                              {repoData.lastCommit.message}
                             </span>
                           </a>
                         )}
-                        {data.latestRelease && (
+                        {repoData.latestRelease && (
                           <a
-                            href={data.latestRelease.url}
+                            href={repoData.latestRelease.url}
                             target="_blank" rel="noopener noreferrer"
                             style={{
                               display: 'flex', alignItems: 'center', gap: 6,
@@ -4463,14 +4523,104 @@
                           >
                             <Tag size={11} color="#3fb950" />
                             <span style={{ color: '#3fb950', fontFamily: MONO, fontSize: 10.5, fontWeight: 700 }}>
-                              {data.latestRelease.tagName}
+                              {repoData.latestRelease.tagName}
                             </span>
                             <span style={{ color: '#7d8590', fontFamily: MONO, fontSize: 9.5, marginLeft: 'auto' }}>
-                              {timeAgo(data.latestRelease.publishedAt)}
+                              {timeAgo(repoData.latestRelease.publishedAt)}
                             </span>
                           </a>
                         )}
                       </>
+                    )}
+
+                    {/* ── Owner / profile mode ─────────────────────────────── */}
+                    {userData && (
+                      <div data-testid={`github-profile-${widget.id}`} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {userData.avatarUrl && (
+                            <img
+                              src={userData.avatarUrl}
+                              alt={`${userData.login} avatar`}
+                              width={compact ? 28 : 36}
+                              height={compact ? 28 : 36}
+                              style={{ borderRadius: '50%', flexShrink: 0, border: '1px solid rgba(48,54,61,0.6)' }}
+                            />
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              color: '#c9d1d9', fontFamily: MONO,
+                              fontSize: compact ? 11 : 12, fontWeight: 700,
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>
+                              {userData.name || userData.login}
+                            </div>
+                            {userData.name && (
+                              <div style={{
+                                color: '#7d8590', fontFamily: MONO, fontSize: 10,
+                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                              }}>
+                                @{userData.login}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {userData.bio && !compact && (
+                          <p style={{
+                            color: '#8b949e', fontFamily: MONO, fontSize: 10.5,
+                            margin: 0, lineHeight: 1.4, display: '-webkit-box',
+                            WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}>
+                            {userData.bio}
+                          </p>
+                        )}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(3, 1fr)',
+                          gap: 6, flexShrink: 0,
+                        }}>
+                          <GitHubStat icon={<Star size={11} />}    label="Repos"     value={userData.publicRepos.toLocaleString()} color="#d29922" />
+                          <GitHubStat icon={<Github size={11} />}  label="Followers" value={userData.followers.toLocaleString()}   color="#58a6ff" />
+                          <GitHubStat icon={<Github size={11} />}  label="Following" value={userData.following.toLocaleString()}   color="#3fb950" />
+                        </div>
+                        {userData.topRepos.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <span style={{
+                              color: '#7d8590', fontFamily: MONO, fontSize: 9,
+                              fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+                            }}>
+                              Top repos
+                            </span>
+                            {userData.topRepos.map(r => (
+                              <a
+                                key={r.htmlUrl}
+                                href={r.htmlUrl}
+                                target="_blank" rel="noopener noreferrer"
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 6,
+                                  padding: '5px 8px', borderRadius: 6,
+                                  background: 'rgba(13,17,23,0.6)',
+                                  border: '1px solid rgba(48,54,61,0.6)',
+                                  textDecoration: 'none',
+                                }}
+                                data-testid={`github-toprepo-${r.name}-${widget.id}`}
+                              >
+                                <span style={{
+                                  flex: 1, color: '#58a6ff', fontFamily: MONO,
+                                  fontSize: 10.5, fontWeight: 600,
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                }}>
+                                  {r.name}
+                                </span>
+                                <Star size={10} color="#d29922" />
+                                <span style={{ color: '#d29922', fontFamily: MONO, fontSize: 10, fontWeight: 700 }}>
+                                  {r.stars.toLocaleString()}
+                                </span>
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
