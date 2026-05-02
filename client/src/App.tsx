@@ -692,14 +692,24 @@
             { value: 'bloomberg',          label: 'Bloomberg'          },
           ];
 
-          function mapCrisisCategoryToApi(category: string | undefined): string {
+          // World maps to a curated bundle of international newswire sources
+          // rather than a NewsAPI category, since NewsAPI has no "world" bucket.
+          // This keeps the preset functionally distinct from "All".
+          const CRISIS_WORLD_SOURCES = 'bbc-news,reuters,associated-press,al-jazeera-english';
+
+          interface CrisisQuery {
+            sources?: string;
+            category?: string;
+          }
+
+          function mapCrisisCategoryToApi(category: string | undefined): CrisisQuery {
             switch (category) {
-              case 'tech':    return 'technology';
-              case 'markets': return 'business';
-              case 'sports':  return 'sports';
-              case 'world':   return '';
-              case 'all':     return '';
-              default:        return '';
+              case 'tech':    return { category: 'technology' };
+              case 'markets': return { category: 'business'   };
+              case 'sports':  return { category: 'sports'     };
+              case 'world':   return { sources:  CRISIS_WORLD_SOURCES };
+              case 'all':     return {};
+              default:        return {};
             }
           }
 
@@ -730,10 +740,15 @@
                 try {
                   const params = new URLSearchParams();
                   if (sources) {
+                    // Explicit per-widget source override always wins.
                     params.set('sources', sources);
                   } else {
-                    const apiCat = mapCrisisCategoryToApi(category);
-                    if (apiCat) params.set('category', apiCat);
+                    // Otherwise resolve the category preset, which may itself
+                    // produce either a category or a curated source bundle
+                    // (e.g. 'world' -> international newswires).
+                    const q = mapCrisisCategoryToApi(category);
+                    if (q.sources)  params.set('sources',  q.sources);
+                    if (q.category) params.set('category', q.category);
                   }
                   const qs = params.toString();
                   const resp = await fetch(qs ? `/api/news?${qs}` : '/api/news');
@@ -1002,34 +1017,22 @@
                   >
                     {headlines.map((h, idx) => {
                       const breaking = isBreakingHeadline(h.text);
-                      const accent = isCrisisHeadline(h.text) ? '#ef4444' : '#1e40af';
-                      const RowEl: any = h.url ? 'a' : 'div';
-                      const rowProps = h.url
-                        ? {
-                            href: h.url,
-                            target: '_blank',
-                            rel: 'noopener noreferrer',
-                            onClick: (e: React.MouseEvent) => e.stopPropagation(),
-                          }
-                        : {};
-                      return (
-                        <RowEl
-                          key={`${h.id}-${idx}`}
-                          className={`crisis-row-${widget.id}`}
-                          {...rowProps}
-                          style={{
-                            height:       `${rowH}px`,
-                            display:      'flex',
-                            alignItems:   'center',
-                            padding:      `0 ${Math.max(8, s * 0.045)}px`,
-                            borderBottom: '1px solid rgba(30,41,59,0.5)',
-                            gap:          `${Math.max(6, s * 0.03)}px`,
-                            textDecoration: 'none',
-                            color: 'inherit',
-                            cursor: h.url ? 'pointer' : 'default',
-                          }}
-                          data-testid={`crisis-headline-${widget.id}-${idx % CRISIS_HEADLINES.length}`}
-                        >
+                      const accent   = isCrisisHeadline(h.text) ? '#ef4444' : '#1e40af';
+                      const rowStyle: React.CSSProperties = {
+                        height:         `${rowH}px`,
+                        display:        'flex',
+                        alignItems:     'center',
+                        padding:        `0 ${Math.max(8, s * 0.045)}px`,
+                        borderBottom:   '1px solid rgba(30,41,59,0.5)',
+                        gap:            `${Math.max(6, s * 0.03)}px`,
+                        textDecoration: 'none',
+                        color:          'inherit',
+                        cursor:         h.url ? 'pointer' : 'default',
+                      };
+                      const rowClass   = `crisis-row-${widget.id}`;
+                      const rowTestId  = `crisis-headline-${widget.id}-${idx % CRISIS_HEADLINES.length}`;
+                      const rowChildren = (
+                        <>
                           {/* Accent bar */}
                           <span style={{
                             width:           '2px',
@@ -1075,7 +1078,33 @@
                               style={{ flexShrink: 0 }}
                             />
                           )}
-                        </RowEl>
+                        </>
+                      );
+
+                      // Branch on link presence so each branch keeps the
+                      // intrinsic-element prop typing intact (no `any` casts).
+                      return h.url ? (
+                        <a
+                          key={`${h.id}-${idx}`}
+                          href={h.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className={rowClass}
+                          style={rowStyle}
+                          data-testid={rowTestId}
+                        >
+                          {rowChildren}
+                        </a>
+                      ) : (
+                        <div
+                          key={`${h.id}-${idx}`}
+                          className={rowClass}
+                          style={rowStyle}
+                          data-testid={rowTestId}
+                        >
+                          {rowChildren}
+                        </div>
                       );
                     })}
                   </div>
