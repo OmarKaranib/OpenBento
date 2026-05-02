@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { HelpCircle, X } from 'lucide-react';
+import { HelpCircle, X, RefreshCw } from 'lucide-react';
+import { REPLAY_EVENT } from '@/components/onboarding-flow';
 
 interface TutorialLabel {
   id: string;
@@ -96,7 +97,12 @@ export function FloatingTutorial({ isDarkMode = true }: { isDarkMode?: boolean }
     if (!isOpen) return;
     
     const handleGlobalClick = (e: MouseEvent | TouchEvent) => {
-      // Close on any click - the entire screen is clickable to close
+      // Don't close when the replay-onboarding button is the target —
+      // it manages its own dispatch + close ordering.
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('[data-testid="button-replay-onboarding"]')) {
+        return;
+      }
       handleClose();
     };
     
@@ -158,9 +164,23 @@ export function FloatingTutorial({ isDarkMode = true }: { isDarkMode?: boolean }
             <X className="w-5 h-5 text-white" />
           </button>
 
-          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 text-center z-[10000] pointer-events-none">
-            <h2 className="text-xl font-bold text-white mb-1" data-testid="text-tutorial-title">Menu Bar Guide</h2>
-            <p className="text-slate-400 text-sm" data-testid="text-tutorial-subtitle">Click anywhere to close</p>
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 text-center z-[10000] flex flex-col items-center gap-3">
+            <div className="pointer-events-none">
+              <h2 className="text-xl font-bold text-white mb-1" data-testid="text-tutorial-title">Menu Bar Guide</h2>
+              <p className="text-slate-400 text-sm" data-testid="text-tutorial-subtitle">Click anywhere to close</p>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                window.dispatchEvent(new CustomEvent(REPLAY_EVENT));
+                handleClose();
+              }}
+              className="pointer-events-auto inline-flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 border border-cyan-400/60 rounded-lg text-white text-sm font-semibold shadow-lg shadow-cyan-500/30 transition-colors"
+              data-testid="button-replay-onboarding"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Replay onboarding
+            </button>
           </div>
 
           {visibleLabels.map((item) => (

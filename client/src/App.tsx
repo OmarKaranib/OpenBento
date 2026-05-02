@@ -21,6 +21,7 @@
           import Privacy from '@/pages/privacy';
           import Feedback from '@/pages/feedback';
           import { WidgetSidebar, TrendingChannel, WidgetTemplate, WIDGET_TEMPLATES } from '@/components/widget-sidebar';
+          import { OnboardingFlow } from '@/components/onboarding-flow';
           import {
             DndContext, DragEndEvent, DragStartEvent, DragMoveEvent, DragOverlay,
             useSensor, useSensors, PointerSensor, UniqueIdentifier, rectIntersection,
@@ -1705,7 +1706,7 @@
             const [loginDefaultMode, setLoginDefaultMode]     = useState<'login' | 'signup' | 'reset' | 'verify'>('login');
 
             const [location, setLocation] = useLocation();
-            const { user, isAuthenticated, logout } = useAuth();
+            const { user, isAuthenticated, logout, isLoading: authIsLoading } = useAuth();
 
             useEffect(() => {
               if (location === '/auth/reset-password') {
@@ -2311,6 +2312,14 @@
                   }}
                   triggerReason={loginTriggerReason}
                   defaultMode={loginDefaultMode}
+                />
+
+                <OnboardingFlow
+                  setWidgets={setWidgets}
+                  hasWidgets={widgets.length > 0}
+                  isAuthenticated={isAuthenticated}
+                  authIsLoading={authIsLoading}
+                  isDashboardRoute={location === '/' || location === '/auth/reset-password'}
                 />
 
                 <DndContext
