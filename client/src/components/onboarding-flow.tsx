@@ -88,15 +88,20 @@ export function OnboardingFlow({
     setPhase('hidden');
   }, []);
 
-  // Escape key closes the flow at any phase
+  // The welcome modal closes into the coachmarks; only Esc *during a coachmark*
+  // ends the flow early and persists the onboarded flag.
+  const skipWelcome = useCallback(() => setPhase('coach-block'), []);
+
   useEffect(() => {
     if (phase === 'hidden') return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') finish();
+      if (e.key !== 'Escape') return;
+      if (phase === 'welcome') skipWelcome();
+      else finish();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [phase, finish]);
+  }, [phase, finish, skipWelcome]);
 
   const handlePickPack = useCallback((pack: StarterPack) => {
     if (pack.tiles.length === 0) {
@@ -117,7 +122,7 @@ export function OnboardingFlow({
   if (phase === 'hidden') return null;
 
   if (phase === 'welcome') {
-    return <WelcomeModal onPick={handlePickPack} onSkip={finish} />;
+    return <WelcomeModal onPick={handlePickPack} onSkip={skipWelcome} />;
   }
 
   if (phase === 'coach-block') {
@@ -162,8 +167,55 @@ function WelcomeModal({
   onPick: (pack: StarterPack) => void;
   onSkip: () => void;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap: focus the first interactive element on mount, restore prior
+  // focus on unmount, and cycle Tab/Shift+Tab within the modal.
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    const getFocusable = () =>
+      Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter(el => el.offsetParent !== null);
+
+    // Focus the first starter pack tile (skip the close X for friendlier UX)
+    const firstPackBtn = root.querySelector<HTMLElement>('[data-testid^="button-pack-"]');
+    firstPackBtn?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const focusable = getFocusable();
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last  = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey) {
+        if (active === first || !root.contains(active)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (active === last || !root.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      previouslyFocused?.focus?.();
+    };
+  }, []);
+
   return (
     <div
+      ref={containerRef}
       className="fixed inset-0 z-[10100] flex items-center justify-center p-6"
       data-testid="onboarding-welcome"
       role="dialog"
