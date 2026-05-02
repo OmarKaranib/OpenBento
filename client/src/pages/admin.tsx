@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useReplitAuth } from '@/hooks/use-replit-auth';
 import { usePageMeta } from '@/hooks/use-page-meta';
+import { Footer } from '@/components/footer';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon, GripVertical, Eye, EyeOff, MessageSquare, Lightbulb, Bug, Search, CheckCircle2 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
@@ -535,56 +536,62 @@ export default function Admin() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <Loader2 className="w-12 h-12 text-cyan-400 animate-spin" />
+      <div className="min-h-screen bg-slate-900 flex flex-col">
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-12 h-12 text-cyan-400 animate-spin" />
+        </div>
+        <Footer />
       </div>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <Shield className="w-16 h-16 text-cyan-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Admin Login Required</h1>
-          <p className="text-slate-400 mb-6">Please log in with your admin account to access this page.</p>
-          <button
-            onClick={login}
-            className="flex items-center gap-2 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white font-medium transition-colors mx-auto"
-            data-testid="button-admin-login"
-          >
-            <LogIn className="w-5 h-5" />
-            Login with Replit
-          </button>
-          <Link href="/">
-            <a className="text-slate-400 hover:text-slate-300 text-sm mt-4 inline-block">
+      <div className="min-h-screen bg-slate-900 flex flex-col">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <Shield className="w-16 h-16 text-cyan-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-white mb-2">Admin Login Required</h1>
+            <p className="text-slate-400 mb-6">Please log in with your admin account to access this page.</p>
+            <button
+              onClick={login}
+              className="flex items-center gap-2 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white font-medium transition-colors mx-auto"
+              data-testid="button-admin-login"
+            >
+              <LogIn className="w-5 h-5" />
+              Login with Replit
+            </button>
+            <Link href="/" className="text-slate-400 hover:text-slate-300 text-sm mt-4 inline-block">
               Back to Dashboard
-            </a>
-          </Link>
+            </Link>
+          </div>
         </div>
+        <Footer />
       </div>
     );
   }
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
-          <p className="text-slate-400">You don't have admin privileges.</p>
-          <Link href="/">
-            <a className="text-cyan-400 hover:text-cyan-300 text-sm mt-4 inline-block">
+      <div className="min-h-screen bg-slate-900 flex flex-col">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
+            <p className="text-slate-400">You don't have admin privileges.</p>
+            <Link href="/" className="text-cyan-400 hover:text-cyan-300 text-sm mt-4 inline-block">
               Back to Dashboard
-            </a>
-          </Link>
+            </Link>
+          </div>
         </div>
+        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 p-8">
+    <div className="min-h-screen bg-slate-900 flex flex-col">
+      <div className="flex-1 p-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
@@ -1330,6 +1337,8 @@ export default function Admin() {
           </p>
         </div>
       </div>
+      </div>
+      <Footer />
     </div>
   );
 }
