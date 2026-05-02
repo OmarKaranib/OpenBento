@@ -145,10 +145,17 @@ export default function Privacy() {
                 <li>opt out of the "sale" or "sharing" of personal information (we do not sell or share it).</li>
               </ul>
               <p className="mt-2">
-                To exercise any of these rights, submit a request through the
-                <Link href="/feedback" className="text-cyan-400 hover:text-cyan-300"> in-app feedback form </Link>
-                with the category "Idea" and the subject "Data request." We will
-                respond within 30 days.
+                To exercise any of these rights, email{" "}
+                <a
+                  href="mailto:support@openbento.tv?subject=Data%20Request"
+                  className="text-cyan-400 hover:text-cyan-300"
+                  data-testid="link-privacy-email"
+                >
+                  support@openbento.tv
+                </a>{" "}
+                with the subject "Data request" or use the
+                <Link href="/feedback" className="text-cyan-400 hover:text-cyan-300"> in-app feedback form</Link>.
+                We will verify your identity and respond within 30 days.
               </p>
             </section>
 
@@ -184,7 +191,15 @@ export default function Privacy() {
             <section>
               <h2 className="text-xl font-semibold text-white mb-3">10. Contact</h2>
               <p>
-                Questions or privacy requests? Reach ANCU LABS FZC LLC through the
+                Questions or privacy requests? Email ANCU LABS FZC LLC at{" "}
+                <a
+                  href="mailto:support@openbento.tv"
+                  className="text-cyan-400 hover:text-cyan-300"
+                  data-testid="link-privacy-contact-email"
+                >
+                  support@openbento.tv
+                </a>{" "}
+                or use the
                 <Link href="/feedback" className="text-cyan-400 hover:text-cyan-300"> in-app feedback form</Link>.
               </p>
             </section>

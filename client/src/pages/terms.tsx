@@ -163,7 +163,15 @@ export default function Terms() {
             <section>
               <h2 className="text-xl font-semibold text-white mb-3">12. Contact</h2>
               <p>
-                Questions about these Terms? Contact ANCU LABS FZC LLC via the in-app
+                Questions about these Terms? Email ANCU LABS FZC LLC at{" "}
+                <a
+                  href="mailto:support@openbento.tv"
+                  className="text-cyan-400 hover:text-cyan-300"
+                  data-testid="link-terms-contact-email"
+                >
+                  support@openbento.tv
+                </a>{" "}
+                or use the in-app
                 feedback form at <Link href="/feedback" className="text-cyan-400 hover:text-cyan-300">/feedback</Link>.
               </p>
             </section>

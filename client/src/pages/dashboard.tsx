@@ -2250,6 +2250,34 @@ const MasterControlDashboard = ({
         </div>
       </div>
 
+      {/* Compact fixed-position footer — visible on the dashboard without
+          consuming grid space. Hidden in fullscreen / TV mode to avoid clutter. */}
+      {!isFullscreen && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-30 pointer-events-none flex justify-center pb-1"
+          data-testid="dashboard-footer"
+        >
+          <div className="pointer-events-auto flex items-center gap-3 px-3 py-1 rounded-full bg-slate-900/70 backdrop-blur-sm border border-slate-700/40 text-[0.7rem] text-slate-400 shadow-lg">
+            <span>© 2026 ANCU LABS FZC LLC</span>
+            <span className="text-slate-600">·</span>
+            <Link
+              href="/terms"
+              className="hover:text-cyan-300 transition-colors"
+              data-testid="link-dashboard-terms"
+            >
+              Terms
+            </Link>
+            <Link
+              href="/privacy"
+              className="hover:text-cyan-300 transition-colors"
+              data-testid="link-dashboard-privacy"
+            >
+              Privacy
+            </Link>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
