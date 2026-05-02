@@ -1,4 +1,4 @@
-          import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+          import React, { useState, useCallback, useRef, useEffect, useMemo, Suspense, lazy } from 'react';
           import { useAuth } from '@/hooks/use-auth';
           import { LoginModal } from '@/components/login-modal';
           import { MobileGuard } from '@/components/mobile-guard';
@@ -27,7 +27,9 @@
           import Terms from '@/pages/terms';
           import Privacy from '@/pages/privacy';
           import Feedback from '@/pages/feedback';
-          import CastPage from '@/pages/cast';
+          // Lazy-load /cast to break the App ↔ cast.tsx module cycle
+          // (cast.tsx imports WidgetRenderer + Widget type from this file).
+          const CastPage = lazy(() => import('@/pages/cast'));
           import { WidgetSidebar, TrendingChannel, WidgetTemplate, WIDGET_TEMPLATES } from '@/components/widget-sidebar';
           import { OnboardingFlow } from '@/components/onboarding-flow';
           import {
@@ -7206,7 +7208,13 @@
                       <Route path="/terms"    component={Terms} />
                       <Route path="/privacy"  component={Privacy} />
                       <Route path="/feedback" component={Feedback} />
-                      <Route path="/cast"     component={CastPage} />
+                      <Route path="/cast">
+                        {() => (
+                          <Suspense fallback={<div className="w-screen h-screen bg-slate-950" />}>
+                            <CastPage />
+                          </Suspense>
+                        )}
+                      </Route>
                       <Route component={NotFound} />
                     </Switch>
                   </SortableContext>
