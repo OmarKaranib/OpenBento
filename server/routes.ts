@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import { isIP } from "net";
 import { storage } from "./storage";
 import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from "./link-refresher";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
@@ -1524,24 +1525,35 @@ export async function registerRoutes(
         if (cached) return res.json(cached);
         return res.status(502).json({ error: `GitHub error ${userResp.status}` });
       }
-      const userData = await userResp.json();
-      const reposData: any[] = reposResp.ok ? await reposResp.json() : [];
-      const topRepos = (Array.isArray(reposData) ? reposData : [])
-        .filter((r: any) => !r?.fork)
-        .sort((a: any, b: any) => Number(b?.stargazers_count ?? 0) - Number(a?.stargazers_count ?? 0))
+      // Narrowly-typed shapes for the GitHub REST fields we actually consume.
+      // Everything else from the upstream response is ignored.
+      type GhUserApi = {
+        login?: unknown; name?: unknown; html_url?: unknown; avatar_url?: unknown;
+        bio?: unknown; public_repos?: unknown; followers?: unknown; following?: unknown;
+      };
+      type GhRepoApi = {
+        name?: unknown; stargazers_count?: unknown; html_url?: unknown;
+        description?: unknown; fork?: unknown;
+      };
+      const userData = (await userResp.json()) as GhUserApi;
+      const reposJson: unknown = reposResp.ok ? await reposResp.json() : [];
+      const reposData: GhRepoApi[] = Array.isArray(reposJson) ? (reposJson as GhRepoApi[]) : [];
+      const topRepos = reposData
+        .filter((r) => !r?.fork)
+        .sort((a, b) => Number(b?.stargazers_count ?? 0) - Number(a?.stargazers_count ?? 0))
         .slice(0, 5)
-        .map((r: any) => ({
-          name:        String(r.name || ''),
+        .map((r) => ({
+          name:        typeof r.name === 'string' ? r.name : '',
           stars:       Number(r.stargazers_count ?? 0),
-          htmlUrl:     String(r.html_url || ''),
+          htmlUrl:     typeof r.html_url === 'string' ? r.html_url : '',
           description: typeof r.description === 'string' ? r.description : null,
         }));
 
       const pulse: GitHubUserPulse = {
-        login:       String(userData.login || owner),
+        login:       typeof userData.login === 'string' ? userData.login : owner,
         name:        typeof userData.name === 'string' ? userData.name : null,
-        htmlUrl:     String(userData.html_url || `https://github.com/${owner}`),
-        avatarUrl:   String(userData.avatar_url || ''),
+        htmlUrl:     typeof userData.html_url === 'string' ? userData.html_url : `https://github.com/${owner}`,
+        avatarUrl:   typeof userData.avatar_url === 'string' ? userData.avatar_url : '',
         bio:         typeof userData.bio === 'string' ? userData.bio : null,
         publicRepos: Number(userData.public_repos ?? 0),
         followers:   Number(userData.followers ?? 0),
@@ -1551,8 +1563,9 @@ export async function registerRoutes(
       };
       GITHUB_USER_CACHE.set(cacheKey, pulse);
       res.json(pulse);
-    } catch (err: any) {
-      console.error('[GitHub Pulse user] Fetch failed:', err?.message || err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[GitHub Pulse user] Fetch failed:', msg);
       if (cached) return res.json(cached);
       res.status(503).json({ error: 'GitHub temporarily unavailable' });
     }
@@ -1578,7 +1591,6 @@ export async function registerRoutes(
   // range. There is a small TOCTOU window between this check and the upstream
   // fetch, but it's tight enough for a personal-dashboard widget proxy.
   function isPrivateOrReservedIp(addr: string): boolean {
-    const { isIP } = require('net') as typeof import('net');
     const family = isIP(addr);
     if (family === 0) return true; // unknown — refuse
     if (family === 4) {
@@ -1637,22 +1649,32 @@ export async function registerRoutes(
     if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
       return res.status(400).json({ error: 'Only http(s) URLs are allowed' });
     }
-    // SSRF guard: resolve hostname and refuse any private/reserved address.
-    // We check ALL resolved addresses so a host with mixed records can't slip
-    // a private IP past us. Hostnames that are themselves IP literals are
-    // checked directly without DNS.
-    try {
+    // SSRF guard helper: resolve hostname and verify EVERY A/AAAA record is
+    // a public address. Hostnames that are themselves IP literals skip DNS.
+    // Throws on failure with a stable message we surface to the caller.
+    const validateHostIsPublic = async (hostname: string): Promise<void> => {
       const dns = await import('dns/promises');
-      const { isIP } = await import('net');
-      const host = parsedUrl.hostname;
-      const targets: string[] = isIP(host)
-        ? [host]
-        : (await dns.lookup(host, { all: true, family: 0 })).map(r => r.address);
-      if (targets.length === 0 || targets.some(isPrivateOrReservedIp)) {
-        return res.status(400).json({ error: 'Refusing to fetch a private or reserved address' });
+      let targets: string[];
+      if (isIP(hostname)) {
+        targets = [hostname];
+      } else {
+        try {
+          targets = (await dns.lookup(hostname, { all: true, family: 0 })).map(r => r.address);
+        } catch (err: unknown) {
+          const code = (err as { code?: string } | null)?.code || 'ENOTFOUND';
+          throw new Error(`DNS lookup failed: ${code}`);
+        }
       }
-    } catch (err: any) {
-      return res.status(400).json({ error: `DNS lookup failed: ${err?.code || 'ENOTFOUND'}` });
+      if (targets.length === 0 || targets.some(isPrivateOrReservedIp)) {
+        throw new Error('Refusing to fetch a private or reserved address');
+      }
+    };
+
+    try {
+      await validateHostIsPublic(parsedUrl.hostname);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Validation failed';
+      return res.status(400).json({ error: msg });
     }
     const cacheKey = parsedUrl.toString();
     const now = Date.now();
@@ -1660,6 +1682,77 @@ export async function registerRoutes(
     if (cached && now - cached.fetchedAt < RSS_TTL_MS) {
       return res.json(cached);
     }
+
+    // Manual fetch with per-hop SSRF re-validation. rss-parser's built-in
+    // parseURL would happily follow a 30x redirect into a private IP (e.g.
+    // a public host returning Location: http://169.254.169.254/latest/meta-data/),
+    // bypassing our pre-check. We follow up to MAX_HOPS redirects ourselves,
+    // re-validating the host (DNS + private-IP filter) on every hop, then
+    // hand the body to parser.parseString.
+    const MAX_HOPS = 5;
+    const FETCH_TIMEOUT_MS = 10_000;
+    const MAX_BODY_BYTES = 5 * 1024 * 1024;
+    const safeFetchFeedBody = async (initialUrl: string): Promise<string> => {
+      let currentUrl = initialUrl;
+      for (let hop = 0; hop <= MAX_HOPS; hop++) {
+        const u = new URL(currentUrl);
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+          throw new Error('Redirect to non-HTTP scheme blocked');
+        }
+        await validateHostIsPublic(u.hostname);
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+        // Inferred return type of global `fetch` — avoid annotating with
+        // `Response` because Express also exports a `Response` type and the
+        // outer route handler shadows the DOM/global one.
+        let resp: Awaited<ReturnType<typeof fetch>>;
+        try {
+          resp = await fetch(currentUrl, {
+            redirect: 'manual',
+            signal: ac.signal,
+            headers: {
+              'User-Agent': 'OpenBento-Dashboard/1.0 (+https://openbento.app)',
+              'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5',
+            },
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+        if (resp.status >= 300 && resp.status < 400) {
+          const loc = resp.headers.get('location');
+          if (!loc) throw new Error(`Redirect ${resp.status} without Location header`);
+          // Resolve relative redirects against the current URL.
+          currentUrl = new URL(loc, currentUrl).toString();
+          continue;
+        }
+        if (!resp.ok) {
+          throw new Error(`Upstream HTTP ${resp.status}`);
+        }
+        // Cap body size to avoid memory blow-ups from malicious/giant feeds.
+        const reader = resp.body?.getReader();
+        if (!reader) return await resp.text();
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value) {
+            total += value.byteLength;
+            if (total > MAX_BODY_BYTES) {
+              try { await reader.cancel(); } catch { /* ignore */ }
+              throw new Error('Feed body exceeds 5 MiB cap');
+            }
+            chunks.push(value);
+          }
+        }
+        const buf = new Uint8Array(total);
+        let off = 0;
+        for (const c of chunks) { buf.set(c, off); off += c.byteLength; }
+        return new TextDecoder('utf-8', { fatal: false }).decode(buf);
+      }
+      throw new Error(`Too many redirects (>${MAX_HOPS})`);
+    };
 
     try {
       // rss-parser is dynamically imported so the server boots even if the
@@ -1669,7 +1762,8 @@ export async function registerRoutes(
         timeout: 10_000,
         headers: { 'User-Agent': 'OpenBento-Dashboard/1.0 (+https://openbento.app)' },
       });
-      const feed = await parser.parseURL(cacheKey);
+      const body = await safeFetchFeedBody(cacheKey);
+      const feed = await parser.parseString(body);
       const items = (feed.items || []).slice(0, RSS_MAX_ITEMS).map(it => ({
         title:   String(it.title    || '').trim(),
         url:     String(it.link     || '').trim(),
@@ -1684,8 +1778,9 @@ export async function registerRoutes(
       };
       RSS_CACHE.set(cacheKey, payload);
       res.json(payload);
-    } catch (err: any) {
-      console.error('[RSS] Fetch failed:', err?.message || err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[RSS] Fetch failed:', msg);
       if (cached) return res.json(cached);
       res.status(502).json({ error: 'Could not parse feed' });
     }

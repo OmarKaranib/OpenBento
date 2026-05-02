@@ -18,6 +18,7 @@
           import { QueryClientProvider } from '@tanstack/react-query';
           import { Toaster } from '@/components/ui/toaster';
           import { TooltipProvider } from '@/components/ui/tooltip';
+          import { useToast } from '@/hooks/use-toast';
           import NotFound from '@/pages/not-found';
           import MasterControlDashboard from '@/pages/dashboard';
           import Admin from '@/pages/admin';
@@ -3635,6 +3636,7 @@
             const [size, setSize] = useState(280);
             const [showSettings, setShowSettings] = useState(false);
             const [copyState, setCopyState] = useState<'idle' | 'copied' | 'downloaded' | 'failed'>('idle');
+            const { toast } = useToast();
 
             useEffect(() => {
               const obs = new ResizeObserver(entries => {
@@ -3712,10 +3714,22 @@
 
             const handleCopy = async () => {
               const svg = svgWrapperRef.current?.querySelector('svg');
-              if (!svg) { setCopyState('failed'); setTimeout(() => setCopyState('idle'), 1600); return; }
+              if (!svg) {
+                setCopyState('failed');
+                setTimeout(() => setCopyState('idle'), 1600);
+                toast({ title: 'Copy failed', description: 'No QR code to copy.', variant: 'destructive' });
+                return;
+              }
               const result = await copyQRToClipboard(svg as SVGSVGElement, bgColor);
               setCopyState(result);
               setTimeout(() => setCopyState('idle'), 1800);
+              if (result === 'copied') {
+                toast({ title: 'Copied!', description: 'QR code copied to clipboard as PNG.' });
+              } else if (result === 'downloaded') {
+                toast({ title: 'Downloaded', description: 'Clipboard unavailable — saved as PNG instead.' });
+              } else {
+                toast({ title: 'Copy failed', description: 'Could not copy or download the QR code.', variant: 'destructive' });
+              }
             };
 
             const handleLogoUpload = (file: File) => {
@@ -4330,8 +4344,11 @@
                   } else {
                     setPayload({ kind: 'user', data: body as GitHubUserData });
                   }
-                } catch (err: any) {
-                  if (!cancelled) setError(err?.message || 'Network error');
+                } catch (err: unknown) {
+                  if (!cancelled) {
+                    const msg = err instanceof Error ? err.message : 'Network error';
+                    setError(msg);
+                  }
                 } finally {
                   if (!cancelled) setLoading(false);
                 }
@@ -4689,8 +4706,11 @@
                   } else {
                     setData(body);
                   }
-                } catch (err: any) {
-                  if (!cancelled) setError(err?.message || 'Network error');
+                } catch (err: unknown) {
+                  if (!cancelled) {
+                    const msg = err instanceof Error ? err.message : 'Network error';
+                    setError(msg);
+                  }
                 } finally {
                   if (!cancelled) setLoading(false);
                 }
