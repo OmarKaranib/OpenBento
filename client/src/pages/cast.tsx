@@ -180,7 +180,14 @@ export default function CastPage() {
   const codeTimerRef = useRef<number | null>(null);
   const codeRetryRef = useRef<number | null>(null);
   const forgetHoldRef = useRef<number | null>(null);
+  // Mirror live pairing state into a ref so closures inside ws callbacks
+  // don't capture stale values when a code rotates.
+  const pairingRef = useRef<PairingState | null>(null);
   const [forgetProgress, setForgetProgress] = useState(0);
+
+  useEffect(() => {
+    pairingRef.current = pairing;
+  }, [pairing]);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
@@ -286,10 +293,19 @@ export default function CastPage() {
     };
     ws.onclose = () => {
       setConnected(false);
-      if (getRoomId() || pairing?.roomId) {
+      // Decide retry from refs (not captured state) so a code rotation or
+      // pair event between connect and close doesn't strand us. Only retry
+      // if `rid` is still the room we care about.
+      const persistedId = getRoomId();
+      const pendingPair = pairingRef.current;
+      const stillRelevant = persistedId === rid || pendingPair?.roomId === rid;
+      const nextTarget = persistedId || pendingPair?.roomId || null;
+      if (stillRelevant && nextTarget) {
+        if (reconnectRef.current) window.clearTimeout(reconnectRef.current);
         reconnectRef.current = window.setTimeout(() => {
-          const target = getRoomId() || pairing?.roomId;
-          if (target) openSocket(target);
+          reconnectRef.current = null;
+          const t = getRoomId() || pairingRef.current?.roomId;
+          if (t) openSocket(t);
         }, 2500);
       }
     };
