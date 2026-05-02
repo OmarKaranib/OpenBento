@@ -1341,6 +1341,266 @@ export async function registerRoutes(
     }
   });
 
+  // ─── GitHub Pulse API ──────────────────────────────────────────────────────
+  // GET /api/github/repo/:owner/:repo
+  // Returns { fullName, stars, openPRs, lastCommit:{sha,message,authoredAt,url},
+  //   latestRelease:{tagName,name,publishedAt,url}, htmlUrl, fetchedAt }.
+  // Public-data only. Cached in-memory for 5 minutes per owner/repo.
+  type GitHubPulse = {
+    fullName: string;
+    htmlUrl: string;
+    description: string | null;
+    stars: number;
+    openPRs: number;
+    lastCommit: {
+      sha: string;
+      message: string;
+      authoredAt: string;
+      url: string;
+    } | null;
+    latestRelease: {
+      tagName: string;
+      name: string;
+      publishedAt: string;
+      url: string;
+    } | null;
+    fetchedAt: number;
+  };
+
+  const GITHUB_CACHE = new Map<string, GitHubPulse>();
+  const GITHUB_TTL_MS = 5 * 60 * 1000;
+  // Owner / repo segments accepted by the GitHub API: alphanumerics, dots,
+  // dashes, underscores, max 100 chars. Reject anything else outright so we
+  // never make an upstream request for obvious junk.
+  const GITHUB_NAME_RE = /^[A-Za-z0-9._-]{1,100}$/;
+
+  app.get('/api/github/repo/:owner/:repo', async (req: Request, res: Response) => {
+    const owner = String(req.params.owner ?? '').trim();
+    const repo  = String(req.params.repo  ?? '').trim();
+    if (!GITHUB_NAME_RE.test(owner) || !GITHUB_NAME_RE.test(repo)) {
+      return res.status(400).json({ error: 'Invalid owner or repo name' });
+    }
+    const cacheKey = `${owner.toLowerCase()}/${repo.toLowerCase()}`;
+    const now = Date.now();
+    const cached = GITHUB_CACHE.get(cacheKey);
+    if (cached && now - cached.fetchedAt < GITHUB_TTL_MS) {
+      return res.json(cached);
+    }
+
+    const headers: Record<string, string> = {
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'OpenBento-Dashboard',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+    if (process.env.GITHUB_TOKEN) {
+      headers['Authorization'] = `Bearer ${process.env.GITHUB_TOKEN}`;
+    }
+
+    try {
+      // Run all four lookups in parallel. PR count uses the search API so we
+      // get a real total without paging through every PR.
+      const [repoResp, commitsResp, prResp, releaseResp] = await Promise.all([
+        fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers }),
+        fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`, { headers }),
+        fetch(`https://api.github.com/search/issues?q=${encodeURIComponent(`repo:${owner}/${repo} is:pr is:open`)}&per_page=1`, { headers }),
+        fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, { headers }),
+      ]);
+
+      if (repoResp.status === 404) {
+        // Honest 404 — the repo doesn't exist; do NOT serve a stale cache for
+        // a different (now-deleted/renamed) repo because that would be wrong.
+        return res.status(404).json({ error: 'Repository not found' });
+      }
+      // For any other non-OK upstream response (403 rate limit, 5xx, etc.),
+      // prefer serving stale cache if we have one — the widget should keep
+      // showing real data instead of an error spinner during a hiccup.
+      if (repoResp.status === 403) {
+        if (cached) return res.json(cached);
+        return res.status(429).json({ error: 'GitHub rate limit reached, try again shortly' });
+      }
+      if (!repoResp.ok) {
+        if (cached) return res.json(cached);
+        return res.status(502).json({ error: `GitHub error ${repoResp.status}` });
+      }
+
+      const repoData = await repoResp.json();
+      const commitsData = commitsResp.ok ? await commitsResp.json() : [];
+      const prData      = prResp.ok      ? await prResp.json()      : { total_count: 0 };
+      // The releases endpoint 404s when a repo has no releases; treat that
+      // as "no release" rather than failure of the whole request.
+      const releaseData = releaseResp.ok ? await releaseResp.json() : null;
+
+      const firstCommit = Array.isArray(commitsData) ? commitsData[0] : null;
+
+      const pulse: GitHubPulse = {
+        fullName: String(repoData.full_name || `${owner}/${repo}`),
+        htmlUrl:  String(repoData.html_url  || `https://github.com/${owner}/${repo}`),
+        description: typeof repoData.description === 'string' ? repoData.description : null,
+        stars:   Number(repoData.stargazers_count   ?? 0),
+        openPRs: Number(prData.total_count          ?? 0),
+        lastCommit: firstCommit ? {
+          sha:  String(firstCommit.sha || '').slice(0, 7),
+          message: String(firstCommit.commit?.message || '').split('\n')[0].slice(0, 200),
+          authoredAt: String(
+            firstCommit.commit?.author?.date ||
+            firstCommit.commit?.committer?.date ||
+            ''
+          ),
+          url: String(firstCommit.html_url || ''),
+        } : null,
+        latestRelease: releaseData && releaseData.tag_name ? {
+          tagName:     String(releaseData.tag_name || ''),
+          name:        String(releaseData.name || releaseData.tag_name || ''),
+          publishedAt: String(releaseData.published_at || ''),
+          url:         String(releaseData.html_url || ''),
+        } : null,
+        fetchedAt: now,
+      };
+
+      GITHUB_CACHE.set(cacheKey, pulse);
+      res.json(pulse);
+    } catch (err: any) {
+      console.error('[GitHub Pulse] Fetch failed:', err?.message || err);
+      // Serve stale cache on transient failure if we have one, so the widget
+      // keeps showing data instead of an error spinner.
+      if (cached) return res.json(cached);
+      res.status(503).json({ error: 'GitHub temporarily unavailable' });
+    }
+  });
+
+  // ─── RSS Headlines API ──────────────────────────────────────────────────────
+  // GET /api/rss?url=<feed_url>
+  // Returns { title, link, items:[{title, url, pubDate, isoDate}], fetchedAt }.
+  // Cached in-memory for 12 minutes per URL. Only http(s) URLs accepted.
+  type RssPayload = {
+    title: string;
+    link: string;
+    items: { title: string; url: string; pubDate: string; isoDate: string }[];
+    fetchedAt: number;
+  };
+  const RSS_CACHE = new Map<string, RssPayload>();
+  const RSS_TTL_MS = 12 * 60 * 1000;
+  const RSS_MAX_ITEMS = 30;
+
+  // SSRF guard: refuse to proxy any URL whose host resolves to a loopback,
+  // private, link-local, CGNAT, multicast, or otherwise non-public address.
+  // Catches the cloud metadata endpoint (169.254.169.254) via the link-local
+  // range. There is a small TOCTOU window between this check and the upstream
+  // fetch, but it's tight enough for a personal-dashboard widget proxy.
+  function isPrivateOrReservedIp(addr: string): boolean {
+    const { isIP } = require('net') as typeof import('net');
+    const family = isIP(addr);
+    if (family === 0) return true; // unknown — refuse
+    if (family === 4) {
+      const parts = addr.split('.').map(Number);
+      if (parts.length !== 4 || parts.some(p => Number.isNaN(p) || p < 0 || p > 255)) return true;
+      const [a, b] = parts;
+      if (a === 0)                                 return true; // 0.0.0.0/8
+      if (a === 10)                                return true; // private
+      if (a === 127)                               return true; // loopback
+      if (a === 169 && b === 254)                  return true; // link-local + metadata
+      if (a === 172 && b >= 16 && b <= 31)         return true; // private
+      if (a === 192 && b === 168)                  return true; // private
+      if (a === 100 && b >= 64 && b <= 127)        return true; // CGNAT
+      if (a >= 224)                                return true; // multicast + reserved
+      return false;
+    }
+    // IPv6 — strip zone id, lowercase
+    const lower = addr.toLowerCase().split('%')[0];
+    if (lower === '::1' || lower === '::')         return true; // loopback / unspecified
+    if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // fc00::/7 ULA
+    // fe80::/10 covers fe80:: through febf::
+    if (/^fe[89ab]/.test(lower))                   return true;
+    if (lower.startsWith('ff'))                    return true; // multicast
+    // IPv4-mapped IPv6 (`::ffff:x.x.x.x`, `::ffff:0:x.x.x.x`, and the
+    // collapsed hex form e.g. `::ffff:7f00:1` ≡ `::ffff:127.0.0.1`) is the
+    // legitimate v4-in-v6 transition mechanism — recurse through IPv4 checks.
+    const mapped = lower.match(/^::ffff(?::0)?:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+    if (mapped) return isPrivateOrReservedIp(mapped[1]);
+    const mappedHex = lower.match(/^::ffff(?::0)?:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (mappedHex) {
+      const hi = parseInt(mappedHex[1], 16);
+      const lo = parseInt(mappedHex[2], 16);
+      const v4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+      return isPrivateOrReservedIp(v4);
+    }
+    // Deprecated IPv4-compatible IPv6 (`::w.x.y.z`) is a legacy format with
+    // no legitimate use today; block outright instead of recursing.
+    if (/^::\d{1,3}(?:\.\d{1,3}){3}$/.test(lower)) return true;
+    // Defense-in-depth: any other IPv6 containing a dot (embedded IPv4) we
+    // can't classify is refused outright.
+    if (lower.includes('.')) return true;
+    return false;
+  }
+
+  app.get('/api/rss', async (req: Request, res: Response) => {
+    const raw = typeof req.query.url === 'string' ? req.query.url.trim() : '';
+    if (!raw) {
+      return res.status(400).json({ error: 'Missing url parameter' });
+    }
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(raw);
+    } catch {
+      return res.status(400).json({ error: 'Malformed URL' });
+    }
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return res.status(400).json({ error: 'Only http(s) URLs are allowed' });
+    }
+    // SSRF guard: resolve hostname and refuse any private/reserved address.
+    // We check ALL resolved addresses so a host with mixed records can't slip
+    // a private IP past us. Hostnames that are themselves IP literals are
+    // checked directly without DNS.
+    try {
+      const dns = await import('dns/promises');
+      const { isIP } = await import('net');
+      const host = parsedUrl.hostname;
+      const targets: string[] = isIP(host)
+        ? [host]
+        : (await dns.lookup(host, { all: true, family: 0 })).map(r => r.address);
+      if (targets.length === 0 || targets.some(isPrivateOrReservedIp)) {
+        return res.status(400).json({ error: 'Refusing to fetch a private or reserved address' });
+      }
+    } catch (err: any) {
+      return res.status(400).json({ error: `DNS lookup failed: ${err?.code || 'ENOTFOUND'}` });
+    }
+    const cacheKey = parsedUrl.toString();
+    const now = Date.now();
+    const cached = RSS_CACHE.get(cacheKey);
+    if (cached && now - cached.fetchedAt < RSS_TTL_MS) {
+      return res.json(cached);
+    }
+
+    try {
+      // rss-parser is dynamically imported so the server boots even if the
+      // dep is missing at startup; treat that as a soft 503.
+      const Parser = (await import('rss-parser')).default;
+      const parser = new Parser({
+        timeout: 10_000,
+        headers: { 'User-Agent': 'OpenBento-Dashboard/1.0 (+https://openbento.app)' },
+      });
+      const feed = await parser.parseURL(cacheKey);
+      const items = (feed.items || []).slice(0, RSS_MAX_ITEMS).map(it => ({
+        title:   String(it.title    || '').trim(),
+        url:     String(it.link     || '').trim(),
+        pubDate: String(it.pubDate  || ''),
+        isoDate: String(it.isoDate  || ''),
+      })).filter(it => it.title.length > 0);
+      const payload: RssPayload = {
+        title: String(feed.title || 'RSS Feed'),
+        link:  String(feed.link  || cacheKey),
+        items,
+        fetchedAt: now,
+      };
+      RSS_CACHE.set(cacheKey, payload);
+      res.json(payload);
+    } catch (err: any) {
+      console.error('[RSS] Fetch failed:', err?.message || err);
+      if (cached) return res.json(cached);
+      res.status(502).json({ error: 'Could not parse feed' });
+    }
+  });
+
   // Auto-import channels on startup (runs once)
   async function autoImportChannels() {
     try {

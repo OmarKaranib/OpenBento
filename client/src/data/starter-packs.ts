@@ -10,7 +10,9 @@ export type StarterTileType =
   | 'markets_ticker'
   | 'world_clocks'
   | 'countdown'
-  | 'note';
+  | 'note'
+  | 'github_pulse'
+  | 'rss_headlines';
 
 export interface StarterTile {
   type: StarterTileType;

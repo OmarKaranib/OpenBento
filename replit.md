@@ -26,7 +26,7 @@ The dashboard is built on a 12-column magnetic grid system.
 - **Viral Ad Mechanic (Free Users Only):** Non-premium users encounter a single expanding viral ad block that pushes widgets aside.
 
 **Technical Implementations & Feature Specifications:**
-- **Dynamic Widget System:** Supports various widget types including Video, Note, Spacer, Image, Clock, Crisis Ticker, Markets Ticker, Weather, Dictionary, QR Portal, World Clocks, and Countdown.
+- **Dynamic Widget System:** Supports various widget types including Video, Note, Spacer, Image, Clock, Crisis Ticker, Markets Ticker, Weather, Dictionary, QR Portal, World Clocks, Countdown, GitHub Pulse, and RSS Headlines.
 - **Edit Layout Mode:** Toggles between locked and editable states for drag-to-resize, settings, and deletion.
 - **Fullscreen Mode:** Utilizes the browser's Fullscreen API.
 - **TV Mode:** Iframes use `pointer-events: none` with video controls managed via `postMessage` API.
@@ -49,7 +49,10 @@ The dashboard is built on a 12-column magnetic grid system.
 - **Admin Dashboard:** An `/admin` route with client-side and server-side authorization, featuring user management, premium toggle, channel management (CRUD with soft-delete), channel auto-import, and system statistics.
 - **Feedback System:** `feedback` table for user submissions, supporting messages, types, and optional screenshots. Public POST `/api/feedback` and admin-only GET `/api/admin/feedback`.
 - **Supabase Auth Hardening:** Client initialized with `autoRefreshToken: true` and `persistSession: true` to prevent session timeouts.
-- **QR Portal Widget:** Generates QR codes client-side for given links, featuring a glassmorphism design.
+- **QR Portal Widget v2:** Five-mode QR generator (URL/WiFi/vCard/Email/Geo) with proper URI builders, optional logo overlay (upload or URL) using error-correction level H, foreground/background colors that track the widget color droplet by default with manual overrides, copy-as-PNG via canvas raster (with download fallback when the Async Clipboard API can't carry image/png), and a debounced 5-entry history strip with one-click recall and clear.
+- **GitHub Pulse Widget:** Owner/repo input plus a stat card showing star count, open PR count, last commit (sha + message + relative time), and latest release tag. Backed by `/api/github/repo/:owner/:repo` (5-minute in-memory cache, optional `GITHUB_TOKEN` for higher rate limits, stale-cache fallback on upstream errors). Auto-refetches every 5 minutes.
+- **RSS Headlines Widget:** Paste any RSS or Atom feed URL to render a scrolling list of headlines with link-out, relative timestamps, and graceful empty / bad-feed states. Backed by `/api/rss?url=` (12-minute cache, http(s)-only validation, dynamic `rss-parser` import).
+- **Dictionary Widget v2:** Search-first input that overrides the daily-seeded "Word of the Day" rotation (stable across reloads, rotates at midnight UTC). Surfaces phonetic spelling, audio playback (when `phonetics[].audio` exists), part of speech, definition, clickable synonym chips, and etymology. Star button + favorites dropdown persist up to 30 favorited words per widget via the `dictionaryFavorites` field.
 - **First-Time Onboarding:** An `OnboardingFlow` component guides new guest users through initial setup, offering starter packs and coachmarks.
 - **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core`, `lucide-react`, `qrcode.react`.
 - **Markets Ticker Widget:** Displays market data for crypto and stocks with sparklines, price, and 24h change. Allows adding, removing, and reordering symbols.
@@ -58,6 +61,10 @@ The dashboard is built on a 12-column magnetic grid system.
     - **`world_clocks` widget:** A responsive grid displaying local times for selected cities.
     - **`countdown` widget:** Shows a live countdown to a target moment with customizable label and emoji.
     - **Clock Widget upgrades:** Includes a Pomodoro 25/5 preset, stopwatch laps, per-widget analog face toggle, and smooth seconds via `requestAnimationFrame`.
+
+**Server Endpoints:**
+- `GET /api/github/repo/:owner/:repo` — Aggregated GitHub repo stats (5-minute in-memory cache).
+- `GET /api/rss?url=` — Server-side RSS/Atom proxy with 12-minute cache and http(s)-only URL validation.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.
@@ -73,4 +80,7 @@ The dashboard is built on a 12-column magnetic grid system.
 - **CoinGecko:** Used for cryptocurrency market data in the Markets Ticker.
 - **Yahoo Finance:** Used for stock market data in the Markets Ticker.
 - **qrcode.react:** For client-side QR code generation.
+- **rss-parser:** Server-side parsing of RSS/Atom feeds for the RSS Headlines widget.
+- **GitHub REST API v3:** Repository, commit, search (PRs), and release endpoints powering the GitHub Pulse widget.
+- **dictionaryapi.dev:** Free dictionary API used by the Dictionary widget for definitions, phonetics, audio, synonyms, and etymology.
 - **Resend:** For sending feedback emails.

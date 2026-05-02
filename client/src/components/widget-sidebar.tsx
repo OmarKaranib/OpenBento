@@ -4,7 +4,7 @@
     Gamepad2, RefreshCw, Star,
     Trash2, Globe, Heart, Radio, PenLine, Clock,
     AlertCircle, CloudSun, BookOpen, QrCode, TrendingUp,
-    Hourglass,
+    Hourglass, Github, Rss,
   } from 'lucide-react';
 
   const failedLogoCache = new Set<string>();
@@ -177,7 +177,7 @@
     widgetType: WidgetType;
     w: number;
     h: number;
-    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'default';
+    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'default';
     color: string;
   }
 
@@ -191,9 +191,11 @@
     { id: 'template-markets-ticker', name: 'Markets',    widgetType: 'markets_ticker', w: 3, h: 3, icon: 'markets_ticker', color: 'emerald' },
     { id: 'template-weather',      name: 'Weather',      widgetType: 'weather',      w: 2, h: 2, icon: 'weather',      color: 'sky'     },
     { id: 'template-dictionary',   name: 'Dictionary',   widgetType: 'dictionary',   w: 3, h: 2, icon: 'dictionary',   color: 'indigo'  },
-    { id: 'template-qr-generator', name: 'QR Portal',    widgetType: 'qr_generator', w: 2, h: 2, icon: 'qr_generator', color: 'violet'  },
+    { id: 'template-qr-generator', name: 'QR Portal',    widgetType: 'qr_generator', w: 3, h: 3, icon: 'qr_generator', color: 'violet'  },
     { id: 'template-world-clocks', name: 'World Clocks', widgetType: 'world_clocks', w: 4, h: 2, icon: 'world_clocks', color: 'amber'   },
     { id: 'template-countdown',    name: 'Countdown',    widgetType: 'countdown',    w: 3, h: 2, icon: 'countdown',    color: 'fuchsia' },
+    { id: 'template-github-pulse', name: 'GitHub Pulse', widgetType: 'github_pulse', w: 3, h: 3, icon: 'github_pulse', color: 'slate'   },
+    { id: 'template-rss-headlines', name: 'RSS Headlines', widgetType: 'rss_headlines', w: 3, h: 3, icon: 'rss_headlines', color: 'orange' },
   ];
 
   function loadPersonalLibrary(): SavedChannel[] {
@@ -688,7 +690,7 @@
           id: 'template-qr-generator',
           name: 'QR Portal',
           widgetType: 'qr_generator' as WidgetType,
-          w: 2, h: 2,
+          w: 3, h: 3,
           icon: 'qr_generator' as const,
           color: 'violet',
         },
@@ -745,6 +747,42 @@
           w: 3, h: 2,
           icon: 'countdown' as const,
           color: 'fuchsia',
+        },
+      },
+      {
+        id: 'github_pulse',
+        label: 'GitHub Pulse',
+        description: 'Stars, open PRs, last commit & latest release',
+        icon: <Github className="w-[2rem] h-[2rem] text-slate-300" />,
+        iconBg: 'bg-slate-500/15',
+        border: 'border-slate-500/30 hover:border-slate-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-slate-300 bg-slate-500/15 border-slate-500/40',
+        template: {
+          id: 'template-github-pulse',
+          name: 'GitHub Pulse',
+          widgetType: 'github_pulse' as WidgetType,
+          w: 3, h: 3,
+          icon: 'github_pulse' as const,
+          color: 'slate',
+        },
+      },
+      {
+        id: 'rss_headlines',
+        label: 'RSS Headlines',
+        description: 'Scrolling list of any RSS or Atom feed',
+        icon: <Rss className="w-[2rem] h-[2rem] text-orange-400" />,
+        iconBg: 'bg-orange-500/15',
+        border: 'border-orange-500/30 hover:border-orange-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-orange-400 bg-orange-500/15 border-orange-500/40',
+        template: {
+          id: 'template-rss-headlines',
+          name: 'RSS Headlines',
+          widgetType: 'rss_headlines' as WidgetType,
+          w: 3, h: 3,
+          icon: 'rss_headlines' as const,
+          color: 'orange',
         },
       },
     ] as const;
