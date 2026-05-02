@@ -4,7 +4,7 @@ import { useReplitAuth } from '@/hooks/use-replit-auth';
 import { usePageMeta } from '@/hooks/use-page-meta';
 import { Footer } from '@/components/footer';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon, GripVertical, Eye, EyeOff, MessageSquare, Lightbulb, Bug, Search, CheckCircle2 } from 'lucide-react';
+import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, LogIn, Rocket, Link as LinkIcon, GripVertical, Eye, EyeOff, MessageSquare, Lightbulb, Bug, Search, CheckCircle2 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { searchChannelLiveStream } from '@/lib/stream-api';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
@@ -331,7 +331,6 @@ export default function Admin() {
     lastSignIn: string | null;
     emailConfirmed: boolean;
     provider: string;
-    isPremium: boolean;
   }
 
   const { data: usersData, isLoading: usersLoading } = useQuery<{ users: AdminUser[], total: number }>({
@@ -354,7 +353,6 @@ export default function Admin() {
   });
 
   const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [userFilterMode, setUserFilterMode] = useState<'all' | 'premium' | 'free'>('all');
   const [feedbackFilterType, setFeedbackFilterType] = useState<'all' | 'bug' | 'idea'>('all');
   const [resolvedFeedbackIds, setResolvedFeedbackIds] = useState<Set<string>>(() => {
     try {
@@ -377,11 +375,9 @@ export default function Admin() {
     if (!usersData?.users) return [];
     return usersData.users.filter(u => {
       if (userSearchQuery && !u.email?.toLowerCase().includes(userSearchQuery.toLowerCase())) return false;
-      if (userFilterMode === 'premium' && !u.isPremium) return false;
-      if (userFilterMode === 'free' && u.isPremium) return false;
       return true;
     });
-  }, [usersData?.users, userSearchQuery, userFilterMode]);
+  }, [usersData?.users, userSearchQuery]);
 
   const filteredFeedback = useMemo(() => {
     if (!feedbackData?.feedback) return [];
@@ -396,14 +392,6 @@ export default function Admin() {
     mutationFn: () => apiRequest('POST', '/api/admin/migrate-channels'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/channels'] });
-    },
-  });
-
-  const togglePremiumMutation = useMutation({
-    mutationFn: ({ userId, isPremium }: { userId: string; isPremium: boolean }) => 
-      apiRequest('PATCH', `/api/admin/users/${userId}/premium`, { isPremium }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
     },
   });
 
@@ -633,23 +621,7 @@ export default function Admin() {
                   data-testid="input-user-search"
                 />
               </div>
-              <div className="flex rounded-lg overflow-hidden border border-slate-700">
-                {(['all', 'premium', 'free'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setUserFilterMode(mode)}
-                    className={`px-3 py-2 text-xs font-medium transition-colors ${
-                      userFilterMode === mode
-                        ? 'bg-cyan-600 text-white'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                    }`}
-                    data-testid={`button-user-filter-${mode}`}
-                  >
-                    {mode === 'all' ? 'All' : mode === 'premium' ? 'Premium' : 'Free'}
-                  </button>
-                ))}
-              </div>
-              {(userSearchQuery || userFilterMode !== 'all') && (
+              {userSearchQuery && (
                 <span className="text-xs text-slate-500">{filteredUsers.length} result{filteredUsers.length !== 1 ? 's' : ''}</span>
               )}
             </div>
@@ -678,29 +650,12 @@ export default function Admin() {
                           {ADMIN_EMAILS.includes(u.email?.toLowerCase() || '') && (
                             <span className="px-2 py-0.5 rounded text-xs bg-cyan-500/20 text-cyan-400">Admin</span>
                           )}
-                          {u.isPremium && (
-                            <span className="px-2 py-0.5 rounded text-xs bg-yellow-500/20 text-yellow-400">Premium</span>
-                          )}
                           {u.emailConfirmed && (
                             <span className="text-emerald-400 text-xs">Verified</span>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => togglePremiumMutation.mutate({ userId: u.id, isPremium: !u.isPremium })}
-                          disabled={togglePremiumMutation.isPending}
-                          className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                            u.isPremium
-                              ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-                              : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                          }`}
-                          data-testid={`button-toggle-premium-${u.id}`}
-                          title={u.isPremium ? 'Remove Premium' : 'Make Premium'}
-                        >
-                          <Crown className="w-3 h-3" />
-                          {u.isPremium ? 'Premium' : 'Free'}
-                        </button>
                         <div className="text-right text-xs text-slate-500">
                           {u.lastSignIn && (
                             <p>Last: {new Date(u.lastSignIn).toLocaleDateString()}</p>

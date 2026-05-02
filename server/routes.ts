@@ -22,6 +22,63 @@ const isAdminEmail = (email: string): boolean => {
   return ADMIN_EMAILS.includes(email?.toLowerCase() || '');
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Supabase Bearer-token middleware.
+//
+// The /api/dashboard cloud-sync routes need to identify the caller from a
+// Supabase access token (sent as `Authorization: Bearer …`) instead of a
+// passport session cookie. We verify the token by hitting Supabase's
+// `/auth/v1/user` endpoint (cheap and reliable) and cache the result for 5
+// minutes so we don't make a network call on every save.
+// ─────────────────────────────────────────────────────────────────────────────
+const supabaseUserCache = new LruTtlCache<{ id: string; email: string }>({
+  max: 500,
+  ttlMs: 5 * 60 * 1000,
+});
+
+async function attachSupabaseUser(req: Request, _res: Response, next: () => void) {
+  const auth = req.headers.authorization || '';
+  const match = auth.match(/^Bearer\s+(.+)$/i);
+  if (!match) return next();
+  const token = match[1].trim();
+  if (!token) return next();
+
+  const cached = supabaseUserCache.get(token);
+  if (cached) {
+    (req as any).userId = cached.id;
+    (req as any).user = { id: cached.id, email: cached.email };
+    return next();
+  }
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !anonKey) return next();
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'apikey': anonKey,
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (response.ok) {
+      const user = await response.json();
+      if (user?.id) {
+        supabaseUserCache.set(token, { id: user.id, email: user.email });
+        (req as any).userId = user.id;
+        (req as any).user = { id: user.id, email: user.email };
+      }
+    }
+  } catch (err) {
+    // Verification failed — leave userId unset; route will return 401.
+  }
+  next();
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -581,7 +638,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/dashboard", async (req: Request, res: Response) => {
+  // Cloud-sync of the user's dashboard layout. Available to every signed-in
+  // user (OpenBento is fully free). Auth is provided by the Supabase Bearer
+  // token attached by `attachSupabaseUser`.
+  app.get("/api/dashboard", attachSupabaseUser, async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
 
     if (!userId) {
@@ -596,8 +656,7 @@ export async function registerRoutes(
     }
   });
 
-  // Save dashboard - available to all authenticated users (no Premium check)
-  app.post("/api/dashboard", async (req: Request, res: Response) => {
+  app.post("/api/dashboard", attachSupabaseUser, async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
 
     if (!userId) {
@@ -618,8 +677,7 @@ export async function registerRoutes(
     }
   });
 
-  // Update dashboard - available to all authenticated users (no Premium check)
-  app.patch("/api/dashboard", async (req: Request, res: Response) => {
+  app.patch("/api/dashboard", attachSupabaseUser, async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
 
     if (!userId) {

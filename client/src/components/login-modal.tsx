@@ -151,9 +151,9 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason, def
     }
     if (triggerReason) return triggerReason;
     switch (mode) {
-      case 'signup': return 'Sign up to save your dashboard';
+      case 'signup': return 'Sign up to sync your dashboard across devices';
       case 'reset': return 'Enter your email to reset password';
-      default: return 'Sign in to save and edit your dashboard';
+      default: return 'Sign in to sync your dashboard across devices';
     }
   };
 

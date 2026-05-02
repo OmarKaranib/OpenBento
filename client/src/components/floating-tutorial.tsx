@@ -19,7 +19,6 @@ const ALL_TUTORIAL_LABELS: TutorialLabel[] = [
   { id: 'edit', targetSelector: '[data-testid="button-edit-layout"]', label: 'Edit' },
   { id: 'mute', targetSelector: '[data-testid="button-master-mute"]', label: 'Mute' },
   { id: 'theme', targetSelector: '[data-testid="button-theme-toggle"]', label: 'Dark Mode' },
-  { id: 'crown', targetSelector: '[data-testid="button-pro-crown"]', label: 'Crown' },
   { id: 'profile', targetSelector: '[data-testid="button-user-menu"], [data-testid="button-login"]', label: 'Profile' },
 ];
 
@@ -116,10 +115,7 @@ export function FloatingTutorial({ isDarkMode = true }: { isDarkMode?: boolean }
     };
   }, [isOpen, handleClose]);
 
-  const visibleLabels = ALL_TUTORIAL_LABELS.filter(item => {
-    if (item.id === 'crown') return false;
-    return true;
-  });
+  const visibleLabels = ALL_TUTORIAL_LABELS;
 
   return (
     <>

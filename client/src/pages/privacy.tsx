@@ -49,12 +49,6 @@ export default function Privacy() {
                   or Google).
                 </li>
                 <li>
-                  <strong className="text-white">Subscription data:</strong> Pro plan
-                  status and limited billing metadata (Stripe customer ID, last 4 of
-                  card). Full payment-card details are processed by Stripe and never
-                  reach our servers.
-                </li>
-                <li>
                   <strong className="text-white">Dashboard content:</strong> the
                   layouts, channel selections, notes, and images you save are stored
                   in your browser <code>localStorage</code> by default and synced to
@@ -78,7 +72,6 @@ export default function Privacy() {
               <ul className="list-disc list-inside space-y-1">
                 <li>Provide, operate, and maintain the Service.</li>
                 <li>Authenticate you and sync your dashboard across devices.</li>
-                <li>Process Pro subscriptions and prevent payment fraud.</li>
                 <li>Respond to feedback, support requests, and service questions.</li>
                 <li>Detect, investigate, and prevent abuse of the Service.</li>
               </ul>
@@ -102,10 +95,6 @@ export default function Privacy() {
                   <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300">privacy policy</a>
                 </li>
                 <li>
-                  <strong className="text-white">Stripe</strong> (payments) —{" "}
-                  <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300">privacy policy</a>
-                </li>
-                <li>
                   <strong className="text-white">Resend</strong> (transactional email) —{" "}
                   <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300">privacy policy</a>
                 </li>
@@ -124,7 +113,7 @@ export default function Privacy() {
             <section>
               <h2 className="text-xl font-semibold text-white mb-3">5. Data Retention</h2>
               <ul className="list-disc list-inside space-y-1">
-                <li>Account &amp; subscription data: kept while your account is active and up to 24 months after deletion for legal/accounting reasons.</li>
+                <li>Account data: kept while your account is active and up to 24 months after deletion for legal reasons.</li>
                 <li>Feedback submissions: retained until resolved or 24 months, whichever is shorter.</li>
                 <li>Technical logs: rotated automatically within 30 days.</li>
                 <li>Local widget data: lives in your browser until you clear it.</li>

@@ -28,8 +28,11 @@ export const users = pgTable("users", {
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
-// Profiles table for additional user data (is_premium for paywall)
-// Links to Supabase auth.users via id
+// Profiles table for additional user data.
+// Links to Supabase auth.users via id.
+// `isPremium` is retained for legacy compatibility — OpenBento is fully free
+// and no code path reads it any more, but the column is kept to avoid a
+// destructive schema change.
 export const profiles = pgTable("profiles", {
   id: varchar("id").primaryKey(), // Matches Supabase auth.users.id
   email: varchar("email"),

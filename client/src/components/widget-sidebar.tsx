@@ -456,7 +456,7 @@
 
     const saveToPersonalLibrary = useCallback((channel: TrendingChannel) => {
       if (!isAuthenticated) {
-        openLoginModal?.('Sign Up Required: Please log in or sign up to save channels to your library.');
+        openLoginModal?.('Sign in to save channels to your library and sync them across devices.');
         return;
       }
       setPersonalLibrary(prev => {

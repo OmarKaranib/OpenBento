@@ -2208,7 +2208,7 @@ const MasterControlDashboard = ({
           </SortableWidget>
         ))}
 
-        {/* VIRAL AD BLOCK - Single ad at a time, only for non-Premium users */}
+        {/* DONATION BLOCK - Single "Buy Me a Coffee" ad block with 10-day cooldown */}
         {ad && (
           <div
             key={ad.id}
