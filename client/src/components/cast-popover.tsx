@@ -19,6 +19,7 @@ interface CastPopoverProps {
 interface RoomMeta {
   online: boolean;
   lastPushedAt?: number;
+  lastSeenAt?: number;
 }
 
 export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProps) {
@@ -103,7 +104,14 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
           } else if (msg.type === "presence") {
             setMeta((m) => ({
               ...m,
-              [tv.roomId]: { ...(m[tv.roomId] ?? {}), online: !!msg.tvOnline },
+              [tv.roomId]: {
+                ...(m[tv.roomId] ?? { online: false }),
+                online: !!msg.tvOnline,
+                lastSeenAt:
+                  typeof msg.lastSeenAt === "number"
+                    ? msg.lastSeenAt
+                    : m[tv.roomId]?.lastSeenAt,
+              },
             }));
           } else if (msg.type === "closed") {
             // Room was removed remotely (TV pressed forget, server validation
@@ -167,9 +175,17 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
               ...m,
               [tv.roomId]: {
                 ...(m[tv.roomId] ?? { online: false }),
+                online:
+                  typeof data.tvOnline === "boolean"
+                    ? data.tvOnline
+                    : (m[tv.roomId]?.online ?? false),
                 lastPushedAt: data.lastPushedAt
                   ? new Date(data.lastPushedAt).getTime()
                   : undefined,
+                lastSeenAt:
+                  typeof data.lastSeenAt === "number"
+                    ? data.lastSeenAt
+                    : m[tv.roomId]?.lastSeenAt,
               },
             }));
           } catch {
@@ -486,7 +502,13 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
                         />
                       </div>
                       <div className={`text-[0.75rem] ${isDarkMode ? "text-slate-500" : "text-gray-500"}`}>
-                        Last pushed: {timeAgo(m?.lastPushedAt)}
+                        <span data-testid={`text-last-pushed-${tv.roomId}`}>
+                          Last pushed: {timeAgo(m?.lastPushedAt)}
+                        </span>
+                        <span className="mx-[0.4rem]">·</span>
+                        <span data-testid={`text-last-seen-${tv.roomId}`}>
+                          Last seen: {m?.online ? "now" : timeAgo(m?.lastSeenAt)}
+                        </span>
                       </div>
                       <div className="flex gap-[0.4rem]">
                         <button

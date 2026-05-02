@@ -28,11 +28,19 @@ const pendingCodes = new Map<string, PendingCode>();
 const roomConns = new Map<string, Set<RoomConn>>();
 const pendingRoomIds = new Set<string>();
 const codeRateLimit = new Map<string, { count: number; resetAt: number }>();
+// Last time *any* TV websocket for a room was confirmed alive (connect or pong).
+// In-memory only — purely a UX hint for the laptop popover, so persistence is
+// unnecessary and a server restart resetting it is acceptable.
+const tvLastSeen = new Map<string, number>();
 
 const CODE_TTL_MS = 60_000;
 const SNAPSHOT_BYTES_LIMIT = 4 * 1024 * 1024;
 const CODE_RATE_WINDOW_MS = 60_000;
 const CODE_RATE_MAX = 10;
+// Heartbeat: ping every 5s, terminate sockets that miss two consecutive pongs.
+// This bounds the offline-detection lag to ~10s for unplugged-TV / dead-Wi-Fi
+// scenarios where the OS-level socket close never fires.
+const HEARTBEAT_INTERVAL_MS = 5_000;
 
 function generateCode(): string {
   let code: string;
@@ -112,7 +120,13 @@ function broadcastPresenceToLaptops(roomId: string): void {
   const set = roomConns.get(roomId);
   if (!set) return;
   const count = tvCount(roomId);
-  const payload = JSON.stringify({ type: "presence", tvOnline: count > 0, tvCount: count });
+  const lastSeenAt = tvLastSeen.get(roomId);
+  const payload = JSON.stringify({
+    type: "presence",
+    tvOnline: count > 0,
+    tvCount: count,
+    lastSeenAt: lastSeenAt ?? null,
+  });
   set.forEach((conn) => {
     if (conn.role !== "laptop") return;
     if (conn.ws.readyState === WebSocket.OPEN) {
@@ -274,7 +288,9 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
         .where(eq(castRooms.id, roomId))
         .limit(1);
       if (!room) return res.status(404).json({ error: "Room not found" });
-      res.json(room);
+      const tvOnline = tvCount(roomId) > 0;
+      const lastSeenAt = tvLastSeen.get(roomId) ?? null;
+      res.json({ ...room, tvOnline, lastSeenAt });
     } catch (err: unknown) {
       console.error("[Cast] /get failed:", err);
       res.status(500).json({ error: "Lookup failed" });
@@ -287,6 +303,7 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
     try {
       await db.delete(castRooms).where(eq(castRooms.id, roomId));
       closeRoomConns(roomId, "Room deleted");
+      tvLastSeen.delete(roomId);
       res.json({ ok: true });
     } catch (err: unknown) {
       console.error("[Cast] /delete failed:", err);
@@ -327,6 +344,35 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
       const conn: RoomConn = { ws, role };
       set.add(conn);
 
+      if (role === "tv") {
+        tvLastSeen.set(roomId, Date.now());
+      }
+
+      // Heartbeat — terminate the socket if two consecutive pings go
+      // unanswered. ws's pong frame is automatic; we only need to track it.
+      let isAlive = true;
+      ws.on("pong", () => {
+        isAlive = true;
+        if (role === "tv") tvLastSeen.set(roomId, Date.now());
+      });
+      const heartbeat = setInterval(() => {
+        if (!isAlive) {
+          try {
+            ws.terminate();
+          } catch {
+            /* ignore */
+          }
+          return;
+        }
+        isAlive = false;
+        try {
+          ws.ping();
+        } catch {
+          /* ignore */
+        }
+      }, HEARTBEAT_INTERVAL_MS);
+      heartbeat.unref();
+
       sendTo(ws, { type: "hello", role });
 
       // Validate the room exists for *both* roles. Closes the socket with a
@@ -339,6 +385,9 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
           const row = rows[0];
           if (!row) {
             sendTo(ws, { type: "closed", reason: "Room not found" });
+            // Room no longer exists — drop any stale presence entry so the
+            // map can't grow unbounded from abandoned/invalid roomIds.
+            tvLastSeen.delete(roomId);
             try {
               ws.close(1000, "Room not found");
             } catch {
@@ -356,6 +405,7 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
               type: "presence",
               tvOnline: tvCount(roomId) > 0,
               tvCount: tvCount(roomId),
+              lastSeenAt: tvLastSeen.get(roomId) ?? null,
             });
           } else {
             // TV connected — let any laptops in the room update their dots.
@@ -378,9 +428,15 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
       });
 
       ws.on("close", () => {
+        clearInterval(heartbeat);
         const s = roomConns.get(roomId);
         if (!s) return;
         s.delete(conn);
+        if (role === "tv") {
+          // Stamp final "last seen" at disconnect so the popover shows when
+          // the TV was last actually alive, even after it goes dark.
+          tvLastSeen.set(roomId, Date.now());
+        }
         if (s.size === 0) {
           roomConns.delete(roomId);
         } else if (role === "tv") {
