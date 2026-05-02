@@ -1,7 +1,7 @@
 # OpenBento Dashboard
 
 ## Overview
-The OpenBento Dashboard is a highly customizable, bento-style Mission Control interface for monitoring and managing various information streams. It features a 12-column grid, dynamic drag-to-resize widgets, and integrates YouTube, Twitch, and Kick video streams with custom TV-style controls. The dashboard supports persistent storage of layouts and widget content (videos, notes, images, spacers) and provides a responsive, fit-to-screen layout, aiming to offer users a personalized and dynamic workspace.
+The OpenBento Dashboard is a highly customizable, bento-style Mission Control interface designed for monitoring and managing diverse information streams. It features a dynamic 12-column grid with drag-to-resize widgets, offering integrations for YouTube, Twitch, and Kick video streams with custom TV-style controls. The dashboard ensures persistent storage of user-defined layouts and widget content (videos, notes, images, spacers, clocks, tickers, weather, dictionary, QR portal), providing a responsive and personalized workspace that fits various screen sizes.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -9,60 +9,55 @@ I want iterative development.
 Ask before making major changes.
 
 ## System Architecture
-The dashboard is built on a 12-column magnetic grid.
+The dashboard is built on a 12-column magnetic grid system.
 
 **UI/UX Decisions:**
-- **Typography:** Inter font, `font-weight: 700` for headers, `font-weight: 500` for buttons.
-- **Geometry:** 12px border-radius, 16px gap, 20px internal padding.
-- **Color Droplet:** Per-widget custom background color picker.
-- **Hover Effects:** Blocks scale up (`scale: 1.02`) with enhanced shadow on hover.
-- **Global Background Engine:** Users can set preset dark/neutral colors, upload custom images, or use image URLs.
+- **Typography:** Uses Inter font with `font-weight: 700` for headers and `font-weight: 500` for buttons.
+- **Geometry:** Features a 12px border-radius, 16px gap, and 20px internal padding.
+- **Color Droplet:** Per-widget custom background color selection.
+- **Hover Effects:** Widgets scale up (`scale: 1.02`) with enhanced shadow on hover.
+- **Global Background Engine:** Supports preset dark/neutral colors, custom image uploads, or image URLs.
 - **Widget Transparency:** Default widgets are semi-transparent; custom-colored widgets are opaque.
-- **Menu Bar Refinements:** Simplified labels, "Edit" button toggles to "Save" to lock layout. Includes Dark/Light theme toggle.
+- **Menu Bar Refinements:** Simplified labels, "Edit" button toggles to "Save" to lock layout, and includes Dark/Light theme toggle.
 - **True Light Mode:** High contrast with light gray backgrounds and dark text.
 - **Channel Library Logos:** Stores official channel profile images with platform-specific and generic fallbacks.
-- **Guest Access Model:** View and edit access without login; optional login for cross-device syncing.
+- **Guest Access Model:** Allows view and edit access without login, with optional login for cross-device syncing.
 - **Library Auth Lock:** Guest users cannot save channels to their personal library.
-- **Viral Ad Mechanic (Free Users Only):** Non-premium users experience a single viral ad block that expands on the dashboard, pushing widgets aside.
+- **Viral Ad Mechanic (Free Users Only):** Non-premium users encounter a single expanding viral ad block that pushes widgets aside.
 
 **Technical Implementations & Feature Specifications:**
-- **Dynamic Widget System:** Supports Video, Note, Spacer, Image, Clock, Crisis Ticker, Markets Ticker, Weather, Dictionary, and QR Portal widget types. (Zoom widget removed — was unreliable, brought a hard dependency on the Zoom Meeting SDK, and conflicted with the read-only TV-mode model of the dashboard.)
-- **Edit Layout Mode:** Toggles between locked and editable states for drag-to-resize, settings, and delete.
-- **Fullscreen Mode:** Uses browser Fullscreen API.
-- **TV Mode:** Iframes set to `pointer-events: none` with video controls via `postMessage` API.
+- **Dynamic Widget System:** Supports various widget types including Video, Note, Spacer, Image, Clock, Crisis Ticker, Markets Ticker, Weather, Dictionary, QR Portal, World Clocks, and Countdown.
+- **Edit Layout Mode:** Toggles between locked and editable states for drag-to-resize, settings, and deletion.
+- **Fullscreen Mode:** Utilizes the browser's Fullscreen API.
+- **TV Mode:** Iframes use `pointer-events: none` with video controls managed via `postMessage` API.
 - **Drag-to-Resize:** Widgets snap to a 12x6 grid with collision prevention.
-- **Widget Sidebar ("Block Library"):** Slide-out sidebar with tabbed widget templates and preset live stream channels.
-- **Content Swapping:** Update existing widget content from the sidebar.
-- **Responsive Scaling:** Uses `rem` units for consistent scaling.
+- **Widget Sidebar ("Block Library"):** A slide-out sidebar providing tabbed widget templates and preset live stream channels.
+- **Content Swapping:** Allows updating existing widget content directly from the sidebar.
+- **Responsive Scaling:** Uses `rem` units for consistent scaling across devices.
 - **Persistence:** Widget layouts and content are saved to `localStorage`.
-- **Video Widget:** Integrates YouTube, Twitch, and Kick with custom TV-style controls.
-- **True Live Filter:** YouTube streams are verified using YouTube Data API v3 to check `liveBroadcastContent`.
-- **Dynamic Channel Resolution:** YouTube channels use Search API to get current live video IDs.
-- **Dynamic Library Sorting & Hourly Validation:** Live streams pinned to top of library, followed by unknown, then offline streams.
-- **Smart Tiered localStorage Cache:** YouTube API responses are cached with tiered TTLs.
-- **ARCHITECTURE PIVOT: Multi-View Replication:** Decouples API from rendering, forcing embeds if `videoId` exists.
-- **TRUST THE VIDEOID:** If YouTube API returns `liveVideoId`, stream is considered LIVE.
-- **Latest-Video Fallback:** When YouTube channel is not live, system fetches most recent video from uploads playlist.
-- **Corporate Footer:** Professional footer with copyright and legal links.
-- **Note Widget:** Markdown-aware notes with a header View/Edit toggle. Custom safe parser (no new deps) supports `# / ## / ###` headings, **bold**, *italic*, `inline code`, [links](https://), `- / *` bullet lists, fenced code blocks, `---` rules, and GitHub-style task lists `- [ ] / - [x]` whose checkboxes are clickable in preview mode and mutate the underlying markdown source. Edit mode shows a textarea; Preview mode shows the rendered note. While the dashboard layout is in Edit mode the widget is forced into Preview and all interactions are disabled, replacing the previous `pointerEvents:'none'` quirk on the textarea so dragging works cleanly. Component lives at `client/src/components/note-widget.tsx`.
-- **Spacer Widget:** Empty placeholder.
-- **Image Widget:** Displays images, supporting local file uploads.
+- **Video Widget:** Integrates YouTube, Twitch, and Kick with custom TV-style controls. Includes "True Live Filter" via YouTube Data API v3, dynamic channel resolution, and "Latest-Video Fallback" when a channel is not live.
+- **Dynamic Library Sorting & Hourly Validation:** Live streams are pinned to the top of the library.
+- **Smart Tiered localStorage Cache:** Caches YouTube API responses with tiered TTLs.
+- **Multi-View Replication Architecture:** Decouples API from rendering, forcing embeds if `videoId` exists.
+- **Note Widget:** Markdown-aware notes with a View/Edit toggle, supporting headings, bold/italic text, inline code, links, lists, code blocks, rules, and GitHub-style task lists.
+- **Image Widget:** Displays images and supports local file uploads.
 - **Default News Streams:** Automatically loads 6 pre-defined news streams if `localStorage` is empty.
-- **Blocked Channels Feature:** Allows users to hide and manage blocked channels.
-- **Master Volume Sync:** A global toggle mutes/unmutes all video widgets.
-- **Authentication & Paywall System:** Leverages Supabase Auth for Email/Password and Google OAuth.
-- **Profiles Table (Paywall Foundation):** A `profiles` table stores user-specific data including `is_premium` status.
-- **Stripe Pro Subscription:** Integrated Stripe for recurring subscriptions. Enforces 6-block limit for free users.
-- **Admin Dashboard:** `/admin` route with client-side and server-side authorization. Features user list, premium toggle, channel manager (CRUD with soft-delete), channel auto-import, and system statistics.
-- **Soft Delete (Hide/Show):** Channels use `isVisible` boolean column.
-- **Channel ID Sanitization:** Admin "Add Channel" form only accepts alphanumeric + dashes. Pasting a URL auto-extracts the channel slug. Backend PATCH/DELETE routes reject IDs containing slashes.
-- **Feedback System:** `feedback` table (id, user_email, message, type, screenshot, created_at). POST `/api/feedback` is public (no auth required), accepts both `type/message` and `category/description` field formats plus optional `screenshot` (base64 data URL, .png/.jpg only, 5MB client limit). Saves to DB and sends email via Resend. GET `/api/admin/feedback` is admin-only. Feedback section in Admin Dashboard displays messages with bug/idea type badges and screenshot thumbnails (click to open full size). Standalone `feedback-modal.tsx` component with file upload UI for in-app modal feedback. Express JSON body limit set to 10mb for base64 payloads.
-- **Supabase Auth Hardening:** Client initialized with `autoRefreshToken: true` and `persistSession: true` to prevent session timeouts. Auth hook includes exponential retry (up to 3 attempts) for session fetch failures and safe cleanup on unmount to prevent 504 errors.
-- **Logo:** All logos use `/t.png` (stored in `client/public/t.png`).
-- **Promo:** Dual coupon strategy in pricing modal. Monthly: `BENTO2FREE` (2 Months Free on Monthly). Yearly: `FREE2BENTO` ($16 off first Yearly purchase). Stripe checkout has `allow_promotion_codes: true`.
-- **QR Portal Widget:** Instant QR code generator widget. Uses `qrcode.react` (QRCodeSVG) for client-side generation. Glassmorphism design with frosted dark background, violet accent glow, white QR code panel, and a glass input bar at the bottom. Shows "Paste link to teleport" placeholder when empty. Input capped at 2953 chars (QR level M max). ResizeObserver scales QR size to widget dimensions. Clear (×) button when input has text. Safe try/catch around QR value updates.
-- **First-Time Onboarding:** `OnboardingFlow` component (`client/src/components/onboarding-flow.tsx`) auto-opens once for fresh guests when `localStorage['openBentoOnboarded']` is unset, the user is not authenticated, and `widgets.length === 0`. Welcome modal offers 4 starter packs (News Briefing, Streamer HQ, Markets Watch, Empty Canvas) defined in `client/src/data/starter-packs.ts`. Picking a pack calls `setWidgets`, then advances through 2 coachmarks (Block, Edit) anchored to existing menu-bar testids via `getBoundingClientRect` + rAF tracking. Pre-fetches `/api/links` on mount to populate fresh `videoId`s. Completion sets the flag. Replay button (`button-replay-onboarding`) inside the existing FloatingTutorial (`?` popover) dispatches a `openbento:replay-onboarding` CustomEvent that re-opens the flow without re-clearing the flag. The FloatingTutorial's global click-to-close handler explicitly skips the replay button.
+- **Blocked Channels Feature:** Users can hide and manage blocked channels.
+- **Master Volume Sync:** A global toggle to mute/unmute all video widgets.
+- **Authentication & Paywall System:** Leverages Supabase Auth for Email/Password and Google OAuth, with a `profiles` table for user data including `is_premium` status.
+- **Stripe Pro Subscription:** Integrated Stripe for recurring subscriptions, enforcing a 6-block limit for free users.
+- **Admin Dashboard:** An `/admin` route with client-side and server-side authorization, featuring user management, premium toggle, channel management (CRUD with soft-delete), channel auto-import, and system statistics.
+- **Feedback System:** `feedback` table for user submissions, supporting messages, types, and optional screenshots. Public POST `/api/feedback` and admin-only GET `/api/admin/feedback`.
+- **Supabase Auth Hardening:** Client initialized with `autoRefreshToken: true` and `persistSession: true` to prevent session timeouts.
+- **QR Portal Widget:** Generates QR codes client-side for given links, featuring a glassmorphism design.
+- **First-Time Onboarding:** An `OnboardingFlow` component guides new guest users through initial setup, offering starter packs and coachmarks.
 - **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core`, `lucide-react`, `qrcode.react`.
+- **Markets Ticker Widget:** Displays market data for crypto and stocks with sparklines, price, and 24h change. Allows adding, removing, and reordering symbols.
+- **Crisis Ticker Upgrades (v2):** Per-widget filtering by source and category, deep-linking to articles, and a "BREAKING" indicator.
+- **Time Widgets:**
+    - **`world_clocks` widget:** A responsive grid displaying local times for selected cities.
+    - **`countdown` widget:** Shows a live countdown to a target moment with customizable label and emoji.
+    - **Clock Widget upgrades:** Includes a Pomodoro 25/5 preset, stopwatch laps, per-widget analog face toggle, and smooth seconds via `requestAnimationFrame`.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.
@@ -73,17 +68,9 @@ The dashboard is built on a 12-column magnetic grid.
 - **localStorage:** Browser API for client-side data persistence.
 - **Supabase:** Backend for authentication and PostgreSQL database.
 - **Stripe:** For managing recurring subscriptions.
-- **OpenWeatherMap API:** Live weather data for WeatherWidget. `GET /api/weather` accepts `?lat=&lon=` (preferred) or `?city=` and returns the resolved `lat`/`lon` so the forecast endpoint can be called without re-geocoding. `GET /api/weather/forecast` aggregates the OWM 5-day/3-hour endpoint into the next 3 days (excluding today), bucketed by the city's local timezone, returning `dayLabel`, `tempMaxC/F`, `tempMinC/F`, `icon`, and `condition` per day. On mount the widget requests the browser's geolocation with a 5s timeout — on success it loads weather + forecast for the user's coordinates; on denial, error, or timeout it falls back to London. City search reuses the same loader. The 3-day forecast strip renders below the current readout when the widget is at least 220×220 px; on smaller widgets it is hidden gracefully so the primary readout stays legible. Hover-activated glass search bar with Search icon replaces the current city instantly on Enter. "City not found" error handling. Controls stay visible while search is focused.
-- **NewsAPI.org:** Live breaking news headlines for CrisisTickerWidget. `GET /api/news` accepts optional `?sources=` (comma-separated NewsAPI source IDs, sanitized to lowercase + dashes) and `?category=` (whitelist: business/entertainment/general/health/science/sports/technology). Sources/category are mutually exclusive — sources wins per NewsAPI's contract. Each article now includes a `url` field so the widget can deep-link to the original story. The widget refreshes every 10 minutes and falls back to static headlines on error.
-- **CoinGecko + Yahoo Finance (Markets Ticker):** `GET /api/markets?symbols=BTC,ETH,SPY,AAPL` powers the new MarketsTickerWidget. Crypto symbols (12 supported: BTC, ETH, SOL, ADA, DOGE, BNB, XRP, MATIC, DOT, AVAX, LTC, LINK) are resolved through CoinGecko's `coins/{id}/market_chart?days=1` endpoint, which returns both the 24h price series (downsampled server-side to ~24 points via `sampleSeries()`) and the computed delta in a single call. Anything else is treated as a stock ticker and routed to Yahoo Finance's `query1.finance.yahoo.com/v8/finance/chart/{sym}` endpoint. Responses are cached in-memory for 60s per symbol with a stale-cache fallback up to 5 minutes when an upstream call fails. Per-symbol upstream errors are surfaced as `{ symbol, error: "..." }` rather than failing the whole request, so one bad ticker can't take down the widget. Yahoo's free endpoint occasionally rate-limits cloud IPs (HTTP 429) — when that happens stocks render `—` while crypto continues to update; the widget UI handles the missing data gracefully.
-- **Markets Ticker Widget:** New `markets_ticker` widget type. Default symbols: BTC, ETH, SPY, AAPL. Polls `/api/markets` every 60s. Each row renders symbol, inline 1-line SVG sparkline (color matches delta), price, and 24h change %. Header has a Settings cog that opens an in-widget panel for add / remove / reorder symbols (input restricted to `[A-Z0-9.\-]{1,8}`, max 12 symbols per widget). Persists to `localStorage` via `marketsSymbols?: string[]` on the widget. Widget defined in `client/src/App.tsx`; sidebar template (`template-markets-ticker`, 3×3) and rich card use the emerald accent.
-- **Crisis Ticker Upgrades (v2):** Per-widget filtering — Settings cog in the header opens a panel with a "Source" dropdown (All / BBC / Reuters / AP / CNN / Al Jazeera / WSJ / Bloomberg) and a "Category" dropdown (All / Tech / Markets / World / Sports). Selecting a source disables Category (NewsAPI mutual-exclusivity). State persisted on the widget as `crisisSources?: string` and `crisisCategory?: string`. Each headline row is now a real `<a target="_blank" rel="noopener noreferrer">` to the article's URL when available, with an inline ExternalLink icon affordance. A red BREAKING pill renders on rows whose text matches `/\b(breaking|alert|urgent|emergency)\b/i`. Hover behavior is gentler: a soft red overlay fades in (250ms ease) over the entire feed when the widget is hovered, while the scroll still pauses immediately so a user can read; per-row hover adds a subtle background tint with a 220ms transition instead of an abrupt jump. Empty filter results show a friendly inline "No headlines for this filter — try a different source or category." instead of silently keeping unrelated results.
-- **Time Widgets v1 (Task #10):** Two new widget types and four upgrades to the existing ClockWidget.
-  - **`world_clocks` widget:** Responsive grid of city clocks (1/2/3 columns based on width). Each cell renders city name, current local time (respects `clockUse24Hour`), date, and a day/night dot — amber for day, indigo for night, derived from `localHourIn(tz)` (6 ≤ h < 19 = day). Defaults to NY / London / Tokyo / Sydney via `DEFAULT_WORLD_CLOCK_TZS`. Persisted as `worldClocksTzs?: string[]`. Settings cog opens an in-widget panel with active-city chips and a searchable picker drawn from the 37-city `WORLD_ZONES` catalog. Capped at 8 cities per widget (`WORLD_CLOCKS_MAX`). Sidebar template is `template-world-clocks` (4×2, amber accent).
-  - **`countdown` widget:** Pinned target moment with live D/H/M/S display. Persisted as `countdownTarget?: string` (ISO), `countdownLabel?: string`, `countdownEmoji?: string`. Defaults to "Launch Day" / 🚀 / now+7d on first mount (one-shot `onUpdate` writes the defaults). Once `target ≤ now`, the readout swaps for a celebratory "Reached!" pulse. Settings cog: text label (max 40 chars), `<input type="datetime-local">` target editor (`isoToLocalInputValue` round-trips the ISO string), and an 8-emoji preset picker (`COUNTDOWN_EMOJI_PRESETS`). Sidebar template is `template-countdown` (3×2, fuchsia accent).
-  - **Clock upgrades:**
-    - **Pomodoro 25/5 preset (Timer tab):** "🍅 Pomodoro" button next to Start. State `pomodoroPhase: 'focus' | 'break' | null`. When active, the countdown effect auto-flips phase, plays the chime, and keeps running. A pill above the timer ("Focus 25" / "Break 5") shows the active phase with a pulsing dot when running. "End Pomodoro" button exits cleanly. Manual `Start` clears any active pomo state.
-    - **Stopwatch laps:** "Lap" button visible while running records cumulative ms. Last 5 laps render below the readout (newest first) with split (delta from previous lap) and total. Reset clears laps too. Hidden when widget height < 180px to keep the primary readout legible.
-    - **Per-widget Analog face toggle:** New `clockShowAnalog?: boolean` field. When `true` and the Clock tab is active, an SVG `AnalogClockFace` (60 ticks, hour/minute/second hands, accent-coloured second hand) replaces the digital readout. Toggle button "ANALOG"/"DIGITAL" sits next to "12H/24H" in the bottom hover-bar; visible only when `onUpdate` is provided.
-    - **Smooth seconds via rAF:** Tick effect picks `requestAnimationFrame` when `showAnalog && tab === 'clock'` (so the second hand sweeps continuously) and falls back to `setInterval(1000)` otherwise — digital readout doesn't need sub-second updates.
-  - **Plumbing:** `WidgetRenderer` now passes `onUpdate` to `ClockWidget` (was previously omitted). Sidebar template type union extended with `world_clocks` and `countdown`. `StarterTileType` extended for forward compatibility.
+- **OpenWeatherMap API:** Provides live weather data for the WeatherWidget.
+- **NewsAPI.org:** Supplies live breaking news headlines for the CrisisTickerWidget.
+- **CoinGecko:** Used for cryptocurrency market data in the Markets Ticker.
+- **Yahoo Finance:** Used for stock market data in the Markets Ticker.
+- **qrcode.react:** For client-side QR code generation.
+- **Resend:** For sending feedback emails.
