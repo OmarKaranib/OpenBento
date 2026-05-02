@@ -26,7 +26,7 @@ The dashboard is built on a 12-column magnetic grid system.
 - **Viral Ad Mechanic (Free Users Only):** Non-premium users encounter a single expanding viral ad block that pushes widgets aside.
 
 **Technical Implementations & Feature Specifications:**
-- **Dynamic Widget System:** Supports various widget types including Video, Note, Spacer, Image, Clock, Crisis Ticker, Markets Ticker, Weather, Dictionary, QR Portal, World Clocks, Countdown, GitHub Pulse, and RSS Headlines.
+- **Dynamic Widget System:** Supports various widget types including Video, Note, Spacer, Image, Clock, Crisis Ticker, Markets Ticker, Weather, Dictionary, QR Portal, World Clocks, Countdown, GitHub Pulse, RSS Headlines, Habit Tracker, Quick Launch, Big Text Marquee, Network Light, and Photo Loop.
 - **Edit Layout Mode:** Toggles between locked and editable states for drag-to-resize, settings, and deletion.
 - **Fullscreen Mode:** Utilizes the browser's Fullscreen API.
 - **TV Mode:** Iframes use `pointer-events: none` with video controls managed via `postMessage` API.
@@ -61,11 +61,19 @@ The dashboard is built on a 12-column magnetic grid system.
     - **`world_clocks` widget:** A responsive grid displaying local times for selected cities.
     - **`countdown` widget:** Shows a live countdown to a target moment with customizable label and emoji.
     - **Clock Widget upgrades:** Includes a Pomodoro 25/5 preset, stopwatch laps, per-widget analog face toggle, and smooth seconds via `requestAnimationFrame`.
+- **Productivity & Personal Widgets (Task #18):**
+    - **Habit Tracker (`habit_tracker`):** Editable list of habits with a 30-day rolling check-grid; per-habit streak counter; local-day keys; auto-trims old entries to keep payload small.
+    - **Quick Launch (`quick_launch`):** Up to 16 user-defined link tiles with auto-fetched favicons (`google.com/s2/favicons`), tile-grid columns of 2/3/4, normalized URL handling, and middle-click safe `target="_blank"` opens.
+    - **Big Text Marquee (`big_text_marquee`):** Static or scrolling display text with bisect-fit font sizing in static mode and CSS-keyframe horizontal scroll in marquee mode; configurable speed, foreground, and background colors.
+    - **Network Light (`network_light`):** Polls a user-supplied URL through `/api/ping` on a configurable interval (10s / 30s / 60s / 5m) and renders a traffic-light dot (green / amber / red) with last-checked relative time.
+    - **Photo Loop (`photo_loop`):** Local-upload photo carousel (up to 20 images, 800KB each, stored as data URLs) with cover/contain fit, fade transitions, dot indicators, prev/next + pause controls, and intervals of 0/3/5/10/30 seconds.
+    - All five Task #18 widgets follow the Task #10 Clock/WorldClocks/Countdown pattern for **light/dark theme awareness**: the per-widget colour droplet (`widget.customColor`) drives the outer background, then `isLightBg(bgColor)` flips text, accent, border, cell, and inert-surface colours so the widget reads cleanly on any chosen background (deep-dark default, pastel, white, neon, etc.). Photo Loop defaults to `#000` for photo presentation but honours customColor overrides; Big Text Marquee already had user-controlled `marqueeBgColor` and now derives a contrast-flipped fg/border when the bg is light.
 
 **Server Endpoints:**
 - `GET /api/github/repo/:owner/:repo` — Aggregated GitHub repo stats (5-minute in-memory cache).
 - `GET /api/github/user/:owner` — GitHub user/org profile + top repos by stars (5-minute in-memory cache, stale-on-error).
 - `GET /api/rss?url=` — Server-side RSS/Atom proxy with 12-minute cache and http(s)-only URL validation.
+- `GET /api/ping?url=` — Lightweight uptime probe (HEAD with 5s timeout, no cache, manual redirects, http(s)-only) used by the Network Light widget.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.

@@ -1793,6 +1793,101 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Network / Uptime Light API ─────────────────────────────────────────────
+  // GET /api/ping?url=<target_url>
+  // Returns { ok, status, latencyMs, fetchedAt }. SSRF-hardened identical to
+  // /api/rss: http(s) only, public-IP DNS check on every redirect hop, manual
+  // redirect handling capped at MAX_PING_HOPS, hard 5 s timeout. No caching —
+  // freshness is the entire point of this widget.
+  app.get('/api/ping', async (req: Request, res: Response) => {
+    const raw = typeof req.query.url === 'string' ? req.query.url.trim() : '';
+    if (!raw) {
+      return res.status(400).json({ error: 'Missing url parameter' });
+    }
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(raw);
+    } catch {
+      return res.status(400).json({ error: 'Malformed URL' });
+    }
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return res.status(400).json({ error: 'Only http(s) URLs are allowed' });
+    }
+    const validateHostIsPublic = async (hostname: string): Promise<void> => {
+      const dns = await import('dns/promises');
+      let targets: string[];
+      if (isIP(hostname)) {
+        targets = [hostname];
+      } else {
+        try {
+          targets = (await dns.lookup(hostname, { all: true, family: 0 })).map(r => r.address);
+        } catch (err: unknown) {
+          const code = (err as { code?: string } | null)?.code || 'ENOTFOUND';
+          throw new Error(`DNS lookup failed: ${code}`);
+        }
+      }
+      if (targets.length === 0 || targets.some(isPrivateOrReservedIp)) {
+        throw new Error('Refusing to ping a private or reserved address');
+      }
+    };
+
+    const MAX_PING_HOPS = 5;
+    const PING_TIMEOUT_MS = 5_000;
+    const t0 = Date.now();
+    let currentUrl = parsedUrl.toString();
+    let lastStatus = 0;
+    try {
+      for (let hop = 0; hop <= MAX_PING_HOPS; hop++) {
+        const u = new URL(currentUrl);
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+          throw new Error('Redirect to non-HTTP scheme blocked');
+        }
+        await validateHostIsPublic(u.hostname);
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), PING_TIMEOUT_MS);
+        let resp: Awaited<ReturnType<typeof fetch>>;
+        try {
+          // HEAD first; many CDNs accept HEAD and it's cheap. Some sites 405
+          // HEAD though, in which case we treat any HTTP response as "alive".
+          resp = await fetch(currentUrl, {
+            method: 'HEAD',
+            redirect: 'manual',
+            signal: ac.signal,
+            headers: {
+              'User-Agent': 'OpenBento-Dashboard/1.0 (+https://openbento.app) NetworkLight',
+              'Accept': '*/*',
+            },
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+        lastStatus = resp.status;
+        if (resp.status >= 300 && resp.status < 400) {
+          const loc = resp.headers.get('location');
+          if (!loc) break;
+          currentUrl = new URL(loc, currentUrl).toString();
+          continue;
+        }
+        break;
+      }
+      const latencyMs = Date.now() - t0;
+      // 2xx / 3xx / 4xx all count as "host is alive". Only 5xx + network error
+      // count as down. This matches uptime-monitor convention.
+      const ok = lastStatus > 0 && lastStatus < 500;
+      return res.json({ ok, status: lastStatus, latencyMs, fetchedAt: Date.now() });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const latencyMs = Date.now() - t0;
+      return res.json({
+        ok: false,
+        status: 0,
+        latencyMs,
+        fetchedAt: Date.now(),
+        error: msg.slice(0, 200),
+      });
+    }
+  });
+
   // Auto-import channels on startup (runs once)
   async function autoImportChannels() {
     try {

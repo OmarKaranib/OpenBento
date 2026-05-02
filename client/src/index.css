@@ -859,3 +859,22 @@ body.light-theme .starry-night {
   }
 }
 
+
+/* ─── Widget hover-only settings cog ─────────────────────────────────────────
+   Used by Habit Tracker, Quick Launch, Big Text Marquee, Network Light,
+   and Photo Loop (Task #18). The cog is invisible until the user hovers
+   over its enclosing dashboard-slot. We also reveal it whenever focus
+   lands inside the widget (keyboard users) or whenever the dashboard is
+   in edit mode (so the cog can be reached without precise hovering).
+   `pointer-events: none` keeps the invisible cog from intercepting
+   clicks meant for the widget body underneath.                            */
+.widget-hover-cog {
+  opacity: 0;
+  pointer-events: none;
+}
+.dashboard-slot:hover .widget-hover-cog,
+.dashboard-slot:focus-within .widget-hover-cog,
+.dashboard-slot.is-editing .widget-hover-cog {
+  opacity: 1;
+  pointer-events: auto;
+}

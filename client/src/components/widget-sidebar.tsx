@@ -5,6 +5,7 @@
     Trash2, Globe, Heart, Radio, PenLine, Clock,
     AlertCircle, CloudSun, BookOpen, QrCode, TrendingUp,
     Hourglass, Github, Rss,
+    Flame, Grid3x3, Megaphone, Activity, ImageIcon,
   } from 'lucide-react';
 
   const failedLogoCache = new Set<string>();
@@ -177,7 +178,7 @@
     widgetType: WidgetType;
     w: number;
     h: number;
-    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'default';
+    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'habit_tracker' | 'quick_launch' | 'big_text_marquee' | 'network_light' | 'photo_loop' | 'default';
     color: string;
   }
 
@@ -196,6 +197,11 @@
     { id: 'template-countdown',    name: 'Countdown',    widgetType: 'countdown',    w: 3, h: 2, icon: 'countdown',    color: 'fuchsia' },
     { id: 'template-github-pulse', name: 'GitHub Pulse', widgetType: 'github_pulse', w: 3, h: 3, icon: 'github_pulse', color: 'slate'   },
     { id: 'template-rss-headlines', name: 'RSS Headlines', widgetType: 'rss_headlines', w: 3, h: 3, icon: 'rss_headlines', color: 'orange' },
+    { id: 'template-habit-tracker', name: 'Habit Tracker', widgetType: 'habit_tracker', w: 3, h: 3, icon: 'habit_tracker', color: 'rose' },
+    { id: 'template-quick-launch', name: 'Quick Launch', widgetType: 'quick_launch', w: 3, h: 3, icon: 'quick_launch', color: 'teal' },
+    { id: 'template-big-text-marquee', name: 'Big Text', widgetType: 'big_text_marquee', w: 4, h: 2, icon: 'big_text_marquee', color: 'pink' },
+    { id: 'template-network-light', name: 'Network Light', widgetType: 'network_light', w: 2, h: 2, icon: 'network_light', color: 'lime' },
+    { id: 'template-photo-loop', name: 'Photo Loop', widgetType: 'photo_loop', w: 3, h: 3, icon: 'photo_loop', color: 'purple' },
   ];
 
   function loadPersonalLibrary(): SavedChannel[] {
@@ -783,6 +789,96 @@
           w: 3, h: 3,
           icon: 'rss_headlines' as const,
           color: 'orange',
+        },
+      },
+      {
+        id: 'habit_tracker',
+        label: 'Habit Tracker',
+        description: 'Daily check-ins with 7-day streak strip',
+        icon: <Flame className="w-[2rem] h-[2rem] text-rose-400" />,
+        iconBg: 'bg-rose-500/15',
+        border: 'border-rose-500/30 hover:border-rose-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-rose-400 bg-rose-500/15 border-rose-500/40',
+        template: {
+          id: 'template-habit-tracker',
+          name: 'Habit Tracker',
+          widgetType: 'habit_tracker' as WidgetType,
+          w: 3, h: 3,
+          icon: 'habit_tracker' as const,
+          color: 'rose',
+        },
+      },
+      {
+        id: 'quick_launch',
+        label: 'Quick Launch',
+        description: 'Grid of named URL tiles you can click to open',
+        icon: <Grid3x3 className="w-[2rem] h-[2rem] text-teal-400" />,
+        iconBg: 'bg-teal-500/15',
+        border: 'border-teal-500/30 hover:border-teal-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-teal-400 bg-teal-500/15 border-teal-500/40',
+        template: {
+          id: 'template-quick-launch',
+          name: 'Quick Launch',
+          widgetType: 'quick_launch' as WidgetType,
+          w: 3, h: 3,
+          icon: 'quick_launch' as const,
+          color: 'teal',
+        },
+      },
+      {
+        id: 'big_text_marquee',
+        label: 'Big Text',
+        description: 'Static or scrolling banner — perfect for "ON AIR"',
+        icon: <Megaphone className="w-[2rem] h-[2rem] text-pink-400" />,
+        iconBg: 'bg-pink-500/15',
+        border: 'border-pink-500/30 hover:border-pink-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-pink-400 bg-pink-500/15 border-pink-500/40',
+        template: {
+          id: 'template-big-text-marquee',
+          name: 'Big Text',
+          widgetType: 'big_text_marquee' as WidgetType,
+          w: 4, h: 2,
+          icon: 'big_text_marquee' as const,
+          color: 'pink',
+        },
+      },
+      {
+        id: 'network_light',
+        label: 'Network Light',
+        description: 'Pings any URL on a timer with green/red status',
+        icon: <Activity className="w-[2rem] h-[2rem] text-lime-400" />,
+        iconBg: 'bg-lime-500/15',
+        border: 'border-lime-500/30 hover:border-lime-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-lime-400 bg-lime-500/15 border-lime-500/40',
+        template: {
+          id: 'template-network-light',
+          name: 'Network Light',
+          widgetType: 'network_light' as WidgetType,
+          w: 2, h: 2,
+          icon: 'network_light' as const,
+          color: 'lime',
+        },
+      },
+      {
+        id: 'photo_loop',
+        label: 'Photo Loop',
+        description: 'Rotating gallery from URLs or uploaded images',
+        icon: <ImageIcon className="w-[2rem] h-[2rem] text-purple-400" />,
+        iconBg: 'bg-purple-500/15',
+        border: 'border-purple-500/30 hover:border-purple-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-purple-400 bg-purple-500/15 border-purple-500/40',
+        template: {
+          id: 'template-photo-loop',
+          name: 'Photo Loop',
+          widgetType: 'photo_loop' as WidgetType,
+          w: 3, h: 3,
+          icon: 'photo_loop' as const,
+          color: 'purple',
         },
       },
     ] as const;

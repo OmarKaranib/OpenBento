@@ -12,7 +12,12 @@ export type StarterTileType =
   | 'countdown'
   | 'note'
   | 'github_pulse'
-  | 'rss_headlines';
+  | 'rss_headlines'
+  | 'habit_tracker'
+  | 'quick_launch'
+  | 'big_text_marquee'
+  | 'network_light'
+  | 'photo_loop';
 
 export interface StarterTile {
   type: StarterTileType;

@@ -11,6 +11,8 @@
             Globe, Hourglass, X,
             Wifi, Mail, MapPin, User as UserIcon, Link2, Copy, Check, History as HistoryIcon, Trash2,
             Upload, Github, Rss, Star, Volume2, RefreshCw, ChevronDown, GitPullRequest, GitCommit, Tag,
+            CheckSquare, Square as SquareIcon, Flame, Grid3x3, Megaphone, Activity, Image as ImageIconLR,
+            ChevronLeft, ChevronRight, Pause as PauseIcon, Play as PlayIcon,
           } from 'lucide-react';
           import { QRCodeSVG } from 'qrcode.react';
           import { Switch, Route, useLocation } from 'wouter';
@@ -64,7 +66,12 @@
             | 'world_clocks'
             | 'countdown'
             | 'github_pulse'
-            | 'rss_headlines';
+            | 'rss_headlines'
+            | 'habit_tracker'
+            | 'quick_launch'
+            | 'big_text_marquee'
+            | 'network_light'
+            | 'photo_loop';
 
           // ─── Widget Interface ─────────────────────────────────────────────────────────
           export interface Widget {
@@ -179,6 +186,34 @@
             dictionaryQuery?: string;
             // Favorite words pinned by the user; persisted with the widget.
             dictionaryFavorites?: string[];
+            // ─── Habit Tracker ────────────────────────────────────────────────
+            // List of named habits, each with the days (YYYY-MM-DD) on which
+            // they were checked off. Days are stored as a string array rather
+            // than a map so older entries roll off naturally when we trim to
+            // the rolling 30-day window in the renderer.
+            habits?: { id: string; name: string; days: string[] }[];
+            // ─── Quick-Launch Grid ────────────────────────────────────────────
+            // Tile entries plus grid size (2/3/4 columns). Each tile carries
+            // an optional color override; otherwise the global widget color
+            // droplet is used. Favicon is derived from URL host at render.
+            quickLinks?: { id: string; label: string; url: string; color?: string }[];
+            quickLaunchCols?: 2 | 3 | 4;
+            // ─── Big-Text Marquee ─────────────────────────────────────────────
+            marqueeText?: string;
+            marqueeMode?: 'static' | 'scroll';
+            // Pixels per second for scroll mode. Defaults to ~120.
+            marqueeSpeed?: number;
+            marqueeFgColor?: string;
+            marqueeBgColor?: string;
+            // ─── Network / Uptime Light ──────────────────────────────────────
+            networkUrl?: string;
+            // Polling interval in seconds — one of 10 / 30 / 60 / 300.
+            networkIntervalSec?: number;
+            // ─── Photo Loop ───────────────────────────────────────────────────
+            photoUrls?: string[];
+            // Crossfade interval in seconds — 0 means manual (no auto-advance).
+            photoIntervalSec?: number;
+            photoFit?: 'cover' | 'contain';
           }
 
           // ─────────────────────────────────────────────────────────────────────────────
@@ -4848,6 +4883,1446 @@
           };
 
           // ─────────────────────────────────────────────────────────────────────────────
+          //  HabitTrackerWidget — daily check-ins with 7-day streak strip.
+          //  Storage: widget.habits[] = { id, name, days: ['YYYY-MM-DD', ...] }.
+          //  Persists via the dashboard's existing widget blob; payload is a
+          //  rolling 30-day window so even 8 habits stay well under 1 KB.
+          // ─────────────────────────────────────────────────────────────────────────────
+
+          interface HabitTrackerProps {
+            widget: Widget;
+            onUpdate?: (widgetId: string, patch: Partial<Widget>) => void;
+          }
+
+          // ISO date `YYYY-MM-DD` in local time — we deliberately avoid UTC so
+          // a habit checked at 11pm doesn't roll into "tomorrow" for the user.
+          function todayKey(): string {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const da = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${da}`;
+          }
+          function offsetDayKey(offset: number): string {
+            const d = new Date();
+            d.setDate(d.getDate() + offset);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const da = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${da}`;
+          }
+
+          export const HabitTrackerWidget: React.FC<HabitTrackerProps> = ({ widget, onUpdate }) => {
+            const containerRef = useRef<HTMLDivElement>(null);
+            const [size, setSize] = useState(280);
+            const [showSettings, setShowSettings] = useState(false);
+            const [draftName, setDraftName] = useState('');
+
+            useEffect(() => {
+              const el = containerRef.current;
+              if (!el) return;
+              const ro = new ResizeObserver((entries) => {
+                for (const e of entries) {
+                  setSize(Math.min(e.contentRect.width, e.contentRect.height));
+                }
+              });
+              ro.observe(el);
+              return () => ro.disconnect();
+            }, []);
+
+            const habits = widget.habits ?? [];
+            const today = todayKey();
+            const last7 = useMemo(
+              () => Array.from({ length: 7 }, (_, i) => offsetDayKey(-(6 - i))),
+              [],
+            );
+
+            const setHabits = useCallback(
+              (next: NonNullable<Widget['habits']>) => {
+                // Trim each habit's day list to the rolling 30-day window so
+                // the persisted blob never grows unbounded.
+                const cutoff = offsetDayKey(-29);
+                const trimmed = next.map(h => ({
+                  ...h,
+                  days: Array.from(new Set(h.days)).filter(d => d >= cutoff).sort(),
+                }));
+                onUpdate?.(widget.id, { habits: trimmed });
+              },
+              [onUpdate, widget.id],
+            );
+
+            const toggle = (habitId: string, dayKey: string) => {
+              const next = habits.map(h => {
+                if (h.id !== habitId) return h;
+                const has = h.days.includes(dayKey);
+                return { ...h, days: has ? h.days.filter(d => d !== dayKey) : [...h.days, dayKey] };
+              });
+              setHabits(next);
+            };
+
+            const addHabit = () => {
+              const name = draftName.trim();
+              if (!name) return;
+              if (habits.length >= 8) return;
+              setHabits([...habits, { id: `habit-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name, days: [] }]);
+              setDraftName('');
+            };
+
+            const removeHabit = (id: string) => {
+              setHabits(habits.filter(h => h.id !== id));
+            };
+
+            const renameHabit = (id: string, name: string) => {
+              setHabits(habits.map(h => h.id === id ? { ...h, name } : h));
+            };
+
+            // Theme awareness: use the per-widget colour droplet as the
+            // background (Task #10 Clock/Countdown/WorldClocks pattern). When
+            // the user picks a light bg we flip text + borders dark via
+            // `isLightBg` so the widget reads cleanly in any theme.
+            const bgColor    = widget.customColor ?? '#0f172a';
+            const light      = isLightBg(bgColor);
+            const accent     = light ? '#dc2626' : '#fb7185';
+            const clrPrimary = light ? '#0f172a' : '#e2e8f0';
+            const clrSubtle  = light ? '#475569' : '#cbd5e1';
+            const clrMuted   = light ? '#64748b' : '#64748b';
+            const clrBorder  = light ? 'rgba(0,0,0,0.10)' : 'rgba(71,85,105,0.4)';
+            const clrCellBg  = light ? 'rgba(0,0,0,0.04)' : 'rgba(15,23,42,0.55)';
+            const clrCellBdr = light ? 'rgba(0,0,0,0.10)' : 'rgba(71,85,105,0.3)';
+            const clrInert   = light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
+            const clrInertBd = light ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.08)';
+            const fs = Math.max(10, Math.min(13, size * 0.04));
+
+            return (
+              <div
+                ref={containerRef}
+                style={{
+                  width: '100%', height: '100%',
+                  background: bgColor,
+                  borderRadius: 'var(--outer-radius)',
+                  display: 'flex', flexDirection: 'column',
+                  padding: 12, boxSizing: 'border-box', overflow: 'hidden',
+                  border: `1px solid ${clrBorder}`,
+                  position: 'relative',
+                }}
+                data-testid={`habit-tracker-widget-${widget.id}`}
+              >
+                {/* Hover-only cog */}
+                <div
+                  className="widget-hover-cog"
+                  style={{
+                    position: 'absolute', top: 8, right: 8,
+                    transition: 'opacity 0.15s', zIndex: 5,
+                  }}
+                >
+                  <button
+                    onClick={() => setShowSettings(s => !s)}
+                    style={qrIconBtnStyle()}
+                    title="Habit settings"
+                    data-testid={`habit-settings-toggle-${widget.id}`}
+                  >
+                    <SettingsIcon size={11} />
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexShrink: 0 }}>
+                  <Flame size={14} color={accent} />
+                  <span style={{
+                    flex: 1, color: accent, fontFamily: MONO,
+                    fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+                  }}>
+                    HABITS
+                  </span>
+                  <span style={{ color: clrMuted, fontFamily: MONO, fontSize: 9 }}>
+                    {habits.filter(h => h.days.includes(today)).length}/{habits.length} today
+                  </span>
+                </div>
+
+                {/* Settings overlay */}
+                {showSettings && (
+                  <div
+                    style={{
+                      position: 'absolute', inset: 0,
+                      background: 'rgba(15,23,42,0.97)', zIndex: 4,
+                      padding: 12, display: 'flex', flexDirection: 'column', gap: 8,
+                      borderRadius: 'var(--outer-radius)',
+                    }}
+                    onKeyDown={e => e.stopPropagation()}
+                    data-testid={`habit-settings-panel-${widget.id}`}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>
+                        Edit habits
+                      </span>
+                      <button
+                        onClick={() => setShowSettings(false)}
+                        style={qrIconBtnStyle()}
+                        data-testid={`habit-settings-close-${widget.id}`}
+                      >
+                        <XIcon size={11} />
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input
+                        type="text"
+                        value={draftName}
+                        onChange={e => setDraftName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') addHabit(); }}
+                        placeholder="New habit name…"
+                        maxLength={40}
+                        style={qrInputStyle(11)}
+                        data-testid={`habit-input-name-${widget.id}`}
+                      />
+                      <button
+                        onClick={addHabit}
+                        disabled={!draftName.trim() || habits.length >= 8}
+                        style={{
+                          ...qrIconBtnStyle(),
+                          opacity: !draftName.trim() || habits.length >= 8 ? 0.4 : 1,
+                        }}
+                        data-testid={`habit-add-${widget.id}`}
+                      >
+                        <PlusIcon size={11} />
+                      </button>
+                    </div>
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {habits.map(h => (
+                        <div key={h.id} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            value={h.name}
+                            onChange={e => renameHabit(h.id, e.target.value)}
+                            maxLength={40}
+                            style={qrInputStyle(10)}
+                            data-testid={`habit-rename-${h.id}-${widget.id}`}
+                          />
+                          <button
+                            onClick={() => removeHabit(h.id)}
+                            style={qrIconBtnStyle()}
+                            title="Delete"
+                            data-testid={`habit-remove-${h.id}-${widget.id}`}
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      ))}
+                      {habits.length === 0 && (
+                        <span style={{ color: clrMuted, fontFamily: MONO, fontSize: 10 }}>
+                          Add your first habit above.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Body */}
+                {!showSettings && (
+                  <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {habits.length === 0 && (
+                      <button
+                        onClick={() => setShowSettings(true)}
+                        style={{
+                          margin: 'auto', padding: '8px 12px', borderRadius: 6,
+                          background: clrInert,
+                          border: `1px dashed ${clrInertBd}`,
+                          color: clrSubtle, fontFamily: MONO, fontSize: 11, cursor: 'pointer',
+                        }}
+                        data-testid={`habit-empty-cta-${widget.id}`}
+                      >
+                        + Add a habit
+                      </button>
+                    )}
+                    {habits.map(h => {
+                      const checkedToday = h.days.includes(today);
+                      // Streak = consecutive days back from today (or yesterday
+                      // if today not yet checked) where the habit was checked.
+                      let streak = 0;
+                      for (let i = 0; i < 60; i++) {
+                        const k = offsetDayKey(-i);
+                        if (h.days.includes(k)) streak++;
+                        else if (i === 0) continue; // today blank doesn't kill streak yet
+                        else break;
+                      }
+                      return (
+                        <div
+                          key={h.id}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '6px 8px', borderRadius: 6,
+                            background: clrCellBg,
+                            border: `1px solid ${clrCellBdr}`,
+                          }}
+                        >
+                          <button
+                            onClick={() => toggle(h.id, today)}
+                            style={{
+                              ...qrIconBtnStyle(),
+                              background: checkedToday ? `${accent}33` : clrInert,
+                              borderColor: checkedToday ? accent : clrInertBd,
+                              color: checkedToday ? accent : clrSubtle,
+                            }}
+                            title={checkedToday ? 'Uncheck today' : 'Check off today'}
+                            data-testid={`habit-toggle-today-${h.id}-${widget.id}`}
+                          >
+                            {checkedToday ? <CheckSquare size={12} /> : <SquareIcon size={12} />}
+                          </button>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              color: clrPrimary, fontFamily: MONO, fontSize: fs, fontWeight: 600,
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>
+                              {h.name}
+                            </div>
+                            <div style={{ display: 'flex', gap: 2, marginTop: 3 }}>
+                              {last7.map(k => {
+                                const has = h.days.includes(k);
+                                const isToday = k === today;
+                                return (
+                                  <button
+                                    key={k}
+                                    onClick={() => toggle(h.id, k)}
+                                    title={k}
+                                    style={{
+                                      width: 10, height: 10, borderRadius: 2,
+                                      background: has ? accent : clrInert,
+                                      border: isToday ? `1px solid ${accent}` : `1px solid ${clrInertBd}`,
+                                      cursor: 'pointer', padding: 0,
+                                    }}
+                                    data-testid={`habit-day-${h.id}-${k}-${widget.id}`}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div style={{
+                            display: 'flex', alignItems: 'center', gap: 2,
+                            color: streak > 0 ? accent : clrMuted,
+                            fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                          }}>
+                            <Flame size={10} />
+                            {streak}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          };
+
+          // ─────────────────────────────────────────────────────────────────────────────
+          //  QuickLaunchWidget — grid of named URL tiles (2/3/4 cols).
+          // ─────────────────────────────────────────────────────────────────────────────
+
+          interface QuickLaunchProps {
+            widget: Widget;
+            onUpdate?: (widgetId: string, patch: Partial<Widget>) => void;
+          }
+
+          function faviconUrl(rawUrl: string): string {
+            try {
+              const u = new URL(rawUrl);
+              return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=64`;
+            } catch {
+              return '';
+            }
+          }
+          function normalizeUrl(raw: string): string {
+            const t = raw.trim();
+            if (!t) return '';
+            if (/^https?:\/\//i.test(t)) return t;
+            return `https://${t}`;
+          }
+
+          export const QuickLaunchWidget: React.FC<QuickLaunchProps> = ({ widget, onUpdate }) => {
+            const containerRef = useRef<HTMLDivElement>(null);
+            const [size, setSize] = useState(280);
+            const [showSettings, setShowSettings] = useState(false);
+            const [draftLabel, setDraftLabel] = useState('');
+            const [draftUrl, setDraftUrl] = useState('');
+
+            useEffect(() => {
+              const el = containerRef.current;
+              if (!el) return;
+              const ro = new ResizeObserver((entries) => {
+                for (const e of entries) setSize(Math.min(e.contentRect.width, e.contentRect.height));
+              });
+              ro.observe(el);
+              return () => ro.disconnect();
+            }, []);
+
+            const cols = (widget.quickLaunchCols ?? 3) as 2 | 3 | 4;
+            const tiles = widget.quickLinks ?? [];
+            // Theme awareness — see HabitTracker note.
+            const bgColor    = widget.customColor ?? '#0f172a';
+            const light      = isLightBg(bgColor);
+            const accent     = light ? '#0891b2' : '#2dd4bf';
+            const clrPrimary = light ? '#0f172a' : '#e2e8f0';
+            const clrSubtle  = light ? '#475569' : '#cbd5e1';
+            const clrMuted   = light ? '#64748b' : '#64748b';
+            const clrBorder  = light ? 'rgba(0,0,0,0.10)' : 'rgba(71,85,105,0.4)';
+            const clrTileBg  = light ? 'rgba(0,0,0,0.04)' : 'rgba(15,23,42,0.55)';
+            const clrTileBd  = light ? 'rgba(0,0,0,0.10)' : 'rgba(71,85,105,0.3)';
+
+            const setTiles = (next: NonNullable<Widget['quickLinks']>) => {
+              onUpdate?.(widget.id, { quickLinks: next });
+            };
+            const setCols = (n: 2 | 3 | 4) => {
+              onUpdate?.(widget.id, { quickLaunchCols: n });
+            };
+
+            const addTile = () => {
+              const u = normalizeUrl(draftUrl);
+              const label = draftLabel.trim() || (() => {
+                try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return 'Link'; }
+              })();
+              if (!u) return;
+              if (tiles.length >= 16) return;
+              setTiles([
+                ...tiles,
+                { id: `tile-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, label, url: u },
+              ]);
+              setDraftLabel('');
+              setDraftUrl('');
+            };
+            const removeTile = (id: string) => setTiles(tiles.filter(t => t.id !== id));
+            const moveTile = (id: string, dir: -1 | 1) => {
+              const i = tiles.findIndex(t => t.id === id);
+              if (i < 0) return;
+              const j = i + dir;
+              if (j < 0 || j >= tiles.length) return;
+              const next = [...tiles];
+              [next[i], next[j]] = [next[j], next[i]];
+              setTiles(next);
+            };
+
+            const tileFs = Math.max(9, Math.min(12, size * 0.035));
+
+            return (
+              <div
+                ref={containerRef}
+                style={{
+                  width: '100%', height: '100%',
+                  background: bgColor,
+                  borderRadius: 'var(--outer-radius)',
+                  display: 'flex', flexDirection: 'column',
+                  padding: 12, boxSizing: 'border-box', overflow: 'hidden',
+                  border: `1px solid ${clrBorder}`,
+                  position: 'relative',
+                }}
+                data-testid={`quick-launch-widget-${widget.id}`}
+              >
+                <div
+                  className="widget-hover-cog"
+                  style={{
+                    position: 'absolute', top: 8, right: 8,
+                    transition: 'opacity 0.15s', zIndex: 5,
+                  }}
+                >
+                  <button
+                    onClick={() => setShowSettings(s => !s)}
+                    style={qrIconBtnStyle()}
+                    title="Tile settings"
+                    data-testid={`quick-launch-settings-toggle-${widget.id}`}
+                  >
+                    <SettingsIcon size={11} />
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexShrink: 0 }}>
+                  <Grid3x3 size={14} color={accent} />
+                  <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>
+                    QUICK LAUNCH
+                  </span>
+                  <span style={{ color: clrMuted, fontFamily: MONO, fontSize: 9 }}>{tiles.length} tile{tiles.length === 1 ? '' : 's'}</span>
+                </div>
+
+                {showSettings && (
+                  <div
+                    style={{
+                      position: 'absolute', inset: 0,
+                      background: 'rgba(15,23,42,0.97)', zIndex: 4,
+                      padding: 12, display: 'flex', flexDirection: 'column', gap: 8,
+                      borderRadius: 'var(--outer-radius)',
+                    }}
+                    onKeyDown={e => e.stopPropagation()}
+                    data-testid={`quick-launch-settings-panel-${widget.id}`}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>
+                        Edit tiles
+                      </span>
+                      <button
+                        onClick={() => setShowSettings(false)}
+                        style={qrIconBtnStyle()}
+                        data-testid={`quick-launch-settings-close-${widget.id}`}
+                      >
+                        <XIcon size={11} />
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {([2, 3, 4] as const).map(n => (
+                        <button
+                          key={n}
+                          onClick={() => setCols(n)}
+                          style={{
+                            ...qrIconBtnStyle(),
+                            background: cols === n ? `${accent}33` : 'rgba(255,255,255,0.04)',
+                            borderColor: cols === n ? accent : 'rgba(255,255,255,0.1)',
+                            color: cols === n ? accent : '#cbd5e1',
+                            fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                            padding: '4px 8px',
+                          }}
+                          data-testid={`quick-launch-cols-${n}-${widget.id}`}
+                        >
+                          {n}×{n}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <input
+                        type="text"
+                        value={draftLabel}
+                        onChange={e => setDraftLabel(e.target.value)}
+                        placeholder="Label (optional)"
+                        maxLength={20}
+                        style={qrInputStyle(11)}
+                        data-testid={`quick-launch-input-label-${widget.id}`}
+                      />
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <input
+                          type="text"
+                          value={draftUrl}
+                          onChange={e => setDraftUrl(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') addTile(); }}
+                          placeholder="https://example.com"
+                          style={qrInputStyle(11)}
+                          data-testid={`quick-launch-input-url-${widget.id}`}
+                        />
+                        <button
+                          onClick={addTile}
+                          disabled={!draftUrl.trim() || tiles.length >= 16}
+                          style={{
+                            ...qrIconBtnStyle(),
+                            opacity: !draftUrl.trim() || tiles.length >= 16 ? 0.4 : 1,
+                          }}
+                          data-testid={`quick-launch-add-${widget.id}`}
+                        >
+                          <PlusIcon size={11} />
+                        </button>
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {tiles.map((t, i) => (
+                        <div key={t.id} style={{
+                          display: 'flex', gap: 4, alignItems: 'center',
+                          padding: '4px 6px', borderRadius: 4,
+                          background: clrTileBg,
+                          border: `1px solid ${clrTileBd}`,
+                        }}>
+                          <span style={{
+                            flex: 1, color: clrPrimary, fontFamily: MONO, fontSize: 10,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }} title={`${t.label} → ${t.url}`}>
+                            {t.label}
+                          </span>
+                          <button
+                            onClick={() => moveTile(t.id, -1)}
+                            disabled={i === 0}
+                            style={{ ...qrIconBtnStyle(), opacity: i === 0 ? 0.3 : 1, padding: 4 }}
+                            data-testid={`quick-launch-up-${t.id}-${widget.id}`}
+                          >
+                            <ChevronLeft size={10} />
+                          </button>
+                          <button
+                            onClick={() => moveTile(t.id, 1)}
+                            disabled={i === tiles.length - 1}
+                            style={{ ...qrIconBtnStyle(), opacity: i === tiles.length - 1 ? 0.3 : 1, padding: 4 }}
+                            data-testid={`quick-launch-down-${t.id}-${widget.id}`}
+                          >
+                            <ChevronRight size={10} />
+                          </button>
+                          <button
+                            onClick={() => removeTile(t.id)}
+                            style={{ ...qrIconBtnStyle(), padding: 4 }}
+                            data-testid={`quick-launch-remove-${t.id}-${widget.id}`}
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!showSettings && (
+                  <div style={{
+                    flex: 1, minHeight: 0,
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                    gap: 6,
+                  }}>
+                    {tiles.length === 0 && (
+                      <button
+                        onClick={() => setShowSettings(true)}
+                        style={{
+                          gridColumn: `span ${cols}`,
+                          padding: '8px 12px', borderRadius: 6,
+                          background: clrTileBg,
+                          border: `1px dashed ${clrTileBd}`,
+                          color: clrSubtle, fontFamily: MONO, fontSize: 11, cursor: 'pointer',
+                          alignSelf: 'center',
+                        }}
+                        data-testid={`quick-launch-empty-cta-${widget.id}`}
+                      >
+                        + Add tile
+                      </button>
+                    )}
+                    {tiles.slice(0, cols * cols).map(t => (
+                      <a
+                        key={t.id}
+                        href={t.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                          gap: 4, padding: 6, borderRadius: 6,
+                          background: clrTileBg,
+                          border: `1px solid ${accent}33`,
+                          textDecoration: 'none', color: clrPrimary,
+                          minHeight: 0, overflow: 'hidden',
+                          transition: 'transform 0.1s, border-color 0.15s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = accent; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = `${accent}33`; }}
+                        title={t.url}
+                        data-testid={`quick-launch-tile-${t.id}-${widget.id}`}
+                      >
+                        <img
+                          src={faviconUrl(t.url)}
+                          alt=""
+                          style={{ width: 20, height: 20, flexShrink: 0 }}
+                          onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
+                        />
+                        <span style={{
+                          fontFamily: MONO, fontSize: tileFs, fontWeight: 600,
+                          textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap', maxWidth: '100%',
+                        }}>
+                          {t.label}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          };
+
+          // ─────────────────────────────────────────────────────────────────────────────
+          //  BigTextMarqueeWidget — static or scrolling banner.
+          // ─────────────────────────────────────────────────────────────────────────────
+
+          interface BigTextMarqueeProps {
+            widget: Widget;
+            onUpdate?: (widgetId: string, patch: Partial<Widget>) => void;
+          }
+
+          export const BigTextMarqueeWidget: React.FC<BigTextMarqueeProps> = ({ widget, onUpdate }) => {
+            const containerRef = useRef<HTMLDivElement>(null);
+            const textRef = useRef<HTMLSpanElement>(null);
+            const [size, setSize] = useState({ w: 320, h: 120 });
+            const [showSettings, setShowSettings] = useState(false);
+            const [staticFs, setStaticFs] = useState(48);
+
+            useEffect(() => {
+              const el = containerRef.current;
+              if (!el) return;
+              const ro = new ResizeObserver((entries) => {
+                for (const e of entries) setSize({ w: e.contentRect.width, h: e.contentRect.height });
+              });
+              ro.observe(el);
+              return () => ro.disconnect();
+            }, []);
+
+            const text = widget.marqueeText ?? 'ON AIR';
+            const mode = widget.marqueeMode ?? 'static';
+            const speed = widget.marqueeSpeed ?? 120;
+            // Theme awareness: bg comes from marqueeBgColor (or customColor as
+            // fallback) so the widget already follows the user's theme via the
+            // colour droplet. We flip the auto-fg accent and border when the
+            // chosen bg is light enough to need dark contrast.
+            const bg = widget.marqueeBgColor ?? widget.customColor ?? '#1e0b2e';
+            const light = isLightBg(bg);
+            const fg = widget.marqueeFgColor ?? (light ? '#9d174d' : '#f9a8d4');
+            const clrBorder = light ? 'rgba(0,0,0,0.12)' : 'rgba(71,85,105,0.4)';
+
+            // For static mode, fit-to-width: shrink font until single-line text
+            // fits in 90% of width. We bisect rather than measuring per-character
+            // because ResizeObserver retriggers on every resize anyway.
+            useEffect(() => {
+              if (mode !== 'static') return;
+              const container = containerRef.current;
+              const span = textRef.current;
+              if (!container || !span) return;
+              const targetW = container.clientWidth * 0.9;
+              const targetH = container.clientHeight * 0.7;
+              let lo = 12, hi = Math.min(targetH, 240);
+              for (let i = 0; i < 8; i++) {
+                const mid = (lo + hi) / 2;
+                span.style.fontSize = `${mid}px`;
+                if (span.scrollWidth <= targetW) lo = mid; else hi = mid;
+              }
+              setStaticFs(lo);
+            }, [text, mode, size.w, size.h]);
+
+            // Scroll mode duration in seconds — derived from text width and speed.
+            // Re-measured whenever text or width changes.
+            const [scrollDur, setScrollDur] = useState(8);
+            useEffect(() => {
+              if (mode !== 'scroll') return;
+              const span = textRef.current;
+              if (!span) return;
+              const totalDist = span.scrollWidth + size.w;
+              setScrollDur(Math.max(3, totalDist / Math.max(40, speed)));
+            }, [text, mode, speed, size.w]);
+
+            return (
+              <div
+                ref={containerRef}
+                style={{
+                  width: '100%', height: '100%',
+                  background: bg,
+                  borderRadius: 'var(--outer-radius)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: 0, boxSizing: 'border-box', overflow: 'hidden',
+                  border: `1px solid ${clrBorder}`,
+                  position: 'relative',
+                }}
+                data-testid={`big-text-marquee-widget-${widget.id}`}
+              >
+                <style>{`
+                  @keyframes obb-marquee-scroll {
+                    0%   { transform: translateX(100%); }
+                    100% { transform: translateX(-100%); }
+                  }
+                `}</style>
+                <div
+                  className="widget-hover-cog"
+                  style={{
+                    position: 'absolute', top: 8, right: 8,
+                    transition: 'opacity 0.15s', zIndex: 5,
+                  }}
+                >
+                  <button
+                    onClick={() => setShowSettings(s => !s)}
+                    style={qrIconBtnStyle()}
+                    title="Marquee settings"
+                    data-testid={`marquee-settings-toggle-${widget.id}`}
+                  >
+                    <SettingsIcon size={11} />
+                  </button>
+                </div>
+
+                {showSettings && (
+                  <div
+                    style={{
+                      position: 'absolute', inset: 0,
+                      background: 'rgba(15,23,42,0.97)', zIndex: 4,
+                      padding: 12, display: 'flex', flexDirection: 'column', gap: 6,
+                      borderRadius: 'var(--outer-radius)',
+                    }}
+                    onKeyDown={e => e.stopPropagation()}
+                    data-testid={`marquee-settings-panel-${widget.id}`}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ flex: 1, color: fg, fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>
+                        Big Text
+                      </span>
+                      <button
+                        onClick={() => setShowSettings(false)}
+                        style={qrIconBtnStyle()}
+                        data-testid={`marquee-settings-close-${widget.id}`}
+                      >
+                        <XIcon size={11} />
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={text}
+                      onChange={e => onUpdate?.(widget.id, { marqueeText: e.target.value.slice(0, 200) })}
+                      maxLength={200}
+                      placeholder="Headline text"
+                      style={qrInputStyle(12)}
+                      data-testid={`marquee-input-text-${widget.id}`}
+                    />
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {(['static', 'scroll'] as const).map(m => (
+                        <button
+                          key={m}
+                          onClick={() => onUpdate?.(widget.id, { marqueeMode: m })}
+                          style={{
+                            ...qrIconBtnStyle(),
+                            flex: 1,
+                            background: mode === m ? `${fg}33` : 'rgba(255,255,255,0.04)',
+                            borderColor: mode === m ? fg : 'rgba(255,255,255,0.1)',
+                            color: mode === m ? fg : '#cbd5e1',
+                            fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                            padding: '4px 8px',
+                          }}
+                          data-testid={`marquee-mode-${m}-${widget.id}`}
+                        >
+                          {m === 'static' ? 'STATIC' : 'SCROLL'}
+                        </button>
+                      ))}
+                    </div>
+                    {mode === 'scroll' && (
+                      <div>
+                        <span style={qrLabelStyle()}>Speed: {speed}px/s</span>
+                        <input
+                          type="range" min={40} max={400} step={10}
+                          value={speed}
+                          onChange={e => onUpdate?.(widget.id, { marqueeSpeed: Number(e.target.value) })}
+                          style={{ width: '100%' }}
+                          data-testid={`marquee-speed-${widget.id}`}
+                        />
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ flex: 1 }}>
+                        <span style={qrLabelStyle()}>Text</span>
+                        <input
+                          type="color" value={fg}
+                          onChange={e => onUpdate?.(widget.id, { marqueeFgColor: e.target.value })}
+                          style={qrColorPickerStyle()}
+                          data-testid={`marquee-fg-${widget.id}`}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <span style={qrLabelStyle()}>Background</span>
+                        <input
+                          type="color" value={bg}
+                          onChange={e => onUpdate?.(widget.id, { marqueeBgColor: e.target.value })}
+                          style={qrColorPickerStyle()}
+                          data-testid={`marquee-bg-${widget.id}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {mode === 'static' && (
+                  <span
+                    ref={textRef}
+                    style={{
+                      color: fg,
+                      fontFamily: MONO, fontWeight: 900,
+                      whiteSpace: 'nowrap', letterSpacing: '0.04em',
+                      fontSize: staticFs,
+                      textShadow: `0 0 24px ${fg}55`,
+                    }}
+                    data-testid={`marquee-text-${widget.id}`}
+                  >
+                    {text}
+                  </span>
+                )}
+                {mode === 'scroll' && (
+                  <div style={{
+                    width: '100%', overflow: 'hidden',
+                    display: 'flex', alignItems: 'center',
+                  }}>
+                    <span
+                      ref={textRef}
+                      style={{
+                        display: 'inline-block',
+                        color: fg,
+                        fontFamily: MONO, fontWeight: 900,
+                        whiteSpace: 'nowrap', letterSpacing: '0.04em',
+                        fontSize: Math.max(24, Math.min(96, size.h * 0.55)),
+                        textShadow: `0 0 24px ${fg}55`,
+                        animation: `obb-marquee-scroll ${scrollDur}s linear infinite`,
+                      }}
+                      data-testid={`marquee-text-${widget.id}`}
+                    >
+                      {text}
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          };
+
+          // ─────────────────────────────────────────────────────────────────────────────
+          //  NetworkLightWidget — pings a URL, shows green/red dot + latency.
+          // ─────────────────────────────────────────────────────────────────────────────
+
+          interface NetworkLightProps {
+            widget: Widget;
+            onUpdate?: (widgetId: string, patch: Partial<Widget>) => void;
+          }
+
+          interface PingResult {
+            ok: boolean;
+            status: number;
+            latencyMs: number;
+            fetchedAt: number;
+            error?: string;
+          }
+
+          export const NetworkLightWidget: React.FC<NetworkLightProps> = ({ widget, onUpdate }) => {
+            const containerRef = useRef<HTMLDivElement>(null);
+            const [size, setSize] = useState(180);
+            const [showSettings, setShowSettings] = useState(false);
+            const [draftUrl, setDraftUrl] = useState(widget.networkUrl ?? '');
+            const [result, setResult] = useState<PingResult | null>(null);
+            const [pinging, setPinging] = useState(false);
+
+            useEffect(() => {
+              const el = containerRef.current;
+              if (!el) return;
+              const ro = new ResizeObserver((entries) => {
+                for (const e of entries) setSize(Math.min(e.contentRect.width, e.contentRect.height));
+              });
+              ro.observe(el);
+              return () => ro.disconnect();
+            }, []);
+
+            const url = widget.networkUrl;
+            const intervalSec = widget.networkIntervalSec ?? 30;
+
+            useEffect(() => {
+              if (!url) { setResult(null); return; }
+              let cancelled = false;
+              const ping = async () => {
+                setPinging(true);
+                try {
+                  const r = await fetch(`/api/ping?url=${encodeURIComponent(url)}`);
+                  const body: PingResult = await r.json();
+                  if (!cancelled) setResult(body);
+                } catch (err: unknown) {
+                  if (!cancelled) {
+                    setResult({
+                      ok: false, status: 0, latencyMs: 0, fetchedAt: Date.now(),
+                      error: err instanceof Error ? err.message : 'Network error',
+                    });
+                  }
+                } finally {
+                  if (!cancelled) setPinging(false);
+                }
+              };
+              ping();
+              const id = setInterval(ping, intervalSec * 1000);
+              return () => { cancelled = true; clearInterval(id); };
+            }, [url, intervalSec]);
+
+            const submit = () => {
+              const u = normalizeUrl(draftUrl);
+              if (!u) return;
+              onUpdate?.(widget.id, { networkUrl: u });
+              setShowSettings(false);
+            };
+
+            // Theme awareness — see HabitTracker note.
+            const bgColor    = widget.customColor ?? '#0f172a';
+            const light      = isLightBg(bgColor);
+            const accent     = light ? '#65a30d' : '#a3e635';
+            const clrPrimary = light ? '#0f172a' : '#e2e8f0';
+            const clrSubtle  = light ? '#475569' : '#cbd5e1';
+            const clrMuted   = light ? '#64748b' : '#64748b';
+            const clrBorder  = light ? 'rgba(0,0,0,0.10)' : 'rgba(71,85,105,0.4)';
+            const dotColor = !url ? (light ? '#94a3b8' : '#475569')
+                              : pinging ? '#fbbf24'
+                              : result?.ok ? '#22c55e' : '#ef4444';
+            const dotSize = Math.max(40, Math.min(96, size * 0.36));
+            const labelFs = Math.max(9, Math.min(12, size * 0.06));
+            const host = (() => { try { return new URL(url || '').hostname.replace(/^www\./, ''); } catch { return url || ''; } })();
+
+            return (
+              <div
+                ref={containerRef}
+                style={{
+                  width: '100%', height: '100%',
+                  background: bgColor,
+                  borderRadius: 'var(--outer-radius)',
+                  display: 'flex', flexDirection: 'column',
+                  padding: 12, boxSizing: 'border-box', overflow: 'hidden',
+                  border: `1px solid ${clrBorder}`,
+                  position: 'relative',
+                }}
+                data-testid={`network-light-widget-${widget.id}`}
+              >
+                <div
+                  className="widget-hover-cog"
+                  style={{
+                    position: 'absolute', top: 8, right: 8,
+                    transition: 'opacity 0.15s', zIndex: 5,
+                  }}
+                >
+                  <button
+                    onClick={() => { setDraftUrl(url ?? ''); setShowSettings(s => !s); }}
+                    style={qrIconBtnStyle()}
+                    title="Network settings"
+                    data-testid={`network-settings-toggle-${widget.id}`}
+                  >
+                    <SettingsIcon size={11} />
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexShrink: 0 }}>
+                  <Activity size={14} color={accent} />
+                  <span style={{
+                    flex: 1, color: accent, fontFamily: MONO,
+                    fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {host || 'NETWORK LIGHT'}
+                  </span>
+                </div>
+
+                {(showSettings || !url) && (
+                  <div
+                    style={{
+                      position: 'absolute', inset: 0,
+                      background: 'rgba(15,23,42,0.97)', zIndex: 4,
+                      padding: 12, display: 'flex', flexDirection: 'column', gap: 6,
+                      borderRadius: 'var(--outer-radius)',
+                    }}
+                    onKeyDown={e => e.stopPropagation()}
+                    data-testid={`network-settings-panel-${widget.id}`}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>
+                        Ping target
+                      </span>
+                      {url && (
+                        <button
+                          onClick={() => setShowSettings(false)}
+                          style={qrIconBtnStyle()}
+                          data-testid={`network-settings-close-${widget.id}`}
+                        >
+                          <XIcon size={11} />
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={draftUrl}
+                      onChange={e => setDraftUrl(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+                      placeholder="https://example.com"
+                      style={qrInputStyle(11)}
+                      data-testid={`network-input-url-${widget.id}`}
+                    />
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {([10, 30, 60, 300] as const).map(s => (
+                        <button
+                          key={s}
+                          onClick={() => onUpdate?.(widget.id, { networkIntervalSec: s })}
+                          style={{
+                            ...qrIconBtnStyle(),
+                            background: intervalSec === s ? `${accent}33` : 'rgba(255,255,255,0.04)',
+                            borderColor: intervalSec === s ? accent : 'rgba(255,255,255,0.1)',
+                            color: intervalSec === s ? accent : '#cbd5e1',
+                            fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                            padding: '4px 6px',
+                          }}
+                          data-testid={`network-interval-${s}-${widget.id}`}
+                        >
+                          {s < 60 ? `${s}s` : `${s / 60}m`}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={submit}
+                      disabled={!draftUrl.trim()}
+                      style={{
+                        padding: '6px 8px', borderRadius: 6,
+                        background: `${accent}33`,
+                        border: `1px solid ${accent}`,
+                        color: accent, cursor: 'pointer',
+                        fontFamily: MONO, fontSize: 11, fontWeight: 700,
+                        opacity: !draftUrl.trim() ? 0.4 : 1,
+                      }}
+                      data-testid={`network-submit-${widget.id}`}
+                    >
+                      Save & ping
+                    </button>
+                  </div>
+                )}
+
+                {!showSettings && url && (
+                  <div style={{
+                    flex: 1, minHeight: 0,
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}>
+                    <div
+                      style={{
+                        width: dotSize, height: dotSize, borderRadius: '50%',
+                        background: `radial-gradient(circle, ${dotColor} 0%, ${dotColor}66 70%, transparent 100%)`,
+                        boxShadow: `0 0 ${dotSize * 0.4}px ${dotColor}88`,
+                        transition: 'background 0.4s, box-shadow 0.4s',
+                      }}
+                      data-testid={`network-dot-${widget.id}`}
+                    />
+                    <div style={{
+                      color: clrPrimary, fontFamily: MONO,
+                      fontSize: labelFs, fontWeight: 700,
+                    }}>
+                      {!result ? 'Pinging…' : result.ok ? `${result.latencyMs}ms` : result.error?.slice(0, 30) || 'DOWN'}
+                    </div>
+                    {result && (
+                      <div style={{
+                        color: clrMuted, fontFamily: MONO,
+                        fontSize: Math.max(8, labelFs - 2),
+                      }}>
+                        {result.status > 0 ? `HTTP ${result.status}` : '—'} · every {intervalSec < 60 ? `${intervalSec}s` : `${intervalSec / 60}m`}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          };
+
+          // ─────────────────────────────────────────────────────────────────────────────
+          //  PhotoLoopWidget — rotating image gallery with crossfade.
+          // ─────────────────────────────────────────────────────────────────────────────
+
+          interface PhotoLoopProps {
+            widget: Widget;
+            onUpdate?: (widgetId: string, patch: Partial<Widget>) => void;
+          }
+
+          export const PhotoLoopWidget: React.FC<PhotoLoopProps> = ({ widget, onUpdate }) => {
+            const containerRef = useRef<HTMLDivElement>(null);
+            const [showSettings, setShowSettings] = useState(false);
+            const [draftUrl, setDraftUrl] = useState('');
+            const [idx, setIdx] = useState(0);
+            const [paused, setPaused] = useState(false);
+
+            useEffect(() => {
+              const el = containerRef.current;
+              if (!el) return;
+              const ro = new ResizeObserver(() => { /* nothing layout-dependent */ });
+              ro.observe(el);
+              return () => ro.disconnect();
+            }, []);
+
+            const photos = widget.photoUrls ?? [];
+            const intervalSec = widget.photoIntervalSec ?? 5;
+            const fit = widget.photoFit ?? 'cover';
+            // Theme awareness: photos look best framed in black, but the user
+            // can override via the colour droplet — we then flip the border
+            // and accent contrast accordingly (Task #10 Clock-family pattern).
+            const bgColor   = widget.customColor ?? '#000';
+            const light     = isLightBg(bgColor);
+            const accent    = light ? '#7c3aed' : '#c084fc';
+            const clrBorder = light ? 'rgba(0,0,0,0.10)' : 'rgba(71,85,105,0.4)';
+
+            useEffect(() => {
+              if (paused) return;
+              if (photos.length <= 1 || intervalSec <= 0) return;
+              const id = setInterval(() => setIdx(i => (i + 1) % photos.length), intervalSec * 1000);
+              return () => clearInterval(id);
+            }, [photos.length, intervalSec, paused]);
+
+            // Reset idx if we deleted past the end.
+            useEffect(() => {
+              if (idx >= photos.length) setIdx(0);
+            }, [photos.length, idx]);
+
+            const setPhotos = (next: string[]) => {
+              onUpdate?.(widget.id, { photoUrls: next });
+            };
+
+            const addUrl = () => {
+              const u = normalizeUrl(draftUrl);
+              if (!u) return;
+              if (photos.length >= 20) return;
+              setPhotos([...photos, u]);
+              setDraftUrl('');
+            };
+            const removeAt = (i: number) => setPhotos(photos.filter((_, j) => j !== i));
+
+            const handleUpload = (file: File) => {
+              if (file.size > 800_000) {
+                alert('Image too large — pick something under ~800 KB or paste a URL.');
+                return;
+              }
+              const reader = new FileReader();
+              reader.onload = () => {
+                const result = reader.result;
+                if (typeof result === 'string') {
+                  if (photos.length >= 20) return;
+                  setPhotos([...photos, result]);
+                }
+              };
+              reader.readAsDataURL(file);
+            };
+
+            const current = photos[idx] ?? null;
+
+            return (
+              <div
+                ref={containerRef}
+                style={{
+                  width: '100%', height: '100%',
+                  background: bgColor,
+                  borderRadius: 'var(--outer-radius)',
+                  display: 'flex', flexDirection: 'column',
+                  padding: 0, boxSizing: 'border-box', overflow: 'hidden',
+                  border: `1px solid ${clrBorder}`,
+                  position: 'relative',
+                }}
+                data-testid={`photo-loop-widget-${widget.id}`}
+              >
+                <div
+                  className="widget-hover-cog"
+                  style={{
+                    position: 'absolute', top: 8, right: 8,
+                    transition: 'opacity 0.15s', zIndex: 5,
+                    display: 'flex', gap: 4,
+                  }}
+                >
+                  {photos.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => setIdx(i => (i - 1 + photos.length) % photos.length)}
+                        style={qrIconBtnStyle()}
+                        title="Previous"
+                        data-testid={`photo-loop-prev-${widget.id}`}
+                      >
+                        <ChevronLeft size={11} />
+                      </button>
+                      <button
+                        onClick={() => setPaused(p => !p)}
+                        style={{
+                          ...qrIconBtnStyle(),
+                          color: paused ? accent : '#cbd5e1',
+                          borderColor: paused ? accent : 'rgba(255,255,255,0.1)',
+                        }}
+                        title={paused ? 'Resume slideshow' : 'Pause slideshow'}
+                        data-testid={`photo-loop-${paused ? 'play' : 'pause'}-${widget.id}`}
+                      >
+                        {paused ? <PlayIcon size={11} /> : <PauseIcon size={11} />}
+                      </button>
+                      <button
+                        onClick={() => setIdx(i => (i + 1) % photos.length)}
+                        style={qrIconBtnStyle()}
+                        title="Next"
+                        data-testid={`photo-loop-next-${widget.id}`}
+                      >
+                        <ChevronRight size={11} />
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setShowSettings(s => !s)}
+                    style={qrIconBtnStyle()}
+                    title="Photo settings"
+                    data-testid={`photo-loop-settings-toggle-${widget.id}`}
+                  >
+                    <SettingsIcon size={11} />
+                  </button>
+                </div>
+
+                {showSettings && (
+                  <div
+                    style={{
+                      position: 'absolute', inset: 0,
+                      background: 'rgba(15,23,42,0.97)', zIndex: 4,
+                      padding: 12, display: 'flex', flexDirection: 'column', gap: 6,
+                      borderRadius: 'var(--outer-radius)',
+                    }}
+                    onKeyDown={e => e.stopPropagation()}
+                    data-testid={`photo-loop-settings-panel-${widget.id}`}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>
+                        Photo Loop
+                      </span>
+                      <button
+                        onClick={() => setShowSettings(false)}
+                        style={qrIconBtnStyle()}
+                        data-testid={`photo-loop-settings-close-${widget.id}`}
+                      >
+                        <XIcon size={11} />
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <input
+                        type="text"
+                        value={draftUrl}
+                        onChange={e => setDraftUrl(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') addUrl(); }}
+                        placeholder="Paste image URL…"
+                        style={qrInputStyle(11)}
+                        data-testid={`photo-loop-input-url-${widget.id}`}
+                      />
+                      <button
+                        onClick={addUrl}
+                        disabled={!draftUrl.trim() || photos.length >= 20}
+                        style={{
+                          ...qrIconBtnStyle(),
+                          opacity: !draftUrl.trim() || photos.length >= 20 ? 0.4 : 1,
+                        }}
+                        data-testid={`photo-loop-add-${widget.id}`}
+                      >
+                        <PlusIcon size={11} />
+                      </button>
+                    </div>
+                    <label
+                      style={{
+                        ...qrIconBtnStyle(),
+                        cursor: photos.length >= 20 ? 'not-allowed' : 'pointer',
+                        opacity: photos.length >= 20 ? 0.4 : 1,
+                        justifyContent: 'flex-start', gap: 6, padding: '6px 8px',
+                        fontFamily: MONO, fontSize: 11,
+                      }}
+                      data-testid={`photo-loop-upload-label-${widget.id}`}
+                    >
+                      <Upload size={11} />
+                      Upload from device (≤800 KB)
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        disabled={photos.length >= 20}
+                        onChange={e => {
+                          const f = e.target.files?.[0];
+                          if (f) handleUpload(f);
+                          e.target.value = '';
+                        }}
+                        data-testid={`photo-loop-upload-${widget.id}`}
+                      />
+                    </label>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {([0, 3, 5, 10, 30] as const).map(s => (
+                        <button
+                          key={s}
+                          onClick={() => onUpdate?.(widget.id, { photoIntervalSec: s })}
+                          style={{
+                            ...qrIconBtnStyle(),
+                            background: intervalSec === s ? `${accent}33` : 'rgba(255,255,255,0.04)',
+                            borderColor: intervalSec === s ? accent : 'rgba(255,255,255,0.1)',
+                            color: intervalSec === s ? accent : '#cbd5e1',
+                            fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                            padding: '4px 6px',
+                          }}
+                          data-testid={`photo-loop-interval-${s}-${widget.id}`}
+                        >
+                          {s === 0 ? 'MANUAL' : `${s}s`}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {(['cover', 'contain'] as const).map(f => (
+                        <button
+                          key={f}
+                          onClick={() => onUpdate?.(widget.id, { photoFit: f })}
+                          style={{
+                            ...qrIconBtnStyle(),
+                            flex: 1,
+                            background: fit === f ? `${accent}33` : 'rgba(255,255,255,0.04)',
+                            borderColor: fit === f ? accent : 'rgba(255,255,255,0.1)',
+                            color: fit === f ? accent : '#cbd5e1',
+                            fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                            padding: '4px 6px',
+                          }}
+                          data-testid={`photo-loop-fit-${f}-${widget.id}`}
+                        >
+                          {f.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {photos.map((p, i) => (
+                        <div key={i} style={{
+                          display: 'flex', gap: 4, alignItems: 'center',
+                          padding: 4, borderRadius: 4,
+                          background: 'rgba(15,23,42,0.55)',
+                          border: '1px solid rgba(71,85,105,0.3)',
+                        }}>
+                          <img src={p} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 3 }} />
+                          <span style={{
+                            flex: 1, color: '#cbd5e1', fontFamily: MONO, fontSize: 9,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {p.startsWith('data:') ? `Upload #${i + 1}` : p}
+                          </span>
+                          <button
+                            onClick={() => removeAt(i)}
+                            style={{ ...qrIconBtnStyle(), padding: 4 }}
+                            data-testid={`photo-loop-remove-${i}-${widget.id}`}
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!showSettings && photos.length === 0 && (
+                  <button
+                    onClick={() => setShowSettings(true)}
+                    style={{
+                      margin: 'auto', padding: '8px 12px', borderRadius: 6,
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px dashed rgba(255,255,255,0.2)',
+                      color: '#cbd5e1', fontFamily: MONO, fontSize: 11, cursor: 'pointer',
+                    }}
+                    data-testid={`photo-loop-empty-cta-${widget.id}`}
+                  >
+                    + Add photos
+                  </button>
+                )}
+                {!showSettings && current && (
+                  <>
+                    <img
+                      key={`${idx}-${current.slice(0, 32)}`}
+                      src={current}
+                      alt=""
+                      style={{
+                        width: '100%', height: '100%',
+                        objectFit: fit,
+                        animation: 'obb-photo-fade 0.6s ease-in',
+                      }}
+                      data-testid={`photo-loop-image-${widget.id}`}
+                    />
+                    <style>{`
+                      @keyframes obb-photo-fade {
+                        from { opacity: 0; }
+                        to   { opacity: 1; }
+                      }
+                    `}</style>
+                    {photos.length > 1 && (
+                      <div style={{
+                        position: 'absolute', bottom: 6, left: 0, right: 0,
+                        display: 'flex', justifyContent: 'center', gap: 4,
+                        pointerEvents: 'none',
+                      }}>
+                        {photos.map((_, i) => (
+                          <span
+                            key={i}
+                            style={{
+                              width: 6, height: 6, borderRadius: '50%',
+                              background: i === idx ? accent : 'rgba(255,255,255,0.3)',
+                              transition: 'background 0.2s',
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          };
+
+          // ─────────────────────────────────────────────────────────────────────────────
           //  WidgetRenderer
           // ─────────────────────────────────────────────────────────────────────────────
 
@@ -4951,6 +6426,51 @@
               case 'rss_headlines':
                 return (
                   <RSSHeadlinesWidget
+                    key={widget.id}
+                    widget={widget}
+                    onUpdate={onUpdate}
+                  />
+                );
+
+              case 'habit_tracker':
+                return (
+                  <HabitTrackerWidget
+                    key={widget.id}
+                    widget={widget}
+                    onUpdate={onUpdate}
+                  />
+                );
+
+              case 'quick_launch':
+                return (
+                  <QuickLaunchWidget
+                    key={widget.id}
+                    widget={widget}
+                    onUpdate={onUpdate}
+                  />
+                );
+
+              case 'big_text_marquee':
+                return (
+                  <BigTextMarqueeWidget
+                    key={widget.id}
+                    widget={widget}
+                    onUpdate={onUpdate}
+                  />
+                );
+
+              case 'network_light':
+                return (
+                  <NetworkLightWidget
+                    key={widget.id}
+                    widget={widget}
+                    onUpdate={onUpdate}
+                  />
+                );
+
+              case 'photo_loop':
+                return (
+                  <PhotoLoopWidget
                     key={widget.id}
                     widget={widget}
                     onUpdate={onUpdate}
