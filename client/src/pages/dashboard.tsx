@@ -234,26 +234,33 @@ const MasterControlDashboard = ({
     }
   }, [isDarkMode]);
 
-  // Auto-save widgets to localStorage with debounce to avoid excessive writes
-  // HARD SESSION WIPE: Only persist widgets for logged-in users
-  // Guests (user is null) lose everything on refresh - return to "Start Building"
+  // Auto-save widgets to localStorage so layouts persist across refreshes
+  // for both signed-in users and guests. When a guest signs up later,
+  // their existing layout is preserved locally and continues to work.
   const widgetsJsonRef = useRef<string>('');
   useEffect(() => {
-    // Only save to localStorage if user is logged in
-    if (!isAuthenticated) {
-      // Guest mode: Clear any existing data from localStorage
-      localStorage.removeItem('openBentoWidgets');
-      localStorage.removeItem('openBentoPersonalLibrary');
-      return;
-    }
-    
     const widgetsJson = JSON.stringify(widgets);
     // Only save if actual content changed (not just reference)
     if (widgetsJson !== widgetsJsonRef.current) {
       widgetsJsonRef.current = widgetsJson;
       localStorage.setItem('openBentoWidgets', widgetsJson);
     }
-  }, [widgets, isAuthenticated]);
+  }, [widgets]);
+
+  // On logout (authenticated → unauthenticated transition only), clear the
+  // Personal Library since it is an authenticated-only feature
+  // (saveWidgetToLibrary requires login). We deliberately do NOT clear it
+  // for guests who never signed in, and we do NOT clear widget layouts —
+  // those persist for everyone so guests can build before signing up.
+  const wasAuthenticatedRef = useRef<boolean>(isAuthenticated);
+  useEffect(() => {
+    if (wasAuthenticatedRef.current && !isAuthenticated) {
+      localStorage.removeItem('openBentoPersonalLibrary');
+      setPersonalLibrary([]);
+      window.dispatchEvent(new CustomEvent('personalLibraryUpdated'));
+    }
+    wasAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
 
   // Set custom color for a specific widget (Bento.me Color Droplet)
   const setWidgetColor = useCallback((widgetId: string, color: string | undefined) => {
