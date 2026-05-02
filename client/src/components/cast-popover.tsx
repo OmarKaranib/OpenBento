@@ -1,0 +1,404 @@
+import { useEffect, useRef, useState } from "react";
+import { Cast, Plus, X, Send, Pencil, Check, Trash2, Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+  buildCastSnapshot,
+  loadPairedTVs,
+  savePairedTVs,
+  type PairedTV,
+} from "@/lib/cast-snapshot";
+import type { Widget } from "@/App";
+
+interface CastPopoverProps {
+  widgets: Widget[];
+  isDarkMode: boolean;
+  masterMute: boolean;
+}
+
+interface RoomMeta {
+  online: boolean;
+  lastPushedAt?: number;
+}
+
+export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProps) {
+  const [open, setOpen] = useState(false);
+  const [tvs, setTVs] = useState<PairedTV[]>(() => loadPairedTVs());
+  const [code, setCode] = useState("");
+  const [pairing, setPairing] = useState(false);
+  const [pushingRoom, setPushingRoom] = useState<string | null>(null);
+  const [editingRoom, setEditingRoom] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [meta, setMeta] = useState<Record<string, RoomMeta>>({});
+  const popRef = useRef<HTMLDivElement | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    savePairedTVs(tvs);
+  }, [tvs]);
+
+  // Close on outside click.
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (popRef.current && !popRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  // Refresh metadata for known TVs whenever the popover opens.
+  useEffect(() => {
+    if (!open || tvs.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const next: Record<string, RoomMeta> = {};
+      await Promise.all(
+        tvs.map(async (tv) => {
+          try {
+            const res = await fetch(`/api/cast/rooms/${tv.roomId}`);
+            if (!res.ok) {
+              next[tv.roomId] = { online: false };
+              return;
+            }
+            const data = await res.json();
+            next[tv.roomId] = {
+              online: true,
+              lastPushedAt: data.lastPushedAt
+                ? new Date(data.lastPushedAt).getTime()
+                : undefined,
+            };
+          } catch {
+            next[tv.roomId] = { online: false };
+          }
+        }),
+      );
+      if (!cancelled) setMeta(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, tvs]);
+
+  async function handlePair(): Promise<void> {
+    const trimmed = code.replace(/\D/g, "").slice(0, 6);
+    if (trimmed.length !== 6) {
+      toast({ title: "Enter the 6-digit code", variant: "destructive" });
+      return;
+    }
+    setPairing(true);
+    try {
+      const res = await apiRequest("POST", "/api/cast/pair", { code: trimmed });
+      const data = await res.json();
+      if (!data?.roomId) throw new Error("No room returned");
+      setTVs((prev) => {
+        if (prev.some((p) => p.roomId === data.roomId)) return prev;
+        return [
+          ...prev,
+          { roomId: data.roomId, label: data.label || "TV", pairedAt: Date.now() },
+        ];
+      });
+      setCode("");
+      toast({ title: "TV paired", description: data.label || "TV" });
+    } catch (err) {
+      toast({
+        title: "Pairing failed",
+        description: err instanceof Error ? err.message : "Try a fresh code",
+        variant: "destructive",
+      });
+    } finally {
+      setPairing(false);
+    }
+  }
+
+  async function handlePush(roomId: string): Promise<void> {
+    setPushingRoom(roomId);
+    try {
+      const snapshot = buildCastSnapshot({ widgets, isDarkMode, masterMute });
+      await apiRequest("POST", `/api/cast/rooms/${roomId}/push`, { snapshot });
+      setMeta((m) => ({
+        ...m,
+        [roomId]: { online: true, lastPushedAt: snapshot.pushedAt },
+      }));
+      toast({ title: "Pushed to TV" });
+    } catch (err) {
+      toast({
+        title: "Push failed",
+        description: err instanceof Error ? err.message : "Check the TV connection",
+        variant: "destructive",
+      });
+    } finally {
+      setPushingRoom(null);
+    }
+  }
+
+  async function handlePushAll(): Promise<void> {
+    if (tvs.length === 0) return;
+    const snapshot = buildCastSnapshot({ widgets, isDarkMode, masterMute });
+    let ok = 0;
+    let fail = 0;
+    await Promise.all(
+      tvs.map(async (tv) => {
+        try {
+          await apiRequest("POST", `/api/cast/rooms/${tv.roomId}/push`, { snapshot });
+          ok++;
+          setMeta((m) => ({
+            ...m,
+            [tv.roomId]: { online: true, lastPushedAt: snapshot.pushedAt },
+          }));
+        } catch {
+          fail++;
+        }
+      }),
+    );
+    toast({
+      title: `Pushed to ${ok}/${tvs.length} TV${tvs.length === 1 ? "" : "s"}`,
+      description: fail > 0 ? `${fail} failed` : undefined,
+      variant: fail === tvs.length ? "destructive" : undefined,
+    });
+  }
+
+  async function handleUnpair(roomId: string): Promise<void> {
+    try {
+      await apiRequest("DELETE", `/api/cast/rooms/${roomId}`);
+    } catch {
+      // Even if server delete fails, remove locally so the UI clears.
+    }
+    setTVs((prev) => prev.filter((p) => p.roomId !== roomId));
+    toast({ title: "TV unpaired" });
+  }
+
+  async function handleRename(roomId: string): Promise<void> {
+    const label = editLabel.trim().slice(0, 40);
+    if (!label) {
+      setEditingRoom(null);
+      return;
+    }
+    try {
+      await apiRequest("PATCH", `/api/cast/rooms/${roomId}`, { label });
+      setTVs((prev) => prev.map((p) => (p.roomId === roomId ? { ...p, label } : p)));
+    } catch (err) {
+      toast({
+        title: "Rename failed",
+        description: err instanceof Error ? err.message : "Try again",
+        variant: "destructive",
+      });
+    } finally {
+      setEditingRoom(null);
+    }
+  }
+
+  function timeAgo(ts: number | undefined): string {
+    if (!ts) return "never";
+    const d = Math.max(0, Date.now() - ts);
+    if (d < 5_000) return "just now";
+    if (d < 60_000) return `${Math.floor(d / 1000)}s ago`;
+    if (d < 3_600_000) return `${Math.floor(d / 60_000)}m ago`;
+    return `${Math.floor(d / 3_600_000)}h ago`;
+  }
+
+  return (
+    <div className="relative" ref={popRef}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`menu-btn h-[3.2rem] px-[1.2rem] slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-md ${
+          tvs.length > 0
+            ? "bg-fuchsia-600/70 hover:bg-fuchsia-500/80 text-white"
+            : "bg-slate-600/60 hover:bg-slate-500/70 text-white"
+        }`}
+        title={tvs.length === 0 ? "Cast to a TV" : `${tvs.length} TV(s) paired`}
+        data-testid="button-cast"
+      >
+        <Cast className="w-[1.4rem] h-[1.4rem]" />
+        Cast
+        {tvs.length > 0 && (
+          <span className="ml-[0.2rem] inline-flex items-center justify-center min-w-[1.6rem] h-[1.6rem] px-[0.4rem] text-[0.85rem] font-bold rounded-full bg-white/25">
+            {tvs.length}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div
+          className={`absolute right-0 top-full mt-[0.4rem] w-[28rem] rounded-lg shadow-2xl border z-[10010] ${
+            isDarkMode
+              ? "bg-slate-900 border-slate-700 text-slate-100"
+              : "bg-white border-gray-200 text-gray-900"
+          }`}
+          data-testid="popover-cast"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="p-[1.2rem] border-b border-slate-700/40">
+            <div className="flex items-center justify-between mb-[0.6rem]">
+              <h3 className="text-[1.15rem] font-bold flex items-center gap-[0.5rem]">
+                <Cast className="w-[1.2rem] h-[1.2rem]" /> Cast to TV
+              </h3>
+              <button
+                onClick={() => setOpen(false)}
+                className="p-[0.3rem] rounded hover:bg-slate-700/30"
+                data-testid="button-cast-close"
+              >
+                <X className="w-[1.1rem] h-[1.1rem]" />
+              </button>
+            </div>
+            <p className={`text-[0.85rem] mb-[0.6rem] ${isDarkMode ? "text-slate-400" : "text-gray-600"}`}>
+              On your TV, open <span className="font-mono">openbento.tv/cast</span>{" "}
+              and enter the 6-digit code shown.
+            </p>
+            <div className="flex gap-[0.5rem]">
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="123 456"
+                inputMode="numeric"
+                maxLength={6}
+                className={`flex-1 h-[2.6rem] px-[0.8rem] rounded-md border text-[1.2rem] tracking-[0.3em] font-mono text-center ${
+                  isDarkMode
+                    ? "bg-slate-800 border-slate-600 text-white"
+                    : "bg-gray-50 border-gray-300 text-gray-900"
+                }`}
+                data-testid="input-cast-code"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handlePair();
+                }}
+              />
+              <button
+                onClick={handlePair}
+                disabled={pairing || code.length !== 6}
+                className={`h-[2.6rem] px-[1rem] rounded-md font-semibold flex items-center gap-[0.4rem] ${
+                  pairing || code.length !== 6
+                    ? "bg-slate-600/60 cursor-not-allowed opacity-60"
+                    : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                }`}
+                data-testid="button-cast-pair"
+              >
+                {pairing ? (
+                  <Loader2 className="w-[1rem] h-[1rem] animate-spin" />
+                ) : (
+                  <Plus className="w-[1rem] h-[1rem]" />
+                )}
+                Pair
+              </button>
+            </div>
+          </div>
+
+          <div className="p-[1.2rem]">
+            <div className="flex items-center justify-between mb-[0.6rem]">
+              <span className={`text-[0.95rem] font-semibold ${isDarkMode ? "text-slate-300" : "text-gray-700"}`}>
+                Paired TVs ({tvs.length})
+              </span>
+              {tvs.length > 0 && (
+                <button
+                  onClick={handlePushAll}
+                  className="text-[0.85rem] px-[0.7rem] py-[0.3rem] rounded bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-semibold flex items-center gap-[0.3rem]"
+                  data-testid="button-cast-push-all"
+                >
+                  <Send className="w-[0.9rem] h-[0.9rem]" /> Push to all
+                </button>
+              )}
+            </div>
+
+            {tvs.length === 0 ? (
+              <p className={`text-[0.85rem] italic ${isDarkMode ? "text-slate-500" : "text-gray-500"}`}>
+                No TVs paired yet. Pair one above to start casting.
+              </p>
+            ) : (
+              <ul className="space-y-[0.5rem] max-h-[20rem] overflow-y-auto">
+                {tvs.map((tv) => {
+                  const m = meta[tv.roomId];
+                  const isEditing = editingRoom === tv.roomId;
+                  return (
+                    <li
+                      key={tv.roomId}
+                      className={`p-[0.7rem] rounded-md border flex flex-col gap-[0.4rem] ${
+                        isDarkMode ? "bg-slate-800/60 border-slate-700" : "bg-gray-50 border-gray-200"
+                      }`}
+                      data-testid={`row-tv-${tv.roomId}`}
+                    >
+                      <div className="flex items-center justify-between gap-[0.5rem]">
+                        {isEditing ? (
+                          <input
+                            value={editLabel}
+                            onChange={(e) => setEditLabel(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleRename(tv.roomId);
+                              if (e.key === "Escape") setEditingRoom(null);
+                            }}
+                            autoFocus
+                            className={`flex-1 px-[0.4rem] py-[0.2rem] rounded border text-[0.95rem] ${
+                              isDarkMode
+                                ? "bg-slate-900 border-slate-600 text-white"
+                                : "bg-white border-gray-300"
+                            }`}
+                            data-testid={`input-rename-${tv.roomId}`}
+                          />
+                        ) : (
+                          <span className="font-semibold text-[1rem] flex-1 truncate">
+                            {tv.label}
+                          </span>
+                        )}
+                        <span
+                          className={`inline-block w-[0.6rem] h-[0.6rem] rounded-full ${
+                            m?.online ? "bg-emerald-500" : "bg-slate-500"
+                          }`}
+                          title={m?.online ? "Reachable" : "Unreachable"}
+                        />
+                      </div>
+                      <div className={`text-[0.75rem] ${isDarkMode ? "text-slate-500" : "text-gray-500"}`}>
+                        Last pushed: {timeAgo(m?.lastPushedAt)}
+                      </div>
+                      <div className="flex gap-[0.4rem]">
+                        <button
+                          onClick={() => handlePush(tv.roomId)}
+                          disabled={pushingRoom === tv.roomId}
+                          className="flex-1 h-[2.2rem] rounded bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-[0.85rem] font-semibold flex items-center justify-center gap-[0.3rem] disabled:opacity-60"
+                          data-testid={`button-push-${tv.roomId}`}
+                        >
+                          {pushingRoom === tv.roomId ? (
+                            <Loader2 className="w-[0.9rem] h-[0.9rem] animate-spin" />
+                          ) : (
+                            <Send className="w-[0.9rem] h-[0.9rem]" />
+                          )}
+                          Push
+                        </button>
+                        {isEditing ? (
+                          <button
+                            onClick={() => handleRename(tv.roomId)}
+                            className="h-[2.2rem] px-[0.7rem] rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[0.85rem]"
+                            data-testid={`button-rename-save-${tv.roomId}`}
+                          >
+                            <Check className="w-[0.9rem] h-[0.9rem]" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setEditingRoom(tv.roomId);
+                              setEditLabel(tv.label);
+                            }}
+                            className="h-[2.2rem] px-[0.7rem] rounded bg-slate-600 hover:bg-slate-500 text-white text-[0.85rem]"
+                            data-testid={`button-rename-${tv.roomId}`}
+                          >
+                            <Pencil className="w-[0.9rem] h-[0.9rem]" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleUnpair(tv.roomId)}
+                          className="h-[2.2rem] px-[0.7rem] rounded bg-red-600 hover:bg-red-500 text-white text-[0.85rem]"
+                          data-testid={`button-unpair-${tv.roomId}`}
+                        >
+                          <Trash2 className="w-[0.9rem] h-[0.9rem]" />
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

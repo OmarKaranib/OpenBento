@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from "./link-refresher";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerChannel } from "./services/pulse-cache";
+import { setupCastHub } from "./services/cast-hub";
 import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, verifyVideoIsLive, searchChannelLiveStream, checkVideoLiveStatusById } from "./services/youtube-api";
 import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema, insertFeedbackSchema } from "@shared/schema";
 import { getUncachableResendClient } from "./services/resend-client";
@@ -2047,6 +2048,8 @@ export async function registerRoutes(
 
   // Run auto-import
   autoImportChannels();
+
+  setupCastHub(httpServer, app);
 
   return httpServer;
 }

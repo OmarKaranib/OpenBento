@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FloatingTutorial } from '@/components/floating-tutorial';
 import { NoteWidget } from '@/components/note-widget';
 import { AdBlock, AdBlockData } from '@/components/ad-block';
+import { CastPopover } from '@/components/cast-popover';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
 
 const GRID_COLS = 12;
@@ -1777,7 +1778,12 @@ const MasterControlDashboard = ({
               {isDarkMode ? 'Dark' : 'Light'}
             </button>
 
-            
+            {/* Cast to TV - Popover with paired TV list + manual push */}
+            <CastPopover
+              widgets={widgets}
+              isDarkMode={isDarkMode}
+              masterMute={masterMute}
+            />
 
             {/* Request Dropdown */}
             <div className="relative group">

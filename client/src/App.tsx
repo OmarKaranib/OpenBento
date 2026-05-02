@@ -27,6 +27,7 @@
           import Terms from '@/pages/terms';
           import Privacy from '@/pages/privacy';
           import Feedback from '@/pages/feedback';
+          import CastPage from '@/pages/cast';
           import { WidgetSidebar, TrendingChannel, WidgetTemplate, WIDGET_TEMPLATES } from '@/components/widget-sidebar';
           import { OnboardingFlow } from '@/components/onboarding-flow';
           import {
@@ -7205,6 +7206,7 @@
                       <Route path="/terms"    component={Terms} />
                       <Route path="/privacy"  component={Privacy} />
                       <Route path="/feedback" component={Feedback} />
+                      <Route path="/cast"     component={CastPage} />
                       <Route component={NotFound} />
                     </Switch>
                   </SortableContext>

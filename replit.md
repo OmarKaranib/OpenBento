@@ -93,3 +93,21 @@ The dashboard is built on a 12-column magnetic grid system.
 - **GitHub REST API v3:** Repository, commit, search (PRs), and release endpoints powering the GitHub Pulse widget.
 - **dictionaryapi.dev:** Free dictionary API used by the Dictionary widget for definitions, phonetics, audio, synonyms, and etymology.
 - **Resend:** For sending feedback emails.
+- **ws:** Server-side WebSocket library for the Cast Hub real-time channel.
+
+**Cast to TV (Task #23):**
+- **TV side:** `openbento.tv/cast` opens a fullscreen pairing screen with a 6-digit code that rotates every 60s. Once paired, the room id is stored in the TV's `localStorage` (`openBentoCastRoomId`) so subsequent reloads skip pairing entirely. A long-press of the "Hold to forget" hot-zone (revealed by hovering the top of the screen) unpairs locally and on the server.
+- **Laptop side:** A "Cast" button in the menu bar (next to Dark/Light) opens a popover for pairing by code, listing all paired TVs (online/offline dot, last-pushed timestamp, rename, unpair, push, push-to-all). Paired-TV list persists in `localStorage` (`openBentoCastTVs`).
+- **Push model:** Manual only — the laptop builds a `CastSnapshot` ({ widgets, isDarkMode, masterMute, pushedAt }) and POSTs it to the server, which broadcasts to every TV WebSocket in the room and stores `last_snapshot` in the `cast_rooms` DB table so a refreshed/reconnecting TV gets an instant replay.
+- **Multi-TV:** A laptop can pair any number of TVs; "Push to all" fans out the snapshot in parallel. Each TV is its own room with its own room id.
+- **Free tier:** No auth, no premium gate. The room id itself is the secret. No video relay — TVs fetch YouTube/Twitch/Kick embeds directly with `pointer-events: none`.
+- **Server endpoints (server/services/cast-hub.ts):**
+  - `POST /api/cast/codes` — TV creates a fresh room + 60s in-memory pairing code.
+  - `POST /api/cast/pair { code }` — laptop consumes a code, returns `{ roomId, label }`.
+  - `POST /api/cast/rooms/:id/push { snapshot }` — broadcasts + stores last snapshot (zod-validated, 4MB cap).
+  - `PATCH /api/cast/rooms/:id { label }` — rename a TV (broadcasts to all peers).
+  - `GET /api/cast/rooms/:id` — fetch label + last-pushed timestamp.
+  - `DELETE /api/cast/rooms/:id` — unpair; closes WS and broadcasts `{type:'closed'}`.
+  - `WS /ws/cast?roomId=…&role=tv|laptop` — single hub mounted via `httpServer.upgrade` and namespaced under `/ws/cast` so it doesn't collide with Vite's HMR socket.
+- **Schema:** `cast_rooms` (id uuid, label, last_snapshot jsonb, last_pushed_at, created_at) declared in `shared/models/cast.ts`. Pairing codes are kept in-memory only (60s TTL) so a server restart drops pending codes but every paired room survives.
+- **Abuse protection:** `/api/cast/codes` is rate-limited per-IP to 10 calls/60s window. Any room created by `/api/cast/codes` whose code expires before being paired is auto-deleted from the DB by a 30-second sweeper, so spamming pair-code creation can't bloat storage.
