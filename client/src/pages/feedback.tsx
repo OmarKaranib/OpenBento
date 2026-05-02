@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Send, Lightbulb, Bug, Loader2, ImagePlus, Trash2 } from 'lucide-react';
+import { Footer } from '@/components/footer';
+import { usePageMeta } from '@/hooks/use-page-meta';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -21,6 +23,10 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 export default function Feedback() {
+  usePageMeta({
+    title: 'Send Feedback',
+    description: 'Share an idea or report a bug to help improve OpenBento Dashboard.',
+  });
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   const { toast } = useToast();
@@ -123,7 +129,8 @@ export default function Feedback() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-900 flex flex-col">
+      <div className="flex-1 flex items-center justify-center p-4">
       <Card className="w-full max-w-lg bg-slate-800 border-slate-700">
         <CardHeader>
           <div className="flex items-center gap-3 mb-2">
@@ -272,6 +279,8 @@ export default function Feedback() {
           </form>
         </CardContent>
       </Card>
+      </div>
+      <Footer />
     </div>
   );
 }

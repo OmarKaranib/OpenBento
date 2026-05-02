@@ -2227,7 +2227,7 @@ const MasterControlDashboard = ({
           >
             <Power className="w-[6rem] h-[6rem] mb-[1.5rem] text-cyan-400/30" />
             <h3 className="text-[1.6rem] font-bold mb-[0.8rem] text-slate-300">Dashboard Empty</h3>
-            <p className="text-[1.2rem] mb-[1.5rem]">Click "Add Block" to add blocks to your dashboard</p>
+            <p className="text-[1.2rem] mb-[1.5rem]">Click "Block" in the menu bar to add blocks to your dashboard</p>
             <button
               onClick={() => {
                 setHasStartedBuilding(true); // Remove this button from DOM after click

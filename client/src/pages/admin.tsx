@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useReplitAuth } from '@/hooks/use-replit-auth';
+import { usePageMeta } from '@/hooks/use-page-meta';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, Crown, LogIn, Rocket, Link as LinkIcon, GripVertical, Eye, EyeOff, MessageSquare, Lightbulb, Bug, Search, CheckCircle2 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
@@ -112,6 +113,10 @@ function smartVideoIdHandler(rawInput: string): string {
 }
 
 export default function Admin() {
+  usePageMeta({
+    title: 'Admin Dashboard',
+    description: 'OpenBento administrator console for managing users, channels, and feedback.',
+  });
   const { user, isLoading, isAuthenticated, login } = useReplitAuth();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();

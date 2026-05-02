@@ -1,46 +1,15 @@
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase as sharedSupabase } from '@/lib/supabase';
 
 // Retry configuration
 const MAX_RETRIES = 3;
 const RETRY_DELAY_BASE = 1000; // 1 second base delay
 
-// Create Supabase client with optimized configuration
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL!,
-  import.meta.env.VITE_SUPABASE_ANON_KEY!,
-  {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-      flowType: 'pkce', // More secure auth flow
-    },
-    global: {
-      headers: {
-        'X-Client-Info': 'openbento-web',
-      },
-      fetch: (url, options = {}) => {
-        // Add timeout to prevent hanging requests
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-        return fetch(url, {
-          ...options,
-          signal: controller.signal,
-        }).finally(() => clearTimeout(timeoutId));
-      },
-    },
-    db: {
-      schema: 'public',
-    },
-    realtime: {
-      params: {
-        eventsPerSecond: 2,
-      },
-    },
-  }
-);
+// Use the shared singleton Supabase client to avoid the
+// "Multiple GoTrueClient instances detected" warning. All auth
+// configuration (autoRefreshToken, persistSession) lives in @/lib/supabase.
+// If the env vars are missing the shared client is null — guard at call sites.
+const supabase = sharedSupabase;
 
 /**
  * Retry wrapper for auth operations with exponential backoff
@@ -141,12 +110,22 @@ export function useAuth() {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    // If Supabase env vars are missing, the shared client is null. Bail out
+    // gracefully so the app still renders for guest users instead of crashing.
+    if (!supabase) {
+      console.warn('[Auth] Supabase client unavailable (missing env vars); auth disabled.');
+      setIsLoading(false);
+      return;
+    }
+
+    const client = supabase;
+
     // Get initial session with retry
     const initSession = async () => {
       try {
         const session = await withRetry(
           async () => {
-            const { data: { session }, error } = await supabase.auth.getSession();
+            const { data: { session }, error } = await client.auth.getSession();
             if (error) throw error;
             return session;
           },
@@ -171,7 +150,7 @@ export function useAuth() {
     initSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const { data: { subscription } } = client.auth.onAuthStateChange(
       (event, session) => {
         console.log('[Auth] State changed:', event);
         setUser(session?.user ?? null);

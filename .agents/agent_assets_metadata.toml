@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "cHwZG3Ir7y4ozn6AcraGO"
+uri = "file://client/public/og-image.png"
+type = "image"
+title = "openbento og banner"
