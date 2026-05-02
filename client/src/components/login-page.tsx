@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } from '@/lib/supabase';
+import { useAuth } from '@/hooks/use-auth';
 import { Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface LoginPageProps {
@@ -9,6 +9,7 @@ interface LoginPageProps {
 type AuthMode = 'login' | 'signup' | 'reset';
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps = {}) {
+  const { signIn, signUp, signInWithOAuth, resetPassword } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,30 +26,22 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps = {}) {
 
     try {
       if (mode === 'reset') {
-        const { error } = await resetPassword(email);
-        if (error) {
-          setError(error.message);
-        } else {
-          setSuccess('Check your email for a password reset link.');
-          setMode('login');
-        }
+        await resetPassword(email);
+        setSuccess('Check your email for a password reset link.');
+        setMode('login');
       } else if (mode === 'signup') {
-        const { user, error } = await signUpWithEmail(email, password);
-        if (error) {
-          setError(error.message);
-        } else if (user) {
+        const data = await signUp(email, password);
+        if (data?.user) {
           setSuccess('Check your email to confirm your account.');
         }
       } else {
-        const { user, error } = await signInWithEmail(email, password);
-        if (error) {
-          setError(error.message);
-        } else if (user) {
+        const data = await signIn(email, password);
+        if (data?.user) {
           onLoginSuccess?.();
         }
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred.');
+      setError(err?.message || 'An error occurred.');
     } finally {
       setIsLoading(false);
     }
@@ -57,14 +50,12 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps = {}) {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      const { error } = await signInWithGoogle();
-      if (error) {
-        setError(error.message);
-      }
+      // Preserve the previous redirect target to avoid an OAuth flow regression.
+      await signInWithOAuth('google', { redirectTo: 'https://openbento.tv/' });
     } catch (err: any) {
-      setError(err.message || 'An error occurred during Google login.');
+      setError(err?.message || 'An error occurred during Google login.');
     } finally {
       setIsLoading(false);
     }

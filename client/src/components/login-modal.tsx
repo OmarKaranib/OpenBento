@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword, isSupabaseConfigured } from '@/lib/supabase';
-import { supabase } from '@/lib/supabase';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { useAuth } from '@/hooks/use-auth';
 import { Loader2, Mail, Lock, Eye, EyeOff, X, KeyRound } from 'lucide-react';
 
 type AuthMode = 'login' | 'signup' | 'reset' | 'verify';
@@ -14,6 +14,7 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason, defaultMode = 'login' }: LoginModalProps) {
+  const { signIn, signUp, signInWithOAuth, resetPassword, verifyOtp } = useAuth();
   const [mode, setMode] = useState<AuthMode>(defaultMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,33 +45,23 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason, def
 
     try {
       if (mode === 'reset') {
-        const { error } = await resetPassword(email);
-        if (error) {
-          setError(error.message);
-        } else {
-          setSuccess('Check your email for a password reset link.');
-          setMode('login');
-        }
+        await resetPassword(email);
+        setSuccess('Check your email for a password reset link.');
+        setMode('login');
       } else if (mode === 'signup') {
-        const { user, error } = await signUpWithEmail(email, password);
-        if (error) {
-          setError(error.message);
-        } else {
-          // Don't log in yet - show verification screen
-          setMode('verify');
-          setPassword(''); // Clear password for security
-        }
+        await signUp(email, password);
+        // Don't log in yet - show verification screen
+        setMode('verify');
+        setPassword(''); // Clear password for security
       } else {
-        const { user, error } = await signInWithEmail(email, password);
-        if (error) {
-          setError(error.message);
-        } else if (user) {
+        const data = await signIn(email, password);
+        if (data?.user) {
           onLoginSuccess?.();
           onClose();
         }
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred.');
+      setError(err?.message || 'An error occurred.');
     } finally {
       setIsLoading(false);
     }
@@ -93,15 +84,8 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason, def
     setSuccess(null);
 
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        email,
-        token: otp,
-        type: 'signup'
-      });
-
-      if (error) {
-        setError(error.message || 'Invalid verification code. Please try again.');
-      } else if (data.user) {
+      const data = await verifyOtp(email, otp, 'signup');
+      if (data?.user) {
         setSuccess('Email verified successfully!');
         // Wait a moment to show success message, then close and trigger login success
         setTimeout(() => {
@@ -110,7 +94,7 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason, def
         }, 1000);
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred during verification.');
+      setError(err?.message || 'Invalid verification code. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -124,14 +108,10 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason, def
     setSuccess(null);
 
     try {
-      const { error } = await signUpWithEmail(email, password || 'temp-password');
-      if (error) {
-        setError(error.message);
-      } else {
-        setSuccess('Verification code resent! Check your email.');
-      }
+      await signUp(email, password || 'temp-password');
+      setSuccess('Verification code resent! Check your email.');
     } catch (err: any) {
-      setError(err.message || 'Failed to resend code.');
+      setError(err?.message || 'Failed to resend code.');
     } finally {
       setIsLoading(false);
     }
@@ -147,12 +127,10 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason, def
     setError(null);
 
     try {
-      const { error } = await signInWithGoogle();
-      if (error) {
-        setError(error.message);
-      }
+      // Preserve the previous redirect target to avoid an OAuth flow regression.
+      await signInWithOAuth('google', { redirectTo: 'https://openbento.tv/' });
     } catch (err: any) {
-      setError(err.message || 'An error occurred during Google login.');
+      setError(err?.message || 'An error occurred during Google login.');
     } finally {
       setIsLoading(false);
     }

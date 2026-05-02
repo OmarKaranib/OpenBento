@@ -230,21 +230,28 @@ export function useAuth() {
 
   /**
    * Sign in with OAuth provider (Google/GitHub)
+   *
+   * Accepts optional overrides so callers can preserve their existing
+   * redirect/query-param behavior when migrating off the deprecated
+   * helpers in @/lib/supabase.
    */
-  const signInWithOAuth = async (provider: 'google' | 'github') => {
+  const signInWithOAuth = async (
+    provider: 'google' | 'github',
+    options?: {
+      redirectTo?: string;
+      queryParams?: Record<string, string>;
+    }
+  ) => {
     setError(null);
-    
+
     try {
       const result = await withRetry(
         async () => {
           const { data, error } = await supabase.auth.signInWithOAuth({
             provider,
             options: {
-              redirectTo: `${window.location.origin}/auth/callback`,
-              queryParams: {
-                access_type: 'offline',
-                prompt: 'consent',
-              },
+              redirectTo: options?.redirectTo ?? `${window.location.origin}/auth/callback`,
+              ...(options?.queryParams ? { queryParams: options.queryParams } : {}),
             },
           });
           if (error) throw error;
@@ -252,11 +259,44 @@ export function useAuth() {
         },
         `signInWith${provider}`
       );
-      
+
       return result;
-      
+
     } catch (err) {
       console.error(`[Auth] signInWith${provider} error:`, err);
+      setError(err as Error);
+      throw err;
+    }
+  };
+
+  /**
+   * Verify a one-time code (e.g. signup email confirmation)
+   */
+  const verifyOtp = async (
+    email: string,
+    token: string,
+    type: 'signup' | 'email' | 'recovery' | 'invite' | 'magiclink' | 'email_change' = 'signup'
+  ) => {
+    setError(null);
+
+    try {
+      const result = await withRetry(
+        async () => {
+          const { data, error } = await supabase.auth.verifyOtp({
+            email,
+            token,
+            type,
+          });
+          if (error) throw error;
+          return data;
+        },
+        'verifyOtp'
+      );
+
+      return result;
+
+    } catch (err) {
+      console.error('[Auth] verifyOtp error:', err);
       setError(err as Error);
       throw err;
     }
@@ -353,6 +393,7 @@ export function useAuth() {
     signUp,
     signIn,
     signInWithOAuth,
+    verifyOtp,
     logout,
     resetPassword,
     updatePassword,
