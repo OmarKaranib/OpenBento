@@ -3,7 +3,7 @@
     X, Search, Tv, LayoutGrid, Grip, Layers,
     Gamepad2, RefreshCw, Star,
     Trash2, Globe, Heart, Radio, PenLine, Clock,
-    AlertCircle, CloudSun, BookOpen, QrCode
+    AlertCircle, CloudSun, BookOpen, QrCode, TrendingUp
   } from 'lucide-react';
 
   const failedLogoCache = new Set<string>();
@@ -176,20 +176,21 @@
     widgetType: WidgetType;
     w: number;
     h: number;
-    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'default';
+    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'default';
     color: string;
   }
 
   export const WIDGET_TEMPLATES: WidgetTemplate[] = [
-    { id: 'template-video',        name: 'Video',        widgetType: 'video',        w: 3, h: 2, icon: 'video',        color: 'cyan'   },
-    { id: 'template-note',         name: 'Note',         widgetType: 'note',         w: 3, h: 2, icon: 'note',         color: 'yellow' },
-    { id: 'template-spacer',       name: 'Spacer',       widgetType: 'spacer',       w: 2, h: 1, icon: 'spacer',       color: 'slate'  },
-    { id: 'template-image',        name: 'Photo',        widgetType: 'image',        w: 3, h: 2, icon: 'image',        color: 'purple' },
-    { id: 'template-clock',        name: 'Clock',        widgetType: 'clock',        w: 3, h: 2, icon: 'clock',        color: 'cyan'   },
-    { id: 'template-crisis-ticker', name: 'Crisis Intel', widgetType: 'crisis_ticker', w: 3, h: 2, icon: 'crisis_ticker', color: 'red'  },
-    { id: 'template-weather',      name: 'Weather',      widgetType: 'weather',      w: 2, h: 2, icon: 'weather',      color: 'sky'    },
-    { id: 'template-dictionary',   name: 'Dictionary',   widgetType: 'dictionary',   w: 3, h: 2, icon: 'dictionary',   color: 'indigo' },
-    { id: 'template-qr-generator', name: 'QR Portal',    widgetType: 'qr_generator', w: 2, h: 2, icon: 'qr_generator', color: 'violet' },
+    { id: 'template-video',        name: 'Video',        widgetType: 'video',        w: 3, h: 2, icon: 'video',        color: 'cyan'    },
+    { id: 'template-note',         name: 'Note',         widgetType: 'note',         w: 3, h: 2, icon: 'note',         color: 'yellow'  },
+    { id: 'template-spacer',       name: 'Spacer',       widgetType: 'spacer',       w: 2, h: 1, icon: 'spacer',       color: 'slate'   },
+    { id: 'template-image',        name: 'Photo',        widgetType: 'image',        w: 3, h: 2, icon: 'image',        color: 'purple'  },
+    { id: 'template-clock',        name: 'Clock',        widgetType: 'clock',        w: 3, h: 2, icon: 'clock',        color: 'cyan'    },
+    { id: 'template-crisis-ticker', name: 'Crisis Intel', widgetType: 'crisis_ticker', w: 3, h: 2, icon: 'crisis_ticker', color: 'red'   },
+    { id: 'template-markets-ticker', name: 'Markets',    widgetType: 'markets_ticker', w: 3, h: 3, icon: 'markets_ticker', color: 'emerald' },
+    { id: 'template-weather',      name: 'Weather',      widgetType: 'weather',      w: 2, h: 2, icon: 'weather',      color: 'sky'     },
+    { id: 'template-dictionary',   name: 'Dictionary',   widgetType: 'dictionary',   w: 3, h: 2, icon: 'dictionary',   color: 'indigo'  },
+    { id: 'template-qr-generator', name: 'QR Portal',    widgetType: 'qr_generator', w: 2, h: 2, icon: 'qr_generator', color: 'violet'  },
   ];
 
   function loadPersonalLibrary(): SavedChannel[] {
@@ -687,6 +688,24 @@
           w: 2, h: 2,
           icon: 'qr_generator' as const,
           color: 'violet',
+        },
+      },
+      {
+        id: 'markets_ticker',
+        label: 'Markets',
+        description: 'Live crypto & stock prices with sparkline',
+        icon: <TrendingUp className="w-[2rem] h-[2rem] text-emerald-400" />,
+        iconBg: 'bg-emerald-500/15',
+        border: 'border-emerald-500/30 hover:border-emerald-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/40',
+        template: {
+          id: 'template-markets-ticker',
+          name: 'Markets',
+          widgetType: 'markets_ticker' as WidgetType,
+          w: 3, h: 3,
+          icon: 'markets_ticker' as const,
+          color: 'emerald',
         },
       },
     ] as const;

@@ -7,6 +7,7 @@ export type StarterTileType =
   | 'weather'
   | 'crisis_ticker'
   | 'qr_generator'
+  | 'markets_ticker'
   | 'note';
 
 export interface StarterTile {
@@ -63,12 +64,13 @@ export const STARTER_PACKS: StarterPack[] = [
     id: 'markets',
     emoji: '📈',
     label: 'Markets Watch',
-    description: 'Finance streams plus a breaking-news ticker.',
+    description: 'Finance streams plus markets ticker and breaking-news strip.',
     tiles: [
       { type: 'video', channelId: 'bloomberg-live', x: 0, y: 0, w: 6, h: 4 },
       { type: 'video', channelId: 'cnbc-live',      x: 6, y: 0, w: 6, h: 4 },
-      { type: 'crisis_ticker',                      x: 0, y: 4, w: 8, h: 2 },
-      { type: 'clock',                              x: 8, y: 4, w: 4, h: 2 },
+      { type: 'markets_ticker',                     x: 0, y: 4, w: 4, h: 2 },
+      { type: 'crisis_ticker',                      x: 4, y: 4, w: 5, h: 2 },
+      { type: 'clock',                              x: 9, y: 4, w: 3, h: 2 },
     ],
   },
   {

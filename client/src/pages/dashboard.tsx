@@ -1278,7 +1278,12 @@ const MasterControlDashboard = ({
   const renderWidgetContent = (widget: Widget) => {
     const isSeekMode = seekModeWidgets.has(widget.id);
 
-    const early = WidgetRenderer({ widget, onToggle24Hour: toggleClock24Hour });
+    const early = WidgetRenderer({
+      widget,
+      onToggle24Hour: toggleClock24Hour,
+      onUpdate: (widgetId, patch) =>
+        setWidgets(prev => prev.map(w => w.id === widgetId ? { ...w, ...patch } : w)),
+    });
     if (early !== false) return early;
 
     switch (widget.type) {
