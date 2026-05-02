@@ -2221,30 +2221,32 @@ const MasterControlDashboard = ({
         )}
 
         {widgets.length === 0 && !isEditMode && !hasStartedBuilding && (
-          <div 
-            className="flex flex-col items-center justify-center text-slate-400 col-span-12"
+          <div
+            className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none"
             data-testid="empty-state"
           >
-            <Power className="w-[6rem] h-[6rem] mb-[1.5rem] text-cyan-400/30" />
-            <h3 className="text-[1.6rem] font-bold mb-[0.8rem] text-slate-300">Dashboard Empty</h3>
-            <p className="text-[1.2rem] mb-[1.5rem]">Click "Block" in the menu bar to add blocks to your dashboard</p>
-            <button
-              onClick={() => {
-                setHasStartedBuilding(true); // Remove this button from DOM after click
-                setIsEditMode(true);
-                // Automatically open the library sidebar so users can add blocks
-                handleOpenSidebarToContent();
-                // Trigger viral ad on Start Building click (free users only)
-                if (!isAdActive) {
-                  triggerAd();
-                }
-              }}
-              className="px-[2rem] py-[1rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.8rem] transition-all duration-300 text-[1.3rem]"
-              data-testid="button-start-editing"
-            >
-              <Edit3 className="w-[1.6rem] h-[1.6rem]" />
-              Start Building
-            </button>
+            <div className="pointer-events-auto flex flex-col items-center justify-center text-center">
+              <Power className="w-[6rem] h-[6rem] mb-[1.5rem] text-cyan-400/30" />
+              <h3 className="text-[1.6rem] font-bold mb-[0.8rem] text-slate-900 dark:text-white">Dashboard Empty</h3>
+              <p className="text-[1.2rem] mb-[1.5rem] text-slate-900 dark:text-white">Click "Block" in the menu bar to add blocks to your dashboard</p>
+              <button
+                onClick={() => {
+                  setHasStartedBuilding(true); // Remove this button from DOM after click
+                  setIsEditMode(true);
+                  // Automatically open the library sidebar so users can add blocks
+                  handleOpenSidebarToContent();
+                  // Trigger viral ad on Start Building click (free users only)
+                  if (!isAdActive) {
+                    triggerAd();
+                  }
+                }}
+                className="px-[2rem] py-[1rem] bg-cyan-600 hover:bg-cyan-500 slot-button font-semibold flex items-center gap-[0.8rem] transition-all duration-300 text-[1.3rem]"
+                data-testid="button-start-editing"
+              >
+                <Edit3 className="w-[1.6rem] h-[1.6rem]" />
+                Start Building
+              </button>
+            </div>
           </div>
         )}
         </div>
