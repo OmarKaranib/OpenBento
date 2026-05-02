@@ -53,7 +53,10 @@ export function OnboardingFlow({
         const list: TrendingChannel[] = data?.channels ?? [];
         setChannels(list);
       })
-      .catch(() => {/* offline / API down — empty array, video packs skip */});
+      .catch(() => {/* offline / API down — empty array, video packs skip */})
+      .finally(() => {
+        if (!cancelled) setChannelsReady(true);
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -88,41 +91,78 @@ export function OnboardingFlow({
     setPhase('hidden');
   }, []);
 
-  // The welcome modal closes into the coachmarks; only Esc *during a coachmark*
-  // ends the flow early and persists the onboarded flag.
-  const skipWelcome = useCallback(() => setPhase('coach-block'), []);
+  // The welcome modal and the Block coachmark always advance to the next step;
+  // only dismissing the *Edit* coachmark persists the onboarded flag.
+  const skipWelcome    = useCallback(() => setPhase('coach-block'), []);
+  const advanceToEdit  = useCallback(() => setPhase('coach-edit'),  []);
 
   useEffect(() => {
     if (phase === 'hidden') return;
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (phase === 'welcome') skipWelcome();
-      else finish();
+      if (phase === 'welcome')         skipWelcome();
+      else if (phase === 'coach-block') advanceToEdit();
+      else                              finish();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [phase, finish, skipWelcome]);
+  }, [phase, finish, skipWelcome, advanceToEdit]);
 
-  const handlePickPack = useCallback((pack: StarterPack) => {
+  // Track whether the channels response has resolved (success OR failure). We
+  // can't simply check `channels.length > 0` because a failed fetch leaves it
+  // at [], which is indistinguishable from "still loading".
+  const [channelsReady, setChannelsReady] = useState(false);
+
+  // Pack picks are queued if the user clicks before /api/links resolves, so
+  // News (and other video-heavy packs) never silently load 0 tiles.
+  const [pendingPick, setPendingPick] = useState<StarterPack | null>(null);
+
+  const buildAndAdvance = useCallback((pack: StarterPack) => {
     if (pack.tiles.length === 0) {
-      // Empty Canvas — skip straight to coachmarks so user knows where to start
       setPhase('coach-block');
       return;
     }
     const widgets = buildWidgetsFromPack(pack, channels);
-    if (widgets.length === 0) {
-      // All channels missing from live data — still advance the flow
+    // Only call setWidgets when there's actually something to load — this
+    // avoids wiping a populated grid if the response shape changes upstream.
+    if (widgets.length > 0) setWidgets(widgets);
+    setPhase('coach-block');
+  }, [channels, setWidgets]);
+
+  // Fulfil the queued pick once channels arrive.
+  useEffect(() => {
+    if (!channelsReady || !pendingPick) return;
+    const queued = pendingPick;
+    setPendingPick(null);
+    buildAndAdvance(queued);
+  }, [channelsReady, pendingPick, buildAndAdvance]);
+
+  const handlePickPack = useCallback((pack: StarterPack) => {
+    // Empty Canvas can advance immediately — it has no video tiles to hydrate.
+    if (pack.tiles.length === 0) {
       setPhase('coach-block');
       return;
     }
-    setWidgets(widgets);
-    setPhase('coach-block');
-  }, [channels, setWidgets]);
+    if (!channelsReady) {
+      // Defer until the live channel data arrives. The pack button shows a
+      // "Loading channels…" state while queued (see WelcomeModal).
+      setPendingPick(pack);
+      return;
+    }
+    buildAndAdvance(pack);
+  }, [channelsReady, buildAndAdvance]);
 
   if (phase === 'hidden') return null;
 
   if (phase === 'welcome') {
-    return <WelcomeModal onPick={handlePickPack} onSkip={skipWelcome} />;
+    return (
+      <WelcomeModal
+        onPick={handlePickPack}
+        onSkip={skipWelcome}
+        channelsReady={channelsReady}
+        pendingPackId={pendingPick?.id ?? null}
+      />
+    );
   }
 
   if (phase === 'coach-block') {
@@ -133,9 +173,11 @@ export function OnboardingFlow({
         body={<>Tap <strong className="text-cyan-300">Block</strong> anytime to add or swap tiles.</>}
         step={1}
         total={2}
-        onNext={() => setPhase('coach-edit')}
+        onNext={advanceToEdit}
         nextLabel="Got it"
-        onSkip={finish}
+        // Backdrop click / skip on Step 1 must still advance to Step 2 — the
+        // spec requires both coachmarks to be shown before persisting the flag.
+        onSkip={advanceToEdit}
       />
     );
   }
@@ -163,9 +205,13 @@ export function OnboardingFlow({
 function WelcomeModal({
   onPick,
   onSkip,
+  channelsReady,
+  pendingPackId,
 }: {
   onPick: (pack: StarterPack) => void;
   onSkip: () => void;
+  channelsReady: boolean;
+  pendingPackId: string | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -258,18 +304,28 @@ function WelcomeModal({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-[1rem]">
-          {STARTER_PACKS.map(pack => (
+          {STARTER_PACKS.map(pack => {
+            // Video-bearing packs need /api/links to have resolved before we
+            // can populate fresh videoIds. Empty Canvas always works.
+            const needsChannels = pack.tiles.some(t => t.type === 'video');
+            const isLoading     = needsChannels && !channelsReady;
+            const isQueued      = pendingPackId === pack.id;
+            return (
             <button
               key={pack.id}
               onClick={() => onPick(pack)}
-              className="group relative text-left bg-slate-800/60 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/60 rounded-xl p-[1.2rem] transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-cyan-500/10"
+              className={`group relative text-left bg-slate-800/60 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/60 rounded-xl p-[1.2rem] transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-cyan-500/10 ${isQueued ? 'cursor-wait opacity-70' : ''}`}
               data-testid={`button-pack-${pack.id}`}
+              aria-busy={isQueued}
+              aria-disabled={isLoading || isQueued}
             >
               <div className="flex items-start gap-[0.8rem]">
                 <span className="text-[2rem] leading-none" aria-hidden="true">{pack.emoji}</span>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-[1.1rem] font-bold text-white mb-[0.2rem]">{pack.label}</h3>
-                  <p className="text-[0.85rem] text-slate-400 leading-snug">{pack.description}</p>
+                  <p className="text-[0.85rem] text-slate-400 leading-snug">
+                    {isQueued ? 'Loading channels…' : pack.description}
+                  </p>
                 </div>
                 <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 mt-[0.4rem] flex-shrink-0 transition-colors" />
               </div>
@@ -301,7 +357,8 @@ function WelcomeModal({
                 </div>
               )}
             </button>
-          ))}
+            );
+          })}
         </div>
 
         <div className="mt-[1.5rem] flex items-center justify-between">
