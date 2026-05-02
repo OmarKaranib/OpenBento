@@ -4330,6 +4330,41 @@
             | { kind: 'repo'; data: GitHubPulseData }
             | { kind: 'user'; data: GitHubUserData };
 
+          // Subtle dot shown next to a widget header while a background
+          // refresh is in flight. Tooltip surfaces last-updated time and any
+          // background error without stealing visual real-estate.
+          const RefreshIndicator: React.FC<{
+            active: boolean;
+            fetchedAt?: number;
+            error?: string | null;
+            color: string;
+          }> = ({ active, fetchedAt, error, color }) => {
+            const updated = fetchedAt
+              ? `Updated ${timeAgo(new Date(fetchedAt).toISOString())}`
+              : '';
+            const tip = active
+              ? `Refreshing…${updated ? ` (${updated})` : ''}`
+              : error
+                ? `${error}${updated ? ` — ${updated}` : ''}`
+                : updated;
+            const dotColor = error ? '#f85149' : color;
+            return (
+              <span
+                title={tip || undefined}
+                aria-label={tip || undefined}
+                style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: dotColor,
+                  opacity: active ? 1 : error ? 0.8 : 0.35,
+                  flexShrink: 0,
+                  animation: active ? 'widget-refresh-pulse 1.2s ease-in-out infinite' : 'none',
+                  boxShadow: active ? `0 0 6px ${dotColor}` : 'none',
+                }}
+                data-testid="refresh-indicator"
+              />
+            );
+          };
+
           function timeAgo(iso: string): string {
             if (!iso) return '';
             const t = Date.parse(iso);
@@ -4367,12 +4402,17 @@
             const owner = widget.githubOwner;
             const repo  = widget.githubRepo;
 
+            // Stale-while-revalidate: keep showing the previous payload while
+            // a background refresh is in flight. The spinner and error text
+            // only appear on the very first fetch (when there's no data yet).
+            // Subsequent failures leave stale data intact and surface the
+            // problem only via the subtle "refreshing" dot tooltip.
+            const hasPayload = payload !== null;
             useEffect(() => {
-              if (!owner) { setPayload(null); return; }
+              if (!owner) { setPayload(null); setError(null); return; }
               let cancelled = false;
               const run = async () => {
                 setLoading(true);
-                setError(null);
                 try {
                   // Branch on whether a repo was supplied: repo stats vs.
                   // owner profile. Both routes share the 5-min cache window.
@@ -4383,12 +4423,15 @@
                   const body = await r.json();
                   if (cancelled) return;
                   if (!r.ok) {
+                    // Preserve stale data on background-refresh failure so the
+                    // widget doesn't flash an error in place of good content.
                     setError(body?.error || `Error ${r.status}`);
-                    setPayload(null);
                   } else if (repo) {
                     setPayload({ kind: 'repo', data: body as GitHubPulseData });
+                    setError(null);
                   } else {
                     setPayload({ kind: 'user', data: body as GitHubUserData });
+                    setError(null);
                   }
                 } catch (err: unknown) {
                   if (!cancelled) {
@@ -4453,6 +4496,12 @@
                       >
                         {repo ? `${owner}/${repo}` : `@${owner}`}
                       </a>
+                      <RefreshIndicator
+                        active={loading && hasPayload}
+                        fetchedAt={repoData?.fetchedAt ?? userData?.fetchedAt}
+                        error={error}
+                        color="#58a6ff"
+                      />
                       <button
                         onClick={() => { setDraftOwner(owner); setDraftRepo(repo || ''); setForceEdit(true); }}
                         style={qrIconBtnStyle()}
@@ -4736,21 +4785,23 @@
 
             const url = widget.rssUrl;
 
+            // Stale-while-revalidate: keep the previous feed visible during
+            // background refreshes; only the first load shows a spinner.
             useEffect(() => {
-              if (!url) { setData(null); return; }
+              if (!url) { setData(null); setError(null); return; }
               let cancelled = false;
               const run = async () => {
                 setLoading(true);
-                setError(null);
                 try {
                   const r = await fetch(`/api/rss?url=${encodeURIComponent(url)}`);
                   const body = await r.json();
                   if (cancelled) return;
                   if (!r.ok) {
+                    // Preserve stale items on background failure.
                     setError(body?.error || `Error ${r.status}`);
-                    setData(null);
                   } else {
                     setData(body);
+                    setError(null);
                   }
                 } catch (err: unknown) {
                   if (!cancelled) {
@@ -4797,6 +4848,12 @@
                       }} title={data?.title || url}>
                         {data?.title || 'RSS Feed'}
                       </span>
+                      <RefreshIndicator
+                        active={loading && data !== null}
+                        fetchedAt={data?.fetchedAt}
+                        error={error}
+                        color="#fb923c"
+                      />
                       <button
                         onClick={() => { setDraftUrl(url); setEditing(true); }}
                         style={qrIconBtnStyle()}

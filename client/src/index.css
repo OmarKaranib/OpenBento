@@ -878,3 +878,9 @@ body.light-theme .starry-night {
   opacity: 1;
   pointer-events: auto;
 }
+
+/* Subtle pulse used by widget background-refresh indicators (GitHub, RSS). */
+@keyframes widget-refresh-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50%      { opacity: 1;   transform: scale(1.15); }
+}
