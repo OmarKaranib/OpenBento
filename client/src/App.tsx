@@ -736,7 +736,7 @@
                         {timerRunning && (
                           <button style={btnStyle()} onClick={(e) => { e.stopPropagation(); setTimerRunning(false); }} data-testid="btn-timer-pause">Pause</button>
                         )}
-                        {!timerRunning && timerLeft < timerTotal && timerLeft > 0 && (
+                        {!timerRunning && timerLeft > 0 && (timerLeft < timerTotal || pomodoroPhase) && (
                           <button style={btnStyle(true)} onClick={(e) => { e.stopPropagation(); setTimerRunning(true); }} data-testid="btn-timer-resume">Resume</button>
                         )}
                         {timerLeft < timerTotal && !pomodoroPhase && (
@@ -1038,21 +1038,41 @@
               return () => clearInterval(id);
             }, []);
 
+            // Memoize one formatter per (tz × use24h) — rebuilding these on every
+            // tick at max-cities is otherwise the dominant cost in this widget.
+            const use24 = widget.clockUse24Hour ?? false;
+            const timeFormatters = useMemo(() => {
+              const m = new Map<string, Intl.DateTimeFormat>();
+              for (const tz of tzs) {
+                try {
+                  m.set(tz, new Intl.DateTimeFormat([], {
+                    hour: '2-digit', minute: '2-digit', hour12: !use24, timeZone: tz,
+                  }));
+                } catch { /* invalid tz — fmtCellTime will return em-dash */ }
+              }
+              return m;
+            }, [tzs, use24]);
+
+            const dateFormatters = useMemo(() => {
+              const m = new Map<string, Intl.DateTimeFormat>();
+              for (const tz of tzs) {
+                try {
+                  m.set(tz, new Intl.DateTimeFormat([], {
+                    weekday: 'short', month: 'short', day: 'numeric', timeZone: tz,
+                  }));
+                } catch { /* invalid tz — fmtCellDate will return '' */ }
+              }
+              return m;
+            }, [tzs]);
+
             const fmtCellTime = (tz: string) => {
-              try {
-                return new Intl.DateTimeFormat([], {
-                  hour: '2-digit', minute: '2-digit', hour12: !(widget.clockUse24Hour ?? false),
-                  timeZone: tz,
-                }).format(now);
-              } catch { return '—'; }
+              const f = timeFormatters.get(tz);
+              return f ? f.format(now) : '—';
             };
 
             const fmtCellDate = (tz: string) => {
-              try {
-                return new Intl.DateTimeFormat([], {
-                  weekday: 'short', month: 'short', day: 'numeric', timeZone: tz,
-                }).format(now);
-              } catch { return ''; }
+              const f = dateFormatters.get(tz);
+              return f ? f.format(now) : '';
             };
 
             const addTz = (tz: string) => {
@@ -1387,7 +1407,16 @@
             }, []);
 
             const targetIso  = widget.countdownTarget ?? fallbackTargetRef.current;
-            const target     = useMemo(() => new Date(targetIso), [targetIso]);
+            const target     = useMemo(() => {
+              const d = new Date(targetIso);
+              if (isNaN(d.getTime())) {
+                const fb = new Date(fallbackTargetRef.current);
+                return isNaN(fb.getTime())
+                  ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                  : fb;
+              }
+              return d;
+            }, [targetIso]);
             const label      = widget.countdownLabel ?? 'Launch Day';
             const emoji      = widget.countdownEmoji ?? '🚀';
 
