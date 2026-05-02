@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Sparkles, ArrowRight } from 'lucide-react';
+import { X, ArrowRight } from 'lucide-react';
 import {
   STARTER_PACKS,
   buildWidgetsFromPack,
   type StarterPack,
 } from '@/data/starter-packs';
 import type { TrendingChannel } from '@/components/widget-sidebar';
+import type { Widget } from '@/App';
 
 export const ONBOARDING_FLAG = 'openBentoOnboarded';
 export const REPLAY_EVENT = 'openbento:replay-onboarding';
@@ -13,7 +14,7 @@ export const REPLAY_EVENT = 'openbento:replay-onboarding';
 type Phase = 'hidden' | 'welcome' | 'coach-block' | 'coach-edit';
 
 interface OnboardingFlowProps {
-  setWidgets: (widgets: any[]) => void;
+  setWidgets: (widgets: Widget[]) => void;
   hasWidgets: boolean;
   isAuthenticated: boolean;
   authIsLoading: boolean;
@@ -123,11 +124,12 @@ export function OnboardingFlow({
     return (
       <Coachmark
         targetSelector='[data-testid="button-add-block"]'
-        title="Add a Block"
-        body="Click here to open the Block Library — drop in news, weather, notes, or anything else."
+        title="Add tiles to your grid"
+        body={<>Tap <strong className="text-cyan-300">Block</strong> anytime to add or swap tiles.</>}
         step={1}
         total={2}
         onNext={() => setPhase('coach-edit')}
+        nextLabel="Got it"
         onSkip={finish}
       />
     );
@@ -137,12 +139,12 @@ export function OnboardingFlow({
     return (
       <Coachmark
         targetSelector='[data-testid="button-edit-layout"]'
-        title="Arrange Your Layout"
-        body="Toggle Edit to drag, resize, or remove blocks. Click Save when you're done."
+        title="Rearrange your dashboard"
+        body={<>Hit <strong className="text-cyan-300">Edit</strong> to drag, resize, or remove tiles.</>}
         step={2}
         total={2}
         onNext={finish}
-        nextLabel="Got it"
+        nextLabel="Done"
         onSkip={finish}
       />
     );
@@ -182,9 +184,12 @@ function WelcomeModal({
         </button>
 
         <div className="text-center mb-[1.5rem]">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-cyan-500/15 border border-cyan-500/40 mb-[0.8rem]">
-            <Sparkles className="w-6 h-6 text-cyan-400" />
-          </div>
+          <img
+            src="/t.png"
+            alt="OpenBento logo"
+            className="w-14 h-14 mx-auto mb-[0.8rem] rounded-xl object-contain"
+            data-testid="img-onboarding-logo"
+          />
           <h2
             id="onboarding-title"
             className="text-[1.8rem] md:text-[2rem] font-bold text-white mb-[0.4rem]"
@@ -192,8 +197,11 @@ function WelcomeModal({
           >
             Welcome to OpenBento
           </h2>
-          <p className="text-[0.95rem] md:text-[1rem] text-slate-400">
-            Pick a starter pack to load some blocks — or start from scratch.
+          <p
+            className="text-[0.95rem] md:text-[1rem] text-slate-400"
+            data-testid="text-onboarding-tagline"
+          >
+            Your live mission control for streams, news &amp; signals.
           </p>
         </div>
 
@@ -266,7 +274,7 @@ function WelcomeModal({
 interface CoachmarkProps {
   targetSelector: string;
   title: string;
-  body: string;
+  body: React.ReactNode;
   step: number;
   total: number;
   onNext: () => void;
@@ -420,7 +428,7 @@ function CoachTooltip({
   style,
 }: {
   title: string;
-  body: string;
+  body: React.ReactNode;
   step: number;
   total: number;
   onNext: () => void;

@@ -1,4 +1,5 @@
 import type { TrendingChannel } from '@/components/widget-sidebar';
+import type { Widget } from '@/App';
 
 export type StarterTileType =
   | 'video'
@@ -96,9 +97,9 @@ function makeId(): string {
 export function buildWidgetsFromPack(
   pack: StarterPack,
   channels: TrendingChannel[],
-): any[] {
+): Widget[] {
   const byId = new Map(channels.map(c => [c.id, c]));
-  const widgets: any[] = [];
+  const widgets: Widget[] = [];
 
   for (const tile of pack.tiles) {
     const base = {
@@ -123,15 +124,18 @@ export function buildWidgetsFromPack(
       const isYouTube = ch.platform === 'youtube';
       const isTwitch  = ch.platform === 'twitch';
       const isKick    = ch.platform === 'kick';
-      const handle = (ch as any).channelHandle ?? ch.channelId ?? null;
+      // The /api/links response stores the platform handle in `channelId` (see
+      // server/routes.ts line 315). Use it as the handle for both YouTube and
+      // Twitch/Kick widgets.
+      const handle: string | null = ch.channelId ?? null;
 
-      widgets.push({
+      const widget: Widget = {
         ...base,
         type: 'video',
         url: ch.url,
         isYouTube,
         videoId: ch.videoId ?? null,
-        youtubeChannelId: ch.channelId ?? null,
+        youtubeChannelId: handle,
         channelHandle: handle,
         channelName: stripLegacyPrefix(ch.name) ?? ch.name,
         isTwitch,
@@ -140,7 +144,8 @@ export function buildWidgetsFromPack(
         kickChannel: isKick ? handle : null,
         isLive: ch.isLive === true,
         lastRefresh: Date.now(),
-      });
+      };
+      widgets.push(widget);
     } else if (tile.type === 'note') {
       widgets.push({ ...base, type: 'note', noteContent: tile.noteContent ?? '' });
     } else {
