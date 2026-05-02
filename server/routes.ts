@@ -1122,13 +1122,44 @@ export async function registerRoutes(
   }
 
   // ─── News API (NewsAPI.org) ───────────────────────────────────────────────
-  app.get('/api/news', async (_req: Request, res: Response) => {
+  // Accepts optional `?sources=bbc-news,reuters` (NewsAPI source IDs, comma-list)
+  // and `?category=business|entertainment|general|health|science|sports|technology`.
+  // Per NewsAPI rules, `sources` is mutually exclusive with `category` & `country` —
+  // when sources are supplied we drop both and forward only sources. Otherwise we
+  // forward category + language=en (default).
+  const NEWS_VALID_CATEGORIES = new Set([
+    'business', 'entertainment', 'general', 'health', 'science', 'sports', 'technology',
+  ]);
+
+  app.get('/api/news', async (req: Request, res: Response) => {
     const apiKey = process.env.NEWS_API_KEY;
     if (!apiKey) {
       return res.status(503).json({ error: 'News API key not configured' });
     }
+
+    const rawSources = typeof req.query.sources === 'string' ? req.query.sources.trim() : '';
+    const rawCategory = typeof req.query.category === 'string' ? req.query.category.trim().toLowerCase() : '';
+
+    // Sanitize sources: NewsAPI source IDs are lowercase + dashes only.
+    const sources = rawSources
+      .split(',')
+      .map(s => s.trim().toLowerCase())
+      .filter(s => /^[a-z0-9-]+$/.test(s))
+      .slice(0, 20)
+      .join(',');
+
+    const category = NEWS_VALID_CATEGORIES.has(rawCategory) ? rawCategory : '';
+
     try {
-      const url = `https://newsapi.org/v2/top-headlines?language=en&apiKey=${apiKey}`;
+      const params = new URLSearchParams();
+      if (sources) {
+        params.set('sources', sources);
+      } else {
+        params.set('language', 'en');
+        if (category) params.set('category', category);
+      }
+      params.set('apiKey', apiKey);
+      const url = `https://newsapi.org/v2/top-headlines?${params.toString()}`;
       const resp = await fetch(url);
       if (!resp.ok) {
         const body = await resp.text();
@@ -1143,10 +1174,169 @@ export async function registerRoutes(
           id: i + 1,
           text: a.title,
           source: a.source?.name || '',
+          url: a.url || '',
         }));
       res.json({ articles });
     } catch (err) {
       console.error('[News] Fetch error:', err);
+      res.status(503).json({ error: 'Service temporarily unavailable' });
+    }
+  });
+
+  // ─── Markets API (CoinGecko + Yahoo Finance) ──────────────────────────────
+  // GET /api/markets?symbols=BTC,ETH,SPY,AAPL
+  // Returns { symbols: [{ symbol, name, type, price, change24hPct, sparkline,
+  //   updatedAt, error? }] }. Symbols are detected by membership in the crypto
+  // map below (everything else is treated as a stock). Server caches each
+  // symbol's resolved payload in-memory for 60s and degrades gracefully on
+  // upstream failures by returning a per-symbol `error` field instead of 5xx.
+  type MarketEntry = {
+    symbol: string;
+    name: string;
+    type: 'crypto' | 'stock';
+    price: number | null;
+    change24hPct: number | null;
+    sparkline: number[];
+    updatedAt: number;
+    error?: string;
+  };
+
+  const CRYPTO_MAP: Record<string, { id: string; name: string }> = {
+    BTC:   { id: 'bitcoin',      name: 'Bitcoin'      },
+    ETH:   { id: 'ethereum',     name: 'Ethereum'     },
+    SOL:   { id: 'solana',       name: 'Solana'       },
+    ADA:   { id: 'cardano',      name: 'Cardano'      },
+    DOGE:  { id: 'dogecoin',     name: 'Dogecoin'     },
+    BNB:   { id: 'binancecoin',  name: 'BNB'          },
+    XRP:   { id: 'ripple',       name: 'XRP'          },
+    MATIC: { id: 'matic-network', name: 'Polygon'     },
+    DOT:   { id: 'polkadot',     name: 'Polkadot'     },
+    AVAX:  { id: 'avalanche-2',  name: 'Avalanche'    },
+    LTC:   { id: 'litecoin',     name: 'Litecoin'     },
+    LINK:  { id: 'chainlink',    name: 'Chainlink'    },
+  };
+
+  const MARKETS_CACHE = new Map<string, MarketEntry>();
+  const MARKETS_TTL_MS = 60 * 1000;
+
+  // Sample a series down to ~24 evenly spaced points for a tidy sparkline.
+  function sampleSeries(arr: number[], target = 24): number[] {
+    if (arr.length <= target) return arr.slice();
+    const step = (arr.length - 1) / (target - 1);
+    const out: number[] = [];
+    for (let i = 0; i < target; i++) out.push(arr[Math.round(i * step)]);
+    return out;
+  }
+
+  async function fetchCryptoEntry(symbol: string): Promise<MarketEntry> {
+    const meta = CRYPTO_MAP[symbol];
+    const updatedAt = Date.now();
+    if (!meta) {
+      return { symbol, name: symbol, type: 'crypto', price: null, change24hPct: null, sparkline: [], updatedAt, error: 'Unknown crypto symbol' };
+    }
+    try {
+      // Single call: market_chart returns price series; derive current price
+      // and 24h % change from it (avoids a second request).
+      const url = `https://api.coingecko.com/api/v3/coins/${meta.id}/market_chart?vs_currency=usd&days=1`;
+      const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!resp.ok) throw new Error(`CoinGecko ${resp.status}`);
+      const data = await resp.json();
+      const prices: [number, number][] = data?.prices || [];
+      if (prices.length === 0) throw new Error('No price data');
+      const series = prices.map(p => p[1]);
+      const first = series[0];
+      const last = series[series.length - 1];
+      const change = first > 0 ? ((last - first) / first) * 100 : 0;
+      return {
+        symbol, name: meta.name, type: 'crypto',
+        price: last, change24hPct: change,
+        sparkline: sampleSeries(series, 24),
+        updatedAt,
+      };
+    } catch (err: any) {
+      console.warn(`[Markets] Crypto fetch failed for ${symbol}:`, err?.message || err);
+      return { symbol, name: meta.name, type: 'crypto', price: null, change24hPct: null, sparkline: [], updatedAt, error: 'Upstream unavailable' };
+    }
+  }
+
+  async function fetchStockEntry(symbol: string): Promise<MarketEntry> {
+    const updatedAt = Date.now();
+    try {
+      // Yahoo Finance unofficial chart endpoint. range=1d/interval=15m gives
+      // enough points for a sparkline; meta.regularMarketPrice +
+      // chartPreviousClose drive the 24h delta when previousClose is present.
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=15m&range=1d&includePrePost=false`;
+      const resp = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+        },
+      });
+      if (!resp.ok) throw new Error(`Yahoo ${resp.status}`);
+      const data = await resp.json();
+      const result = data?.chart?.result?.[0];
+      if (!result) throw new Error('No chart result');
+      const meta = result.meta || {};
+      const closes: (number | null)[] = result.indicators?.quote?.[0]?.close || [];
+      const cleaned = closes.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+      if (cleaned.length === 0 && typeof meta.regularMarketPrice !== 'number') {
+        throw new Error('No price points');
+      }
+      const last = typeof meta.regularMarketPrice === 'number'
+        ? meta.regularMarketPrice
+        : cleaned[cleaned.length - 1];
+      const prev = typeof meta.chartPreviousClose === 'number'
+        ? meta.chartPreviousClose
+        : (typeof meta.previousClose === 'number' ? meta.previousClose : cleaned[0]);
+      const change = prev > 0 ? ((last - prev) / prev) * 100 : 0;
+      const name = (meta.shortName || meta.longName || symbol) as string;
+      return {
+        symbol, name, type: 'stock',
+        price: last, change24hPct: change,
+        sparkline: sampleSeries(cleaned.length ? cleaned : [last], 24),
+        updatedAt,
+      };
+    } catch (err: any) {
+      console.warn(`[Markets] Stock fetch failed for ${symbol}:`, err?.message || err);
+      return { symbol, name: symbol, type: 'stock', price: null, change24hPct: null, sparkline: [], updatedAt, error: 'Upstream unavailable' };
+    }
+  }
+
+  async function getMarketEntry(rawSymbol: string): Promise<MarketEntry> {
+    const symbol = rawSymbol.trim().toUpperCase();
+    const cached = MARKETS_CACHE.get(symbol);
+    const now = Date.now();
+    if (cached && now - cached.updatedAt < MARKETS_TTL_MS && !cached.error) {
+      return cached;
+    }
+    const entry = symbol in CRYPTO_MAP
+      ? await fetchCryptoEntry(symbol)
+      : await fetchStockEntry(symbol);
+    // Only cache successful entries; errored entries are retried next request.
+    if (!entry.error) MARKETS_CACHE.set(symbol, entry);
+    else if (cached) {
+      // If the new fetch errored but we have a not-too-stale cached value
+      // (≤ 5 min old), serve the stale cache instead of an error.
+      if (now - cached.updatedAt < 5 * 60 * 1000) return cached;
+    }
+    return entry;
+  }
+
+  app.get('/api/markets', async (req: Request, res: Response) => {
+    const raw = typeof req.query.symbols === 'string' ? req.query.symbols : '';
+    const symbols = raw
+      .split(',')
+      .map(s => s.trim().toUpperCase())
+      .filter(s => /^[A-Z0-9.\-]{1,8}$/.test(s))
+      .slice(0, 20);
+    if (symbols.length === 0) {
+      return res.status(400).json({ error: 'No valid symbols provided' });
+    }
+    try {
+      const entries = await Promise.all(symbols.map(getMarketEntry));
+      res.json({ symbols: entries, fetchedAt: Date.now() });
+    } catch (err) {
+      console.error('[Markets] Unexpected error:', err);
       res.status(503).json({ error: 'Service temporarily unavailable' });
     }
   });

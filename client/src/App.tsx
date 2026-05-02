@@ -7,6 +7,7 @@
           import { getVerifiedChannel, getStaticLiveId, getFallbackVideoId } from '@/lib/channel-constants';
           import {
             Sun, Cloud, CloudRain, CloudSnow, CloudLightning, Wind, CloudDrizzle, Cloudy, Search, QrCode,
+            Settings as SettingsIcon, ExternalLink, TrendingUp, ArrowUp, ArrowDown, Plus as PlusIcon, X as XIcon,
           } from 'lucide-react';
           import { QRCodeSVG } from 'qrcode.react';
           import { Switch, Route, useLocation } from 'wouter';
@@ -54,7 +55,8 @@
             | 'crisis_ticker'
             | 'weather'
             | 'dictionary'
-            | 'qr_generator';
+            | 'qr_generator'
+            | 'markets_ticker';
 
           // ─── Widget Interface ─────────────────────────────────────────────────────────
           export interface Widget {
@@ -97,6 +99,15 @@
             isDeleting?: boolean;
             // Clock-only — toggled by handleToggleClockFormat → onToggleClockFormat
             clockUse24Hour?: boolean;
+            // Markets Ticker — list of symbols to track (uppercase, e.g. ['BTC','SPY']).
+            // Persisted with the widget; defaults to BTC/ETH/SPY/AAPL on first add.
+            marketsSymbols?: string[];
+            // Crisis Ticker — per-widget filter knobs forwarded as /api/news query
+            // params. crisisSources is a comma-list of NewsAPI source IDs (mutually
+            // exclusive with crisisCategory upstream). crisisCategory is one of
+            // tech | markets | world | sports | all (mapped server-side).
+            crisisSources?: string;
+            crisisCategory?: string;
           }
 
           // ─────────────────────────────────────────────────────────────────────────────
@@ -636,7 +647,7 @@
           //  • All font sizes and icon sizes scale with container dimensions.
           // ─────────────────────────────────────────────────────────────────────────────
 
-          const FALLBACK_HEADLINES = [
+          const FALLBACK_HEADLINES: Headline[] = [
             { id: 1,  text: 'BREAKING: Major earthquake strikes Pacific Rim \u2014 tsunami Alert issued for coastal regions' },
             { id: 2,  text: 'Markets surge 3% on surprise Fed rate hold; tech sector leads gains' },
             { id: 3,  text: 'Crisis declared in southern provinces as flooding displaces 40,000 residents' },
@@ -645,32 +656,96 @@
             { id: 6,  text: 'Space agency confirms successful orbital rendezvous \u2014 crew safe aboard station' },
           ];
 
+          interface Headline {
+            id: number;
+            text: string;
+            url?: string;
+            source?: string;
+          }
+
+          const isBreakingHeadline = (text: string) =>
+            /\b(breaking|alert|urgent|emergency)\b/i.test(text);
+
           const isCrisisHeadline = (text: string) =>
             /crisis|alert|breaking|urgent|emergency/i.test(text);
 
-          interface CrisisTickerWidgetProps {
-            widget: Widget;
+          // Maps the widget's category preset to the NewsAPI `category` value the
+          // server forwards. 'world' and 'all' both fall through to no category.
+          const CRISIS_CATEGORIES: { value: string; label: string }[] = [
+            { value: 'all',     label: 'All'     },
+            { value: 'tech',    label: 'Tech'    },
+            { value: 'markets', label: 'Markets' },
+            { value: 'world',   label: 'World'   },
+            { value: 'sports',  label: 'Sports'  },
+          ];
+
+          // Curated NewsAPI source IDs the per-widget filter exposes. Empty string
+          // (default) means "All sources" and forwards no `sources` param.
+          const CRISIS_SOURCES: { value: string; label: string }[] = [
+            { value: '',                   label: 'All sources'        },
+            { value: 'bbc-news',           label: 'BBC'                },
+            { value: 'reuters',            label: 'Reuters'            },
+            { value: 'associated-press',   label: 'AP'                 },
+            { value: 'cnn',                label: 'CNN'                },
+            { value: 'al-jazeera-english', label: 'Al Jazeera'         },
+            { value: 'the-wall-street-journal', label: 'WSJ'           },
+            { value: 'bloomberg',          label: 'Bloomberg'          },
+          ];
+
+          function mapCrisisCategoryToApi(category: string | undefined): string {
+            switch (category) {
+              case 'tech':    return 'technology';
+              case 'markets': return 'business';
+              case 'sports':  return 'sports';
+              case 'world':   return '';
+              case 'all':     return '';
+              default:        return '';
+            }
           }
 
-          export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget }) => {
+          interface CrisisTickerWidgetProps {
+            widget: Widget;
+            onUpdate?: (widgetId: string, patch: Partial<Widget>) => void;
+          }
+
+          export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget, onUpdate }) => {
             const containerRef = useRef<HTMLDivElement>(null);
             const scrollRef    = useRef<HTMLDivElement>(null);
             const [cw, setCw]  = useState(320);
             const [ch, setCh]  = useState(200);
             const [blink, setBlink] = useState(true);
             const [hovered, setHovered] = useState(false);
-            const [liveHeadlines, setLiveHeadlines] = useState<{ id: number; text: string }[] | null>(null);
+            const [settingsOpen, setSettingsOpen] = useState(false);
+            const [liveHeadlines, setLiveHeadlines] = useState<Headline[] | null>(null);
             const [newsError, setNewsError] = useState(false);
 
+            const sources  = widget.crisisSources  ?? '';
+            const category = widget.crisisCategory ?? 'all';
+
+            // Re-fetch whenever the per-widget filter knobs change. Sources wins
+            // over category server-side (NewsAPI rule).
             useEffect(() => {
               let mounted = true;
               const fetchNews = async () => {
                 try {
-                  const resp = await fetch('/api/news');
+                  const params = new URLSearchParams();
+                  if (sources) {
+                    params.set('sources', sources);
+                  } else {
+                    const apiCat = mapCrisisCategoryToApi(category);
+                    if (apiCat) params.set('category', apiCat);
+                  }
+                  const qs = params.toString();
+                  const resp = await fetch(qs ? `/api/news?${qs}` : '/api/news');
                   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                   const data = await resp.json();
                   if (mounted && data.articles?.length > 0) {
                     setLiveHeadlines(data.articles);
+                    setNewsError(false);
+                  } else if (mounted) {
+                    // Empty result for this filter — surface as fallback rather
+                    // than silently keeping the previous unrelated batch.
+                    setLiveHeadlines([]);
                     setNewsError(false);
                   }
                 } catch (err) {
@@ -681,9 +756,14 @@
               fetchNews();
               const interval = setInterval(fetchNews, 10 * 60 * 1000);
               return () => { mounted = false; clearInterval(interval); };
-            }, []);
+            }, [sources, category]);
 
-            const CRISIS_HEADLINES = liveHeadlines || FALLBACK_HEADLINES;
+            const CRISIS_HEADLINES: Headline[] =
+              liveHeadlines && liveHeadlines.length > 0
+                ? liveHeadlines
+                : (liveHeadlines && liveHeadlines.length === 0 && !newsError
+                    ? [{ id: 0, text: 'No headlines for this filter — try a different source or category.' }]
+                    : FALLBACK_HEADLINES);
 
             // ── ResizeObserver ────────────────────────────────────────────────────────
             useEffect(() => {
