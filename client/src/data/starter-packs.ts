@@ -8,6 +8,8 @@ export type StarterTileType =
   | 'crisis_ticker'
   | 'qr_generator'
   | 'markets_ticker'
+  | 'world_clocks'
+  | 'countdown'
   | 'note';
 
 export interface StarterTile {

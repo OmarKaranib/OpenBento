@@ -8,6 +8,7 @@
           import {
             Sun, Cloud, CloudRain, CloudSnow, CloudLightning, Wind, CloudDrizzle, Cloudy, Search, QrCode,
             Settings as SettingsIcon, ExternalLink, TrendingUp, ArrowUp, ArrowDown, Plus as PlusIcon, X as XIcon,
+            Globe, Hourglass, X,
           } from 'lucide-react';
           import { QRCodeSVG } from 'qrcode.react';
           import { Switch, Route, useLocation } from 'wouter';
@@ -3378,6 +3379,25 @@
                     key={widget.id}
                     widget={widget}
                     onToggle24Hour={onToggle24Hour}
+                    onUpdate={onUpdate}
+                  />
+                );
+
+              case 'world_clocks':
+                return (
+                  <WorldClocksWidget
+                    key={widget.id}
+                    widget={widget}
+                    onUpdate={onUpdate}
+                  />
+                );
+
+              case 'countdown':
+                return (
+                  <CountdownWidget
+                    key={widget.id}
+                    widget={widget}
+                    onUpdate={onUpdate}
                   />
                 );
 

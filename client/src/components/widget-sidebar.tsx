@@ -3,7 +3,8 @@
     X, Search, Tv, LayoutGrid, Grip, Layers,
     Gamepad2, RefreshCw, Star,
     Trash2, Globe, Heart, Radio, PenLine, Clock,
-    AlertCircle, CloudSun, BookOpen, QrCode, TrendingUp
+    AlertCircle, CloudSun, BookOpen, QrCode, TrendingUp,
+    Hourglass,
   } from 'lucide-react';
 
   const failedLogoCache = new Set<string>();
@@ -176,7 +177,7 @@
     widgetType: WidgetType;
     w: number;
     h: number;
-    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'default';
+    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'default';
     color: string;
   }
 
@@ -191,6 +192,8 @@
     { id: 'template-weather',      name: 'Weather',      widgetType: 'weather',      w: 2, h: 2, icon: 'weather',      color: 'sky'     },
     { id: 'template-dictionary',   name: 'Dictionary',   widgetType: 'dictionary',   w: 3, h: 2, icon: 'dictionary',   color: 'indigo'  },
     { id: 'template-qr-generator', name: 'QR Portal',    widgetType: 'qr_generator', w: 2, h: 2, icon: 'qr_generator', color: 'violet'  },
+    { id: 'template-world-clocks', name: 'World Clocks', widgetType: 'world_clocks', w: 4, h: 2, icon: 'world_clocks', color: 'amber'   },
+    { id: 'template-countdown',    name: 'Countdown',    widgetType: 'countdown',    w: 3, h: 2, icon: 'countdown',    color: 'fuchsia' },
   ];
 
   function loadPersonalLibrary(): SavedChannel[] {
@@ -706,6 +709,42 @@
           w: 3, h: 3,
           icon: 'markets_ticker' as const,
           color: 'emerald',
+        },
+      },
+      {
+        id: 'world_clocks',
+        label: 'World Clocks',
+        description: 'City times around the globe with day/night dot',
+        icon: <Globe className="w-[2rem] h-[2rem] text-amber-400" />,
+        iconBg: 'bg-amber-500/15',
+        border: 'border-amber-500/30 hover:border-amber-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-amber-400 bg-amber-500/15 border-amber-500/40',
+        template: {
+          id: 'template-world-clocks',
+          name: 'World Clocks',
+          widgetType: 'world_clocks' as WidgetType,
+          w: 4, h: 2,
+          icon: 'world_clocks' as const,
+          color: 'amber',
+        },
+      },
+      {
+        id: 'countdown',
+        label: 'Countdown',
+        description: 'Days, hours and minutes until your big moment',
+        icon: <Hourglass className="w-[2rem] h-[2rem] text-fuchsia-400" />,
+        iconBg: 'bg-fuchsia-500/15',
+        border: 'border-fuchsia-500/30 hover:border-fuchsia-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-fuchsia-400 bg-fuchsia-500/15 border-fuchsia-500/40',
+        template: {
+          id: 'template-countdown',
+          name: 'Countdown',
+          widgetType: 'countdown' as WidgetType,
+          w: 3, h: 2,
+          icon: 'countdown' as const,
+          color: 'fuchsia',
         },
       },
     ] as const;
