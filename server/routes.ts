@@ -1398,8 +1398,7 @@ export async function registerRoutes(
     }
 
     try {
-      // Run all four lookups in parallel. PR count uses the search API so we
-      // get a real total without paging through every PR.
+      // PR count uses the search API to get a real total without paging.
       const [repoResp, commitsResp, prResp, releaseResp] = await Promise.all([
         fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers }),
         fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`, { headers }),
@@ -1408,13 +1407,9 @@ export async function registerRoutes(
       ]);
 
       if (repoResp.status === 404) {
-        // Honest 404 — the repo doesn't exist; do NOT serve a stale cache for
-        // a different (now-deleted/renamed) repo because that would be wrong.
         return res.status(404).json({ error: 'Repository not found' });
       }
-      // For any other non-OK upstream response (403 rate limit, 5xx, etc.),
-      // prefer serving stale cache if we have one — the widget should keep
-      // showing real data instead of an error spinner during a hiccup.
+      // 403 / 5xx: prefer stale cache so the widget keeps showing real data.
       if (repoResp.status === 403) {
         if (cached) return res.json(cached);
         return res.status(429).json({ error: 'GitHub rate limit reached, try again shortly' });
@@ -1424,46 +1419,64 @@ export async function registerRoutes(
         return res.status(502).json({ error: `GitHub error ${repoResp.status}` });
       }
 
-      const repoData = await repoResp.json();
-      const commitsData = commitsResp.ok ? await commitsResp.json() : [];
-      const prData      = prResp.ok      ? await prResp.json()      : { total_count: 0 };
-      // The releases endpoint 404s when a repo has no releases; treat that
-      // as "no release" rather than failure of the whole request.
-      const releaseData = releaseResp.ok ? await releaseResp.json() : null;
+      type GhRepoFull = {
+        full_name?: unknown; html_url?: unknown; description?: unknown;
+        stargazers_count?: unknown;
+      };
+      type GhCommit = {
+        sha?: unknown; html_url?: unknown;
+        commit?: {
+          message?: unknown;
+          author?: { date?: unknown };
+          committer?: { date?: unknown };
+        };
+      };
+      type GhPrSearch = { total_count?: unknown };
+      type GhRelease = {
+        tag_name?: unknown; name?: unknown; published_at?: unknown; html_url?: unknown;
+      };
 
-      const firstCommit = Array.isArray(commitsData) ? commitsData[0] : null;
+      const repoData    = (await repoResp.json()) as GhRepoFull;
+      const commitsJson: unknown = commitsResp.ok ? await commitsResp.json() : [];
+      const commitsData: GhCommit[] = Array.isArray(commitsJson) ? (commitsJson as GhCommit[]) : [];
+      const prData      = (prResp.ok ? await prResp.json() : { total_count: 0 }) as GhPrSearch;
+      // Releases endpoint 404s when no releases exist — treat as "no release".
+      const releaseData = (releaseResp.ok ? await releaseResp.json() : null) as GhRelease | null;
+
+      const firstCommit = commitsData[0] ?? null;
+      const releaseTag = typeof releaseData?.tag_name === 'string' ? releaseData.tag_name : '';
 
       const pulse: GitHubPulse = {
-        fullName: String(repoData.full_name || `${owner}/${repo}`),
-        htmlUrl:  String(repoData.html_url  || `https://github.com/${owner}/${repo}`),
+        fullName: typeof repoData.full_name === 'string' ? repoData.full_name : `${owner}/${repo}`,
+        htmlUrl:  typeof repoData.html_url === 'string' ? repoData.html_url : `https://github.com/${owner}/${repo}`,
         description: typeof repoData.description === 'string' ? repoData.description : null,
-        stars:   Number(repoData.stargazers_count   ?? 0),
-        openPRs: Number(prData.total_count          ?? 0),
+        stars:   Number(repoData.stargazers_count ?? 0),
+        openPRs: Number(prData.total_count ?? 0),
         lastCommit: firstCommit ? {
-          sha:  String(firstCommit.sha || '').slice(0, 7),
-          message: String(firstCommit.commit?.message || '').split('\n')[0].slice(0, 200),
+          sha:  (typeof firstCommit.sha === 'string' ? firstCommit.sha : '').slice(0, 7),
+          message: (typeof firstCommit.commit?.message === 'string' ? firstCommit.commit.message : '')
+            .split('\n')[0].slice(0, 200),
           authoredAt: String(
             firstCommit.commit?.author?.date ||
             firstCommit.commit?.committer?.date ||
             ''
           ),
-          url: String(firstCommit.html_url || ''),
+          url: typeof firstCommit.html_url === 'string' ? firstCommit.html_url : '',
         } : null,
-        latestRelease: releaseData && releaseData.tag_name ? {
-          tagName:     String(releaseData.tag_name || ''),
-          name:        String(releaseData.name || releaseData.tag_name || ''),
-          publishedAt: String(releaseData.published_at || ''),
-          url:         String(releaseData.html_url || ''),
+        latestRelease: releaseData && releaseTag ? {
+          tagName:     releaseTag,
+          name:        typeof releaseData.name === 'string' ? releaseData.name : releaseTag,
+          publishedAt: typeof releaseData.published_at === 'string' ? releaseData.published_at : '',
+          url:         typeof releaseData.html_url === 'string' ? releaseData.html_url : '',
         } : null,
         fetchedAt: now,
       };
 
       GITHUB_CACHE.set(cacheKey, pulse);
       res.json(pulse);
-    } catch (err: any) {
-      console.error('[GitHub Pulse] Fetch failed:', err?.message || err);
-      // Serve stale cache on transient failure if we have one, so the widget
-      // keeps showing data instead of an error spinner.
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[GitHub Pulse] Fetch failed:', msg);
       if (cached) return res.json(cached);
       res.status(503).json({ error: 'GitHub temporarily unavailable' });
     }
@@ -1585,11 +1598,8 @@ export async function registerRoutes(
   const RSS_TTL_MS = 12 * 60 * 1000;
   const RSS_MAX_ITEMS = 30;
 
-  // SSRF guard: refuse to proxy any URL whose host resolves to a loopback,
-  // private, link-local, CGNAT, multicast, or otherwise non-public address.
-  // Catches the cloud metadata endpoint (169.254.169.254) via the link-local
-  // range. There is a small TOCTOU window between this check and the upstream
-  // fetch, but it's tight enough for a personal-dashboard widget proxy.
+  // SSRF guard: reject loopback, private, link-local, CGNAT, multicast,
+  // and other non-public addresses (incl. 169.254.169.254 metadata).
   function isPrivateOrReservedIp(addr: string): boolean {
     const family = isIP(addr);
     if (family === 0) return true; // unknown — refuse
@@ -1683,12 +1693,9 @@ export async function registerRoutes(
       return res.json(cached);
     }
 
-    // Manual fetch with per-hop SSRF re-validation. rss-parser's built-in
-    // parseURL would happily follow a 30x redirect into a private IP (e.g.
-    // a public host returning Location: http://169.254.169.254/latest/meta-data/),
-    // bypassing our pre-check. We follow up to MAX_HOPS redirects ourselves,
-    // re-validating the host (DNS + private-IP filter) on every hop, then
-    // hand the body to parser.parseString.
+    // Manual fetch with per-hop SSRF re-validation: rss-parser's parseURL
+    // follows redirects unconditionally, so a public host could 30x into a
+    // private IP. We follow ≤MAX_HOPS redirects and re-validate each hop.
     const MAX_HOPS = 5;
     const FETCH_TIMEOUT_MS = 10_000;
     const MAX_BODY_BYTES = 5 * 1024 * 1024;

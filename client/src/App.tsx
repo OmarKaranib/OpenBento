@@ -4297,10 +4297,7 @@
           export const GitHubPulseWidget: React.FC<GitHubPulseProps> = ({ widget, onUpdate }) => {
             const containerRef = useRef<HTMLDivElement>(null);
             const [size, setSize] = useState(280);
-            // `editing` is DERIVED from props (no owner ⇒ must edit) plus an
-            // explicit user-requested override. Deriving instead of a plain
-            // useState avoids races where setEditing(false) gets shadowed by
-            // a parent re-render that happened in the same React batch.
+            // Editing is derived (no owner ⇒ edit) + a manual override.
             const [forceEdit, setForceEdit] = useState(false);
             const editing = forceEdit || !widget.githubOwner;
             const [draftOwner, setDraftOwner] = useState(widget.githubOwner || '');
