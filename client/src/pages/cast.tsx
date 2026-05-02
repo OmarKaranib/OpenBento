@@ -1,14 +1,5 @@
-// ─── /cast — TV-side display page ───────────────────────────────────────────
-//  Workflow:
-//    1. On mount, look up `openBentoCastRoomId` in localStorage.
-//    2. If absent, POST /api/cast/codes to create a new room + 6-digit code,
-//       show it full-screen, rotate every 60s. Open WS so the server can push
-//       a {type: 'paired'} event the moment a laptop pairs.
-//    3. If present (or once paired), open WS, listen for snapshots, render
-//       widgets in a locked, full-screen grid (no edit affordances).
-//    4. A long-press of the "Forget" hot-zone unpairs and returns to step 2.
-// ────────────────────────────────────────────────────────────────────────────
-
+// TV-side cast page: shows a 6-digit pair code while unpaired, then locks
+// itself to displaying snapshots pushed from a paired laptop.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Cast, Tv2, Wifi, WifiOff, Trash2 } from "lucide-react";
 import { WidgetRenderer, type Widget } from "@/App";
@@ -55,7 +46,6 @@ function setLabel(label: string): void {
   }
 }
 
-// ─── Renderers for the four "raw" widget types WidgetRenderer skips ────────
 function VideoCastRender({ widget, masterMute }: { widget: Widget; masterMute: boolean }) {
   const muted = masterMute || widget.isMuted;
   const src = useMemo(() => buildEmbedUrl(widget, muted), [widget, muted]);
@@ -129,7 +119,6 @@ function ImageCastRender({ widget }: { widget: Widget }) {
   );
 }
 
-// ─── Single widget cell on the TV grid ─────────────────────────────────────
 function CastWidgetCell({ widget, masterMute }: { widget: Widget; masterMute: boolean }) {
   const style: React.CSSProperties = {
     gridColumn: `${widget.x + 1} / span ${Math.min(widget.w, GRID_COLS - widget.x)}`,
@@ -139,8 +128,6 @@ function CastWidgetCell({ widget, masterMute }: { widget: Widget; masterMute: bo
     position: "relative",
   };
 
-  // Build the inner element: WidgetRenderer handles most types, raw types
-  // fall through to our local renderers.
   let inner: React.ReactNode;
   switch (widget.type) {
     case "video":
@@ -181,7 +168,6 @@ function CastWidgetCell({ widget, masterMute }: { widget: Widget; masterMute: bo
   );
 }
 
-// ─── Main /cast page ───────────────────────────────────────────────────────
 export default function CastPage() {
   const [roomId, setRoomIdState] = useState<string | null>(() => getRoomId());
   const [pairing, setPairing] = useState<PairingState | null>(null);
@@ -192,17 +178,20 @@ export default function CastPage() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
   const codeTimerRef = useRef<number | null>(null);
+  const codeRetryRef = useRef<number | null>(null);
   const forgetHoldRef = useRef<number | null>(null);
   const [forgetProgress, setForgetProgress] = useState(0);
 
-  // Tick every second so the code-expiry countdown updates.
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
 
-  // ── Pairing-code flow (only when no roomId) ──────────────────────────
   async function fetchNewCode(): Promise<void> {
+    if (codeRetryRef.current) {
+      window.clearTimeout(codeRetryRef.current);
+      codeRetryRef.current = null;
+    }
     try {
       const res = await fetch("/api/cast/codes", { method: "POST" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -212,31 +201,29 @@ export default function CastPage() {
         roomId: data.roomId,
         expiresAt: data.expiresAt,
       });
-      // Open a WS to that brand-new room so we hear "paired" as soon as the
-      // laptop submits the code.
       openSocket(data.roomId);
     } catch (err) {
       console.error("[Cast] code fetch failed", err);
-      // Retry in 5s.
-      window.setTimeout(fetchNewCode, 5000);
+      if (codeRetryRef.current) window.clearTimeout(codeRetryRef.current);
+      codeRetryRef.current = window.setTimeout(fetchNewCode, 5000);
     }
   }
 
   useEffect(() => {
     if (roomId) return;
     fetchNewCode();
-    // Rotate the code every 60s while still on the pairing screen.
     codeTimerRef.current = window.setInterval(() => {
       if (!getRoomId()) fetchNewCode();
     }, 60_000);
     return () => {
       if (codeTimerRef.current) window.clearInterval(codeTimerRef.current);
       codeTimerRef.current = null;
+      if (codeRetryRef.current) window.clearTimeout(codeRetryRef.current);
+      codeRetryRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
-  // ── WebSocket lifecycle for paired rooms ─────────────────────────────
   useEffect(() => {
     if (!roomId) return;
     openSocket(roomId);
@@ -264,7 +251,6 @@ export default function CastPage() {
       try {
         const msg = JSON.parse(String(ev.data));
         if (msg.type === "paired") {
-          // We were on the pairing screen — promote this room to permanent.
           setRoomId(msg.roomId);
           setRoomIdState(msg.roomId);
           if (msg.label) {
@@ -277,12 +263,19 @@ export default function CastPage() {
             codeTimerRef.current = null;
           }
         } else if (msg.type === "snapshot" && msg.snapshot) {
-          setSnapshot(msg.snapshot as CastSnapshot);
+          // Monotonic guard: ignore older snapshots that arrive after a newer
+          // one (e.g. a DB-replay landing after a fresh /push during connect).
+          const next = msg.snapshot as CastSnapshot;
+          setSnapshot((prev) => {
+            if (prev && typeof next.pushedAt === "number" && next.pushedAt <= prev.pushedAt) {
+              return prev;
+            }
+            return next;
+          });
         } else if (msg.type === "renamed" && typeof msg.label === "string") {
           setLabel(msg.label);
           setLabelState(msg.label);
         } else if (msg.type === "closed") {
-          // Server told us the room is gone — clear and restart pairing.
           setRoomId(null);
           setRoomIdState(null);
           setSnapshot(null);
@@ -293,7 +286,6 @@ export default function CastPage() {
     };
     ws.onclose = () => {
       setConnected(false);
-      // Reconnect with backoff if we still have a room.
       if (getRoomId() || pairing?.roomId) {
         reconnectRef.current = window.setTimeout(() => {
           const target = getRoomId() || pairing?.roomId;
@@ -327,7 +319,6 @@ export default function CastPage() {
     }
   }
 
-  // ── Forget / unpair (long-press) ─────────────────────────────────────
   function startForget(): void {
     forgetHoldRef.current = window.setInterval(() => {
       const start = forgetHoldStartRef.current;
@@ -347,15 +338,10 @@ export default function CastPage() {
   }
   function doForget(): void {
     endForget();
-    // Best-effort server unpair so the room doesn't linger in the DB.
-    // We clear local state regardless — even if the network is dead, the
-    // user expects "forget" to forget.
     const rid = getRoomId();
     if (rid) {
       fetch(`/api/cast/rooms/${encodeURIComponent(rid)}`, { method: "DELETE" }).catch(
-        () => {
-          /* ignore — local-side reset still happens below */
-        },
+        () => {},
       );
     }
     setRoomId(null);
@@ -365,7 +351,6 @@ export default function CastPage() {
   }
   const forgetHoldStartRef = useRef<number | null>(null);
 
-  // ── Render ───────────────────────────────────────────────────────────
   if (!roomId) {
     const code = pairing?.code ?? "------";
     const remaining = pairing
@@ -411,17 +396,17 @@ export default function CastPage() {
   const widgets = (snapshot?.widgets ?? []) as unknown as Widget[];
   const isDark = snapshot?.isDarkMode ?? true;
   const masterMute = snapshot?.masterMute ?? true;
+  const background = snapshot?.background || (isDark ? "#0f172a" : "#F8F9FA");
 
   return (
     <div
       className="w-screen h-screen overflow-hidden flex flex-col"
       style={{
-        background: isDark ? "#0f172a" : "#F8F9FA",
+        background,
         color: isDark ? "#f1f5f9" : "#1A1A1A",
       }}
       data-testid="cast-paired-screen"
     >
-      {/* Hover-reveal status bar across the top */}
       <div
         className="absolute top-0 left-0 right-0 z-50 group"
         style={{ height: "2.4rem" }}

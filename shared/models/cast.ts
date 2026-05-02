@@ -35,6 +35,7 @@ export interface CastSnapshot {
   widgets: CastSnapshotWidget[];
   isDarkMode: boolean;
   masterMute: boolean;
+  background: string;
   pushedAt: number;
 }
 
@@ -52,5 +53,6 @@ export const castSnapshotSchema = z.object({
   ),
   isDarkMode: z.boolean(),
   masterMute: z.boolean(),
+  background: z.string().max(2048).default(""),
   pushedAt: z.number(),
 });

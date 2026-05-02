@@ -31,13 +31,22 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
   const [editLabel, setEditLabel] = useState("");
   const [meta, setMeta] = useState<Record<string, RoomMeta>>({});
   const popRef = useRef<HTMLDivElement | null>(null);
+  const socketsRef = useRef<Map<string, WebSocket>>(new Map());
+  const reconnectTimersRef = useRef<Map<string, number>>(new Map());
   const { toast } = useToast();
+
+  function clearReconnect(roomId: string): void {
+    const t = reconnectTimersRef.current.get(roomId);
+    if (t !== undefined) {
+      window.clearTimeout(t);
+      reconnectTimersRef.current.delete(roomId);
+    }
+  }
 
   useEffect(() => {
     savePairedTVs(tvs);
   }, [tvs]);
 
-  // Close on outside click.
   useEffect(() => {
     if (!open) return;
     function onDoc(e: MouseEvent) {
@@ -49,38 +58,146 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
-  // Refresh metadata for known TVs whenever the popover opens.
+  // Maintain a long-lived WS per paired TV. The server broadcasts to this
+  // socket whenever the TV is renamed or the room is unpaired/deleted from
+  // any peer (including the TV itself), so we can keep our paired list and
+  // online indicators in sync without polling.
+  useEffect(() => {
+    const sockets = socketsRef.current;
+    const known = new Set(tvs.map((tv) => tv.roomId));
+
+    sockets.forEach((ws, roomId) => {
+      if (!known.has(roomId)) {
+        clearReconnect(roomId);
+        try {
+          ws.onclose = null;
+          ws.close();
+        } catch {
+          /* ignore */
+        }
+        sockets.delete(roomId);
+      }
+    });
+
+    tvs.forEach((tv) => {
+      if (sockets.has(tv.roomId)) return;
+      const proto = window.location.protocol === "https:" ? "wss" : "ws";
+      const url = `${proto}://${window.location.host}/ws/cast?roomId=${encodeURIComponent(
+        tv.roomId,
+      )}&role=laptop`;
+      const ws = new WebSocket(url);
+      sockets.set(tv.roomId, ws);
+
+      ws.onopen = () => {
+        // Hub link is up; actual TV presence arrives via {type:'presence'}.
+        clearReconnect(tv.roomId);
+      };
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(String(ev.data));
+          if (msg.type === "renamed" && typeof msg.label === "string") {
+            setTVs((prev) =>
+              prev.map((p) => (p.roomId === tv.roomId ? { ...p, label: msg.label } : p)),
+            );
+          } else if (msg.type === "presence") {
+            setMeta((m) => ({
+              ...m,
+              [tv.roomId]: { ...(m[tv.roomId] ?? {}), online: !!msg.tvOnline },
+            }));
+          } else if (msg.type === "closed") {
+            // Room was removed remotely (TV pressed forget, server validation
+            // closed an orphan, etc). Drop from local list automatically.
+            setTVs((prev) => prev.filter((p) => p.roomId !== tv.roomId));
+          }
+        } catch {
+          /* ignore */
+        }
+      };
+      ws.onclose = () => {
+        setMeta((m) => ({
+          ...m,
+          [tv.roomId]: { ...(m[tv.roomId] ?? {}), online: false },
+        }));
+        sockets.delete(tv.roomId);
+        clearReconnect(tv.roomId);
+        // Reconnect only if the TV is still in our persisted paired list.
+        const timerId = window.setTimeout(() => {
+          reconnectTimersRef.current.delete(tv.roomId);
+          if (loadPairedTVs().some((p) => p.roomId === tv.roomId)) {
+            setTVs((prev) => [...prev]);
+          }
+        }, 3000);
+        reconnectTimersRef.current.set(tv.roomId, timerId);
+      };
+      ws.onerror = () => {
+        try {
+          ws.close();
+        } catch {
+          /* ignore */
+        }
+      };
+    });
+
+    return () => {
+      // Sockets are intentionally kept open across re-renders; the cleanup
+      // path runs only when the component unmounts.
+    };
+  }, [tvs]);
+
+  // On open, refresh last-pushed timestamps from the server. Online state
+  // comes from the WS, not from this HTTP probe.
   useEffect(() => {
     if (!open || tvs.length === 0) return;
     let cancelled = false;
     (async () => {
-      const next: Record<string, RoomMeta> = {};
       await Promise.all(
         tvs.map(async (tv) => {
           try {
             const res = await fetch(`/api/cast/rooms/${tv.roomId}`);
+            if (cancelled) return;
             if (!res.ok) {
-              next[tv.roomId] = { online: false };
+              if (res.status === 404) {
+                setTVs((prev) => prev.filter((p) => p.roomId !== tv.roomId));
+              }
               return;
             }
             const data = await res.json();
-            next[tv.roomId] = {
-              online: true,
-              lastPushedAt: data.lastPushedAt
-                ? new Date(data.lastPushedAt).getTime()
-                : undefined,
-            };
+            setMeta((m) => ({
+              ...m,
+              [tv.roomId]: {
+                ...(m[tv.roomId] ?? { online: false }),
+                lastPushedAt: data.lastPushedAt
+                  ? new Date(data.lastPushedAt).getTime()
+                  : undefined,
+              },
+            }));
           } catch {
-            next[tv.roomId] = { online: false };
+            /* ignore */
           }
         }),
       );
-      if (!cancelled) setMeta(next);
     })();
     return () => {
       cancelled = true;
     };
   }, [open, tvs]);
+
+  // Tear down all sockets and pending reconnect timers on unmount.
+  useEffect(() => {
+    return () => {
+      reconnectTimersRef.current.forEach((id) => window.clearTimeout(id));
+      reconnectTimersRef.current.clear();
+      socketsRef.current.forEach((ws) => {
+        try {
+          ws.onclose = null;
+          ws.close();
+        } catch {
+          /* ignore */
+        }
+      });
+      socketsRef.current.clear();
+    };
+  }, []);
 
   async function handlePair(): Promise<void> {
     const trimmed = code.replace(/\D/g, "").slice(0, 6);
@@ -120,7 +237,7 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
       await apiRequest("POST", `/api/cast/rooms/${roomId}/push`, { snapshot });
       setMeta((m) => ({
         ...m,
-        [roomId]: { online: true, lastPushedAt: snapshot.pushedAt },
+        [roomId]: { ...(m[roomId] ?? { online: true }), lastPushedAt: snapshot.pushedAt },
       }));
       toast({ title: "Pushed to TV" });
     } catch (err) {
@@ -146,7 +263,10 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
           ok++;
           setMeta((m) => ({
             ...m,
-            [tv.roomId]: { online: true, lastPushedAt: snapshot.pushedAt },
+            [tv.roomId]: {
+              ...(m[tv.roomId] ?? { online: true }),
+              lastPushedAt: snapshot.pushedAt,
+            },
           }));
         } catch {
           fail++;
@@ -164,7 +284,7 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
     try {
       await apiRequest("DELETE", `/api/cast/rooms/${roomId}`);
     } catch {
-      // Even if server delete fails, remove locally so the UI clears.
+      /* ignore — local removal still happens below */
     }
     setTVs((prev) => prev.filter((p) => p.roomId !== roomId));
     toast({ title: "TV unpaired" });
@@ -343,7 +463,8 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
                           className={`inline-block w-[0.6rem] h-[0.6rem] rounded-full ${
                             m?.online ? "bg-emerald-500" : "bg-slate-500"
                           }`}
-                          title={m?.online ? "Reachable" : "Unreachable"}
+                          title={m?.online ? "Online" : "Offline"}
+                          data-testid={`presence-${tv.roomId}`}
                         />
                       </div>
                       <div className={`text-[0.75rem] ${isDarkMode ? "text-slate-500" : "text-gray-500"}`}>

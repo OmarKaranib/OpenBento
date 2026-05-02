@@ -1,27 +1,6 @@
-// ─── Cast Hub ────────────────────────────────────────────────────────────────
-//  Server-side relay for the "Cast to TV" feature.
-//
-//  Flow:
-//    1. TV opens /cast and POSTs /api/cast/codes → server creates a fresh
-//       cast_rooms row and a 6-digit pairing code (in-memory, 60s TTL) that
-//       points at the new room_id.
-//    2. Laptop POSTs /api/cast/pair { code } → server consumes the code and
-//       returns the room_id + label.
-//    3. Both sides open ws://.../ws/cast?roomId=XXX&role=tv|laptop. The hub
-//       keeps an in-memory broadcast set per room.
-//    4. Laptop POSTs /api/cast/rooms/:id/push { snapshot } → server stores
-//       in DB and broadcasts { type: 'snapshot', snapshot } to every
-//       connected TV in that room.
-//    5. Either side can DELETE /api/cast/rooms/:id to unpair; server
-//       broadcasts { type: 'closed' } and removes the room.
-//
-//  Notes:
-//    - No auth. Free for everyone. Room_id is the secret.
-//    - Pairing codes never persist to disk — only room_ids do, so a server
-//       restart drops pending codes but every paired room survives.
-//    - WS is mounted at `/ws/cast` to avoid colliding with Vite's HMR ws.
-// ────────────────────────────────────────────────────────────────────────────
-
+// Cast Hub: HTTP + WebSocket relay backing the "Cast to TV" feature.
+// Pairing codes live in-memory (60s TTL); rooms persist in cast_rooms.
+// Anyone with a roomId can push to it (free-tier model — roomId is the secret).
 import type { Express, Request, Response } from "express";
 import type { Server as HttpServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
@@ -42,10 +21,7 @@ interface RoomConn {
 
 const pendingCodes = new Map<string, PendingCode>();
 const roomConns = new Map<string, Set<RoomConn>>();
-// Rooms that were created via /codes but never paired. If their code expires
-// we tear the row back out of the DB so spamming /codes can't bloat storage.
 const pendingRoomIds = new Set<string>();
-// Per-IP code-creation throttle: max 10 codes per 60s window.
 const codeRateLimit = new Map<string, { count: number; resetAt: number }>();
 
 const CODE_TTL_MS = 60_000;
@@ -65,14 +41,11 @@ async function purgeExpiredCodes(): Promise<void> {
   const now = Date.now();
   const expired: string[] = [];
   pendingCodes.forEach((p, code) => {
-    if (p.expiresAt <= now) {
-      expired.push(code);
-    }
+    if (p.expiresAt <= now) expired.push(code);
   });
   for (const code of expired) {
     const p = pendingCodes.get(code);
     pendingCodes.delete(code);
-    // If this room was never paired, drop the DB row too.
     if (p && pendingRoomIds.has(p.roomId)) {
       pendingRoomIds.delete(p.roomId);
       try {
@@ -111,6 +84,42 @@ function broadcast(roomId: string, payload: unknown, exclude?: WebSocket): void 
   });
 }
 
+function sendTo(ws: WebSocket, payload: unknown): void {
+  if (ws.readyState !== WebSocket.OPEN) return;
+  try {
+    ws.send(JSON.stringify(payload));
+  } catch {
+    /* ignore */
+  }
+}
+
+function tvCount(roomId: string): number {
+  const set = roomConns.get(roomId);
+  if (!set) return 0;
+  let n = 0;
+  set.forEach((c) => {
+    if (c.role === "tv" && c.ws.readyState === WebSocket.OPEN) n++;
+  });
+  return n;
+}
+
+function broadcastPresenceToLaptops(roomId: string): void {
+  const set = roomConns.get(roomId);
+  if (!set) return;
+  const count = tvCount(roomId);
+  const payload = JSON.stringify({ type: "presence", tvOnline: count > 0, tvCount: count });
+  set.forEach((conn) => {
+    if (conn.role !== "laptop") return;
+    if (conn.ws.readyState === WebSocket.OPEN) {
+      try {
+        conn.ws.send(payload);
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+}
+
 function closeRoomConns(roomId: string, reason: string): void {
   const set = roomConns.get(roomId);
   if (!set) return;
@@ -129,7 +138,6 @@ function closeRoomConns(roomId: string, reason: string): void {
 }
 
 export function setupCastHub(httpServer: HttpServer, app: Express): void {
-  // ─── HTTP: TV requests a fresh pairing code + new room ─────────────────
   app.post("/api/cast/codes", async (req: Request, res: Response): Promise<void | Response> => {
     const ip =
       (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
@@ -166,7 +174,6 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
     }
   });
 
-  // ─── HTTP: Laptop pairs by submitting the code ─────────────────────────
   app.post("/api/cast/pair", async (req: Request, res: Response) => {
     await purgeExpiredCodes();
     const code = String(req.body?.code ?? "").trim();
@@ -178,8 +185,6 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
       return res.status(404).json({ error: "Code expired or invalid" });
     }
     pendingCodes.delete(code);
-    // Pairing succeeded — this room is now "real" and should survive
-    // until the user explicitly unpairs.
     pendingRoomIds.delete(pending.roomId);
     try {
       const [room] = await db
@@ -190,7 +195,6 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
       if (!room) {
         return res.status(404).json({ error: "Room no longer exists" });
       }
-      // Notify TVs in this room that pairing succeeded so they can swap UI.
       broadcast(pending.roomId, { type: "paired", roomId: pending.roomId, label: room.label });
       res.json({ roomId: room.id, label: room.label });
     } catch (err: unknown) {
@@ -199,7 +203,6 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
     }
   });
 
-  // ─── HTTP: Laptop pushes a snapshot to a room ──────────────────────────
   app.post("/api/cast/rooms/:id/push", async (req: Request, res: Response) => {
     const roomId = String(req.params.id ?? "").trim();
     if (!roomId) return res.status(400).json({ error: "Missing room id" });
@@ -210,7 +213,6 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
     }
     const snapshot: CastSnapshot = parsed.data;
 
-    // Reject anything obviously oversized so a runaway dashboard can't OOM us.
     const approxBytes = Buffer.byteLength(JSON.stringify(snapshot), "utf8");
     if (approxBytes > SNAPSHOT_BYTES_LIMIT) {
       return res.status(413).json({ error: "Snapshot too large" });
@@ -233,7 +235,6 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
     }
   });
 
-  // ─── HTTP: Either side renames the TV ──────────────────────────────────
   app.patch("/api/cast/rooms/:id", async (req: Request, res: Response) => {
     const roomId = String(req.params.id ?? "").trim();
     const label = String(req.body?.label ?? "").trim().slice(0, 40);
@@ -254,7 +255,6 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
     }
   });
 
-  // ─── HTTP: Either side fetches room metadata (label + lastPushedAt) ────
   app.get("/api/cast/rooms/:id", async (req: Request, res: Response) => {
     const roomId = String(req.params.id ?? "").trim();
     if (!roomId) return res.status(400).json({ error: "Missing room id" });
@@ -276,7 +276,6 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
     }
   });
 
-  // ─── HTTP: Unpair / delete a room ──────────────────────────────────────
   app.delete("/api/cast/rooms/:id", async (req: Request, res: Response) => {
     const roomId = String(req.params.id ?? "").trim();
     if (!roomId) return res.status(400).json({ error: "Missing room id" });
@@ -290,7 +289,7 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
     }
   });
 
-  // ─── WebSocket hub at /ws/cast?roomId=XXX&role=tv|laptop ───────────────
+  // WebSocket hub at /ws/cast?roomId=XXX&role=tv|laptop
   const wss = new WebSocketServer({ noServer: true });
 
   httpServer.on("upgrade", (request, socket, head) => {
@@ -323,41 +322,50 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
       const conn: RoomConn = { ws, role };
       set.add(conn);
 
-      ws.send(JSON.stringify({ type: "hello", role }));
+      sendTo(ws, { type: "hello", role });
 
-      // If a TV (re)connects and we already have a stored snapshot, replay
-      // it immediately so the screen isn't blank.
-      if (role === "tv") {
-        db.select({ lastSnapshot: castRooms.lastSnapshot, label: castRooms.label })
-          .from(castRooms)
-          .where(eq(castRooms.id, roomId))
-          .limit(1)
-          .then((rows) => {
-            const row = rows[0];
-            if (!row) {
-              ws.send(JSON.stringify({ type: "closed", reason: "Room not found" }));
+      // Validate the room exists for *both* roles. Closes the socket with a
+      // {type:'closed'} so the client can prune its local list immediately.
+      db.select({ lastSnapshot: castRooms.lastSnapshot, label: castRooms.label })
+        .from(castRooms)
+        .where(eq(castRooms.id, roomId))
+        .limit(1)
+        .then((rows) => {
+          const row = rows[0];
+          if (!row) {
+            sendTo(ws, { type: "closed", reason: "Room not found" });
+            try {
               ws.close(1000, "Room not found");
-              return;
+            } catch {
+              /* ignore */
             }
-            if (row.label) {
-              ws.send(JSON.stringify({ type: "renamed", label: row.label }));
-            }
-            if (row.lastSnapshot) {
-              ws.send(JSON.stringify({ type: "snapshot", snapshot: row.lastSnapshot }));
-            }
-          })
-          .catch((err: unknown) => {
-            console.error("[Cast] WS replay failed:", err);
-          });
-      }
+            return;
+          }
+          if (row.label) sendTo(ws, { type: "renamed", label: row.label });
+          if (role === "tv" && row.lastSnapshot) {
+            sendTo(ws, { type: "snapshot", snapshot: row.lastSnapshot });
+          }
+          if (role === "laptop") {
+            // Initial presence snapshot for this newly-connected laptop.
+            sendTo(ws, {
+              type: "presence",
+              tvOnline: tvCount(roomId) > 0,
+              tvCount: tvCount(roomId),
+            });
+          } else {
+            // TV connected — let any laptops in the room update their dots.
+            broadcastPresenceToLaptops(roomId);
+          }
+        })
+        .catch((err: unknown) => {
+          console.error("[Cast] WS validate failed:", err);
+        });
 
       ws.on("message", (data) => {
-        // Forward laptop-originated messages to TVs. Used for lightweight
-        // ping-style health checks. Snapshot pushes go through HTTP, not WS.
         try {
           const parsed = JSON.parse(String(data));
           if (parsed?.type === "ping") {
-            ws.send(JSON.stringify({ type: "pong", t: Date.now() }));
+            sendTo(ws, { type: "pong", t: Date.now() });
           }
         } catch {
           /* ignore non-JSON */
@@ -368,7 +376,11 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
         const s = roomConns.get(roomId);
         if (!s) return;
         s.delete(conn);
-        if (s.size === 0) roomConns.delete(roomId);
+        if (s.size === 0) {
+          roomConns.delete(roomId);
+        } else if (role === "tv") {
+          broadcastPresenceToLaptops(roomId);
+        }
       });
 
       ws.on("error", () => {
@@ -381,7 +393,6 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
     },
   );
 
-  // Periodic code purge so an idle TV doesn't leave dangling rooms forever.
   setInterval(() => {
     purgeExpiredCodes().catch((err: unknown) => {
       console.error("[Cast] purgeExpiredCodes failed:", err);

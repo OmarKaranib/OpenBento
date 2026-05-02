@@ -1,20 +1,20 @@
 import type { Widget } from "@/App";
 import type { CastSnapshot } from "@shared/schema";
 
-/** Strip volatile fields that should never travel to the TV. */
 function stripWidgetForCast(w: Widget): Record<string, unknown> {
-  const {
-    isDeleting: _isDeleting,
-    refreshCounter: _refreshCounter,
-    ...rest
-  } = w;
+  const { isDeleting: _d, refreshCounter: _r, ...rest } = w;
   return rest as unknown as Record<string, unknown>;
+}
+
+function resolveBackground(isDarkMode: boolean): string {
+  return isDarkMode ? "#0f172a" : "#F8F9FA";
 }
 
 export function buildCastSnapshot(args: {
   widgets: Widget[];
   isDarkMode: boolean;
   masterMute: boolean;
+  background?: string;
 }): CastSnapshot {
   return {
     v: 1,
@@ -23,11 +23,11 @@ export function buildCastSnapshot(args: {
       .map((w) => stripWidgetForCast(w)) as CastSnapshot["widgets"],
     isDarkMode: args.isDarkMode,
     masterMute: args.masterMute,
+    background: args.background ?? resolveBackground(args.isDarkMode),
     pushedAt: Date.now(),
   };
 }
 
-/** Persist the laptop-side list of paired TVs in localStorage. */
 const STORAGE_KEY = "openBentoCastTVs";
 
 export interface PairedTV {
@@ -55,6 +55,6 @@ export function savePairedTVs(list: PairedTV[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
   } catch {
-    /* quota — ignore */
+    /* ignore quota */
   }
 }
