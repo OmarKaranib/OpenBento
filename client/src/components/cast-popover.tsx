@@ -153,6 +153,42 @@ export function CastPopover({ widgets, isDarkMode, masterMute }: CastPopoverProp
     };
   }, [tvs]);
 
+  // Push lightweight mute control messages to all paired TVs whenever the
+  // effective mute (master mute || per-widget mute) of a video widget
+  // changes. Avoids the user having to remember to "Push" again just to
+  // mute. Only diffs are sent; no message goes out on first render.
+  const prevMutesRef = useRef<Record<string, boolean> | null>(null);
+  useEffect(() => {
+    const videoMutes: Record<string, boolean> = {};
+    widgets.forEach((w) => {
+      if (w.type === "video") {
+        videoMutes[w.id] = !!(masterMute || w.isMuted);
+      }
+    });
+    const prev = prevMutesRef.current;
+    prevMutesRef.current = videoMutes;
+    if (prev === null) return;
+    const changed: Record<string, boolean> = {};
+    let any = false;
+    for (const id in videoMutes) {
+      if (prev[id] !== videoMutes[id]) {
+        changed[id] = videoMutes[id];
+        any = true;
+      }
+    }
+    if (!any) return;
+    const payload = JSON.stringify({ type: "control", videoMutes: changed });
+    socketsRef.current.forEach((ws) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(payload);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+  }, [widgets, masterMute]);
+
   // On open, refresh last-pushed timestamps from the server. Online state
   // comes from the WS, not from this HTTP probe.
   useEffect(() => {

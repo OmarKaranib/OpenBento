@@ -418,9 +418,50 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
 
       ws.on("message", (data) => {
         try {
-          const parsed = JSON.parse(String(data));
+          // Defensive size cap: control messages are tiny (a mute map per
+          // room). Anything bigger is either abuse or a bug; drop it before
+          // JSON parsing chews CPU.
+          const raw = String(data);
+          if (raw.length > 16 * 1024) return;
+          const parsed = JSON.parse(raw);
           if (parsed?.type === "ping") {
             sendTo(ws, { type: "pong", t: Date.now() });
+            return;
+          }
+          if (parsed?.type === "control" && role === "laptop") {
+            // Relay only the known control fields so a malformed/extra
+            // payload from one laptop can't be forwarded verbatim to TVs.
+            const out: Record<string, unknown> = { type: "control" };
+            if (parsed.videoMutes && typeof parsed.videoMutes === "object") {
+              const mutes: Record<string, boolean> = {};
+              for (const [id, val] of Object.entries(parsed.videoMutes)) {
+                if (typeof id === "string" && id.length <= 128) {
+                  mutes[id] = !!val;
+                }
+              }
+              out.videoMutes = mutes;
+            }
+            if (parsed.videoPlayback && typeof parsed.videoPlayback === "object") {
+              const playback: Record<string, boolean> = {};
+              for (const [id, val] of Object.entries(parsed.videoPlayback)) {
+                if (typeof id === "string" && id.length <= 128) {
+                  playback[id] = !!val;
+                }
+              }
+              out.videoPlayback = playback;
+            }
+            const set = roomConns.get(roomId);
+            if (!set) return;
+            const msg = JSON.stringify(out);
+            set.forEach((conn) => {
+              if (conn.role !== "tv") return;
+              if (conn.ws.readyState !== WebSocket.OPEN) return;
+              try {
+                conn.ws.send(msg);
+              } catch {
+                /* ignore */
+              }
+            });
           }
         } catch {
           /* ignore non-JSON */

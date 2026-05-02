@@ -46,9 +46,18 @@ function setLabel(label: string): void {
   }
 }
 
-function VideoCastRender({ widget, masterMute }: { widget: Widget; masterMute: boolean }) {
+function VideoCastRender({
+  widget,
+  masterMute,
+  registerIframe,
+}: {
+  widget: Widget;
+  masterMute: boolean;
+  registerIframe?: (id: string, el: HTMLIFrameElement | null, kind: "youtube" | "other") => void;
+}) {
   const muted = masterMute || widget.isMuted;
   const src = useMemo(() => buildEmbedUrl(widget, muted), [widget, muted]);
+  const isYouTube = !!(widget.isYouTube || widget.videoId);
   if (!src) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-slate-900 text-slate-500 text-sm">
@@ -58,6 +67,11 @@ function VideoCastRender({ widget, masterMute }: { widget: Widget; masterMute: b
   }
   return (
     <iframe
+      ref={(el) => {
+        if (registerIframe) {
+          registerIframe(widget.id, el, isYouTube ? "youtube" : "other");
+        }
+      }}
       src={src}
       title={widget.channelName || widget.id}
       className="w-full h-full"
@@ -74,7 +88,9 @@ function buildEmbedUrl(widget: Widget, muted: boolean): string | null {
   if (widget.isYouTube || widget.videoId) {
     const id = widget.verifiedLiveId || widget.videoId || widget.latestVideoId;
     if (!id) return null;
-    return `https://www.youtube.com/embed/${id}?autoplay=1&mute=${muteFlag}&playsinline=1&rel=0&modestbranding=1&controls=0`;
+    // enablejsapi=1 lets us postMessage mute/play/pause commands without
+    // rebuilding the iframe (the cast-hub control channel relies on this).
+    return `https://www.youtube.com/embed/${id}?autoplay=1&mute=${muteFlag}&playsinline=1&rel=0&modestbranding=1&controls=0&enablejsapi=1`;
   }
   if (widget.isTwitch || widget.twitchChannel) {
     const ch = widget.twitchChannel;
@@ -119,7 +135,15 @@ function ImageCastRender({ widget }: { widget: Widget }) {
   );
 }
 
-function CastWidgetCell({ widget, masterMute }: { widget: Widget; masterMute: boolean }) {
+function CastWidgetCell({
+  widget,
+  masterMute,
+  registerIframe,
+}: {
+  widget: Widget;
+  masterMute: boolean;
+  registerIframe?: (id: string, el: HTMLIFrameElement | null, kind: "youtube" | "other") => void;
+}) {
   const style: React.CSSProperties = {
     gridColumn: `${widget.x + 1} / span ${Math.min(widget.w, GRID_COLS - widget.x)}`,
     gridRow: `${widget.y + 1} / span ${Math.min(widget.h, GRID_ROWS - widget.y)}`,
@@ -131,7 +155,13 @@ function CastWidgetCell({ widget, masterMute }: { widget: Widget; masterMute: bo
   let inner: React.ReactNode;
   switch (widget.type) {
     case "video":
-      inner = <VideoCastRender widget={widget} masterMute={masterMute} />;
+      inner = (
+        <VideoCastRender
+          widget={widget}
+          masterMute={masterMute}
+          registerIframe={registerIframe}
+        />
+      );
       break;
     case "note":
       inner = <NoteCastRender widget={widget} />;
@@ -175,6 +205,12 @@ export default function CastPage() {
   const [label, setLabelState] = useState<string>(() => getLabel());
   const [connected, setConnected] = useState(false);
   const [now, setNow] = useState<number>(Date.now());
+  // Map of video widget id -> { iframe, kind }. Populated as iframes mount
+  // so the WS control channel can postMessage mute/play/pause without
+  // rebuilding the iframe (which would interrupt playback).
+  const videoIframesRef = useRef<Map<string, { el: HTMLIFrameElement; kind: "youtube" | "other" }>>(
+    new Map(),
+  );
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef<number>(0);
@@ -261,6 +297,54 @@ export default function CastPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
+  function registerVideoIframe(
+    id: string,
+    el: HTMLIFrameElement | null,
+    kind: "youtube" | "other",
+  ): void {
+    if (el) videoIframesRef.current.set(id, { el, kind });
+    else videoIframesRef.current.delete(id);
+  }
+
+  function applyControl(msg: { videoMutes?: Record<string, boolean>; videoPlayback?: Record<string, boolean> }): void {
+    if (msg.videoMutes) {
+      for (const [id, muted] of Object.entries(msg.videoMutes)) {
+        const entry = videoIframesRef.current.get(id);
+        if (!entry || entry.kind !== "youtube") continue;
+        const win = entry.el.contentWindow;
+        if (!win) continue;
+        try {
+          win.postMessage(
+            JSON.stringify({ event: "command", func: muted ? "mute" : "unMute", args: [] }),
+            "https://www.youtube.com",
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    if (msg.videoPlayback) {
+      for (const [id, playing] of Object.entries(msg.videoPlayback)) {
+        const entry = videoIframesRef.current.get(id);
+        if (!entry || entry.kind !== "youtube") continue;
+        const win = entry.el.contentWindow;
+        if (!win) continue;
+        try {
+          win.postMessage(
+            JSON.stringify({
+              event: "command",
+              func: playing ? "playVideo" : "pauseVideo",
+              args: [],
+            }),
+            "https://www.youtube.com",
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
   function openSocket(rid: string): void {
     closeSocket();
     const proto = window.location.protocol === "https:" ? "wss" : "ws";
@@ -301,6 +385,8 @@ export default function CastPage() {
             }
             return next;
           });
+        } else if (msg.type === "control") {
+          applyControl(msg);
         } else if (msg.type === "renamed" && typeof msg.label === "string") {
           setLabel(msg.label);
           setLabelState(msg.label);
@@ -524,7 +610,12 @@ export default function CastPage() {
           data-testid="cast-grid"
         >
           {widgets.map((w) => (
-            <CastWidgetCell key={w.id} widget={w} masterMute={masterMute} />
+            <CastWidgetCell
+              key={w.id}
+              widget={w}
+              masterMute={masterMute}
+              registerIframe={registerVideoIframe}
+            />
           ))}
         </div>
       ) : (
