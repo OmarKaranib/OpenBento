@@ -50,7 +50,6 @@
             | 'note'
             | 'spacer'
             | 'image'
-            | 'zoom'
             | 'clock'
             | 'crisis_ticker'
             | 'weather'
@@ -885,6 +884,19 @@
             icon:       WeatherIconType;
             humidity:   number;
             windKph:    number;
+            lat?:       number | null;
+            lon?:       number | null;
+          }
+
+          interface ForecastDay {
+            date:      string;
+            dayLabel:  string;
+            tempMaxC:  number;
+            tempMinC:  number;
+            tempMaxF:  number;
+            tempMinF:  number;
+            icon:      WeatherIconType;
+            condition: string;
           }
 
           const FALLBACK_WEATHER: Record<string, WeatherEntry> = {
@@ -956,6 +968,7 @@
             const [isHovered, setIsHovered]         = useState(false);
             const [isSearchFocused, setIsSearchFocused] = useState(false);
             const [data, setData]           = useState<WeatherEntry>(FALLBACK_WEATHER['London']);
+            const [forecast, setForecast]   = useState<ForecastDay[]>([]);
             const [weatherError, setWeatherError] = useState(false);
             const [searchVal, setSearchVal] = useState('');
             const [searchErr, setSearchErr] = useState('');
@@ -976,21 +989,89 @@
               return () => ro.disconnect();
             }, []);
 
-            useEffect(() => {
-              let mounted = true;
-              (async () => {
+            // ── Loader: fetch current weather + 3-day forecast for either a city
+            //    name or coordinates. Used for both initial load and city search.
+            const loadWeather = useCallback(async (
+              query: { kind: 'coords'; lat: number; lon: number } | { kind: 'city'; city: string },
+              mountedRef: { current: boolean }
+            ): Promise<boolean> => {
+              const qs = query.kind === 'coords'
+                ? `lat=${query.lat}&lon=${query.lon}`
+                : `city=${encodeURIComponent(query.city)}`;
+              try {
+                const resp = await fetch(`/api/weather?${qs}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const w = await resp.json() as WeatherEntry;
+                if (!mountedRef.current) return false;
+                setData(w);
+                setWeatherError(false);
+                // Forecast — best-effort, prefer lat/lon from current weather response
+                const fcQs = (w.lat != null && w.lon != null)
+                  ? `lat=${w.lat}&lon=${w.lon}`
+                  : qs;
                 try {
-                  const resp = await fetch(`/api/weather?city=${encodeURIComponent(data.city)}`);
-                  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                  const w = await resp.json();
-                  if (mounted) { setData(w as WeatherEntry); setWeatherError(false); }
-                } catch (err) {
-                  console.warn(`[WeatherWidget] Failed to fetch weather for ${data.city}:`, err);
-                  if (mounted) setWeatherError(true);
+                  const fcResp = await fetch(`/api/weather/forecast?${fcQs}`);
+                  if (fcResp.ok) {
+                    const fc = await fcResp.json() as { days: ForecastDay[] };
+                    if (mountedRef.current) setForecast(Array.isArray(fc.days) ? fc.days : []);
+                  } else if (mountedRef.current) {
+                    setForecast([]);
+                  }
+                } catch {
+                  if (mountedRef.current) setForecast([]);
                 }
-              })();
-              return () => { mounted = false; };
+                return true;
+              } catch (err) {
+                console.warn('[WeatherWidget] Failed to fetch weather:', err);
+                if (mountedRef.current) setWeatherError(true);
+                return false;
+              }
             }, []);
+
+            useEffect(() => {
+              const mountedRef = { current: true };
+              let timeoutId: ReturnType<typeof setTimeout> | null = null;
+              const fallbackToLondon = () => {
+                void loadWeather({ kind: 'city', city: 'London' }, mountedRef);
+              };
+
+              if (typeof navigator !== 'undefined' && navigator.geolocation) {
+                let resolved = false;
+                timeoutId = setTimeout(() => {
+                  if (!resolved) {
+                    resolved = true;
+                    if (mountedRef.current) fallbackToLondon();
+                  }
+                }, 5000);
+
+                navigator.geolocation.getCurrentPosition(
+                  (pos) => {
+                    if (resolved) return;
+                    resolved = true;
+                    if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
+                    if (!mountedRef.current) return;
+                    void loadWeather(
+                      { kind: 'coords', lat: pos.coords.latitude, lon: pos.coords.longitude },
+                      mountedRef
+                    ).then((ok) => { if (!ok && mountedRef.current) fallbackToLondon(); });
+                  },
+                  () => {
+                    if (resolved) return;
+                    resolved = true;
+                    if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
+                    if (mountedRef.current) fallbackToLondon();
+                  },
+                  { timeout: 5000, maximumAge: 600000 }
+                );
+              } else {
+                fallbackToLondon();
+              }
+
+              return () => {
+                mountedRef.current = false;
+                if (timeoutId) clearTimeout(timeoutId);
+              };
+            }, [loadWeather]);
 
             useEffect(() => {
               if (showControls && searchRef.current) searchRef.current.focus();
@@ -1001,26 +1082,22 @@
               if (!trimmed) return;
               setIsSearching(true);
               setSearchErr('');
-              try {
-                const resp = await fetch(`/api/weather?city=${encodeURIComponent(trimmed)}`);
-                if (!resp.ok) {
-                  setSearchErr('City not found');
-                  setTimeout(() => setSearchErr(''), 2500);
-                  return;
-                }
-                const w = await resp.json() as WeatherEntry;
-                setData(w);
-                setWeatherError(false);
-                setSearchVal('');
-              } catch {
+              const mountedRef = { current: true };
+              const ok = await loadWeather({ kind: 'city', city: trimmed }, mountedRef);
+              if (!ok) {
                 setSearchErr('City not found');
                 setTimeout(() => setSearchErr(''), 2500);
-              } finally {
-                setIsSearching(false);
+              } else {
+                setSearchVal('');
               }
+              setIsSearching(false);
             };
 
             const s = Math.min(cw, ch);
+
+            // ── Forecast strip is only rendered when the widget is large enough
+            //    to show it without crowding the primary readout.
+            const showForecast = forecast.length > 0 && ch >= 220 && cw >= 220;
 
             const iconSize    = Math.max(24, Math.min(s * 0.28, cw * 0.22, ch * 0.30));
             const tempFont    = Math.max(22, Math.min(s * 0.25, cw * 0.18, ch * 0.27));
@@ -1037,6 +1114,9 @@
             const temp        = useFahrenheit ? `${data.tempF}\u00B0F` : `${data.tempC}\u00B0C`;
             const searchH     = Math.max(26, s * 0.13);
             const searchIcon  = Math.max(12, s * 0.065);
+            const fcDayFont   = Math.max(8,  Math.min(s * 0.052, cw * 0.038));
+            const fcTempFont  = Math.max(9,  Math.min(s * 0.058, cw * 0.042));
+            const fcIconSz    = Math.max(14, Math.min(s * 0.10, cw * 0.07, 28));
 
             return (
               <div
@@ -1218,6 +1298,68 @@
                     <span style={{ fontSize: `${metaIconSz}px`, lineHeight: 1 }}>{'\uD83D\uDCA8'}</span> {data.windKph} km/h
                   </span>
                 </div>
+
+                {/* ── 3-day forecast strip (only when widget is large enough) ─── */}
+                {showForecast && (
+                  <div
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'space-around',
+                      alignItems: 'stretch',
+                      gap: `${Math.max(4, s * 0.025)}px`,
+                      marginTop: `${Math.max(4, s * 0.02)}px`,
+                      paddingTop: `${Math.max(6, s * 0.03)}px`,
+                      borderTop: '1px solid rgba(255,255,255,0.10)',
+                      zIndex: 1,
+                    }}
+                    data-testid={`weather-forecast-${widget.id}`}
+                  >
+                    {forecast.map((d) => (
+                      <div
+                        key={d.date}
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: `${Math.max(2, s * 0.012)}px`,
+                          minWidth: 0,
+                        }}
+                        data-testid={`weather-forecast-day-${d.date}`}
+                      >
+                        <span style={{
+                          fontFamily: MONO,
+                          fontSize: `${fcDayFont}px`,
+                          fontWeight: 700,
+                          color: '#cbd5e1',
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          lineHeight: 1,
+                        }}>
+                          {d.dayLabel}
+                        </span>
+                        <div style={{ lineHeight: 0 }}>
+                          <WeatherIcon icon={d.icon} size={fcIconSz} color={weatherIconColor(d.icon)} />
+                        </div>
+                        <span style={{
+                          fontFamily: MONO,
+                          fontSize: `${fcTempFont}px`,
+                          fontWeight: 600,
+                          color: '#f1f5f9',
+                          letterSpacing: '0.02em',
+                          lineHeight: 1,
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {useFahrenheit
+                            ? `${d.tempMaxF}\u00B0/${d.tempMinF}\u00B0`
+                            : `${d.tempMaxC}\u00B0/${d.tempMinC}\u00B0`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* ── °C / °F toggle (visible on hover) ───────────────────────────── */}
                 <div style={{
@@ -1593,9 +1735,6 @@
             onColorChange,
           }: WidgetRendererProps): React.ReactElement | null | false {
             switch (widget.type) {
-              case 'zoom':
-                return null;
-
               case 'clock':
                 return (
                   <ClockWidget
@@ -1741,22 +1880,26 @@
               if (saved) {
                 try {
                   const parsed = JSON.parse(saved);
-                  return parsed.map((w: Widget) => ({
-                    ...w,
-                    isMuted:        w.isMuted        ?? true,
-                    isPaused:       w.isPaused       ?? false,
-                    volume:         w.volume         ?? 0,
-                    previousVolume: w.previousVolume ?? 50,
-                    isOffline:      w.isOffline      ?? false,
-                    x:              w.x              ?? 0,
-                    y:              w.y              ?? 0,
-                    w:              w.w              ?? 3,
-                    h:              w.h              ?? 2,
-                    refreshCounter: (w as any).refreshCounter ?? (w as any).iframeKey ?? 0,
-                    channelName:    stripLegacyPrefix(w.channelName),
-                    noteContent:    w.type === 'note' ? (w.noteContent ?? '') : w.noteContent,
-                    clockUse24Hour: w.clockUse24Hour ?? false,
-                  }));
+                  return parsed
+                    // Drop legacy 'zoom' widgets persisted before the type was removed.
+                    // Otherwise they render as unknown ghost tiles for returning users.
+                    .filter((w: Widget) => (w.type as string) !== 'zoom')
+                    .map((w: Widget) => ({
+                      ...w,
+                      isMuted:        w.isMuted        ?? true,
+                      isPaused:       w.isPaused       ?? false,
+                      volume:         w.volume         ?? 0,
+                      previousVolume: w.previousVolume ?? 50,
+                      isOffline:      w.isOffline      ?? false,
+                      x:              w.x              ?? 0,
+                      y:              w.y              ?? 0,
+                      w:              w.w              ?? 3,
+                      h:              w.h              ?? 2,
+                      refreshCounter: (w as any).refreshCounter ?? (w as any).iframeKey ?? 0,
+                      channelName:    stripLegacyPrefix(w.channelName),
+                      noteContent:    w.type === 'note' ? (w.noteContent ?? '') : w.noteContent,
+                      clockUse24Hour: w.clockUse24Hour ?? false,
+                    }));
                 } catch {
                   return getDefaultWidgets();
                 }

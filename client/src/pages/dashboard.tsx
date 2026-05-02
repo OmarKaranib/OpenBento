@@ -11,6 +11,7 @@ import { SavedChannel, loadPersonalLibrary, savePersonalLibrary } from '@/compon
 import { useStreamHealing } from '@/hooks/use-stream-healing';
 import { useToast } from '@/hooks/use-toast';
 import { FloatingTutorial } from '@/components/floating-tutorial';
+import { NoteWidget } from '@/components/note-widget';
 import { AdBlock, AdBlockData } from '@/components/ad-block';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
 
@@ -1468,26 +1469,13 @@ const MasterControlDashboard = ({
 
       case 'note':
         return (
-          <div className={`w-full h-full p-[1.2rem] flex flex-col rounded-[var(--outer-radius)] ${
-            isDarkMode ? 'bg-[#1a1b1e]' : 'bg-gray-50 border border-slate-200'
-          }`}>
-            <div className={`flex items-center gap-[0.6rem] mb-[0.8rem] pb-[0.6rem] border-b ${
-              isDarkMode ? 'text-yellow-400 border-slate-700/50' : 'text-yellow-600 border-slate-200'
-            }`}>
-              <FileText className="w-[1.4rem] h-[1.4rem]" />
-              <span className="text-[1.1rem] font-semibold">Note</span>
-            </div>
-            <textarea
-              value={widget.noteContent || ''}
-              onChange={(e) => updateNoteContent(widget.id, e.target.value)}
-              placeholder="Type your note here..."
-              className={`flex-1 w-full bg-transparent border-none outline-none resize-none text-[1.2rem] pt-[0.4rem] ${
-                isDarkMode ? 'text-slate-200 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'
-              }`}
-              style={{ pointerEvents: isEditMode ? 'none' : 'auto' }}
-              data-testid={`textarea-note-${widget.id}`}
-            />
-          </div>
+          <NoteWidget
+            widgetId={widget.id}
+            noteContent={widget.noteContent || ''}
+            isDarkMode={isDarkMode}
+            isEditMode={isEditMode}
+            onChange={updateNoteContent}
+          />
         );
 
       case 'spacer':

@@ -176,7 +176,7 @@
     widgetType: WidgetType;
     w: number;
     h: number;
-    icon: 'video' | 'note' | 'spacer' | 'image' | 'zoom' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'default';
+    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'default';
     color: string;
   }
 
@@ -185,7 +185,6 @@
     { id: 'template-note',         name: 'Note',         widgetType: 'note',         w: 3, h: 2, icon: 'note',         color: 'yellow' },
     { id: 'template-spacer',       name: 'Spacer',       widgetType: 'spacer',       w: 2, h: 1, icon: 'spacer',       color: 'slate'  },
     { id: 'template-image',        name: 'Photo',        widgetType: 'image',        w: 3, h: 2, icon: 'image',        color: 'purple' },
-    { id: 'template-zoom',         name: 'Zoom Meeting', widgetType: 'zoom',         w: 3, h: 2, icon: 'zoom',         color: 'blue'   },
     { id: 'template-clock',        name: 'Clock',        widgetType: 'clock',        w: 3, h: 2, icon: 'clock',        color: 'cyan'   },
     { id: 'template-crisis-ticker', name: 'Crisis Intel', widgetType: 'crisis_ticker', w: 3, h: 2, icon: 'crisis_ticker', color: 'red'  },
     { id: 'template-weather',      name: 'Weather',      widgetType: 'weather',      w: 2, h: 2, icon: 'weather',      color: 'sky'    },

@@ -26,7 +26,7 @@ The dashboard is built on a 12-column magnetic grid.
 - **Viral Ad Mechanic (Free Users Only):** Non-premium users experience a single viral ad block that expands on the dashboard, pushing widgets aside.
 
 **Technical Implementations & Feature Specifications:**
-- **Dynamic Widget System:** Supports Video, Note, Spacer, Image, Clock, Crisis Ticker, Weather, and QR Portal widget types.
+- **Dynamic Widget System:** Supports Video, Note, Spacer, Image, Clock, Crisis Ticker, Weather, Dictionary, and QR Portal widget types. (Zoom widget removed — was unreliable, brought a hard dependency on the Zoom Meeting SDK, and conflicted with the read-only TV-mode model of the dashboard.)
 - **Edit Layout Mode:** Toggles between locked and editable states for drag-to-resize, settings, and delete.
 - **Fullscreen Mode:** Uses browser Fullscreen API.
 - **TV Mode:** Iframes set to `pointer-events: none` with video controls via `postMessage` API.
@@ -44,7 +44,7 @@ The dashboard is built on a 12-column magnetic grid.
 - **TRUST THE VIDEOID:** If YouTube API returns `liveVideoId`, stream is considered LIVE.
 - **Latest-Video Fallback:** When YouTube channel is not live, system fetches most recent video from uploads playlist.
 - **Corporate Footer:** Professional footer with copyright and legal links.
-- **Note Widget:** Editable text area.
+- **Note Widget:** Markdown-aware notes with a header View/Edit toggle. Custom safe parser (no new deps) supports `# / ## / ###` headings, **bold**, *italic*, `inline code`, [links](https://), `- / *` bullet lists, fenced code blocks, `---` rules, and GitHub-style task lists `- [ ] / - [x]` whose checkboxes are clickable in preview mode and mutate the underlying markdown source. Edit mode shows a textarea; Preview mode shows the rendered note. While the dashboard layout is in Edit mode the widget is forced into Preview and all interactions are disabled, replacing the previous `pointerEvents:'none'` quirk on the textarea so dragging works cleanly. Component lives at `client/src/components/note-widget.tsx`.
 - **Spacer Widget:** Empty placeholder.
 - **Image Widget:** Displays images, supporting local file uploads.
 - **Default News Streams:** Automatically loads 6 pre-defined news streams if `localStorage` is empty.
@@ -73,5 +73,5 @@ The dashboard is built on a 12-column magnetic grid.
 - **localStorage:** Browser API for client-side data persistence.
 - **Supabase:** Backend for authentication and PostgreSQL database.
 - **Stripe:** For managing recurring subscriptions.
-- **OpenWeatherMap API:** Live weather data for WeatherWidget (single city at a time, fetched on demand via `GET /api/weather?city=`). Falls back to static data on error. Hover-activated glass search bar with Search icon replaces current city instantly on Enter. "City not found" error handling. Controls stay visible while search is focused.
+- **OpenWeatherMap API:** Live weather data for WeatherWidget. `GET /api/weather` accepts `?lat=&lon=` (preferred) or `?city=` and returns the resolved `lat`/`lon` so the forecast endpoint can be called without re-geocoding. `GET /api/weather/forecast` aggregates the OWM 5-day/3-hour endpoint into the next 3 days (excluding today), bucketed by the city's local timezone, returning `dayLabel`, `tempMaxC/F`, `tempMinC/F`, `icon`, and `condition` per day. On mount the widget requests the browser's geolocation with a 5s timeout — on success it loads weather + forecast for the user's coordinates; on denial, error, or timeout it falls back to London. City search reuses the same loader. The 3-day forecast strip renders below the current readout when the widget is at least 220×220 px; on smaller widgets it is hidden gracefully so the primary readout stays legible. Hover-activated glass search bar with Search icon replaces the current city instantly on Enter. "City not found" error handling. Controls stay visible while search is focused.
 - **NewsAPI.org:** Live breaking news headlines for CrisisTickerWidget (fetched via `GET /api/news`, refreshes every 10 minutes). Falls back to static headlines on error.

@@ -1,6 +1,5 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
-import { createHmac } from "crypto";
 import { storage } from "./storage";
 import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from "./link-refresher";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
@@ -18,72 +17,6 @@ const ADMIN_EMAILS = [
 const isAdminEmail = (email: string): boolean => {
   return ADMIN_EMAILS.includes(email?.toLowerCase() || '');
 };
-
-// ─── generateZoomSignature ────────────────────────────────────────────────────
-// Generates a Zoom Meeting SDK JWT signature for client-side SDK initialization.
-// Uses HMAC-SHA256 with the ZOOM_CLIENT_SECRET to sign a structured payload
-// containing the SDK key, meeting number, role, and expiry timestamps.
-//
-// Algorithm (Zoom Meeting SDK Web v3+):
-//   1. Build a base64url-encoded JWT header  → { alg: "HS256", typ: "JWT" }
-//   2. Build a base64url-encoded JWT payload → { sdkKey, appKey, mn, role, iat, exp, tokenExp }
-//   3. Sign  header.payload  with HMAC-SHA256 using ZOOM_CLIENT_SECRET
-//   4. Return  header.payload.signature  as the complete JWT
-//
-// role: 0 = attendee, 1 = host
-//
-// Required env vars:
-//   ZOOM_CLIENT_ID      – your Zoom Meeting SDK App's Client ID (SDK Key)
-//   ZOOM_CLIENT_SECRET  – your Zoom Meeting SDK App's Client Secret
-//
-// Required Zoom App scopes:
-//   meeting:read:meeting
-//   meeting:write:meeting
-function generateZoomSignature(
-  meetingNumber: string,
-  role: 0 | 1,
-  clientId: string,
-  clientSecret: string
-): string {
-  const iat = Math.floor(Date.now() / 1000);
-  // Token valid for 2 hours
-  const exp = iat + 7200;
-
-  // base64url encoding helper (no padding, URL-safe chars)
-  const toBase64Url = (input: string): string =>
-    Buffer.from(input)
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-
-  const header = toBase64Url(
-    JSON.stringify({ alg: 'HS256', typ: 'JWT' })
-  );
-
-  const payload = toBase64Url(
-    JSON.stringify({
-      sdkKey:   clientId,     // Zoom Meeting SDK v3+ uses sdkKey
-      appKey:   clientId,     // Legacy alias — include both for compatibility
-      mn:       meetingNumber,
-      role:     role,
-      iat:      iat,
-      exp:      exp,
-      tokenExp: exp,          // Zoom Web SDK checks tokenExp
-    })
-  );
-
-  const signingInput = `${header}.${payload}`;
-
-  const signature = createHmac('sha256', clientSecret)
-    .update(signingInput)
-    .digest('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-
-  return `${header}.${payload}.${signature}`;
-}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -184,115 +117,6 @@ export async function registerRoutes(
       });
       return res.status(500).json({
         error: error.message || 'An unexpected error occurred during signup'
-      });
-    }
-  });
-
-  // ─── POST /api/zoom/signature ─────────────────────────────────────────────
-  // Generates a Zoom Meeting SDK JWT signature for use in the browser-side
-  // Zoom Web SDK (@zoom/meetingsdk-embedded or @zoom/meetingsdk-web).
-  //
-  // The ZOOM_CLIENT_SECRET never leaves the server — the client only receives
-  // the signed JWT, which Zoom validates on its own servers during join().
-  //
-  // Request body (JSON):
-  //   meetingNumber  {string}  Zoom meeting ID — digits only, spaces/hyphens
-  //                            are stripped automatically (e.g. "123 456 7890"
-  //                            or "12345678901" are both accepted)
-  //   role           {0|1}     0 = attendee (default), 1 = host/co-host
-  //
-  // Response (JSON):
-  //   {
-  //     signature:  string,  // JWT to pass to ZoomMtg.init() / join()
-  //     sdkKey:     string,  // clientId — pass as sdkKey in join()
-  //     expiresAt:  number,  // Unix timestamp; regenerate a new token before this
-  //   }
-  //
-  // Usage on the client (Zoom Web SDK v3):
-  //   const { signature, sdkKey } = await fetch('/api/zoom/signature', {
-  //     method: 'POST',
-  //     headers: { 'Content-Type': 'application/json' },
-  //     body: JSON.stringify({ meetingNumber, role: 0 }),
-  //   }).then(r => r.json());
-  //
-  //   ZoomMtg.join({ signature, sdkKey, meetingNumber, userName, passWord });
-  //
-  // Security:
-  //   • Role 1 (host) grants elevated privileges — add your own auth guard
-  //     before issuing host tokens in production.
-  //   • Tokens expire after 2 hours. The client should request a fresh
-  //     signature for each new session rather than caching it long-term.
-  //
-  // Required env vars:
-  //   ZOOM_CLIENT_ID      (your Meeting SDK App's Client ID / SDK Key)
-  //   ZOOM_CLIENT_SECRET  (your Meeting SDK App's Client Secret)
-  //
-  // Required Zoom App scopes:
-  //   meeting:read:meeting
-  //   meeting:write:meeting
-  app.post("/api/zoom/signature", async (req: Request, res: Response) => {
-    const { meetingNumber, role } = req.body;
-
-    // ── Input validation ──────────────────────────────────────────────────
-    if (!meetingNumber || typeof meetingNumber !== 'string') {
-      return res.status(400).json({
-        error: "meetingNumber is required and must be a string (numeric meeting ID, spaces/hyphens are stripped automatically)"
-      });
-    }
-
-    // Strip whitespace and hyphens — users often copy IDs formatted as
-    // "123 456 7890" or "123-456-7890" from the Zoom invite.
-    const cleanMeetingNumber = meetingNumber.replace(/[\s\-]/g, '');
-
-    if (!/^\d{9,11}$/.test(cleanMeetingNumber)) {
-      return res.status(400).json({
-        error: "meetingNumber must be 9–11 digits after stripping spaces and hyphens"
-      });
-    }
-
-    // Role defaults to 0 (attendee). Only 0 or 1 are valid Zoom SDK roles.
-    const parsedRole = role !== undefined ? Number(role) : 0;
-    if (![0, 1].includes(parsedRole)) {
-      return res.status(400).json({
-        error: "role must be 0 (attendee) or 1 (host)"
-      });
-    }
-
-    // ── Read credentials from environment ─────────────────────────────────
-    const clientId     = process.env.ZOOM_CLIENT_ID;
-    const clientSecret = process.env.ZOOM_CLIENT_SECRET;
-
-    if (!clientId || !clientSecret) {
-      console.error('[Zoom Signature] ZOOM_CLIENT_ID or ZOOM_CLIENT_SECRET not set in environment');
-      return res.status(503).json({
-        error: "Zoom credentials are not configured on the server. Add ZOOM_CLIENT_ID and ZOOM_CLIENT_SECRET to your Replit Secrets (or .env file)."
-      });
-    }
-
-    // ── Generate the JWT and return it ────────────────────────────────────
-    try {
-      const signature = generateZoomSignature(
-        cleanMeetingNumber,
-        parsedRole as 0 | 1,
-        clientId,
-        clientSecret
-      );
-
-      // 2-hour window — same as the token expiry inside generateZoomSignature
-      const expiresAt = Math.floor(Date.now() / 1000) + 7200;
-
-      console.log(`[Zoom Signature] Issued token for meeting=${cleanMeetingNumber} role=${parsedRole}`);
-
-      res.json({
-        signature,
-        sdkKey:    clientId,  // The client passes this alongside the signature
-        expiresAt,            // Unix timestamp — client should refresh before this
-      });
-
-    } catch (error: any) {
-      console.error('[Zoom Signature] Error generating signature:', error);
-      res.status(500).json({
-        error: error.message || 'Failed to generate Zoom signature'
       });
     }
   });
@@ -1141,14 +965,32 @@ export async function registerRoutes(
   });
 
   // ─── Weather API (OpenWeatherMap) ──────────────────────────────────────────
+  // Supports lookup by city name (?city=London) OR coordinates (?lat=&lon=).
+  // Coordinate lookup is preferred when the client has geolocation; the
+  // response always includes lat/lon so the client can request the matching
+  // forecast without a second geocoding round-trip.
   app.get('/api/weather', async (req: Request, res: Response) => {
-    const city = (req.query.city as string) || 'London';
     const apiKey = process.env.WEATHER_API_KEY;
     if (!apiKey) {
       return res.status(503).json({ error: 'Weather API key not configured' });
     }
+
+    const latParam = req.query.lat as string | undefined;
+    const lonParam = req.query.lon as string | undefined;
+    const cityParam = req.query.city as string | undefined;
+    const lat = latParam !== undefined ? Number(latParam) : NaN;
+    const lon = lonParam !== undefined ? Number(lonParam) : NaN;
+    const useCoords = Number.isFinite(lat) && Number.isFinite(lon);
+
+    let url: string;
+    if (useCoords) {
+      url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+    } else {
+      const city = cityParam || 'London';
+      url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`;
+    }
+
     try {
-      const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`;
       const resp = await fetch(url);
       if (!resp.ok) {
         const body = await resp.text();
@@ -1158,6 +1000,8 @@ export async function registerRoutes(
       const data = await resp.json();
       const mapped = {
         city: data.name,
+        lat: data.coord?.lat ?? (useCoords ? lat : null),
+        lon: data.coord?.lon ?? (useCoords ? lon : null),
         tempC: Math.round(data.main.temp),
         tempF: Math.round(data.main.temp * 9 / 5 + 32),
         condition: data.weather?.[0]?.main || 'Unknown',
@@ -1169,6 +1013,98 @@ export async function registerRoutes(
       res.json(mapped);
     } catch (err) {
       console.error('[Weather] Fetch error:', err);
+      res.status(503).json({ error: 'Service temporarily unavailable' });
+    }
+  });
+
+  // ─── Weather Forecast (OpenWeatherMap 5-day / 3-hour, aggregated to days) ─
+  // Returns the next 3 days (excluding today) with min/max temps and the
+  // representative icon. Accepts ?lat=&lon= or ?city=.
+  app.get('/api/weather/forecast', async (req: Request, res: Response) => {
+    const apiKey = process.env.WEATHER_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({ error: 'Weather API key not configured' });
+    }
+
+    const latParam = req.query.lat as string | undefined;
+    const lonParam = req.query.lon as string | undefined;
+    const cityParam = req.query.city as string | undefined;
+    const lat = latParam !== undefined ? Number(latParam) : NaN;
+    const lon = lonParam !== undefined ? Number(lonParam) : NaN;
+    const useCoords = Number.isFinite(lat) && Number.isFinite(lon);
+
+    let url: string;
+    if (useCoords) {
+      url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+    } else {
+      const city = cityParam || 'London';
+      url = `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`;
+    }
+
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        const body = await resp.text();
+        console.error(`[Weather Forecast] OpenWeatherMap error ${resp.status}: ${body}`);
+        return res.status(resp.status).json({ error: 'Weather service error' });
+      }
+      const data = await resp.json();
+      const list: any[] = Array.isArray(data.list) ? data.list : [];
+
+      const tzOffsetSec: number = data.city?.timezone ?? 0;
+      // ── "today" must also be expressed in the city's local time, otherwise
+      //    cities far from UTC can incorrectly drop or include a day.
+      const nowLocalMs = (Math.floor(Date.now() / 1000) + tzOffsetSec) * 1000;
+      const today = new Date(nowLocalMs).toISOString().slice(0, 10);
+
+      const buckets = new Map<string, { temps: number[]; icons: string[]; conditions: string[]; midday?: any }>();
+      for (const entry of list) {
+        const localMs = (entry.dt + tzOffsetSec) * 1000;
+        const dateKey = new Date(localMs).toISOString().slice(0, 10);
+        if (dateKey === today) continue;
+        let bucket = buckets.get(dateKey);
+        if (!bucket) {
+          bucket = { temps: [], icons: [], conditions: [] };
+          buckets.set(dateKey, bucket);
+        }
+        bucket.temps.push(entry.main?.temp ?? 0);
+        bucket.icons.push(entry.weather?.[0]?.icon ?? '01d');
+        bucket.conditions.push(entry.weather?.[0]?.main ?? 'Unknown');
+        const hourLocal = new Date(localMs).getUTCHours();
+        if (hourLocal === 12 || (!bucket.midday && hourLocal >= 11 && hourLocal <= 14)) {
+          bucket.midday = entry;
+        }
+      }
+
+      const sortedDates = Array.from(buckets.keys()).sort().slice(0, 3);
+      const days = sortedDates.map((dateKey) => {
+        const b = buckets.get(dateKey)!;
+        const tempMax = Math.max(...b.temps);
+        const tempMin = Math.min(...b.temps);
+        const repIcon = b.midday?.weather?.[0]?.icon || b.icons[Math.floor(b.icons.length / 2)] || '01d';
+        const repCond = b.midday?.weather?.[0]?.main || b.conditions[Math.floor(b.conditions.length / 2)] || 'Unknown';
+        const dayDate = new Date(`${dateKey}T12:00:00Z`);
+        const dayLabel = dayDate.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+        return {
+          date: dateKey,
+          dayLabel,
+          tempMaxC: Math.round(tempMax),
+          tempMinC: Math.round(tempMin),
+          tempMaxF: Math.round(tempMax * 9 / 5 + 32),
+          tempMinF: Math.round(tempMin * 9 / 5 + 32),
+          icon: mapOwmIcon(repIcon),
+          condition: repCond,
+        };
+      });
+
+      res.json({
+        city: data.city?.name ?? null,
+        lat: data.city?.coord?.lat ?? (useCoords ? lat : null),
+        lon: data.city?.coord?.lon ?? (useCoords ? lon : null),
+        days,
+      });
+    } catch (err) {
+      console.error('[Weather Forecast] Fetch error:', err);
       res.status(503).json({ error: 'Service temporarily unavailable' });
     }
   });
