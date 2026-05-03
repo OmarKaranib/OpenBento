@@ -7,10 +7,7 @@ function stripWidgetForCast(w: Widget): Record<string, unknown> {
 }
 
 // The dashboard has no separate background state — the visible bg is purely
-// theme-derived (see dashboard.tsx ~L1543). Resolving here keeps the TV
-// renderer self-contained and matches the laptop pixel-for-pixel. If a
-// custom background engine is added later, callers can pass `background`
-// explicitly to override.
+// theme-derived. Resolving here keeps the TV renderer self-contained.
 function resolveBackground(isDarkMode: boolean): string {
   return isDarkMode ? "#0f172a" : "#F8F9FA";
 }
@@ -20,6 +17,8 @@ export function buildCastSnapshot(args: {
   isDarkMode: boolean;
   masterMute: boolean;
   background?: string;
+  layoutId?: string | null;
+  layoutName?: string | null;
 }): CastSnapshot {
   return {
     v: 1,
@@ -30,6 +29,8 @@ export function buildCastSnapshot(args: {
     masterMute: args.masterMute,
     background: args.background ?? resolveBackground(args.isDarkMode),
     pushedAt: Date.now(),
+    layoutId: args.layoutId ?? null,
+    layoutName: args.layoutName ?? null,
   };
 }
 
@@ -39,6 +40,7 @@ export interface PairedTV {
   roomId: string;
   label: string;
   pairedAt: number;
+  code?: string | null;
 }
 
 export function loadPairedTVs(): PairedTV[] {

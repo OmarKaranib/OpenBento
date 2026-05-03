@@ -1589,6 +1589,7 @@ const MasterControlDashboard = ({
               widgets={widgets}
               isDarkMode={isDarkMode}
               masterMute={masterMute}
+              isAuthenticated={isAuthenticated}
             />
 
             {/* Request Dropdown */}

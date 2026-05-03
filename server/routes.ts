@@ -11,6 +11,7 @@ import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema, in
 import { getUncachableResendClient } from "./services/resend-client";
 import { createMarketsService, parseSymbols as parseMarketsSymbols } from "./markets";
 import { LruTtlCache } from "./services/lruCache";
+import { attachSupabaseUser as attachSupabaseUserShared } from "./services/supabaseAuth";
 
 // Admin email list - used for admin access only
 const ADMIN_EMAILS = [
@@ -31,53 +32,10 @@ const isAdminEmail = (email: string): boolean => {
 // `/auth/v1/user` endpoint (cheap and reliable) and cache the result for 5
 // minutes so we don't make a network call on every save.
 // ─────────────────────────────────────────────────────────────────────────────
-const supabaseUserCache = new LruTtlCache<{ id: string; email: string }>({
-  max: 500,
-  ttlMs: 5 * 60 * 1000,
-});
-
-async function attachSupabaseUser(req: Request, _res: Response, next: () => void) {
-  const auth = req.headers.authorization || '';
-  const match = auth.match(/^Bearer\s+(.+)$/i);
-  if (!match) return next();
-  const token = match[1].trim();
-  if (!token) return next();
-
-  const cached = supabaseUserCache.get(token);
-  if (cached) {
-    (req as any).userId = cached.id;
-    (req as any).user = { id: cached.id, email: cached.email };
-    return next();
-  }
-
-  const supabaseUrl = process.env.VITE_SUPABASE_URL;
-  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !anonKey) return next();
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'apikey': anonKey,
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    if (response.ok) {
-      const user = await response.json();
-      if (user?.id) {
-        supabaseUserCache.set(token, { id: user.id, email: user.email });
-        (req as any).userId = user.id;
-        (req as any).user = { id: user.id, email: user.email };
-      }
-    }
-  } catch (err) {
-    // Verification failed — leave userId unset; route will return 401.
-  }
-  next();
-}
+// Auth middleware extracted to ./services/supabaseAuth.ts so the cast hub
+// (and any other route module) can share the same LRU cache and verification
+// logic. Re-exported under the local name so existing references compile.
+const attachSupabaseUser = attachSupabaseUserShared;
 
 export async function registerRoutes(
   httpServer: Server,

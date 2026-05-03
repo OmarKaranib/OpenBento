@@ -223,6 +223,12 @@ export default function CastPage() {
   const cursorTimerRef = useRef<number | null>(null);
   const [forgetProgress, setForgetProgress] = useState(0);
   const [cursorIdle, setCursorIdle] = useState(false);
+  // Overlay state — shown briefly on layout change / reconnect, then auto-hides
+  // after 4s so it never covers the dashboard for long. Banner reconnect state
+  // is separate because it stays visible while WS is down (no auto-hide).
+  const [overlayUntil, setOverlayUntil] = useState<number>(0);
+  const [nextScheduled, setNextScheduled] = useState<{ layoutName: string; inMinutes: number } | null>(null);
+  const lastLayoutSigRef = useRef<string>("");
 
   // Idle-hide the cursor after 3s of mouse inactivity for a clean TV display.
   useEffect(() => {
@@ -383,8 +389,17 @@ export default function CastPage() {
             if (prev && typeof next.pushedAt === "number" && next.pushedAt <= prev.pushedAt) {
               return prev;
             }
+            // Show overlay for 4s when the layout identity changes (or first
+            // snapshot ever). Any other content-only push leaves it hidden.
+            const sig = `${next.layoutId ?? ""}|${next.layoutName ?? ""}`;
+            if (sig !== lastLayoutSigRef.current) {
+              lastLayoutSigRef.current = sig;
+              setOverlayUntil(Date.now() + 4000);
+            }
             return next;
           });
+        } else if (msg.type === "next-scheduled") {
+          setNextScheduled(msg.next ?? null);
         } else if (msg.type === "control") {
           applyControl(msg);
         } else if (msg.type === "renamed" && typeof msg.label === "string") {
@@ -526,6 +541,8 @@ export default function CastPage() {
   const isDark = snapshot?.isDarkMode ?? true;
   const masterMute = snapshot?.masterMute ?? true;
   const background = snapshot?.background || (isDark ? "#0f172a" : "#F8F9FA");
+  const overlayVisible = now < overlayUntil;
+  const currentLayoutName = snapshot?.layoutName || null;
 
   return (
     <div
@@ -537,6 +554,50 @@ export default function CastPage() {
       }}
       data-testid="cast-paired-screen"
     >
+      {/* Reconnect banner — sticky while WS is down, no auto-hide. */}
+      {!connected && (
+        <div
+          className="absolute top-0 left-0 right-0 z-[60] flex items-center justify-center gap-[0.6rem] px-[1rem] py-[0.5rem] text-[1rem] font-semibold text-amber-50 bg-amber-700/90 shadow-lg"
+          data-testid="banner-reconnecting"
+        >
+          <WifiOff className="w-[1.1rem] h-[1.1rem]" />
+          Reconnecting to OpenBento…
+        </div>
+      )}
+
+      {/* Layout-change overlay — auto-hides 4s after the layout identity
+          changes. Shows the TV name, the current layout, and (when known)
+          when the next scheduled rotation will fire. */}
+      {overlayVisible && (
+        <div
+          className="absolute inset-0 z-[55] flex items-end justify-center pointer-events-none p-[2rem]"
+          data-testid="overlay-cast-info"
+        >
+          <div
+            className={`pointer-events-none rounded-2xl backdrop-blur-md shadow-2xl px-[1.6rem] py-[1.2rem] text-center transition-opacity duration-500 ${
+              isDark ? "bg-slate-900/80 text-slate-100" : "bg-white/85 text-gray-900"
+            }`}
+          >
+            <div className="flex items-center justify-center gap-[0.5rem] text-[0.9rem] uppercase tracking-[0.2em] opacity-80">
+              <Cast className="w-[1rem] h-[1rem]" />
+              <span data-testid="overlay-tv-name">{label}</span>
+            </div>
+            <div className="mt-[0.4rem] text-[2rem] font-bold" data-testid="overlay-current-layout">
+              {currentLayoutName || "Live"}
+            </div>
+            {nextScheduled && (
+              <div className="mt-[0.3rem] text-[0.95rem] opacity-80" data-testid="overlay-next-scheduled">
+                Next:{" "}
+                <span className="font-semibold">{nextScheduled.layoutName}</span>{" "}
+                in {nextScheduled.inMinutes < 60
+                  ? `${Math.max(1, nextScheduled.inMinutes)}m`
+                  : `${Math.floor(nextScheduled.inMinutes / 60)}h ${nextScheduled.inMinutes % 60}m`}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Always-visible label badge so it's clear which TV this is. */}
       <div
         className={`absolute bottom-[1rem] right-[1rem] z-40 flex items-center gap-[0.4rem] px-[0.7rem] py-[0.3rem] rounded-full text-[0.8rem] font-semibold shadow-md backdrop-blur-md transition-opacity duration-500 pointer-events-none ${

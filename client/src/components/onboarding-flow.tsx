@@ -11,7 +11,7 @@ import type { Widget } from '@/App';
 export const ONBOARDING_FLAG = 'openBentoOnboarded';
 export const REPLAY_EVENT = 'openbento:replay-onboarding';
 
-type Phase = 'hidden' | 'welcome' | 'coach-block' | 'coach-edit';
+type Phase = 'hidden' | 'welcome' | 'coach-block' | 'coach-edit' | 'coach-cast';
 
 interface OnboardingFlowProps {
   setWidgets: (widgets: Widget[]) => void;
@@ -95,6 +95,7 @@ export function OnboardingFlow({
   // only dismissing the *Edit* coachmark persists the onboarded flag.
   const skipWelcome    = useCallback(() => setPhase('coach-block'), []);
   const advanceToEdit  = useCallback(() => setPhase('coach-edit'),  []);
+  const advanceToCast  = useCallback(() => setPhase('coach-cast'),  []);
 
   useEffect(() => {
     if (phase === 'hidden') return;
@@ -102,11 +103,12 @@ export function OnboardingFlow({
       if (e.key !== 'Escape') return;
       if (phase === 'welcome')         skipWelcome();
       else if (phase === 'coach-block') advanceToEdit();
+      else if (phase === 'coach-edit')  advanceToCast();
       else                              finish();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [phase, finish, skipWelcome, advanceToEdit]);
+  }, [phase, finish, skipWelcome, advanceToEdit, advanceToCast]);
 
   // Track whether the channels response has resolved (success OR failure). We
   // can't simply check `channels.length > 0` because a failed fetch leaves it
@@ -172,7 +174,7 @@ export function OnboardingFlow({
         title="Add tiles to your grid"
         body={<>Tap <strong className="text-cyan-300">Block</strong> anytime to add or swap tiles.</>}
         step={1}
-        total={2}
+        total={3}
         onNext={advanceToEdit}
         nextLabel="Got it"
         // Backdrop click / skip on Step 1 must still advance to Step 2 — the
@@ -189,7 +191,22 @@ export function OnboardingFlow({
         title="Rearrange your dashboard"
         body={<>Hit <strong className="text-cyan-300">Edit</strong> to drag, resize, or remove tiles.</>}
         step={2}
-        total={2}
+        total={3}
+        onNext={advanceToCast}
+        nextLabel="Next"
+        onSkip={advanceToCast}
+      />
+    );
+  }
+
+  if (phase === 'coach-cast') {
+    return (
+      <Coachmark
+        targetSelector='[data-testid="button-cast"]'
+        title="Cast to any TV"
+        body={<>Tap <strong className="text-cyan-300">Cast</strong> to mirror this dashboard onto any TV — sign in to schedule layouts across the week.</>}
+        step={3}
+        total={3}
         onNext={finish}
         nextLabel="Done"
         onSkip={finish}

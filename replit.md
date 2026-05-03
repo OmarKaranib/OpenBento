@@ -32,7 +32,13 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 - **RSS Headlines Widget:** Renders scrolling headlines from any RSS or Atom feed URL via a server-side proxy.
 - **Dictionary Widget v2:** Provides definitions, phonetics, audio, synonyms, and etymology, with a search function and favoriting capabilities.
 - **Onboarding:** An `OnboardingFlow` guides new guest users with starter packs and coachmarks.
-- **Cast to TV Feature:** Allows users to cast their dashboard layout to a separate TV interface via a pairing code, using a push model for updates and WebSocket communication.
+- **Cast to TV Feature (headline):** OpenBento turns any browser-equipped TV into a dashboard wall.
+  - **Guest pairing (legacy, unchanged):** TV at `/cast` shows a 6-digit code, laptop pairs with `Cast → enter code`.
+  - **Persistent BENTO-XXXX rooms (signed-in):** Each paired TV gets a permanent `BENTO-XXXX` code (alphabet excludes 0/O/1/I) that survives server restarts and re-pairing. Rooms are owner-scoped — every persistent route runs through `attachSupabaseUser` and an `ensureCanWrite` ownership check.
+  - **One phone → many TVs:** the Cast popover lists every paired TV, supports per-room push, "Push to all", rename, hold-to-unpair, and a live presence dot driven by the WebSocket.
+  - **Saved layouts + scheduled rotations:** signed-in users can save the current dashboard as a named layout (e.g. "Morning", "Evening") and attach a weekly schedule (`day-of-week + HH:MM`). An in-process scheduler ticks every 60s; matching entries push their layout snapshot to the target room and stamp `lastFiredAt`.
+  - **TV overlay:** auto-hides 4s after the layout identity changes, shows TV name, current layout name, and "Next: X in Ym". A persistent reconnect banner appears whenever the WebSocket is down.
+  - **Onboarding:** the first-run coachmark flow now ends on the Cast button so guests discover the feature immediately.
 - **Theming for Productivity Widgets:** Productivity and personal widgets (Habit Tracker, Quick Launch, Big Text Marquee, Network Light, Photo Loop) dynamically adjust text, accent, border, and surface colors based on the widget's background color to ensure readability.
 
 **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core` for drag-and-drop, `lucide-react` for icons, `localStorage` for persistence, and `qrcode.react` for QR generation.
@@ -46,7 +52,7 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 ## Quality Gates
 A `check` workflow gates the codebase against a clean baseline:
 - `npx tsc --noEmit` — must report **zero** TypeScript errors. Anything new fails the gate.
-- `npx tsx --test tests/server/markets.test.ts tests/client/markets-symbols.test.ts` — markets ticker server + symbol-resolution unit tests.
+- `npx tsx --test tests/server/markets.test.ts tests/client/markets-symbols.test.ts tests/server/cast-schedule.test.ts` — markets ticker server + symbol-resolution unit tests **and** Cast scheduler tests (firing + unpair-stops-pushes).
 - `node --test tests/client/use-cloud-sync.test.mjs` — cross-device dashboard cloud-sync hook unit tests.
 
 Run all three locally with the `check` workflow (or copy the command above). A red `check` workflow blocks the task from being marked complete.
