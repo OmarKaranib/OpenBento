@@ -267,7 +267,7 @@ export const IssTrackerWidget: React.FC<IssTrackerProps> = ({ widget, onUpdate }
               if (pass && pass.willPassOverhead && pass.atTs > nowTick) {
                 const minutes = Math.max(0, Math.round((pass.atTs - nowTick) / 60_000));
                 if (minutes > 0 && !overheadNow) {
-                  return `${distLine} · Passing over ${widget.issCity} in ${minutes}m`;
+                  return `${distLine} · Est. passing over ${widget.issCity} in ~${minutes}m`;
                 }
               }
               return distLine;
