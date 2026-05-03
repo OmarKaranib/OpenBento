@@ -1,6 +1,4 @@
-// Water Tracker — tap +/- to log cups against a daily target. Streak
-// counts consecutive target-met days. Resets at local midnight (we
-// just key by local YYYY-MM-DD and read "today" each render).
+// Water Tracker — +/- cups against a daily target with a streak.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Droplet, Flame, Minus, Plus, Settings as SettingsIcon, X as XIcon } from 'lucide-react';
 import {
@@ -17,7 +15,7 @@ export const WaterTrackerWidget: React.FC<WaterTrackerProps> = ({ widget, onUpda
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState(280);
   const [showSettings, setShowSettings] = useState(false);
-  // Re-render at local midnight so the "today" key flips without a page reload.
+  // Re-render at local midnight so the "today" key flips.
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -44,7 +42,7 @@ export const WaterTrackerWidget: React.FC<WaterTrackerProps> = ({ widget, onUpda
 
   const setCups = (next: number) => {
     const clamped = Math.max(0, Math.min(99, next));
-    // Trim to last 90 days so the persisted blob never grows unbounded.
+    // Rolling 90-day trim.
     const cutoff = (() => {
       const d = new Date(); d.setDate(d.getDate() - 90);
       const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), da = String(d.getDate()).padStart(2, '0');
@@ -71,7 +69,6 @@ export const WaterTrackerWidget: React.FC<WaterTrackerProps> = ({ widget, onUpda
   const clrInertBd = light ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.08)';
   const clrTrack   = light ? 'rgba(0,0,0,0.08)' : 'rgba(15,23,42,0.55)';
 
-  // Progress ring sizing — diameter scales with widget, stroke ~10% of radius.
   const ringD     = Math.max(80, Math.min(160, size * 0.46));
   const ringR     = ringD / 2 - 8;
   const ringCirc  = 2 * Math.PI * ringR;

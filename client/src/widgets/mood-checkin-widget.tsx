@@ -1,5 +1,4 @@
-// Mood Check-in — pick today's emoji, see a 30-day heatmap. Long-press
-// any cell to clear it. Stored as moodDays[YYYY-MM-DD] = emojiIndex (0..4).
+// Mood Check-in — daily emoji + 30-day heatmap. Long-press to clear.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Smile } from 'lucide-react';
 import { MONO, Widget, isLightBg, offsetLocalKey, todayLocalKey } from './shared';
@@ -30,14 +29,12 @@ export const MoodCheckinWidget: React.FC<MoodCheckinProps> = ({ widget, onUpdate
   const today = todayLocalKey();
   const todayMood = days[today];
 
-  // Last 30 local days (oldest → today).
   const last30 = useMemo(
     () => Array.from({ length: 30 }, (_, i) => offsetLocalKey(-(29 - i))),
     [],
   );
 
   const setMood = (idx: number | null) => {
-    // Trim to last 60 days when persisting.
     const cutoff = offsetLocalKey(-59);
     const trimmed: Record<string, number> = {};
     for (const k of Object.keys(days)) if (k >= cutoff) trimmed[k] = days[k];
@@ -72,7 +69,6 @@ export const MoodCheckinWidget: React.FC<MoodCheckinProps> = ({ widget, onUpdate
   const clrCellBg  = light ? 'rgba(0,0,0,0.06)' : 'rgba(15,23,42,0.55)';
   const clrCellBdr = light ? 'rgba(0,0,0,0.10)' : 'rgba(71,85,105,0.3)';
 
-  // Map emoji idx (0=great → 4=bad) to a heatmap colour with declining alpha.
   const cellColor = (idx: number | undefined): string => {
     if (idx === undefined) return clrCellBg;
     const palette = light
@@ -81,7 +77,6 @@ export const MoodCheckinWidget: React.FC<MoodCheckinProps> = ({ widget, onUpdate
     return palette[Math.max(0, Math.min(4, idx))];
   };
 
-  // Heatmap: 5 rows × 6 columns, oldest top-left → newest bottom-right.
   const cellSize = Math.max(12, Math.min(22, Math.min(size.w / 8, (size.h - 110) / 6)));
 
   return (
@@ -106,7 +101,6 @@ export const MoodCheckinWidget: React.FC<MoodCheckinProps> = ({ widget, onUpdate
         </span>
       </div>
 
-      {/* Today picker */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', gap: 4, marginBottom: 10, flexShrink: 0,
       }}>
@@ -133,7 +127,6 @@ export const MoodCheckinWidget: React.FC<MoodCheckinProps> = ({ widget, onUpdate
         })}
       </div>
 
-      {/* 30-day heatmap (5×6, newest bottom-right) */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <span style={{
           color: clrMuted, fontFamily: MONO, fontSize: 9,

@@ -1,14 +1,7 @@
-// Focus Soundscape — bundled royalty-free ambient loops shipped as WAV
-// assets in /sounds/wellness/. Each WAV is pre-conditioned (filter chain
-// + 150ms equal-power seam crossfade applied at build time by
-// scripts/generate-soundscapes.mjs) so AudioBufferSourceNode.loop = true
-// produces no click at the boundary. The widget fetches + decodes the
-// asset on first play, caches the AudioBuffer for the lifetime of the
-// AudioContext, and routes through a GainNode so widget.isMuted /
-// widget.volume can be applied without rebuilding the graph.
-//
-// Honors widget.isMuted (master mute, default unmuted) and
-// widget.volume (0-100). Productivity theming via isLightBg.
+// Focus Soundscape — bundled WAV loop player. Assets are generated
+// offline by scripts/generate-soundscapes.mjs (filter chain + seam
+// crossfade) and shipped from /sounds/wellness/. Honors widget.isMuted
+// + widget.volume; theming via isLightBg.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CloudRain, Flame, type LucideIcon, Pause, Play, Settings as SettingsIcon, TreePine, Volume2, Waves, Wind, X as XIcon } from 'lucide-react';
 import { MONO, Widget, isLightBg, qrIconBtnStyle } from './shared';
@@ -34,9 +27,8 @@ interface AudioGraph {
   gain: GainNode;
 }
 
-// Module-scoped decode cache, keyed by sound preset. Lives across widget
-// remounts but is cheap (~150KB per buffer) and avoids re-fetching the
-// asset every time the user pauses+plays or switches presets.
+// Module-scoped decode cache so pause→play and preset switches don't
+// re-fetch the asset.
 const bufferCache = new Map<SoundKey, AudioBuffer>();
 const inflightCache = new Map<SoundKey, Promise<AudioBuffer>>();
 
@@ -86,9 +78,7 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
   const [loading, setLoading] = useState(false);
   const graphRef = useRef<AudioGraph | null>(null);
   const mountedRef = useRef(true);
-  // Token bumped on every play/stop/preset switch; async loaders compare
-  // against this to detect a cancelled request and bail without leaking
-  // an AudioContext or a stale graph.
+  // Bumped on play/stop/switch; in-flight loaders bail when it changes.
   const reqIdRef = useRef(0);
 
   useEffect(() => {
@@ -102,25 +92,19 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
 
   const sound = widget.soundscape ?? 'rain';
   const volume = widget.volume ?? 40;
-  // Master mute contract: only true if the dashboard explicitly muted
-  // this widget. Defaults to unmuted so a user-gesture play actually
-  // produces sound at the chosen volume.
   const muted = widget.isMuted === true;
 
-  // Effective gain: 0 when muted, volume === 0, or paused.
   const effGain = useMemo(
     () => (muted || volume === 0 || !playing) ? 0 : Math.min(0.45, (volume / 100) * 0.45),
     [muted, volume, playing],
   );
 
-  // Live-update gain on volume / mute changes (no audio rebuild).
   useEffect(() => {
     const g = graphRef.current; if (!g) return;
     g.gain.gain.cancelScheduledValues(g.ctx.currentTime);
     g.gain.gain.linearRampToValueAtTime(effGain, g.ctx.currentTime + 0.12);
   }, [effGain]);
 
-  // Tear down graph + invalidate any in-flight loaders on unmount.
   useEffect(() => {
     return () => {
       mountedRef.current = false;
@@ -136,8 +120,6 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
     setLoading(false);
   }, []);
 
-  // Start playback for the given preset. Async because the first play of
-  // a preset has to fetch + decode the bundled WAV.
   const startAudio = useCallback(async (which: SoundKey) => {
     if (graphRef.current) return;
     const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -147,8 +129,6 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
     setLoading(true);
     try {
       const buf = await loadBuffer(ctx, which);
-      // Bail if we were cancelled (unmount, stop, or preset switch) while
-      // the asset was decoding.
       if (!mountedRef.current || reqIdRef.current !== myReq) {
         ctx.close().catch(() => {});
         return;
@@ -166,7 +146,6 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
     }
   }, [effGain]);
 
-  // Switching sound while playing tears down + restarts on the new asset.
   const selectSound = (next: SoundKey) => {
     if (next === sound) return;
     onUpdate?.(widget.id, { soundscape: next });

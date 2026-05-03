@@ -234,6 +234,9 @@ const addWidget = useCallback(
         refreshCounter: 0,
         ...(type === 'note'  && { noteContent: '' }),
         ...(type === 'clock' && { clockUse24Hour: false }),
+        // Soundscape ships unmuted at a default audible volume so the
+        // first play actually plays. Master mute can still be toggled.
+        ...(type === 'focus_soundscape' && { isMuted: false, volume: 40, previousVolume: 40 }),
         ...extraData,
       };
       return [...prev, newWidget];

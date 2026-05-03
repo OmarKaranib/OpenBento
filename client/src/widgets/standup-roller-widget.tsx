@@ -1,6 +1,4 @@
-// Standup Roller — manage a roster of names, hit "Roll" to shuffle the
-// speaking order using a seeded RNG so the result is stable across
-// reloads / cloud-sync round-trips and easy to test.
+// Standup Roller — roster + seeded shuffle for stable speaking order.
 import React, { useEffect, useRef, useState } from 'react';
 import { Plus as PlusIcon, RotateCcw, Settings as SettingsIcon, Shuffle, Trash2, Users, X as XIcon } from 'lucide-react';
 import { MONO, Widget, isLightBg, qrIconBtnStyle, qrInputStyle, seededShuffle } from './shared';
@@ -17,9 +15,6 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
   const [size, setSize] = useState(280);
   const [showSettings, setShowSettings] = useState(false);
   const [draftName, setDraftName] = useState('');
-  // Sequential reveal: how many entries of `order` are currently visible.
-  // Starts at full when the page loads (so we don't replay the animation
-  // every refresh), but drops to 0 + ticks back up on Roll / Reset.
   const [revealCount, setRevealCount] = useState<number>(Number.MAX_SAFE_INTEGER);
   const revealTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
@@ -52,19 +47,19 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
   };
 
   const names = widget.standupNames ?? [];
-  // Display order: persisted shuffled order if the name set is unchanged,
-  // else fall back to the roster order so the UI never shows stale entries.
-  const order: string[] = (() => {
-    const stored = widget.standupOrder;
-    if (!stored || stored.length === 0) return names;
-    const stockSet = new Set(names);
-    const filtered = stored.filter(n => stockSet.has(n));
-    if (filtered.length !== names.length) return names;
-    return filtered;
-  })();
+  // A roll is "active" only when standupOrder is non-empty. After Reset
+  // we leave it empty so nothing is displayed until the next Roll.
+  const stored = widget.standupOrder;
+  const hasRoll = !!stored && stored.length > 0;
+  const order: string[] = hasRoll
+    ? stored.filter(n => names.includes(n))
+    : [];
 
   const writeNames = (next: string[]) => {
-    onUpdate?.(widget.id, { standupNames: next, standupOrder: next, standupSeed: undefined });
+    // Editing the roster clears any active roll so the displayed order
+    // can never reference removed teammates.
+    onUpdate?.(widget.id, { standupNames: next, standupOrder: [], standupSeed: undefined });
+    setRevealCount(0);
   };
 
   const addName = () => {
@@ -84,9 +79,7 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
     startReveal(next.length);
   };
 
-  // Reset clears the current roll state (both the revealed list and the
-  // persisted shuffled order/seed) so a refresh won't bring it back. The
-  // roster is preserved.
+  // Reset clears the current roll. Roster is preserved.
   const reset = () => {
     if (revealTimer.current) { clearInterval(revealTimer.current); revealTimer.current = null; }
     setRevealCount(0);
@@ -217,11 +210,11 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
             </button>
             <button
               onClick={reset}
-              disabled={revealCount === 0 || order.length === 0}
-              title="Hide the order so you can re-roll"
+              disabled={!hasRoll}
+              title="Clear the rolled order"
               style={{
                 ...qrIconBtnStyle(),
-                opacity: (revealCount === 0 || order.length === 0) ? 0.4 : 1,
+                opacity: hasRoll ? 1 : 0.4,
               }}
               data-testid={`standup-reset-${widget.id}`}
             >
@@ -250,7 +243,7 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
               listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4,
             }}
           >
-            {order.slice(0, revealCount).map((n, i) => (
+            {hasRoll && order.slice(0, revealCount).map((n, i) => (
               <li
                 key={`${n}-${i}`}
                 style={{
@@ -258,7 +251,6 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
                   padding: '6px 8px', borderRadius: 6,
                   background: i === 0 ? `${accent}22` : clrCellBg,
                   border: `1px solid ${i === 0 ? accent : clrCellBdr}`,
-                  // Tiny enter animation as each entry is revealed.
                   animation: 'standupSlideIn 240ms ease both',
                 }}
                 data-testid={`standup-order-item-${i}-${widget.id}`}
@@ -281,7 +273,7 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
                 </span>
               </li>
             ))}
-            {order.length > 0 && revealCount < order.length && (
+            {hasRoll && revealCount < order.length && (
               <li
                 aria-hidden
                 style={{
