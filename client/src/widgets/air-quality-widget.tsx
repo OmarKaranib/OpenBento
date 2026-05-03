@@ -248,7 +248,11 @@ export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
           </span>
         )}
         <button
-          onClick={() => loc && void fetchAQ(loc)}
+          onClick={async () => {
+            if (!loc || loading) return;
+            setLoading(true);
+            try { await fetchAQ(loc); } finally { setLoading(false); }
+          }}
           disabled={loading || !loc}
           title="Refresh"
           style={{
