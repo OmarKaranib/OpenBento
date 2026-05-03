@@ -39,13 +39,17 @@ async function loadBuffer(ctx: AudioContext, sound: SoundKey): Promise<AudioBuff
   if (inflight) return inflight;
   const opt = SOUND_OPTIONS.find(o => o.key === sound) ?? SOUND_OPTIONS[0];
   const p = (async () => {
-    const res = await fetch(opt.asset);
-    if (!res.ok) throw new Error(`fetch ${opt.asset} → ${res.status}`);
-    const arr = await res.arrayBuffer();
-    const buf = await ctx.decodeAudioData(arr);
-    bufferCache.set(sound, buf);
-    inflightCache.delete(sound);
-    return buf;
+    try {
+      const res = await fetch(opt.asset);
+      if (!res.ok) throw new Error(`fetch ${opt.asset} → ${res.status}`);
+      const arr = await res.arrayBuffer();
+      const buf = await ctx.decodeAudioData(arr);
+      bufferCache.set(sound, buf);
+      return buf;
+    } finally {
+      // Always clear so a transient failure doesn't poison future retries.
+      inflightCache.delete(sound);
+    }
   })();
   inflightCache.set(sound, p);
   return p;

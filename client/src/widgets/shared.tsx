@@ -369,6 +369,7 @@ export {
   dateKey,
   todayLocalKey,
   offsetLocalKey,
+  lastNDays,
   computeStreak,
   mulberry32,
   seededShuffle,

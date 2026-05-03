@@ -18,6 +18,14 @@ export function offsetLocalKey(offset: number, base?: Date): string {
   return dateKey(d);
 }
 
+// ─── Last-N-days window (oldest → today) ────────────────────────────────
+export function lastNDays(n: number, todayKey: string): string[] {
+  const parts = todayKey.split('-').map(s => parseInt(s, 10));
+  if (parts.length !== 3 || parts.some(p => Number.isNaN(p))) return [];
+  const base = new Date(parts[0], parts[1] - 1, parts[2]);
+  return Array.from({ length: n }, (_, i) => offsetLocalKey(-(n - 1 - i), base));
+}
+
 // ─── Streak calculator ───────────────────────────────────────────────────
 // A day "counts" if days[k] >= target. Today is allowed to be short
 // without immediately killing the streak (we resume from yesterday).

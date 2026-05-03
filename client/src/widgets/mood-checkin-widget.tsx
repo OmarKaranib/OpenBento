@@ -1,7 +1,7 @@
 // Mood Check-in — daily emoji + 30-day heatmap. Long-press to clear.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Smile } from 'lucide-react';
-import { MONO, Widget, isLightBg, offsetLocalKey, todayLocalKey } from './shared';
+import { MONO, Widget, isLightBg, lastNDays, offsetLocalKey, todayLocalKey } from './shared';
 
 interface MoodCheckinProps {
   widget: Widget;
@@ -17,6 +17,9 @@ export const MoodCheckinWidget: React.FC<MoodCheckinProps> = ({ widget, onUpdate
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 280, h: 200 });
   const pressTimer = useRef<number | null>(null);
+  // Re-render at local midnight so the "today" key flips and the
+  // heatmap shifts without any user interaction.
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     const el = containerRef.current; if (!el) return;
@@ -25,14 +28,19 @@ export const MoodCheckinWidget: React.FC<MoodCheckinProps> = ({ widget, onUpdate
     return () => ro.disconnect();
   }, []);
 
+  useEffect(() => {
+    const now = new Date();
+    const next = new Date(now); next.setDate(next.getDate() + 1); next.setHours(0, 0, 5, 0);
+    const ms = Math.max(60_000, next.getTime() - now.getTime());
+    const t = setTimeout(() => setTick(n => n + 1), ms);
+    return () => clearTimeout(t);
+  });
+
   const days = widget.moodDays ?? {};
   const today = todayLocalKey();
   const todayMood = days[today];
 
-  const last30 = useMemo(
-    () => Array.from({ length: 30 }, (_, i) => offsetLocalKey(-(29 - i))),
-    [],
-  );
+  const last30 = useMemo(() => lastNDays(30, today), [today]);
 
   const setMood = (idx: number | null) => {
     const cutoff = offsetLocalKey(-59);

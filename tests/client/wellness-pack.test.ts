@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import {
   computeStreak,
   dateKey,
+  lastNDays,
   offsetLocalKey,
   seededShuffle,
 } from '../../client/src/widgets/wellness-helpers';
@@ -110,4 +111,32 @@ test('offsetLocalKey: 0 returns today, -1 returns yesterday', () => {
   assert.match(today, /^\d{4}-\d{2}-\d{2}$/);
   assert.match(yesterday, /^\d{4}-\d{2}-\d{2}$/);
   assert.notEqual(today, yesterday);
+});
+
+// ─── lastNDays (Mood heatmap window) ────────────────────────────────────
+test('lastNDays: returns N keys ending at today, oldest first', () => {
+  const out = lastNDays(30, '2026-05-03');
+  assert.equal(out.length, 30);
+  assert.equal(out[29], '2026-05-03');
+  assert.equal(out[28], '2026-05-02');
+  assert.equal(out[0], '2026-04-04');
+});
+
+test('lastNDays: midnight rollover shifts the window forward by one day', () => {
+  // Simulates the Mood Check-in widget rerendering at local midnight: the
+  // todayKey changes, so the heatmap window slides forward, the new today
+  // appears at the tail, and the oldest day falls off the head.
+  const beforeMidnight = lastNDays(30, '2026-05-03');
+  const afterMidnight  = lastNDays(30, '2026-05-04');
+  assert.equal(afterMidnight[29], '2026-05-04');
+  assert.equal(afterMidnight[0],  '2026-04-05');
+  assert.notEqual(afterMidnight[29], beforeMidnight[29]);
+  // The 29 overlapping days should match: shifted-by-one alignment.
+  for (let i = 0; i < 29; i++) {
+    assert.equal(afterMidnight[i], beforeMidnight[i + 1]);
+  }
+});
+
+test('lastNDays: invalid todayKey → empty array (guard)', () => {
+  assert.deepEqual(lastNDays(30, 'not-a-date'), []);
 });
