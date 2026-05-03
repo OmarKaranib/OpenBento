@@ -870,6 +870,14 @@ return (
             }}
             onChannelClick={handleChannelClick}
             onTemplateClick={handleTemplateClick}
+            onCustomWidgetAdd={(url, opts) => {
+              addWidget('custom_widget', 4, 4, {
+                customWidgetUrl: url,
+                customWidgetTrusted: opts.trusted,
+                customWidgetState: {},
+              });
+              setSidebarOpen(false);
+            }}
             urlValue={urlInputValue}
             onUrlChange={setUrlInputValue}
             onUrlSubmit={handleSubmitUrl}

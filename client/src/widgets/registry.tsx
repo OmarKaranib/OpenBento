@@ -39,6 +39,7 @@ import { WordleWidget } from './wordle-widget';
 import { TriviaWidget } from './trivia-widget';
 import { AirQualityWidget } from './air-quality-widget';
 import { SketchPadWidget } from './sketch-pad-widget';
+import { CustomWidget } from './custom-widget';
 
 export interface WidgetRendererArgs {
   widget: Widget;
@@ -152,6 +153,9 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   ),
   sketch_pad: ({ widget, onUpdate, isDarkMode }) => (
     <SketchPadWidget key={widget.id} widget={widget} onUpdate={onUpdate} isDarkMode={isDarkMode ?? true} />
+  ),
+  custom_widget: ({ widget, onUpdate, isDarkMode }) => (
+    <CustomWidget key={widget.id} widget={widget} onUpdate={onUpdate} isDarkMode={isDarkMode} />
   ),
   // Closure-bound on dashboard state (iframe refs / seek mode / inline
   // input). Rendered inline by pages/dashboard.tsx via <VideoWidget />.

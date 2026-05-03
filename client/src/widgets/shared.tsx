@@ -38,7 +38,8 @@ export type WidgetType =
   | 'wordle'
   | 'trivia'
   | 'air_quality'
-  | 'sketch_pad';
+  | 'sketch_pad'
+  | 'custom_widget';
 
 // ─── Widget Interface ─────────────────────────────────────────────────────────
 export interface Widget {
@@ -296,6 +297,22 @@ export interface Widget {
   sketchColor?: string;
   sketchSize?: 'S' | 'M' | 'L';
   sketchEraser?: boolean;
+  // ─── Custom Widget (sandboxed iframe SDK) ─────────────────────────
+  // URL of the third-party HTML page that gets mounted inside an
+  // iframe with `sandbox="allow-scripts"`. Validated against the
+  // shared/widget-sdk-protocol allow-list before mount.
+  customWidgetUrl?: string;
+  // Per-instance trust flag. Untrusted widgets render a confirmation
+  // banner before mounting; toggled via the trust banner button or
+  // the in-iframe settings popover ("Untrust").
+  customWidgetTrusted?: boolean;
+  // Latest version string the widget reported via `OpenBento.ready({ version })`.
+  // Surfaced in the per-widget settings popover.
+  customWidgetVersion?: string;
+  // Per-instance state slice exposed to the iframe via getState/setState.
+  // The host shallow-merges setState patches into this bag and never
+  // shares it across widget instances.
+  customWidgetState?: Record<string, unknown>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

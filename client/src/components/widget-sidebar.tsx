@@ -9,8 +9,12 @@
     CloudRain, Droplet, Smile, Users,
     Sparkles, Sun, Globe2, Satellite,
     CalendarDays, Quote as QuoteIcon, Puzzle, HelpCircle,
-    Wind, Brush,
+    Wind, Brush, Code2, ShieldAlert, ExternalLink,
   } from 'lucide-react';
+  import {
+    SAMPLE_CUSTOM_WIDGETS,
+    isAllowedCustomWidgetUrl,
+  } from '@shared/widget-sdk-protocol';
 
   const failedLogoCache = new Set<string>();
 
@@ -182,7 +186,7 @@
     widgetType: WidgetType;
     w: number;
     h: number;
-    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'habit_tracker' | 'quick_launch' | 'big_text_marquee' | 'network_light' | 'photo_loop' | 'focus_soundscape' | 'water_tracker' | 'mood_checkin' | 'standup_roller' | 'lava_lamp' | 'sun_sky' | 'earth_night' | 'iss_tracker' | 'on_this_day' | 'quote' | 'wordle' | 'trivia' | 'air_quality' | 'sketch_pad' | 'default';
+    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'habit_tracker' | 'quick_launch' | 'big_text_marquee' | 'network_light' | 'photo_loop' | 'focus_soundscape' | 'water_tracker' | 'mood_checkin' | 'standup_roller' | 'lava_lamp' | 'sun_sky' | 'earth_night' | 'iss_tracker' | 'on_this_day' | 'quote' | 'wordle' | 'trivia' | 'air_quality' | 'sketch_pad' | 'custom_widget' | 'default';
     color: string;
   }
 
@@ -438,6 +442,7 @@
     onClose: () => void;
     onChannelClick?: (channel: TrendingChannel) => void;
     onTemplateClick?: (template: WidgetTemplate) => void;
+    onCustomWidgetAdd?: (url: string, opts: { trusted: boolean }) => void;
     urlValue?: string;
     onUrlChange?: (value: string) => void;
     onUrlSubmit?: (url: string) => void;
@@ -452,6 +457,7 @@
     onClose,
     onChannelClick,
     onTemplateClick,
+    onCustomWidgetAdd,
     urlValue = '',
     onUrlChange,
     onUrlSubmit,
@@ -466,6 +472,19 @@
     const [liveStatuses, setLiveStatuses]       = useState<Record<string, LiveStatus>>({});
     const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
     const [blockedChannels, setBlockedChannels] = useState<BlockedChannel[]>(() => loadBlockedChannels());
+
+    // ─── Custom Widget add modal (sandboxed iframe SDK) ─────────────────
+    const [customModalOpen, setCustomModalOpen]   = useState(false);
+    const [customUrlInput, setCustomUrlInput]     = useState('');
+    const [customTrusted, setCustomTrusted]       = useState(false);
+    const customUrlValid = isAllowedCustomWidgetUrl(customUrlInput);
+    const submitCustomWidget = (url: string, trusted: boolean) => {
+      if (!isAllowedCustomWidgetUrl(url)) return;
+      onCustomWidgetAdd?.(url, { trusted });
+      setCustomModalOpen(false);
+      setCustomUrlInput('');
+      setCustomTrusted(false);
+    };
 
     useEffect(() => {
       const h = () => setPersonalLibrary(loadPersonalLibrary());
@@ -1141,6 +1160,24 @@
         },
       },
       {
+        id: 'custom_widget',
+        label: 'Custom Widget',
+        description: 'Mount any third-party widget by URL — sandboxed iframe + SDK',
+        icon: <Code2 className="w-[2rem] h-[2rem] text-cyan-400" />,
+        iconBg: 'bg-cyan-500/15',
+        border: 'border-cyan-500/30 hover:border-cyan-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-cyan-400 bg-cyan-500/15 border-cyan-500/40',
+        template: {
+          id: 'template-custom-widget',
+          name: 'Custom Widget',
+          widgetType: 'custom_widget' as WidgetType,
+          w: 4, h: 4,
+          icon: 'custom_widget' as const,
+          color: 'cyan',
+        },
+      },
+      {
         id: 'sketch_pad',
         label: 'Sketch Pad',
         description: 'Freehand drawing canvas with brushes, eraser, undo & PNG export',
@@ -1471,7 +1508,10 @@
                     {availableWidgets.map((w) => (
                       <button
                         key={w.id}
-                        onClick={() => onTemplateClick?.(w.template)}
+                        onClick={() => {
+                          if (w.id === 'custom_widget') { setCustomModalOpen(true); return; }
+                          onTemplateClick?.(w.template);
+                        }}
                         className={`group relative flex flex-col items-center justify-center gap-[0.8rem] p-[1.4rem] rounded-xl border ${w.border} ${w.cardBg} transition-all duration-200 hover:scale-[1.03] hover:shadow-lg active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500`}
                         data-testid={`widget-library-${w.id}`}
                       >
@@ -1492,6 +1532,119 @@
               </div>
             )}
           </div>
+
+          {/* Custom Widget add-modal — overlay inside the sidebar */}
+          {customModalOpen && (
+            <div
+              className="absolute inset-0 z-[110] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-[1.6rem]"
+              data-testid="custom-widget-modal"
+            >
+              <div className="w-full max-w-[28rem] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-[1.6rem] space-y-[1.2rem]">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[1.4rem] font-bold text-cyan-400 flex items-center gap-[0.6rem]">
+                    <Code2 className="w-[1.6rem] h-[1.6rem]" /> Add Custom Widget
+                  </h3>
+                  <button
+                    onClick={() => setCustomModalOpen(false)}
+                    className="p-[0.4rem] hover:bg-slate-800 rounded-md transition-colors"
+                    data-testid="button-close-custom-widget-modal"
+                  >
+                    <X className="w-[1.4rem] h-[1.4rem] text-slate-400" />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-[0.9rem] font-semibold text-slate-400 uppercase tracking-wider mb-[0.5rem]">
+                    Widget URL
+                  </label>
+                  <input
+                    type="text"
+                    value={customUrlInput}
+                    onChange={(e) => setCustomUrlInput(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && customUrlValid) {
+                        e.preventDefault();
+                        submitCustomWidget(customUrlInput, customTrusted);
+                      }
+                    }}
+                    placeholder="https://example.com/my-widget.html"
+                    className="w-full px-[1rem] py-[0.8rem] bg-slate-800 border border-slate-700 rounded-md focus:border-cyan-500 focus:outline-none text-[1.1rem] placeholder:text-slate-600"
+                    data-testid="input-custom-widget-url"
+                  />
+                  {customUrlInput && !customUrlValid && (
+                    <p className="text-[0.95rem] text-red-400 mt-[0.4rem]">
+                      Only http(s) URLs or same-origin paths (starting with /) are allowed.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-[0.9rem] font-semibold text-slate-400 uppercase tracking-wider mb-[0.5rem]">
+                    Or pick a sample
+                  </p>
+                  <div className="space-y-[0.5rem]">
+                    {SAMPLE_CUSTOM_WIDGETS.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => setCustomUrlInput(s.url)}
+                        className="w-full text-left p-[0.9rem] rounded-md bg-slate-800/60 border border-slate-700 hover:border-cyan-500/60 hover:bg-slate-800 transition-colors"
+                        data-testid={`button-sample-custom-widget-${s.id}`}
+                      >
+                        <p className="text-[1.1rem] font-semibold text-slate-100">{s.name}</p>
+                        <p className="text-[0.95rem] text-slate-500 mt-[0.2rem]">{s.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-[0.6rem] p-[0.9rem] rounded-md bg-amber-500/10 border border-amber-500/30">
+                  <ShieldAlert className="w-[1.4rem] h-[1.4rem] text-amber-400 flex-shrink-0 mt-[0.1rem]" />
+                  <div className="text-[0.95rem] text-amber-100/90 leading-snug">
+                    Custom widgets run inside a sandboxed iframe with no access to your
+                    dashboard data beyond the SDK. Only run widgets from sources you trust.{' '}
+                    <a
+                      href="/dev/widgets"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-400 hover:underline inline-flex items-center gap-[0.2rem]"
+                      data-testid="link-custom-widget-docs"
+                    >
+                      Read the SDK docs <ExternalLink className="w-[1rem] h-[1rem]" />
+                    </a>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-[0.6rem] cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={customTrusted}
+                    onChange={(e) => setCustomTrusted(e.target.checked)}
+                    className="w-[1.4rem] h-[1.4rem] accent-cyan-500"
+                    data-testid="input-custom-widget-trust"
+                  />
+                  <span className="text-[1rem] text-slate-300">I trust this URL — run immediately</span>
+                </label>
+
+                <div className="flex justify-end gap-[0.6rem] pt-[0.4rem]">
+                  <button
+                    onClick={() => setCustomModalOpen(false)}
+                    className="px-[1.2rem] py-[0.7rem] rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[1rem] font-semibold transition-colors"
+                    data-testid="button-cancel-custom-widget"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => submitCustomWidget(customUrlInput, customTrusted)}
+                    disabled={!customUrlValid}
+                    className="px-[1.2rem] py-[0.7rem] rounded-md bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-[1rem] font-bold transition-colors"
+                    data-testid="button-submit-custom-widget"
+                  >
+                    Add widget
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="p-[1.6rem] border-t border-slate-700/80 flex-shrink-0">

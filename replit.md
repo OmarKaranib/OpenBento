@@ -1,7 +1,7 @@
 # OpenBento Dashboard
 
 ## Overview
-The OpenBento Dashboard is a highly customizable, bento-style Mission Control interface for monitoring and managing diverse information streams. It features a dynamic 12-column grid with drag-to-resize widgets and integrations for various content, including YouTube, Twitch, and Kick video streams with custom TV-style controls. The dashboard ensures persistent storage of user-defined layouts and widget content (videos, notes, images, spacers, clocks, tickers, weather, dictionary, QR portal, etc.), providing a responsive and personalized workspace. The project aims to offer a completely free, ad-supported experience with optional cloud sync for layout persistence across devices.
+The OpenBento Dashboard is a highly customizable, bento-style Mission Control interface for monitoring and managing diverse information streams. It features a dynamic 12-column grid with drag-to-resize widgets and integrations for various content, including YouTube, Twitch, and Kick video streams with custom TV-style controls. The dashboard ensures persistent storage of user-defined layouts and widget content, providing a responsive and personalized workspace. The project aims to offer a completely free, ad-supported experience with optional cloud sync for layout persistence across devices.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -18,46 +18,37 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 - **Donation Model:** A single expanding "Buy Me a Coffee" donation block appears for all users on a 10-day cooldown.
 
 **Technical Implementations & Feature Specifications:**
-- **Dynamic Widget System:** Supports a wide array of widget types including Video, Note, Spacer, Image, Clock, Crisis Ticker, Markets Ticker, Weather, Dictionary, QR Portal, World Clocks, Countdown, GitHub Pulse, RSS Headlines, Habit Tracker, Quick Launch, Big Text Marquee, Network Light, Photo Loop, Focus Soundscape, Water Tracker, Mood Check-in, Standup Roller, and Sketch Pad.
+- **Dynamic Widget System:** Supports a wide array of widget types including Video, Note, Spacer, Image, Clock, Crisis Ticker, Markets Ticker, Weather, Dictionary, QR Portal, World Clocks, Countdown, GitHub Pulse, RSS Headlines, Habit Tracker, Quick Launch, Big Text Marquee, Network Light, Photo Loop, Focus Soundscape, Water Tracker, Mood Check-in, Standup Roller, Sketch Pad, and Air Quality.
 - **Layout Management:** Features an "Edit Layout Mode" for drag-to-resize, settings, and deletion, and a "Fullscreen Mode". Widgets snap to a 12x6 grid with collision prevention.
 - **Widget Sidebar ("Block Library"):** A slide-out sidebar provides tabbed widget templates and preset live stream channels.
-- **Persistence:** Widget layouts and content are saved to `localStorage` for guest users.
+- **Persistence:** Widget layouts and content are saved to `localStorage` for guest users. Optional Supabase Auth (Email/Password, Google OAuth) for cross-device persistence via cloud sync.
 - **Video Widget:** Integrates YouTube, Twitch, and Kick with custom TV-style controls, "True Live Filter", dynamic channel resolution, and "Latest-Video Fallback".
-- **Note Widget:** Markdown-aware notes with View/Edit toggle.
-- **Image Widget:** Displays images and supports local file uploads.
-- **Authentication:** Optional Supabase Auth (Email/Password, Google OAuth) for cross-device persistence via cloud sync.
-- **Admin Dashboard:** An `/admin` route with client-side and server-side authorization for management.
-- **QR Portal Widget v2:** Five-mode QR generator with optional logo overlay, customizable colors, and copy-as-PNG functionality.
+- **QR Portal Widget:** Five-mode QR generator with optional logo overlay, customizable colors, and copy-as-PNG functionality.
 - **GitHub Pulse Widget:** Displays GitHub repository statistics or user profiles.
 - **RSS Headlines Widget:** Renders scrolling headlines from any RSS or Atom feed URL via a server-side proxy.
-- **Dictionary Widget v2:** Provides definitions, phonetics, audio, synonyms, and etymology.
+- **Dictionary Widget:** Provides definitions, phonetics, audio, synonyms, and etymology.
 - **Onboarding:** An `OnboardingFlow` guides new guest users with starter packs and coachmarks.
-- **Sky & Ambient Pack:** Includes Lava Lamp animations, Sun & Sky Position tracking (sunrise/sunset, moon phase), Earth at Night globe, and an ISS Live Tracker with pass estimations.
-- **Knowledge & Play Pack:** Features On This Day events from Wikipedia, Random Quote generator, Daily Wordle game, and Trivia questions.
+- **Environmental & Knowledge Packs:** Includes features like Lava Lamp animations, Sun & Sky Position tracking, Earth at Night globe, ISS Live Tracker, "On This Day" events, Random Quote generator, Daily Wordle game, and Trivia questions.
 - **Cast to TV Feature:** Allows casting the dashboard to browser-equipped TVs. Supports guest pairing and persistent "BENTO-XXXX" rooms for signed-in users, enabling multi-TV control and scheduled layout rotations.
-- **Theming for Productivity Widgets:** Productivity and personal widgets dynamically adjust colors for readability.
-- **Wellness & Focus Pack:** Includes Focus Soundscape (ambient loops), Water Tracker, Mood Check-in, and Standup Roller (randomized speaking order).
-- **Sketch Pad Widget:** Freehand drawing canvas with HTML5 pointer events (mouse/touch/stylus). Uses midpoint-quadratic-Bezier smoothing for fluid strokes, decimates redundant move events for performance, and renders at device-pixel resolution (×DPR, capped at 3) for crisp lines. Floating auto-hide toolbar (3 s) offers a colour palette + custom picker, S/M/L brush sizes, eraser, 20-step undo, clear, and PNG download. Drawings persist as a debounced PNG data URL on the widget (500 ms after last pointer-up) and are rescaled with a "contain" fit when the widget is resized so strokes are never cropped or distorted.
-- **Air Quality Widget:** Surfaces US AQI (EPA 6-band scale), dominant pollutant, a short EPA-aligned health blurb, and optional pollen levels for the user's location via Open-Meteo (no API key). Reuses the shared geolocation cache populated by Weather/Sun & Sky, exposes a settings popover (gear icon) with city search and pollen toggle, auto-refreshes every 30 min and on tab focus, and persists the last payload to `localStorage` so reloads/offline starts render a "stale"-badged value before the next fetch lands.
-- **Multi-Page Dashboards:** Users can split their workspace into multiple named pages (e.g. *Home*, *Work*, *Stream*) that each carry their own widgets, layout, optional background, and optional theme override. State is modelled as `{pages: DashboardPage[], activePageId}` in `shared/dashboard-pages.ts` (a pure, framework-free module shared by client, server, and tests). On first load the legacy `openBentoWidgets` array is migrated into a single "Home" page via `migrateLegacyWidgets`, then persisted to `localStorage` keys `openBentoPages` + `openBentoActivePageId`. The active page's widgets are also mirrored back to the legacy `openBentoWidgets` key so any code paths still reading the old shape (cast push, server back-compat) keep working during the rollout. The page collection round-trips through cloud sync via the existing `PATCH /api/dashboard` (new optional `pages jsonb default []` and `active_page_id varchar` columns on `dashboards`); guests stay on `localStorage` only. A scrollable **PageTabsStrip** sits between the menu bar and the canvas — it's hidden until a 2nd page exists (only the **+** button shows for single-page users), and each tab supports rename (double-click), set default (★), duplicate, and delete (with a confirm). Deleting the default re-promotes the next remaining page; the very last page is undeletable. The cast popover gains a "Page to push" dropdown when the user has 2+ pages so they can broadcast a non-active page to a TV. Deep-linking is supported via `?page=<id>` on first navigation. The full operations set (`addPage`/`renamePage`/`duplicatePage`/`deletePage`/`setDefaultPage`/`setActivePage`/`updateActivePageWidgets`/`sanitizePages`) is unit-tested in `tests/client/dashboard-pages.test.ts`.
-- **Mobile Companion (Expo):** A self-contained Expo + TypeScript app lives in `mobile/` for read-only mirroring of the signed-in user's default dashboard page on a phone (bedside / kitchen-counter use, plus remote casting without a laptop). Auth reuses the same Supabase project (email/password + Google OAuth via `expo-web-browser` + `expo-auth-session`) with sessions persisted in Expo SecureStore. The Dashboard tab fetches `GET /api/dashboard` (Bearer token), normalizes both new (`pages` jsonb) and legacy (`widgets` array) row shapes, and renders the active/default page widgets vertically with pull-to-refresh and a foreground refresh loop driven by a 1/5/15/30-min picker. The Cast tab lists the user's BENTO-XXXX rooms via `GET /api/cast/rooms` and pushes the currently-mirrored page via `POST /api/cast/rooms/:id/push` using the same snapshot shape (`shared/models/cast.ts`) the web popover uses. The Settings tab exposes page selector, refresh interval, dark/light/auto theme, and sign-out. A small renderer registry (`mobile/src/renderers/index.tsx`) ships first-class read-only renderers for Clock, Weather, Markets Ticker, RSS Headlines, Note, Image, Quote, and On This Day; every other widget type falls through to a neutral placeholder card naming the widget. Brand tokens (Midnight Ocean bg, cyan accent, Inter-style font stack) are pulled from `shared/themes.ts` into `mobile/src/lib/colors.ts` so the mobile UI matches the web product. The mobile app does NOT touch the root `package.json` or web build pipeline — it has its own `mobile/package.json` and runs locally with `cd mobile && npm install && npx expo start` after setting `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, and `EXPO_PUBLIC_API_BASE_URL` (see `mobile/README.md`). Out of scope for v1: native push, layout editing, interactive widgets (Wordle/Trivia/Sketch Pad), App Store / Play Store publishing.
-- **Themes Marketplace:** A "Themes" button in the top menu opens a modal with **Built-in** and **My Themes** tabs. The Built-in tab ships eight curated full-look identities (Midnight Ocean, Sunrise, Cyberpunk, Paper Light, Forest, Mono Slate, Lava Lounge, Vaporwave). Each card renders an SVG mock thumbnail; hovering a card previews the look on the live dashboard for **2 seconds** then auto-reverts, and clicking **Apply** atomically swaps the background, accent color, font stack, default widget tint, and dark/light mode in one step. **Save current look** captures the running settings as a personal Theme (name + slugged id + timestamp) which lands in **My Themes** and can be renamed or deleted. Personal themes persist to `localStorage` (`openBentoPersonalThemes`, `openBentoActiveThemeId`) and, for signed-in users, sync to Supabase via debounced `PATCH /api/dashboard` against the new `personal_themes` jsonb / `active_theme_id` columns on the `dashboards` table. The `Theme` type, the eight built-ins, and the pure `themeToCssVars` apply-reducer all live in `shared/themes.ts` so future server-driven theme bundles and the cast hub share the same shape. Onboarding now ends with a 4th coachmark pointing at the Themes button.
+- **Multi-Page Dashboards:** Users can split their workspace into multiple named pages, each with its own widgets, layout, optional background, and theme override. Pages persist to `localStorage` and optionally sync via Supabase.
+- **Mobile Companion (Expo):** A self-contained Expo + TypeScript app for read-only mirroring of the signed-in user's default dashboard page on a phone, including remote casting without a laptop.
+- **Custom Widgets (sandboxed iframe SDK):** Third-party or user-authored widgets can be installed at runtime by URL within a sandboxed iframe, communicating via `postMessage` with a Zod-validated protocol.
+- **Themes Marketplace:** A "Themes" button in the top menu opens a modal with Built-in and My Themes tabs. Built-in themes offer curated full-look identities that can be previewed and applied. Users can save their current settings as personal themes.
 
 **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core` for drag-and-drop, `lucide-react` for icons, `localStorage` for persistence, and `qrcode.react` for QR generation.
 
 **Server Endpoints:**
-- `GET /api/github/repo/:owner/:repo` and `GET /api/github/user/:owner`: Aggregated GitHub stats.
-- `GET /api/rss?url=`: Server-side RSS/Atom proxy.
-- `GET /api/ping?url=`: Lightweight uptime probe.
-- `GET /api/onthisday`: Wikipedia "On This Day" events feed proxy.
-- `GET /api/quote`: zenquotes.io random quote proxy.
-- `GET /api/trivia?difficulty=...`: Open Trivia DB proxy.
-- `GET /api/iss`: Server-proxied ISS position.
-- `GET /api/iss/pass?lat=&lon=`: Next-overhead-pass estimator for ISS.
-- `GET /api/air-quality?lat=&lon=&pollen=1`: Open-Meteo Air Quality proxy (no key, ~15 min TTL cache, 6 h stale-fallback, 7 s timeout). Returns US AQI, six pollutant concentrations, dominant pollutant, and (when `pollen=1`) the six European pollen series with the worst-case level pre-computed. Also accepts `?city=` (geocoded via Open-Meteo's free geocoder) when coords aren't supplied; the response then includes a `cityLabel` field.
-- `GET /api/wordle/today`: Returns `{ date, answer }` for the current UTC day, deterministically seeded from the shared `@shared/wordle-pool` module so server and client offline-fallback never diverge.
+- Aggregated GitHub stats (`GET /api/github/repo/:owner/:repo`, `GET /api/github/user/:owner`).
+- Server-side RSS/Atom proxy (`GET /api/rss?url=`).
+- Lightweight uptime probe (`GET /api/ping?url=`).
+- Wikipedia "On This Day" events feed proxy (`GET /api/onthisday`).
+- Zenquotes.io random quote proxy (`GET /api/quote`).
+- Open Trivia DB proxy (`GET /api/trivia?difficulty=...`).
+- Server-proxied ISS position and pass estimator (`GET /api/iss`, `GET /api/iss/pass?lat=&lon=`).
+- Open-Meteo Air Quality proxy (`GET /api/air-quality?lat=&lon=&pollen=1` or `?city=`).
+- Wordle daily answer (`GET /api/wordle/today`).
 - Cast to TV API endpoints for pairing, pushing snapshots, renaming, fetching, and unpairing cast rooms, and a WebSocket for real-time communication.
-- `GET/PATCH /api/dashboard`: Cloud-sync of the user's dashboard. PATCH accepts `personalThemes` and `activeThemeId` alongside the existing widget payload so the Themes Marketplace round-trips through the same row.
+- Cloud-sync of the user's dashboard (`GET/PATCH /api/dashboard`), including themes and pages.
 
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pomodoro — OpenBento Sample Widget</title>
+  <script src="/sdk/widget-sdk.v1.js"></script>
+  <style>
+    :root { --bg: #0f172a; --fg: #e2e8f0; --accent: #22d3ee; --muted: #64748b; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; padding: 16px; transition: background 200ms, color 200ms;
+    }
+    .label   { font-size: 11px; letter-spacing: 0.18em; color: var(--muted); text-transform: uppercase; }
+    .time    { font-size: clamp(36px, 18vw, 96px); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; color: var(--accent); }
+    .row     { display: flex; gap: 8px; }
+    button   {
+      background: rgba(255,255,255,0.06); color: var(--fg);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+      padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background 120ms;
+    }
+    button:hover    { background: rgba(255,255,255,0.12); }
+    button.primary  { background: var(--accent); color: #0f172a; border-color: transparent; }
+    .mode    { font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="label" id="mode">Focus</div>
+  <div class="time" id="time">25:00</div>
+  <div class="row">
+    <button id="toggle" class="primary" type="button">Start</button>
+    <button id="reset"  type="button">Reset</button>
+    <button id="skip"   type="button">Skip</button>
+  </div>
+  <div class="mode" id="round">Round 1 of 4</div>
+
+  <script>
+    (function () {
+      var FOCUS_SEC = 25 * 60;
+      var BREAK_SEC = 5  * 60;
+
+      var state = {
+        mode: 'focus',           // 'focus' | 'break'
+        remaining: FOCUS_SEC,
+        running: false,
+        round: 1,
+      };
+
+      var $time   = document.getElementById('time');
+      var $mode   = document.getElementById('mode');
+      var $toggle = document.getElementById('toggle');
+      var $reset  = document.getElementById('reset');
+      var $skip   = document.getElementById('skip');
+      var $round  = document.getElementById('round');
+
+      function fmt(sec) {
+        var m = Math.floor(sec / 60), s = sec % 60;
+        return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+      }
+
+      function render() {
+        $time.textContent  = fmt(Math.max(0, state.remaining));
+        $mode.textContent  = state.mode === 'focus' ? 'Focus' : 'Break';
+        $toggle.textContent = state.running ? 'Pause' : 'Start';
+        $round.textContent = 'Round ' + state.round + ' of 4';
+      }
+
+      function persist() {
+        OpenBento.setState({
+          mode: state.mode,
+          remaining: state.remaining,
+          running: state.running,
+          round: state.round,
+        }).catch(function () { /* host gone */ });
+      }
+
+      function tick() {
+        if (!state.running) return;
+        state.remaining -= 1;
+        if (state.remaining <= 0) {
+          if (state.mode === 'focus') {
+            state.mode = 'break'; state.remaining = BREAK_SEC;
+          } else {
+            state.mode = 'focus'; state.remaining = FOCUS_SEC;
+            state.round = (state.round % 4) + 1;
+          }
+          persist();
+        }
+        render();
+        if (state.running) setTimeout(tick, 1000);
+      }
+
+      $toggle.addEventListener('click', function () {
+        state.running = !state.running;
+        render(); persist();
+        if (state.running) setTimeout(tick, 1000);
+      });
+      $reset.addEventListener('click', function () {
+        state.running = false;
+        state.remaining = state.mode === 'focus' ? FOCUS_SEC : BREAK_SEC;
+        render(); persist();
+      });
+      $skip.addEventListener('click', function () {
+        state.remaining = 0;
+        if (state.running) tick(); else { state.running = true; tick(); state.running = false; render(); persist(); }
+      });
+
+      // Hydrate from host on mount.
+      OpenBento.onTheme(function (t) {
+        document.documentElement.style.setProperty('--bg',     t.bg || (t.dark ? '#0f172a' : '#f8fafc'));
+        document.documentElement.style.setProperty('--fg',     t.dark ? '#e2e8f0' : '#0f172a');
+        document.documentElement.style.setProperty('--accent', t.accent || '#22d3ee');
+      });
+      OpenBento.onResize(function () { /* layout is fluid; nothing to do */ });
+
+      OpenBento.ready({ name: 'Pomodoro', version: '1.0.0' });
+      OpenBento.getState().then(function (saved) {
+        if (saved && typeof saved === 'object') {
+          if (saved.mode === 'focus' || saved.mode === 'break') state.mode = saved.mode;
+          if (typeof saved.remaining === 'number') state.remaining = saved.remaining;
+          if (typeof saved.round === 'number')     state.round     = saved.round;
+          // Persisted `running` is intentionally ignored — we don't auto-resume.
+          state.running = false;
+        }
+        render();
+      }).catch(function () { render(); });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
