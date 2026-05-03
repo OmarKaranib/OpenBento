@@ -236,6 +236,10 @@ export default function CastPage() {
       setCursorIdle(false);
       if (cursorTimerRef.current) window.clearTimeout(cursorTimerRef.current);
       cursorTimerRef.current = window.setTimeout(() => setCursorIdle(true), 3000);
+      // Re-show the overlay (TV name / current layout / next-scheduled) for 4s
+      // whenever the viewer wiggles the mouse — handy for confirming what's on
+      // screen without waiting for the next layout change.
+      setOverlayUntil(Date.now() + 4000);
     }
     ping();
     window.addEventListener("mousemove", ping);
