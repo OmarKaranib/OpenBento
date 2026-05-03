@@ -176,8 +176,40 @@ export const SketchPadWidget: React.FC<Props> = ({ widget, onUpdate, isDarkMode 
     return () => ro.disconnect();
     // We deliberately omit widget.sketchPad from deps — we hydrate on
     // mount and never want a remote update to wipe in-flight strokes.
+    // The dedicated cloud-sync hydration effect below handles updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Cloud-sync hydration: when the widget prop's sketchPad payload
+  // changes (e.g. a fresh layout arrives from Supabase after another
+  // device updated it), repaint the canvas with the remote bitmap —
+  // but only when the user isn't mid-stroke, so we never steal a
+  // drawing in flight. The surfaceGen guard prevents a stale image
+  // load from clobbering a subsequent resize/init.
+  const lastHydratedRef = useRef<string | undefined>(widget.sketchPad?.dataUrl);
+  useEffect(() => {
+    const url = widget.sketchPad?.dataUrl;
+    if (!url) return;
+    if (url === lastHydratedRef.current) return;
+    if (activePointerRef.current !== null) return; // mid-stroke — skip
+    const canvas = canvasRef.current; const ctx = ctxRef.current;
+    if (!canvas || !ctx) return;
+    const myGen = ++surfaceGenRef.current;
+    const img = new Image();
+    img.onload = () => {
+      if (surfaceGenRef.current !== myGen) return;
+      const c = canvasRef.current; const cx = ctxRef.current;
+      if (!c || !cx) return;
+      cx.save();
+      cx.globalCompositeOperation = 'source-over';
+      cx.clearRect(0, 0, c.width, c.height);
+      const fit = fitContain(img.naturalWidth, img.naturalHeight, c.width, c.height);
+      cx.drawImage(img, fit.dx, fit.dy, fit.dw, fit.dh);
+      cx.restore();
+      lastHydratedRef.current = url;
+    };
+    img.src = url;
+  }, [widget.sketchPad?.dataUrl]);
 
   // ── Stroke rendering
   const flushStroke = useCallback(() => {
