@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, LogIn, LogOut, User, Loader2, Shield, MessageSquare, Lightbulb, Bug } from 'lucide-react';
+import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, LogIn, LogOut, User, Loader2, Shield, MessageSquare, Lightbulb, Bug, Tv } from 'lucide-react';
 import { Link } from 'wouter';
 import { ADMIN_EMAIL } from '@/pages/admin';
 import { UniqueIdentifier } from '@dnd-kit/core';
@@ -1667,6 +1667,19 @@ const MasterControlDashboard = ({
                       </a>
                     </Link>
                   )}
+                  <button
+                    onClick={() => {
+                      const btn = document.querySelector<HTMLButtonElement>(
+                        '[data-testid="button-cast"]',
+                      );
+                      btn?.click();
+                    }}
+                    className="w-full flex items-center gap-[0.8rem] px-[1.2rem] py-[1rem] text-[1.2rem] text-cyan-300 hover:bg-slate-700 transition-colors"
+                    data-testid="link-user-menu-cast"
+                  >
+                    <Tv className="w-[1.4rem] h-[1.4rem]" />
+                    Cast Settings
+                  </button>
                   <button
                     onClick={onLogout}
                     className="w-full flex items-center gap-[0.8rem] px-[1.2rem] py-[1rem] text-[1.2rem] text-red-400 hover:bg-slate-700 transition-colors rounded-b-lg"
