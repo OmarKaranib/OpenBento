@@ -169,6 +169,12 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
   const cloudUploadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastUploadedRef     = useRef<string>('');
   const hydrationDoneRef    = useRef<boolean>(false);
+  // Tracks the id of the theme currently written to the DOM so the
+  // hydration effect can detect genuine activeThemeId changes (cross-
+  // device cloud sync, late-arriving personal themes) without double-
+  // writing on every render. Must be declared before applyTheme so the
+  // callback can update it.
+  const lastAppliedIdRef    = useRef<string | null>(null);
 
   // ── Apply + persist ─────────────────────────────────────────────────────
 
@@ -179,6 +185,10 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
     previewBackupRef.current  = null;
     writeThemeToDom(theme, setIsDarkMode);
     setActiveThemeId(theme.id);
+    // Keep the hydration-effect's "what's currently on the DOM" tracker
+    // in sync so the effect doesn't re-write the same theme moments
+    // later when the activeThemeId state update flushes.
+    lastAppliedIdRef.current = theme.id;
     try { localStorage.setItem(ACTIVE_THEME_ID_KEY, theme.id); } catch {/* private mode */}
   }, [setIsDarkMode]);
 
@@ -222,22 +232,27 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
     previewBackupRef.current = null;
   }, [setIsDarkMode, activeThemeId]);
 
-  // Re-apply the active theme on first mount so a returning user lands on
-  // their last look without an explicit click. We also re-apply whenever
-  // personalThemes changes and the active id resolves to a personal theme
-  // (covers the cloud-hydration handoff).
-  const initialApplyDoneRef = useRef(false);
+  // Re-apply the active theme whenever the resolved theme actually changes.
+  // This covers three cases:
+  //   1. First mount — returning user lands on their last look without an
+  //      explicit click.
+  //   2. Cloud hydration handoff — a signed-in user opens device B with
+  //      a different active theme than device A's local state; the hook
+  //      sees activeThemeId switch and writes the new look to the DOM.
+  //   3. Personal-theme list arriving after activeThemeId — when the
+  //      active id points at a personal theme that wasn't loaded yet,
+  //      the resolution becomes valid only once personalThemes hydrates.
+  // We track the last id we actually wrote to DOM (lastAppliedIdRef,
+  // declared above) so explicit applyTheme() calls don't trigger a
+  // redundant double-write, while genuine id changes always reach the DOM.
   useEffect(() => {
     if (!activeThemeId) return;
     const all: Theme[] = [...BUILT_IN_THEMES, ...personalThemes];
     const found = all.find(t => t.id === activeThemeId);
     if (!found) return;
-    // Only the very first resolution writes to DOM here — subsequent
-    // changes flow through applyTheme/previewTheme which are explicit.
-    if (!initialApplyDoneRef.current) {
-      writeThemeToDom(found, setIsDarkMode);
-      initialApplyDoneRef.current = true;
-    }
+    if (lastAppliedIdRef.current === activeThemeId) return;
+    writeThemeToDom(found, setIsDarkMode);
+    lastAppliedIdRef.current = activeThemeId;
   }, [activeThemeId, personalThemes, setIsDarkMode]);
 
   // ── Save / rename / delete personal themes ──────────────────────────────

@@ -81,8 +81,18 @@ function installDom() {
 }
 
 beforeEach(() => {
-  // Fresh DOM before each test so class+style state never leaks.
+  // Fresh DOM + localStorage before each test so class/style/state
+  // never leaks (the cloud-hydration test seeds localStorage with an
+  // active id; without this reset later tests would auto-apply that
+  // theme on mount and break their preconditions).
   installDom();
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => store.get(k) ?? null,
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+    clear: () => store.clear(),
+  };
 });
 
 // ─── Tests ────────────────────────────────────────────────────────────
@@ -133,6 +143,125 @@ test('writeThemeToDom: gradient theme writes raw gradient to backgroundImage', a
     'gradient theme must paint backgroundImage with the raw gradient string',
   );
   assert.equal(document.body.style.backgroundColor, 'transparent');
+});
+
+test('useTheme: cloud-sync handoff — activeThemeId switching A→B reapplies theme B to the DOM', async () => {
+  // Regression test for the "cloud hydration handoff" bug: when device A
+  // applies theme A locally and device B opens with a different cloud-
+  // synced active theme B, the hook must re-write the DOM (not just
+  // update React state). The fix tracks the last id written to the DOM
+  // in lastAppliedIdRef and reapplies whenever activeThemeId changes
+  // resolution to a different theme.
+  const React = (await import('react')).default;
+  const { useTheme } = await import('../../client/src/dashboard/use-theme.ts');
+  const { BUILT_IN_THEMES_BY_ID } = await import('../../shared/themes.ts');
+
+  // Stub a localStorage that starts with theme A active so the hook's
+  // initial useState picks it up.
+  const themeA = BUILT_IN_THEMES_BY_ID['paper-light'];      // tint #ffffff
+  const themeB = BUILT_IN_THEMES_BY_ID['midnight-ocean'];   // gradient bg
+  const store = new Map([['openBentoActiveThemeId', themeA.id]]);
+  globalThis.localStorage = {
+    getItem: (k) => store.get(k) ?? null,
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+    clear: () => store.clear(),
+  };
+
+  // ── Re-renderable dispatcher with effect-deps tracking ─────────────
+  const states  = [];
+  const refs    = [];
+  let effects   = [];
+  let cursorS = 0, cursorR = 0;
+
+  const dispatcher = {
+    useState(init) {
+      const i = cursorS++;
+      if (i >= states.length) {
+        states.push(typeof init === 'function' ? init() : init);
+      }
+      const setter = (v) => { states[i] = typeof v === 'function' ? v(states[i]) : v; };
+      return [states[i], setter];
+    },
+    useRef(init)  { const i = cursorR++; if (i >= refs.length) refs.push({ current: init }); return refs[i]; },
+    useCallback(fn) { return fn; },
+    useMemo(fn)     { return fn(); },
+    useEffect(fn, deps) { effects.push({ fn, deps }); },
+    useLayoutEffect(fn, deps) { effects.push({ fn, deps }); },
+    useContext()    { return undefined; },
+    useReducer(_r, init) { return [init, () => {}]; },
+    useImperativeHandle() {},
+    useDebugValue() {},
+    useTransition() { return [false, (cb) => cb()]; },
+    useDeferredValue(v) { return v; },
+    useId() { return ':r:test:'; },
+    useSyncExternalStore(_s, get) { return get(); },
+    useInsertionEffect() {},
+  };
+
+  const Internals =
+    React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher
+    ?? React.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H;
+
+  // Track which effect-instances have already run, keyed by call order +
+  // a snapshot of their last deps array. Mirrors React's effect-skip
+  // semantics: re-run only when deps change.
+  const lastDeps = [];
+  const render = () => {
+    cursorS = 0; cursorR = 0; effects = [];
+    const prev = Internals.current;
+    Internals.current = dispatcher;
+    let api;
+    try {
+      api = useTheme({
+        isAuthenticated: false,
+        userId: undefined,
+        supabaseClient: null,
+        isDarkMode: true,
+        setIsDarkMode: () => {},
+      });
+    } finally { Internals.current = prev; }
+    // Run only effects whose deps changed (or first-time effects).
+    effects.forEach((e, idx) => {
+      const prevDeps = lastDeps[idx];
+      const changed = !prevDeps
+        || !e.deps
+        || prevDeps.length !== e.deps.length
+        || prevDeps.some((d, i) => !Object.is(d, e.deps[i]));
+      if (changed) {
+        e.fn();
+        lastDeps[idx] = e.deps ? [...e.deps] : null;
+      }
+    });
+    return api;
+  };
+
+  // First render: hook hydrates activeThemeId='paper-light' from
+  // localStorage and the hydration effect writes theme A to the DOM.
+  render();
+  assert.equal(
+    document.documentElement.style.getPropertyValue('--slot-bg-rgb'),
+    '255, 255, 255',
+    'after first render the DOM must reflect theme A (paper-light tint)',
+  );
+
+  // Simulate cloud sync arriving with a different active theme. In
+  // production this happens inside the cloud-hydration effect via
+  // setActiveThemeId; here we mutate the state slot directly to model
+  // the post-hydration React state.
+  const activeIdSlot = states.findIndex((v) => v === themeA.id);
+  assert.notEqual(activeIdSlot, -1, 'expected an activeThemeId state slot');
+  states[activeIdSlot] = themeB.id;
+
+  // Re-render: the hydration effect's deps (activeThemeId) changed, so
+  // it must re-run and write theme B to the DOM. If the old one-shot
+  // gate were still in place, --slot-bg-rgb would stay at A's value.
+  render();
+  // Theme B is a gradient theme — assert on its body backgroundImage.
+  assert.ok(
+    document.body.style.backgroundImage.startsWith('linear-gradient'),
+    'after cloud handoff the DOM must reflect theme B (gradient body bg)',
+  );
 });
 
 test('useTheme.previewTheme then revertPreview removes themed class for first-time users', async () => {
