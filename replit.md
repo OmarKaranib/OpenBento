@@ -37,6 +37,7 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 - **Cast to TV Feature:** Allows casting the dashboard to browser-equipped TVs. Supports guest pairing and persistent "BENTO-XXXX" rooms for signed-in users, enabling multi-TV control and scheduled layout rotations.
 - **Theming for Productivity Widgets:** Productivity and personal widgets dynamically adjust colors for readability.
 - **Wellness & Focus Pack:** Includes Focus Soundscape (ambient loops), Water Tracker, Mood Check-in, and Standup Roller (randomized speaking order).
+- **Air Quality Widget:** Surfaces US AQI (EPA 6-band scale), dominant pollutant, optional pollen levels for the user's location via Open-Meteo (no API key). Reuses the shared geolocation cache populated by Weather/Sun & Sky, supports city search via the existing weather geocoder, auto-refreshes every 30 min and on tab focus, and persists the last payload to `localStorage` so reloads/offline starts render a "stale"-badged value before the next fetch lands.
 
 **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core` for drag-and-drop, `lucide-react` for icons, `localStorage` for persistence, and `qrcode.react` for QR generation.
 
@@ -49,6 +50,7 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 - `GET /api/trivia?difficulty=...`: Open Trivia DB proxy.
 - `GET /api/iss`: Server-proxied ISS position.
 - `GET /api/iss/pass?lat=&lon=`: Next-overhead-pass estimator for ISS.
+- `GET /api/air-quality?lat=&lon=&pollen=1`: Open-Meteo Air Quality proxy (no key, ~15 min TTL cache, 6 h stale-fallback, 7 s timeout). Returns US AQI, six pollutant concentrations, dominant pollutant, and (when `pollen=1`) the six European pollen series with the worst-case level pre-computed.
 - `GET /api/wordle/today`: Returns `{ date, answer }` for the current UTC day, deterministically seeded from the shared `@shared/wordle-pool` module so server and client offline-fallback never diverge.
 - Cast to TV API endpoints for pairing, pushing snapshots, renaming, fetching, and unpairing cast rooms, and a WebSocket for real-time communication.
 

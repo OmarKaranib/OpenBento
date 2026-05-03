@@ -37,6 +37,7 @@ import { OnThisDayWidget } from './on-this-day-widget';
 import { QuoteWidget } from './quote-widget';
 import { WordleWidget } from './wordle-widget';
 import { TriviaWidget } from './trivia-widget';
+import { AirQualityWidget } from './air-quality-widget';
 
 export interface WidgetRendererArgs {
   widget: Widget;
@@ -144,6 +145,9 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   ),
   trivia: ({ widget, onUpdate }) => (
     <TriviaWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
+  air_quality: ({ widget, onUpdate }) => (
+    <AirQualityWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
   ),
   // Closure-bound on dashboard state (iframe refs / seek mode / inline
   // input). Rendered inline by pages/dashboard.tsx via <VideoWidget />.

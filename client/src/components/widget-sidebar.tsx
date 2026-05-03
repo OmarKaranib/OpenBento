@@ -9,6 +9,7 @@
     CloudRain, Droplet, Smile, Users,
     Sparkles, Sun, Globe2, Satellite,
     CalendarDays, Quote as QuoteIcon, Puzzle, HelpCircle,
+    Wind,
   } from 'lucide-react';
 
   const failedLogoCache = new Set<string>();
@@ -181,7 +182,7 @@
     widgetType: WidgetType;
     w: number;
     h: number;
-    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'habit_tracker' | 'quick_launch' | 'big_text_marquee' | 'network_light' | 'photo_loop' | 'focus_soundscape' | 'water_tracker' | 'mood_checkin' | 'standup_roller' | 'lava_lamp' | 'sun_sky' | 'earth_night' | 'iss_tracker' | 'on_this_day' | 'quote' | 'wordle' | 'trivia' | 'default';
+    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'habit_tracker' | 'quick_launch' | 'big_text_marquee' | 'network_light' | 'photo_loop' | 'focus_soundscape' | 'water_tracker' | 'mood_checkin' | 'standup_roller' | 'lava_lamp' | 'sun_sky' | 'earth_night' | 'iss_tracker' | 'on_this_day' | 'quote' | 'wordle' | 'trivia' | 'air_quality' | 'default';
     color: string;
   }
 
@@ -217,6 +218,7 @@
     { id: 'template-quote',            name: 'Quote',      widgetType: 'quote',            w: 3, h: 2, icon: 'quote',            color: 'cyan'    },
     { id: 'template-wordle',           name: 'Wordle',     widgetType: 'wordle',           w: 3, h: 3, icon: 'wordle',           color: 'teal'    },
     { id: 'template-trivia',           name: 'Trivia',     widgetType: 'trivia',           w: 3, h: 3, icon: 'trivia',           color: 'purple'  },
+    { id: 'template-air-quality',      name: 'Air Quality', widgetType: 'air_quality',     w: 2, h: 3, icon: 'air_quality',      color: 'emerald' },
   ];
 
   function loadPersonalLibrary(): SavedChannel[] {
@@ -919,6 +921,24 @@
           w: 2, h: 3,
           icon: 'focus_soundscape' as const,
           color: 'cyan',
+        },
+      },
+      {
+        id: 'air_quality',
+        label: 'Air Quality',
+        description: 'Live AQI, dominant pollutant, optional pollen — refreshes every 30 min',
+        icon: <Wind className="w-[2rem] h-[2rem] text-emerald-400" />,
+        iconBg: 'bg-emerald-500/15',
+        border: 'border-emerald-500/30 hover:border-emerald-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/40',
+        template: {
+          id: 'template-air-quality',
+          name: 'Air Quality',
+          widgetType: 'air_quality' as WidgetType,
+          w: 2, h: 3,
+          icon: 'air_quality' as const,
+          color: 'emerald',
         },
       },
       {

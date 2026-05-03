@@ -36,7 +36,8 @@ export type WidgetType =
   | 'on_this_day'
   | 'quote'
   | 'wordle'
-  | 'trivia';
+  | 'trivia'
+  | 'air_quality';
 
 // ─── Widget Interface ─────────────────────────────────────────────────────────
 export interface Widget {
@@ -246,6 +247,39 @@ export interface Widget {
   triviaAnsweredIdx?: number | null;
   triviaCooldownUntil?: number;
   triviaDifficulty?: 'any' | 'easy' | 'medium' | 'hard';
+  // ─── Air Quality ──────────────────────────────────────────────────
+  // Optional location override. When both lat/lon are set they win;
+  // otherwise the widget falls back to the shared geolocation cache
+  // (populated by Weather/Sun & Sky) and finally to a city geocode.
+  airQualityCity?: string;
+  airQualityLat?: number;
+  airQualityLon?: number;
+  // Whether to fetch + render the pollen sub-card (Open-Meteo only
+  // returns pollen for European latitudes; renderer hides gracefully
+  // when the upstream omits it).
+  airQualityShowPollen?: boolean;
+  // Last successful payload, persisted so reloads / offline starts
+  // can render a stale-badged value before the next refresh lands.
+  airQualityCurrent?: {
+    lat:        number;
+    lon:        number;
+    fetchedAt:  number;
+    observedAt: string | null;
+    aqi:        number | null;
+    pollutants: {
+      pm2_5: number | null; pm10: number | null;
+      o3:    number | null; no2:  number | null;
+      so2:   number | null; co:   number | null;
+    };
+    dominant:   'pm2_5' | 'pm10' | 'o3' | 'no2' | 'so2' | 'co' | null;
+    pollen:     {
+      alder:    number | null; birch:   number | null;
+      grass:    number | null; mugwort: number | null;
+      olive:    number | null; ragweed: number | null;
+      maxLevel: 'low' | 'moderate' | 'high' | 'very_high' | null;
+    } | null;
+    cityLabel?: string;
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema, in
 import { pickDailyWordleAnswer, wordleUtcDateKey } from "@shared/wordle-pool";
 import { getUncachableResendClient } from "./services/resend-client";
 import { createMarketsService, parseSymbols as parseMarketsSymbols } from "./markets";
+import { createAirQualityService } from "./air-quality";
 import { LruTtlCache } from "./services/lruCache";
 import { attachSupabaseUser as attachSupabaseUserShared } from "./services/supabaseAuth";
 
@@ -1738,6 +1739,28 @@ export async function registerRoutes(
   // /api/rss: http(s) only, public-IP DNS check on every redirect hop, manual
   // redirect handling capped at MAX_PING_HOPS, hard 5 s timeout. No caching —
   // freshness is the entire point of this widget.
+  // ─── Air Quality (Open-Meteo, no key) ────────────────────────────
+  // Free upstream — 15-min cache, 6-hour stale fallback, 7s timeout.
+  // ?lat= & ?lon= required; optional ?pollen=1 enables the pollen series
+  // (only meaningful for European latitudes — upstream returns null
+  // elsewhere and the widget hides the row).
+  const airQualityService = createAirQualityService();
+  app.get('/api/air-quality', async (req: Request, res: Response) => {
+    const lat = Number(req.query.lat);
+    const lon = Number(req.query.lon);
+    const pollen = req.query.pollen === '1' || req.query.pollen === 'true';
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+      return res.status(400).json({ error: 'lat/lon required and must be valid coordinates' });
+    }
+    try {
+      const payload = await airQualityService.getAirQuality({ lat, lon, includePollen: pollen });
+      res.json(payload);
+    } catch (err) {
+      console.error('[AirQuality] Fetch error:', err);
+      res.status(503).json({ error: 'Service temporarily unavailable' });
+    }
+  });
+
   // ─── ISS Live Tracker ─────────────────────────────────────────────
   // Server proxy to wheretheiss.at (no key, public). Cached ~25s so the
   // upstream isn't hammered when many widgets refresh in parallel.
