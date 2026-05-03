@@ -33,6 +33,10 @@ import { LavaLampWidget } from './lava-lamp-widget';
 import { SunSkyWidget } from './sun-sky-widget';
 import { EarthNightWidget } from './earth-night-widget';
 import { IssTrackerWidget } from './iss-tracker-widget';
+import { OnThisDayWidget } from './on-this-day-widget';
+import { QuoteWidget } from './quote-widget';
+import { WordleWidget } from './wordle-widget';
+import { TriviaWidget } from './trivia-widget';
 
 export interface WidgetRendererArgs {
   widget: Widget;
@@ -128,6 +132,18 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   ),
   iss_tracker: ({ widget, onUpdate }) => (
     <IssTrackerWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
+  on_this_day: ({ widget, onUpdate }) => (
+    <OnThisDayWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
+  quote: ({ widget, onUpdate }) => (
+    <QuoteWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
+  wordle: ({ widget, onUpdate }) => (
+    <WordleWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
+  trivia: ({ widget, onUpdate }) => (
+    <TriviaWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
   ),
   // Closure-bound on dashboard state (iframe refs / seek mode / inline
   // input). Rendered inline by pages/dashboard.tsx via <VideoWidget />.

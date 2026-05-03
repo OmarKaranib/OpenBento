@@ -32,7 +32,11 @@ export type WidgetType =
   | 'lava_lamp'
   | 'sun_sky'
   | 'earth_night'
-  | 'iss_tracker';
+  | 'iss_tracker'
+  | 'on_this_day'
+  | 'quote'
+  | 'wordle'
+  | 'trivia';
 
 // ─── Widget Interface ─────────────────────────────────────────────────────────
 export interface Widget {
@@ -216,6 +220,32 @@ export interface Widget {
   issLat?: number;
   issLon?: number;
   issRefreshSec?: number;
+  // ─── Knowledge & Play pack ────────────────────────────────────────
+  // On This Day — auto-rotation cadence in seconds (5–60).
+  onThisDayRotateSec?: number;
+  // Random Quote — favourite quotes pinned by the user, plus the
+  // currently-displayed entry (persisted so reloads don't reshuffle).
+  quoteFavorites?: { text: string; author: string }[];
+  quoteCurrent?: { text: string; author: string };
+  // Daily Wordle — UTC date key, the guesses the player has made so
+  // far (each a 5-letter lowercase string), and the resolved status.
+  wordleDate?: string;
+  wordleGuesses?: string[];
+  wordleStatus?: 'playing' | 'won' | 'lost';
+  // Trivia — running local score, the active question payload, when
+  // the next question may be requested (cooldown), and the chosen
+  // difficulty filter forwarded to /api/trivia.
+  triviaScore?: { correct: number; total: number };
+  triviaCurrent?: {
+    question: string;
+    choices: string[];
+    answerIdx: number;
+    category: string;
+    difficulty: string;
+  };
+  triviaAnsweredIdx?: number | null;
+  triviaCooldownUntil?: number;
+  triviaDifficulty?: 'any' | 'easy' | 'medium' | 'hard';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

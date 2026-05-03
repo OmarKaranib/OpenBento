@@ -25,7 +25,11 @@ export type StarterTileType =
   | 'lava_lamp'
   | 'sun_sky'
   | 'earth_night'
-  | 'iss_tracker';
+  | 'iss_tracker'
+  | 'on_this_day'
+  | 'quote'
+  | 'wordle'
+  | 'trivia';
 
 export interface StarterTile {
   type: StarterTileType;

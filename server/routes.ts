@@ -1817,6 +1817,148 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Knowledge & Play pack ──────────────────────────────────────────────
+  // GET /api/onthisday — Wikipedia REST `events` feed for today's MM/DD,
+  // 1-hour cache (the upstream payload only changes once a day).
+  interface OnThisDayEvent { year: number; text: string; pages: { title: string; url: string }[]; }
+  interface OnThisDayPayload { date: string; events: OnThisDayEvent[]; fetchedAt: number; }
+  const ONTHISDAY_CACHE = new LruTtlCache<OnThisDayPayload>({ max: 366, ttlMs: 60 * 60_000 });
+  app.get('/api/onthisday', async (_req: Request, res: Response) => {
+    const now = new Date();
+    const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(now.getUTCDate()).padStart(2, '0');
+    const key = `${mm}/${dd}`;
+    const cached = ONTHISDAY_CACHE.get(key);
+    if (cached) return res.json(cached);
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8_000);
+    try {
+      const r = await fetch(`https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/${mm}/${dd}`, {
+        signal: ctrl.signal,
+        headers: { 'User-Agent': 'OpenBento-Dashboard/1.0 (+https://openbento.app)', 'Accept': 'application/json' },
+      });
+      if (!r.ok) return res.status(502).json({ error: `Upstream ${r.status}` });
+      const j = await r.json() as { events?: Array<{ year?: number; text?: string; pages?: Array<{ titles?: { normalized?: string }; title?: string; content_urls?: { desktop?: { page?: string } } }> }> };
+      const events: OnThisDayEvent[] = (j.events || []).slice(0, 40).map(ev => ({
+        year: typeof ev.year === 'number' ? ev.year : 0,
+        text: String(ev.text || '').trim(),
+        pages: (ev.pages || []).slice(0, 3).map(p => ({
+          title: String(p.titles?.normalized || p.title || '').trim(),
+          url: String(p.content_urls?.desktop?.page || ''),
+        })).filter(p => p.title.length > 0),
+      })).filter(ev => ev.text.length > 0 && ev.year > 0);
+      const payload: OnThisDayPayload = { date: key, events, fetchedAt: Date.now() };
+      ONTHISDAY_CACHE.set(key, payload);
+      res.json(payload);
+    } catch (err) {
+      res.status(502).json({ error: err instanceof Error ? err.message : 'On This Day fetch failed' });
+    } finally {
+      clearTimeout(t);
+    }
+  });
+
+  // GET /api/quote — proxies zenquotes.io. 5-min cache so a refresh-spam
+  // user can't melt the upstream; the widget falls back to a bundled
+  // pool when this endpoint is unavailable.
+  interface QuotePayload { text: string; author: string; fetchedAt: number; }
+  const QUOTE_CACHE = new LruTtlCache<QuotePayload>({ max: 1, ttlMs: 5 * 60_000 });
+  app.get('/api/quote', async (_req: Request, res: Response) => {
+    const cached = QUOTE_CACHE.get('q');
+    if (cached) return res.json(cached);
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 6_000);
+    try {
+      const r = await fetch('https://zenquotes.io/api/random', {
+        signal: ctrl.signal,
+        headers: { 'User-Agent': 'OpenBento-Dashboard/1.0 (+https://openbento.app)' },
+      });
+      if (!r.ok) return res.status(502).json({ error: `Upstream ${r.status}` });
+      const arr = await r.json() as Array<{ q?: string; a?: string }>;
+      const first = Array.isArray(arr) ? arr[0] : null;
+      if (!first || typeof first.q !== 'string') {
+        return res.status(502).json({ error: 'Malformed upstream payload' });
+      }
+      const payload: QuotePayload = {
+        text: first.q.trim(),
+        author: typeof first.a === 'string' ? first.a.trim() : 'Unknown',
+        fetchedAt: Date.now(),
+      };
+      QUOTE_CACHE.set('q', payload);
+      res.json(payload);
+    } catch (err) {
+      res.status(502).json({ error: err instanceof Error ? err.message : 'Quote fetch failed' });
+    } finally {
+      clearTimeout(t);
+    }
+  });
+
+  // GET /api/trivia?difficulty=easy|medium|hard|any
+  // Proxies Open Trivia DB (no key). Decodes upstream HTML entities and
+  // returns a single multiple-choice question with its answer index. Not
+  // cached — every request must yield a fresh question.
+  interface TriviaPayload {
+    question: string; choices: string[]; answerIdx: number;
+    category: string; difficulty: string; fetchedAt: number;
+  }
+  const decodeHtml = (s: string): string => s
+    .replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&rsquo;/g, '\u2019').replace(/&lsquo;/g, '\u2018')
+    .replace(/&ldquo;/g, '\u201c').replace(/&rdquo;/g, '\u201d')
+    .replace(/&hellip;/g, '\u2026').replace(/&eacute;/g, '\u00e9')
+    .replace(/&ntilde;/g, '\u00f1').replace(/&uuml;/g, '\u00fc')
+    .replace(/&ouml;/g, '\u00f6').replace(/&auml;/g, '\u00e4');
+  app.get('/api/trivia', async (req: Request, res: Response) => {
+    const diff = String(req.query.difficulty ?? 'any');
+    const allowed = new Set(['any', 'easy', 'medium', 'hard']);
+    const difficulty = allowed.has(diff) ? diff : 'any';
+    const params = new URLSearchParams({ amount: '1', type: 'multiple', encode: 'url3986' });
+    if (difficulty !== 'any') params.set('difficulty', difficulty);
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 7_000);
+    try {
+      const r = await fetch(`https://opentdb.com/api.php?${params.toString()}`, {
+        signal: ctrl.signal,
+        headers: { 'User-Agent': 'OpenBento-Dashboard/1.0 (+https://openbento.app)' },
+      });
+      if (!r.ok) return res.status(502).json({ error: `Upstream ${r.status}` });
+      const j = await r.json() as {
+        response_code?: number;
+        results?: Array<{
+          category?: string; difficulty?: string; question?: string;
+          correct_answer?: string; incorrect_answers?: string[];
+        }>;
+      };
+      if (j.response_code !== 0 || !Array.isArray(j.results) || j.results.length === 0) {
+        return res.status(502).json({ error: 'No question available' });
+      }
+      const q = j.results[0];
+      const dec = (s?: string) => decodeHtml(decodeURIComponent(s || ''));
+      const correct = dec(q.correct_answer);
+      const incorrect = (q.incorrect_answers || []).map(dec);
+      // Shuffle answers — Fisher-Yates with Math.random is fine here
+      // (per-request randomness, not security-sensitive).
+      const choices = [correct, ...incorrect];
+      for (let i = choices.length - 1; i > 0; i--) {
+        const k = Math.floor(Math.random() * (i + 1));
+        [choices[i], choices[k]] = [choices[k], choices[i]];
+      }
+      const answerIdx = choices.indexOf(correct);
+      const payload: TriviaPayload = {
+        question: dec(q.question),
+        choices, answerIdx,
+        category: dec(q.category),
+        difficulty: dec(q.difficulty),
+        fetchedAt: Date.now(),
+      };
+      res.json(payload);
+    } catch (err) {
+      res.status(502).json({ error: err instanceof Error ? err.message : 'Trivia fetch failed' });
+    } finally {
+      clearTimeout(t);
+    }
+  });
+
   app.get('/api/iss', async (_req: Request, res: Response) => {
     try {
       const cached = ISS_CACHE.get('iss');

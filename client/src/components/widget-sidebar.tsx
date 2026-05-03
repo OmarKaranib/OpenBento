@@ -8,6 +8,7 @@
     Flame, Grid3x3, Megaphone, Activity, ImageIcon,
     CloudRain, Droplet, Smile, Users,
     Sparkles, Sun, Globe2, Satellite,
+    CalendarDays, Quote as QuoteIcon, Puzzle, Brain,
   } from 'lucide-react';
 
   const failedLogoCache = new Set<string>();
@@ -180,7 +181,7 @@
     widgetType: WidgetType;
     w: number;
     h: number;
-    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'habit_tracker' | 'quick_launch' | 'big_text_marquee' | 'network_light' | 'photo_loop' | 'focus_soundscape' | 'water_tracker' | 'mood_checkin' | 'standup_roller' | 'lava_lamp' | 'sun_sky' | 'earth_night' | 'iss_tracker' | 'default';
+    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'habit_tracker' | 'quick_launch' | 'big_text_marquee' | 'network_light' | 'photo_loop' | 'focus_soundscape' | 'water_tracker' | 'mood_checkin' | 'standup_roller' | 'lava_lamp' | 'sun_sky' | 'earth_night' | 'iss_tracker' | 'on_this_day' | 'quote' | 'wordle' | 'trivia' | 'default';
     color: string;
   }
 
@@ -212,6 +213,10 @@
     { id: 'template-sun-sky',          name: 'Sun & Sky',  widgetType: 'sun_sky',          w: 3, h: 2, icon: 'sun_sky',          color: 'amber'   },
     { id: 'template-earth-night',      name: 'Earth Night', widgetType: 'earth_night',     w: 3, h: 3, icon: 'earth_night',      color: 'sky'     },
     { id: 'template-iss-tracker',      name: 'ISS Live',   widgetType: 'iss_tracker',      w: 3, h: 3, icon: 'iss_tracker',      color: 'cyan'    },
+    { id: 'template-on-this-day',      name: 'On This Day', widgetType: 'on_this_day',     w: 3, h: 3, icon: 'on_this_day',      color: 'violet'  },
+    { id: 'template-quote',            name: 'Quote',      widgetType: 'quote',            w: 3, h: 2, icon: 'quote',            color: 'cyan'    },
+    { id: 'template-wordle',           name: 'Wordle',     widgetType: 'wordle',           w: 3, h: 3, icon: 'wordle',           color: 'teal'    },
+    { id: 'template-trivia',           name: 'Trivia',     widgetType: 'trivia',           w: 3, h: 3, icon: 'trivia',           color: 'purple'  },
   ];
 
   function loadPersonalLibrary(): SavedChannel[] {
@@ -1040,6 +1045,78 @@
           w: 3, h: 3,
           icon: 'iss_tracker' as const,
           color: 'cyan',
+        },
+      },
+      {
+        id: 'on_this_day',
+        label: 'On This Day',
+        description: 'Wikipedia historical events for today, auto-rotating',
+        icon: <CalendarDays className="w-[2rem] h-[2rem] text-violet-400" />,
+        iconBg: 'bg-violet-500/15',
+        border: 'border-violet-500/30 hover:border-violet-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-violet-400 bg-violet-500/15 border-violet-500/40',
+        template: {
+          id: 'template-on-this-day',
+          name: 'On This Day',
+          widgetType: 'on_this_day' as WidgetType,
+          w: 3, h: 3,
+          icon: 'on_this_day' as const,
+          color: 'violet',
+        },
+      },
+      {
+        id: 'quote',
+        label: 'Random Quote',
+        description: 'Daily inspiration with refresh and heart-favourite',
+        icon: <QuoteIcon className="w-[2rem] h-[2rem] text-cyan-400" />,
+        iconBg: 'bg-cyan-500/15',
+        border: 'border-cyan-500/30 hover:border-cyan-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-cyan-400 bg-cyan-500/15 border-cyan-500/40',
+        template: {
+          id: 'template-quote',
+          name: 'Quote',
+          widgetType: 'quote' as WidgetType,
+          w: 3, h: 2,
+          icon: 'quote' as const,
+          color: 'cyan',
+        },
+      },
+      {
+        id: 'wordle',
+        label: 'Daily Wordle',
+        description: 'One 5-letter puzzle per day — same word for everyone',
+        icon: <Puzzle className="w-[2rem] h-[2rem] text-teal-400" />,
+        iconBg: 'bg-teal-500/15',
+        border: 'border-teal-500/30 hover:border-teal-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-teal-400 bg-teal-500/15 border-teal-500/40',
+        template: {
+          id: 'template-wordle',
+          name: 'Wordle',
+          widgetType: 'wordle' as WidgetType,
+          w: 3, h: 3,
+          icon: 'wordle' as const,
+          color: 'teal',
+        },
+      },
+      {
+        id: 'trivia',
+        label: 'Trivia',
+        description: 'Multiple-choice trivia with running score',
+        icon: <Brain className="w-[2rem] h-[2rem] text-purple-400" />,
+        iconBg: 'bg-purple-500/15',
+        border: 'border-purple-500/30 hover:border-purple-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-purple-400 bg-purple-500/15 border-purple-500/40',
+        template: {
+          id: 'template-trivia',
+          name: 'Trivia',
+          widgetType: 'trivia' as WidgetType,
+          w: 3, h: 3,
+          icon: 'trivia' as const,
+          color: 'purple',
         },
       },
     ] as const;
