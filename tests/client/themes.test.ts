@@ -18,6 +18,7 @@ import {
   THEME_FONT_STACKS,
   themeToCssVars,
   hexToRgba,
+  hexToRgbTriplet,
   captureLookAsTheme,
   sanitizeThemes,
   isValidTheme,
@@ -55,6 +56,15 @@ test('themeToCssVars returns the full var bag for a solid-color theme', () => {
   assert.equal(vars['--ob-font'], THEME_FONT_STACKS.serif);
   // --ob-accent-soft is the accent at ~18% alpha
   assert.match(vars['--ob-accent-soft'], /^rgba\(31, 41, 55, 0\.18\)$/);
+  // --slot-bg-rgb drives .dashboard-slot's translucent fill in index.css
+  assert.equal(vars['--slot-bg-rgb'], '255, 255, 255');
+});
+
+test('themeToCssVars sets --slot-bg-rgb so .dashboard-slot picks up the tint', () => {
+  for (const t of BUILT_IN_THEMES) {
+    const vars = themeToCssVars(t);
+    assert.match(vars['--slot-bg-rgb'], /^\d+, \d+, \d+$/, `${t.id} bad triplet`);
+  }
 });
 
 test('themeToCssVars returns transparent bg-color for gradient themes', () => {
@@ -81,6 +91,12 @@ test('hexToRgba parses 3-digit and 6-digit hex; passes through garbage', () => {
   assert.equal(hexToRgba('#22d3ee', 0.5), 'rgba(34, 211, 238, 0.5)');
   // Bad input → return as-is so a malformed personal theme can't crash.
   assert.equal(hexToRgba('not-a-color', 0.5), 'not-a-color');
+});
+
+test('hexToRgbTriplet returns "r, g, b" or null for bad input', () => {
+  assert.equal(hexToRgbTriplet('#fff'),    '255, 255, 255');
+  assert.equal(hexToRgbTriplet('#22d3ee'), '34, 211, 238');
+  assert.equal(hexToRgbTriplet('nope'),    null);
 });
 
 // ─── Personal-theme round-trip ─────────────────────────────────────────────

@@ -254,6 +254,14 @@ body.light-theme [class*="rounded-full"][class*="bg-slate-800"] {
   color: #374151 !important;
 }
 
+/* Themes Marketplace — when a theme is active, the body owns the global
+   background (color / image / gradient) and the dashboard's outer container
+   becomes transparent (see dashboard.tsx). The starry-night layer is also
+   suppressed so theme imagery isn't double-painted. */
+body.ob-theme-active .starry-night {
+  display: none !important;
+}
+
 /* Default to dark theme */
 body {
   --text-primary: #f1f5f9;

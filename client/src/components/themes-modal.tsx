@@ -8,7 +8,6 @@ import { useEffect, useRef, useState } from 'react';
 import { X, Palette, Check, Trash2, Pencil, Plus } from 'lucide-react';
 import {
   type Theme,
-  type ThemeFont,
   BUILT_IN_THEMES,
   THEME_FONT_STACKS,
   themeToCssVars,
@@ -391,6 +390,3 @@ function SaveLookDialog({ onCancel, onSave }: SaveDialogProps) {
   );
 }
 
-// Ensure the unused-import linter doesn't cull the ThemeFont type — kept here
-// because consumers may extend the modal in the future.
-type _Reserved = ThemeFont;

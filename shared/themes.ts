@@ -39,6 +39,11 @@ export interface Theme {
 
 // CSS variables a Theme writes to :root when applied. Stable string keys so
 // the apply reducer and the unit tests share a single source of truth.
+//
+// `--slot-bg-rgb` is a "r, g, b" triplet (no rgb() wrapper) because the
+// existing .dashboard-slot rule in index.css consumes it that way to build
+// rgba() colors at runtime. Setting it from a theme makes every untinted
+// widget pick up the theme's widgetTint as its translucent background.
 export interface ThemeCssVars {
   '--ob-bg-color':    string;
   '--ob-bg-image':    string;   // 'none' for solid colors
@@ -46,6 +51,7 @@ export interface ThemeCssVars {
   '--ob-accent-soft': string;   // accent at ~20% alpha for highlights/borders
   '--ob-font':        string;   // resolved font-family stack
   '--ob-widget-tint': string;
+  '--slot-bg-rgb':    string;   // "r, g, b" triplet driving .dashboard-slot
 }
 
 // ─── Font stacks ──────────────────────────────────────────────────────────
@@ -166,14 +172,26 @@ export const BUILT_IN_THEMES_BY_ID: Record<string, Theme> =
  * dashboard.
  */
 export function hexToRgba(hex: string, alpha: number): string {
+  const triplet = hexToRgbTriplet(hex);
+  if (!triplet) return hex;
+  const a = Math.max(0, Math.min(1, alpha));
+  return `rgba(${triplet}, ${a})`;
+}
+
+/**
+ * Parse a hex (#rgb / #rrggbb) into a comma-space triplet "r, g, b" suitable
+ * for use inside rgba(). Returns null on parse failure so the caller can
+ * decide on a sensible fallback. Pure helper, used by both hexToRgba and
+ * the apply reducer's `--slot-bg-rgb` var.
+ */
+export function hexToRgbTriplet(hex: string): string | null {
   const clean = hex.trim().replace(/^#/, '');
   const full  = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
-  if (!/^[0-9a-fA-F]{6}$/.test(full)) return hex;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return null;
   const r = parseInt(full.slice(0, 2), 16);
   const g = parseInt(full.slice(2, 4), 16);
   const b = parseInt(full.slice(4, 6), 16);
-  const a = Math.max(0, Math.min(1, alpha));
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
+  return `${r}, ${g}, ${b}`;
 }
 
 /**
@@ -183,6 +201,9 @@ export function hexToRgba(hex: string, alpha: number): string {
  * without booting the browser.
  */
 export function themeToCssVars(theme: Theme): ThemeCssVars {
+  // Fall back to slate-900 for unparseable widget tints so the dashboard
+  // never renders fully-transparent slots.
+  const tintTriplet = hexToRgbTriplet(theme.widgetTint) ?? '15, 23, 42';
   return {
     '--ob-bg-color':    theme.background.kind === 'color' ? theme.background.value : 'transparent',
     '--ob-bg-image':    theme.background.kind === 'color' ? 'none' : theme.background.value,
@@ -190,6 +211,7 @@ export function themeToCssVars(theme: Theme): ThemeCssVars {
     '--ob-accent-soft': hexToRgba(theme.accent, 0.18),
     '--ob-font':        THEME_FONT_STACKS[theme.font] ?? THEME_FONT_STACKS.inter,
     '--ob-widget-tint': theme.widgetTint,
+    '--slot-bg-rgb':    tintTriplet,
   };
 }
 

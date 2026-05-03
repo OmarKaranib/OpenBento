@@ -27,6 +27,12 @@ import {
   isValidTheme,
 } from '@shared/themes';
 
+// Marker class added to <body> while a theme is active. The dashboard's
+// outer container reads it via [data-themed] / .ob-theme-active to switch
+// its hardcoded background off so the theme's body background shows
+// through. Kept as a constant so the dashboard import stays in sync.
+export const THEMED_BODY_CLASS = 'ob-theme-active';
+
 type SupabaseLike = {
   auth: {
     getSession: () => Promise<{ data: { session: { access_token?: string } | null } }>;
@@ -59,17 +65,23 @@ function writeThemeToDom(theme: Theme, setIsDarkMode: (v: boolean) => void): voi
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   const vars = themeToCssVars(theme);
+  // 1) CSS variables — consumed by .dashboard-slot (--slot-bg-rgb) and by
+  //    any theme-aware components that opt in to --ob-accent / --ob-accent-soft.
   for (const [k, v] of Object.entries(vars)) {
     root.style.setProperty(k, v);
   }
-  // Apply background to <body> directly so the existing static-bg reset
-  // in App.tsx doesn't fight us. Use background-image for gradients/images,
-  // background-color for solids.
+  // 2) Global font — set on <body> so every descendant inherits it. The
+  //    dashboard's title still pins Inter inline (legacy hero styling) but
+  //    everything else inherits from the body and visibly changes.
   const body = document.body;
   if (body) {
+    body.style.fontFamily = vars['--ob-font'];
+    // 3) Background — body is the lowest layer; the dashboard outer div
+    //    becomes transparent (see ob-theme-active class) so this shows.
     if (theme.background.kind === 'color') {
       body.style.backgroundImage = 'none';
       body.style.backgroundColor = theme.background.value;
+      body.style.backgroundAttachment = 'initial';
     } else {
       body.style.backgroundImage = theme.background.kind === 'image'
         ? `url("${theme.background.value}")`
@@ -79,23 +91,48 @@ function writeThemeToDom(theme: Theme, setIsDarkMode: (v: boolean) => void): voi
       body.style.backgroundPosition = 'center';
       body.style.backgroundAttachment = 'fixed';
     }
+    body.classList.add(THEMED_BODY_CLASS);
   }
-  // Sync the existing dark/light toggle. The CSS true-light mode rules
-  // already react to body.light-theme / .dark-theme, so this single call
-  // is enough to flip the whole UI.
+  // 4) Sync the existing dark/light toggle. The CSS true-light-mode rules
+  //    already react to body.light-theme / .dark-theme, so this single
+  //    call is enough to flip the rest of the UI's contrast palette.
   setIsDarkMode(!theme.lightMode);
 }
 
 // Capture whatever theme-shaped state is currently on the DOM. Used so
-// previewTheme() can revert to the previous look on hover-out.
-function readThemeSnapshotFromDom(): Partial<Theme> {
-  if (typeof document === 'undefined') return {};
-  const root = document.documentElement;
-  const cs   = root.style;
+// previewTheme() can revert to a synthetic snapshot when no Theme has
+// been applied yet, and so saveCurrentLook() can grab the running font
+// directly from the body when no active Theme exists. Reads computed
+// styles (not inline) so we pick up CSS-defined defaults too.
+function readDomSnapshot(): { accent: string; widgetTint: string; font: string } {
+  if (typeof document === 'undefined') {
+    return { accent: '', widgetTint: '', font: '' };
+  }
+  const inline = document.documentElement.style;
+  const bodyStyle = document.body
+    ? window.getComputedStyle(document.body).fontFamily
+    : '';
   return {
-    accent:     cs.getPropertyValue('--ob-accent').trim() || '',
-    widgetTint: cs.getPropertyValue('--ob-widget-tint').trim() || '',
+    accent:     inline.getPropertyValue('--ob-accent').trim()      || '',
+    widgetTint: inline.getPropertyValue('--ob-widget-tint').trim() || '',
+    font:       (inline.getPropertyValue('--ob-font').trim() || bodyStyle || ''),
   };
+}
+
+// Reverse-lookup a ThemeFont key from a resolved font-family stack so
+// saveCurrentLook can name the running font correctly. Falls back to
+// 'inter' when nothing matches.
+function fontKeyFromStack(stack: string): ThemeFont {
+  const norm = stack.trim().toLowerCase();
+  if (!norm) return 'inter';
+  for (const key of Object.keys(THEME_FONT_STACKS) as ThemeFont[]) {
+    if (THEME_FONT_STACKS[key].toLowerCase() === norm) return key;
+  }
+  // Heuristic match against the family name a CSS engine might leave behind.
+  if (norm.includes('mono') || norm.includes('jetbrains') || norm.includes('fira')) return 'mono';
+  if (norm.includes('serif') || norm.includes('georgia') || norm.includes('source serif')) return 'serif';
+  if (norm.includes('nunito') || norm.includes('quicksand')) return 'rounded';
+  return 'inter';
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────
@@ -150,15 +187,16 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
       // user has explicitly applied anything.
       const allKnown: Theme[] = [...BUILT_IN_THEMES, ...personalThemes];
       const current = activeThemeId ? allKnown.find(t => t.id === activeThemeId) : undefined;
+      const dom = readDomSnapshot();
       const snapshot: Theme = current ?? {
         id: '__pre_preview__',
         name: 'Previous',
         description: '',
         builtIn: false,
         background: { kind: 'color', value: '#0f172a' },
-        accent:     readThemeSnapshotFromDom().accent     || '#22d3ee',
-        font:       'inter' as ThemeFont,
-        widgetTint: readThemeSnapshotFromDom().widgetTint || '#0f172a',
+        accent:     dom.accent     || '#22d3ee',
+        font:       fontKeyFromStack(dom.font),
+        widgetTint: dom.widgetTint || '#0f172a',
         lightMode:  !isDarkMode,
       };
       previewBackupRef.current = snapshot;
@@ -169,10 +207,17 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
 
   const revertPreview = useCallback(() => {
     if (!previewActiveRef.current || !previewBackupRef.current) return;
-    writeThemeToDom(previewBackupRef.current, setIsDarkMode);
+    const backup = previewBackupRef.current;
+    writeThemeToDom(backup, setIsDarkMode);
+    // If we reverted to the synthetic "pre-preview" snapshot (i.e. no
+    // theme had ever been applied), drop the marker class so the
+    // dashboard goes back to its hardcoded backdrop too.
+    if (!activeThemeId && backup.id === '__pre_preview__' && typeof document !== 'undefined') {
+      document.body?.classList.remove(THEMED_BODY_CLASS);
+    }
     previewActiveRef.current = false;
     previewBackupRef.current = null;
-  }, [setIsDarkMode]);
+  }, [setIsDarkMode, activeThemeId]);
 
   // Re-apply the active theme on first mount so a returning user lands on
   // their last look without an explicit click. We also re-apply whenever
@@ -200,18 +245,40 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
   }, []);
 
   const saveCurrentLook = useCallback((name: string): Theme => {
-    // Prefer the active theme as the basis (richer metadata) and fall
-    // back to a DOM read so the capture still works even if no theme
-    // has been applied yet.
+    // Prefer the active theme as the basis (richer metadata, including the
+    // background's exact CSS expression). When no theme is active we
+    // reconstruct from live DOM state — body background + computed font +
+    // the accent/tint vars the last applied theme left on documentElement.
     const all: Theme[] = [...BUILT_IN_THEMES, ...personalThemes];
     const base = activeThemeId ? all.find(t => t.id === activeThemeId) : undefined;
-    const dom  = readThemeSnapshotFromDom();
+    const dom  = readDomSnapshot();
+
+    // Read live body background so guests who applied nothing still get
+    // their actual look captured (not a hardcoded slate-900).
+    let liveBg: Theme['background'] = { kind: 'color', value: '#0f172a' };
+    if (typeof document !== 'undefined' && document.body) {
+      const cs = window.getComputedStyle(document.body);
+      const bgImage = cs.backgroundImage;
+      const bgColor = cs.backgroundColor;
+      if (bgImage && bgImage !== 'none') {
+        // url("…") → image; everything else (gradient/etc) is a CSS expression.
+        const urlMatch = bgImage.match(/^url\(["']?(.+?)["']?\)$/);
+        if (urlMatch) {
+          liveBg = { kind: 'image', value: urlMatch[1] };
+        } else {
+          liveBg = { kind: 'gradient', value: bgImage };
+        }
+      } else if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
+        liveBg = { kind: 'color', value: bgColor };
+      }
+    }
+
     const captured = captureLookAsTheme({
       name,
-      background:  base?.background  ?? { kind: 'color', value: '#0f172a' },
-      accent:      base?.accent      ?? dom.accent      ?? '#22d3ee',
-      font:        base?.font        ?? 'inter',
-      widgetTint:  base?.widgetTint  ?? dom.widgetTint  ?? '#0f172a',
+      background:  base?.background  ?? liveBg,
+      accent:      base?.accent      ?? (dom.accent      || '#22d3ee'),
+      font:        base?.font        ?? fontKeyFromStack(dom.font),
+      widgetTint:  base?.widgetTint  ?? (dom.widgetTint  || '#0f172a'),
       lightMode:   !isDarkMode,
     });
     setPersonalThemes(prev => {
@@ -325,10 +392,6 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
       if (cloudUploadTimerRef.current) clearTimeout(cloudUploadTimerRef.current);
     };
   }, [personalThemes, activeThemeId, isAuthenticated, userId, getToken]);
-
-  // Keep the (unused-here) font stack export referenced so tree-shakers
-  // don't drop it — themes-modal.tsx imports it directly anyway.
-  void THEME_FONT_STACKS;
 
   return {
     personalThemes,
