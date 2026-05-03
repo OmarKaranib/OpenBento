@@ -28,7 +28,11 @@ export type WidgetType =
   | 'focus_soundscape'
   | 'water_tracker'
   | 'mood_checkin'
-  | 'standup_roller';
+  | 'standup_roller'
+  | 'lava_lamp'
+  | 'sun_sky'
+  | 'earth_night'
+  | 'iss_tracker';
 
 // ─── Widget Interface ─────────────────────────────────────────────────────────
 export interface Widget {
@@ -194,6 +198,24 @@ export interface Widget {
   standupNames?: string[];
   standupOrder?: string[];
   standupSeed?: number;
+  // ─── Lava Lamp ────────────────────────────────────────────────────
+  // One of the named palette presets, or 'match' to derive colors
+  // from the widget's customColor.
+  lavaPalette?: 'aurora' | 'sunset' | 'ocean' | 'magma' | 'forest' | 'match';
+  // ─── Sun & Sky ────────────────────────────────────────────────────
+  // Optional location override. If sunCity is set we geocode it via the
+  // existing /api/weather route; sunLat/sunLon win when both are set.
+  sunCity?: string;
+  sunLat?: number;
+  sunLon?: number;
+  // ─── Earth at Night ───────────────────────────────────────────────
+  // Seconds per full rotation of the schematic globe (20–600).
+  earthRotateSec?: number;
+  // ─── ISS Tracker ──────────────────────────────────────────────────
+  issCity?: string;
+  issLat?: number;
+  issLon?: number;
+  issRefreshSec?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

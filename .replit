@@ -70,7 +70,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx tsc --noEmit && npx tsx --test tests/server/markets.test.ts tests/client/markets-symbols.test.ts tests/server/cast-schedule.test.ts tests/client/wellness-pack.test.ts && node --test tests/client/use-cloud-sync.test.mjs"
+args = "npx tsc --noEmit && npx tsx --test tests/server/markets.test.ts tests/client/markets-symbols.test.ts tests/server/cast-schedule.test.ts tests/client/wellness-pack.test.ts tests/client/sky-helpers.test.ts && node --test tests/client/use-cloud-sync.test.mjs"
 
 [agent]
 integrations = ["javascript_log_in_with_replit:2.0.0", "stripe:2.0.0", "javascript_stripe:1.0.0", "resend:1.0.0"]

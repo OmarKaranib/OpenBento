@@ -1737,6 +1737,38 @@ export async function registerRoutes(
   // /api/rss: http(s) only, public-IP DNS check on every redirect hop, manual
   // redirect handling capped at MAX_PING_HOPS, hard 5 s timeout. No caching —
   // freshness is the entire point of this widget.
+  // ─── ISS Live Tracker ─────────────────────────────────────────────
+  // Server proxy to wheretheiss.at (no key, public). Cached ~25s so the
+  // upstream isn't hammered when many widgets refresh in parallel.
+  interface IssPayload { lat: number; lon: number; altitudeKm: number | null; velocityKmh: number | null; ts: number; }
+  const ISS_CACHE = new LruTtlCache<IssPayload>({ max: 1, ttlMs: 25_000 });
+  app.get('/api/iss', async (_req: Request, res: Response) => {
+    try {
+      const cached = ISS_CACHE.get('iss');
+      if (cached) return res.json(cached);
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 5_000);
+      const r = await fetch('https://api.wheretheiss.at/v1/satellites/25544', { signal: ctrl.signal });
+      clearTimeout(t);
+      if (!r.ok) return res.status(502).json({ error: `Upstream ${r.status}` });
+      const j = await r.json() as { latitude?: number; longitude?: number; altitude?: number; velocity?: number };
+      if (typeof j.latitude !== 'number' || typeof j.longitude !== 'number') {
+        return res.status(502).json({ error: 'Malformed upstream payload' });
+      }
+      const payload: IssPayload = {
+        lat: j.latitude,
+        lon: j.longitude,
+        altitudeKm: typeof j.altitude === 'number' ? j.altitude : null,
+        velocityKmh: typeof j.velocity === 'number' ? j.velocity : null,
+        ts: Date.now(),
+      };
+      ISS_CACHE.set('iss', payload);
+      res.json(payload);
+    } catch (err) {
+      res.status(502).json({ error: err instanceof Error ? err.message : 'ISS fetch failed' });
+    }
+  });
+
   app.get('/api/ping', async (req: Request, res: Response) => {
     const raw = typeof req.query.url === 'string' ? req.query.url.trim() : '';
     if (!raw) {

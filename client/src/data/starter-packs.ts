@@ -21,7 +21,11 @@ export type StarterTileType =
   | 'focus_soundscape'
   | 'water_tracker'
   | 'mood_checkin'
-  | 'standup_roller';
+  | 'standup_roller'
+  | 'lava_lamp'
+  | 'sun_sky'
+  | 'earth_night'
+  | 'iss_tracker';
 
 export interface StarterTile {
   type: StarterTileType;

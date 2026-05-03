@@ -7,6 +7,7 @@
     Hourglass, Github, Rss,
     Flame, Grid3x3, Megaphone, Activity, ImageIcon,
     CloudRain, Droplet, Smile, Users,
+    Sparkles, Sun, Globe2, Satellite,
   } from 'lucide-react';
 
   const failedLogoCache = new Set<string>();
@@ -179,7 +180,7 @@
     widgetType: WidgetType;
     w: number;
     h: number;
-    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'habit_tracker' | 'quick_launch' | 'big_text_marquee' | 'network_light' | 'photo_loop' | 'focus_soundscape' | 'water_tracker' | 'mood_checkin' | 'standup_roller' | 'default';
+    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'habit_tracker' | 'quick_launch' | 'big_text_marquee' | 'network_light' | 'photo_loop' | 'focus_soundscape' | 'water_tracker' | 'mood_checkin' | 'standup_roller' | 'lava_lamp' | 'sun_sky' | 'earth_night' | 'iss_tracker' | 'default';
     color: string;
   }
 
@@ -207,6 +208,10 @@
     { id: 'template-water-tracker',    name: 'Water',      widgetType: 'water_tracker',    w: 2, h: 2, icon: 'water_tracker',    color: 'sky' },
     { id: 'template-mood-checkin',     name: 'Mood',       widgetType: 'mood_checkin',     w: 3, h: 2, icon: 'mood_checkin',     color: 'violet' },
     { id: 'template-standup-roller',   name: 'Standup',    widgetType: 'standup_roller',   w: 3, h: 3, icon: 'standup_roller',   color: 'emerald' },
+    { id: 'template-lava-lamp',        name: 'Lava Lamp',  widgetType: 'lava_lamp',        w: 3, h: 3, icon: 'lava_lamp',        color: 'fuchsia' },
+    { id: 'template-sun-sky',          name: 'Sun & Sky',  widgetType: 'sun_sky',          w: 3, h: 2, icon: 'sun_sky',          color: 'amber'   },
+    { id: 'template-earth-night',      name: 'Earth Night', widgetType: 'earth_night',     w: 3, h: 3, icon: 'earth_night',      color: 'sky'     },
+    { id: 'template-iss-tracker',      name: 'ISS Live',   widgetType: 'iss_tracker',      w: 3, h: 3, icon: 'iss_tracker',      color: 'cyan'    },
   ];
 
   function loadPersonalLibrary(): SavedChannel[] {
@@ -963,6 +968,78 @@
           w: 3, h: 3,
           icon: 'standup_roller' as const,
           color: 'emerald',
+        },
+      },
+      {
+        id: 'lava_lamp',
+        label: 'Lava Lamp',
+        description: 'Slow blob animation — 5 palettes or match background',
+        icon: <Sparkles className="w-[2rem] h-[2rem] text-fuchsia-400" />,
+        iconBg: 'bg-fuchsia-500/15',
+        border: 'border-fuchsia-500/30 hover:border-fuchsia-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-fuchsia-400 bg-fuchsia-500/15 border-fuchsia-500/40',
+        template: {
+          id: 'template-lava-lamp',
+          name: 'Lava Lamp',
+          widgetType: 'lava_lamp' as WidgetType,
+          w: 3, h: 3,
+          icon: 'lava_lamp' as const,
+          color: 'fuchsia',
+        },
+      },
+      {
+        id: 'sun_sky',
+        label: 'Sun & Sky',
+        description: 'Sunrise, sunset, golden hour and moon phase',
+        icon: <Sun className="w-[2rem] h-[2rem] text-amber-400" />,
+        iconBg: 'bg-amber-500/15',
+        border: 'border-amber-500/30 hover:border-amber-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-amber-400 bg-amber-500/15 border-amber-500/40',
+        template: {
+          id: 'template-sun-sky',
+          name: 'Sun & Sky',
+          widgetType: 'sun_sky' as WidgetType,
+          w: 3, h: 2,
+          icon: 'sun_sky' as const,
+          color: 'amber',
+        },
+      },
+      {
+        id: 'earth_night',
+        label: 'Earth at Night',
+        description: 'Slowly rotating night-side globe',
+        icon: <Globe2 className="w-[2rem] h-[2rem] text-sky-400" />,
+        iconBg: 'bg-sky-500/15',
+        border: 'border-sky-500/30 hover:border-sky-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-sky-400 bg-sky-500/15 border-sky-500/40',
+        template: {
+          id: 'template-earth-night',
+          name: 'Earth Night',
+          widgetType: 'earth_night' as WidgetType,
+          w: 3, h: 3,
+          icon: 'earth_night' as const,
+          color: 'sky',
+        },
+      },
+      {
+        id: 'iss_tracker',
+        label: 'ISS Live',
+        description: 'Live International Space Station position with optional reference city',
+        icon: <Satellite className="w-[2rem] h-[2rem] text-cyan-400" />,
+        iconBg: 'bg-cyan-500/15',
+        border: 'border-cyan-500/30 hover:border-cyan-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-cyan-400 bg-cyan-500/15 border-cyan-500/40',
+        template: {
+          id: 'template-iss-tracker',
+          name: 'ISS Live',
+          widgetType: 'iss_tracker' as WidgetType,
+          w: 3, h: 3,
+          icon: 'iss_tracker' as const,
+          color: 'cyan',
         },
       },
     ] as const;

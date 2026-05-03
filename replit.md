@@ -32,6 +32,11 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 - **RSS Headlines Widget:** Renders scrolling headlines from any RSS or Atom feed URL via a server-side proxy.
 - **Dictionary Widget v2:** Provides definitions, phonetics, audio, synonyms, and etymology, with a search function and favoriting capabilities.
 - **Onboarding:** An `OnboardingFlow` guides new guest users with starter packs and coachmarks.
+- **Sky & Ambient Pack:**
+  - **Lava Lamp:** Pure-canvas blob animation (5 lazy-drifting radial gradients in `lighter` composite). Five named palettes (Aurora, Sunset, Ocean, Magma, Forest) plus "Match BG" which derives blob colors from the widget's customColor. Honors `prefers-reduced-motion` with a static gradient fallback. Runs at ~30fps capped via timestamp gating to keep CPU use trivial.
+  - **Sun & Sky Position:** SVG sky-arc with a sun-glyph dot positioned by `arcFraction` between sunrise and sunset, plus golden-hour countdown and current moon phase glyph + illumination %. Location resolves explicit `sunLat/sunLon` → `sunCity` (geocoded via existing `/api/weather` route) → browser geolocation → London fallback. All math is local — no API calls — and lives in `client/src/widgets/sky-helpers.ts`.
+  - **Earth at Night:** Slowly auto-rotating CSS sphere (configurable seconds-per-rotation, 20–600s) with a schematic "city lights" texture. A radial day-side glow is anchored to the current sub-solar longitude (computed from `computeSunTimes(now, 0, 0).subSolarLon`) so the lit/dark line tracks the real terminator. No external imagery — everything is procedurally rendered to keep the bundle small.
+  - **ISS Live Tracker:** Equirectangular world-map dot fed by `/api/iss` (server proxy to `https://api.wheretheiss.at/v1/satellites/25544`, 25s in-memory cache). Configurable refresh interval (15–300s). Optional reference city (geocoded via `/api/weather`) shows great-circle distance to the current ISS subpoint and an "Above {city} now" hint when within 2000 km.
 - **Cast to TV Feature (headline):** OpenBento turns any browser-equipped TV into a dashboard wall.
   - **Guest pairing (legacy, unchanged):** TV at `/cast` shows a 6-digit code, laptop pairs with `Cast → enter code`.
   - **Persistent BENTO-XXXX rooms (signed-in):** Each paired TV gets a permanent `BENTO-XXXX` code (alphabet excludes 0/O/1/I) that survives server restarts and re-pairing. Rooms are owner-scoped — every persistent route runs through `attachSupabaseUser` and an `ensureCanWrite` ownership check.
@@ -52,12 +57,13 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 - `GET /api/github/repo/:owner/:repo` and `GET /api/github/user/:owner`: Aggregated GitHub stats with in-memory caching.
 - `GET /api/rss?url=`: Server-side RSS/Atom proxy with caching and URL validation.
 - `GET /api/ping?url=`: Lightweight uptime probe for Network Light widget.
+- `GET /api/iss`: Server-proxied ISS position from wheretheiss.at with a 25s in-memory cache. Returns `{lat, lon, altitudeKm, velocityKmh, ts}`.
 - Cast to TV API endpoints for pairing, pushing snapshots, renaming, fetching, and unpairing cast rooms, and a WebSocket for real-time communication.
 
 ## Quality Gates
 A `check` workflow gates the codebase against a clean baseline:
 - `npx tsc --noEmit` — must report **zero** TypeScript errors. Anything new fails the gate.
-- `npx tsx --test tests/server/markets.test.ts tests/client/markets-symbols.test.ts tests/server/cast-schedule.test.ts tests/client/wellness-pack.test.ts` — markets ticker server + symbol-resolution unit tests, Cast scheduler tests (firing + unpair-stops-pushes), **and** Wellness pack helper tests (Water Tracker `computeStreak` math + Standup Roller `seededShuffle` determinism, importing the real `client/src/widgets/wellness-helpers.ts` module so any drift fails the gate).
+- `npx tsx --test tests/server/markets.test.ts tests/client/markets-symbols.test.ts tests/server/cast-schedule.test.ts tests/client/wellness-pack.test.ts tests/client/sky-helpers.test.ts` — markets ticker server + symbol-resolution unit tests, Cast scheduler tests (firing + unpair-stops-pushes), Wellness pack helper tests (Water Tracker `computeStreak` math + Standup Roller `seededShuffle` determinism, importing the real `client/src/widgets/wellness-helpers.ts` module so any drift fails the gate), **and** Sky & Ambient pack helper tests (sun-position + moon-phase + haversine math, importing the real `client/src/widgets/sky-helpers.ts` module).
 - `node --test tests/client/use-cloud-sync.test.mjs` — cross-device dashboard cloud-sync hook unit tests.
 
 Run all three locally with the `check` workflow (or copy the command above). A red `check` workflow blocks the task from being marked complete.

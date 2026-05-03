@@ -29,6 +29,10 @@ import { FocusSoundscapeWidget } from './focus-soundscape-widget';
 import { WaterTrackerWidget } from './water-tracker-widget';
 import { MoodCheckinWidget } from './mood-checkin-widget';
 import { StandupRollerWidget } from './standup-roller-widget';
+import { LavaLampWidget } from './lava-lamp-widget';
+import { SunSkyWidget } from './sun-sky-widget';
+import { EarthNightWidget } from './earth-night-widget';
+import { IssTrackerWidget } from './iss-tracker-widget';
 
 export interface WidgetRendererArgs {
   widget: Widget;
@@ -112,6 +116,18 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   ),
   standup_roller: ({ widget, onUpdate }) => (
     <StandupRollerWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
+  lava_lamp: ({ widget, onUpdate }) => (
+    <LavaLampWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
+  sun_sky: ({ widget, onUpdate }) => (
+    <SunSkyWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
+  earth_night: ({ widget, onUpdate }) => (
+    <EarthNightWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
+  iss_tracker: ({ widget, onUpdate }) => (
+    <IssTrackerWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
   ),
   // Closure-bound on dashboard state (iframe refs / seek mode / inline
   // input). Rendered inline by pages/dashboard.tsx via <VideoWidget />.
