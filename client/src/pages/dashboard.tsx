@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Dispatch, SetStateAction, MutableRefObject } from 'react';
-import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, LogIn, LogOut, User, Loader2, Shield, MessageSquare, Lightbulb, Bug, Tv } from 'lucide-react';
-import { Link } from 'wouter';
+import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, LogIn, LogOut, User, Loader2, Shield, MessageSquare, Lightbulb, Bug, Tv, Command as CommandIcon } from 'lucide-react';
+import { Link, useLocation } from 'wouter';
+import { CommandPalette } from '@/components/command-palette';
+import type { CommandHostBag } from '@/lib/command-palette-helpers';
 import { ADMIN_EMAIL } from '@/pages/admin';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
@@ -260,6 +262,47 @@ const MasterControlDashboard = ({
     setIsDarkMode,
   });
   const [themesModalOpen, setThemesModalOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [, navigate] = useLocation();
+
+  // Host bag for the Command Palette. Memoized so palette doesn't
+  // rebuild commands on every dashboard re-render — only when one of
+  // the inputs the palette actually reads has changed.
+  const commandHost = useMemo<CommandHostBag>(() => ({
+    isEditMode,
+    isFullscreen,
+    isDarkMode,
+    pages,
+    activePageId,
+    setEditMode: setIsEditMode,
+    addWidget,
+    onAddPage,
+    onRenamePage,
+    onDeletePage,
+    onSetActivePage,
+    onSetDefaultPage,
+    setFullscreen: setIsFullscreen,
+    setDarkMode: setIsDarkMode,
+    openThemes: () => setThemesModalOpen(true),
+    openBlockLibrary: () => handleOpenSidebar(),
+    openCastSettings: () => {
+      // CastPopover owns its open state internally; the same trick the
+      // user-menu "Cast Settings" button uses works here too.
+      const btn = document.querySelector<HTMLButtonElement>(
+        '[data-testid="button-cast"]',
+      );
+      btn?.click();
+    },
+    openFeedbackIdea: () => navigate('/feedback?category=idea'),
+    openFeedbackBug: () => navigate('/feedback?category=bug'),
+    promptText: (msg, def) => window.prompt(msg, def),
+    confirm: (msg) => window.confirm(msg),
+  }), [
+    isEditMode, isFullscreen, isDarkMode, pages, activePageId,
+    setIsEditMode, addWidget, onAddPage, onRenamePage, onDeletePage,
+    onSetActivePage, onSetDefaultPage, setIsFullscreen,
+    handleOpenSidebar, navigate,
+  ]);
 
   // When the user has 2+ pages, themes selected through the marketplace
   // are persisted to the *active page* via onSetPageTheme/Background so
@@ -1738,6 +1781,22 @@ const MasterControlDashboard = ({
               {isDarkMode ? 'Dark' : 'Light'}
             </button>
 
+            {/* Command Palette trigger — keyboard shortcut is also wired
+                inside <CommandPalette /> so power users can open it from
+                anywhere on the dashboard route. */}
+            <button
+              onClick={() => setCommandPaletteOpen(true)}
+              className="menu-btn h-[3.2rem] px-[1.2rem] bg-slate-700/60 hover:bg-slate-600/70 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-md text-white"
+              data-testid="button-command-palette"
+              title="Open command palette (⌘K)"
+            >
+              <CommandIcon className="w-[1.4rem] h-[1.4rem]" />
+              <span className="hidden lg:inline">Commands</span>
+              <kbd className="hidden xl:inline text-[0.7rem] text-slate-300 border border-slate-500/60 px-[0.4rem] py-[0.05rem] rounded">
+                ⌘K
+              </kbd>
+            </button>
+
             {/* Themes Marketplace — opens the curated + personal themes modal */}
             <button
               onClick={() => setThemesModalOpen(true)}
@@ -2297,6 +2356,16 @@ const MasterControlDashboard = ({
           </div>
         </div>
       )}
+
+      {/* Command Palette — ⌘K / Ctrl+K toggles it from anywhere
+          on the dashboard route; the menu button above is the
+          mouse-discoverable surface. */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onOpen={() => setCommandPaletteOpen(true)}
+        onClose={() => setCommandPaletteOpen(false)}
+        host={commandHost}
+      />
 
       {/* Themes Marketplace modal — controlled by the Themes button in the menu bar */}
       <ThemesModal

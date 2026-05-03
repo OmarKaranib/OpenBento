@@ -34,6 +34,7 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 - **Mobile Companion (Expo):** A self-contained Expo + TypeScript app for read-only mirroring of the signed-in user's default dashboard page on a phone, including remote casting without a laptop.
 - **Custom Widgets (sandboxed iframe SDK):** Third-party or user-authored widgets can be installed at runtime by URL within a sandboxed iframe, communicating via `postMessage` with a Zod-validated protocol.
 - **Themes Marketplace:** A "Themes" button in the top menu opens a modal with Built-in and My Themes tabs. Built-in themes offer curated full-look identities that can be previewed and applied. Users can save their current settings as personal themes.
+- **Command Palette (⌘K):** A Spotlight-style modal opened from a "Commands" header button or the ⌘K / Ctrl+K shortcut. Three sections — Add widget, Pages, and Actions — with fuzzy search, arrow/Enter/Esc keyboard nav, and a recents row capped at 5 entries persisted to `localStorage`. Selecting an "Add widget" command auto-enters Edit Mode. The shortcut is route-scoped to the dashboard and bypassed while typing in inputs/contenteditables.
 
 **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core` for drag-and-drop, `lucide-react` for icons, `localStorage` for persistence, and `qrcode.react` for QR generation.
 
