@@ -364,8 +364,14 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
           const body = await res.json();
           const remote = body?.dashboard;
           if (remote) {
-            const remoteThemes = sanitizeThemes(remote.personalThemes);
-            if (remoteThemes.length > 0) {
+            // Cross-device deletion propagation: if the field is PRESENT
+            // (even as an empty array), trust the remote as source of
+            // truth so a user who cleared their themes on device A sees
+            // them disappear on device B. We previously gated this on
+            // `length > 0`, which left stale local themes intact and
+            // caused them to be re-uploaded on the next debounce.
+            if (Array.isArray(remote.personalThemes)) {
+              const remoteThemes = sanitizeThemes(remote.personalThemes);
               setPersonalThemes(remoteThemes);
               persistPersonal(remoteThemes);
             }
