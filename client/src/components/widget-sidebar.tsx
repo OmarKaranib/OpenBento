@@ -6,6 +6,7 @@
     AlertCircle, CloudSun, BookOpen, QrCode, TrendingUp,
     Hourglass, Github, Rss,
     Flame, Grid3x3, Megaphone, Activity, ImageIcon,
+    CloudRain, Droplet, Smile, Users,
   } from 'lucide-react';
 
   const failedLogoCache = new Set<string>();
@@ -178,7 +179,7 @@
     widgetType: WidgetType;
     w: number;
     h: number;
-    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'habit_tracker' | 'quick_launch' | 'big_text_marquee' | 'network_light' | 'photo_loop' | 'default';
+    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'habit_tracker' | 'quick_launch' | 'big_text_marquee' | 'network_light' | 'photo_loop' | 'focus_soundscape' | 'water_tracker' | 'mood_checkin' | 'standup_roller' | 'default';
     color: string;
   }
 
@@ -202,6 +203,10 @@
     { id: 'template-big-text-marquee', name: 'Big Text', widgetType: 'big_text_marquee', w: 4, h: 2, icon: 'big_text_marquee', color: 'pink' },
     { id: 'template-network-light', name: 'Network Light', widgetType: 'network_light', w: 2, h: 2, icon: 'network_light', color: 'lime' },
     { id: 'template-photo-loop', name: 'Photo Loop', widgetType: 'photo_loop', w: 3, h: 3, icon: 'photo_loop', color: 'purple' },
+    { id: 'template-focus-soundscape', name: 'Soundscape', widgetType: 'focus_soundscape', w: 2, h: 3, icon: 'focus_soundscape', color: 'cyan' },
+    { id: 'template-water-tracker',    name: 'Water',      widgetType: 'water_tracker',    w: 2, h: 2, icon: 'water_tracker',    color: 'sky' },
+    { id: 'template-mood-checkin',     name: 'Mood',       widgetType: 'mood_checkin',     w: 3, h: 2, icon: 'mood_checkin',     color: 'violet' },
+    { id: 'template-standup-roller',   name: 'Standup',    widgetType: 'standup_roller',   w: 3, h: 3, icon: 'standup_roller',   color: 'emerald' },
   ];
 
   function loadPersonalLibrary(): SavedChannel[] {
@@ -886,6 +891,78 @@
           w: 3, h: 3,
           icon: 'photo_loop' as const,
           color: 'purple',
+        },
+      },
+      {
+        id: 'focus_soundscape',
+        label: 'Soundscape',
+        description: 'Procedural ambient loops — rain, cafe, fire, forest, waves',
+        icon: <CloudRain className="w-[2rem] h-[2rem] text-cyan-400" />,
+        iconBg: 'bg-cyan-500/15',
+        border: 'border-cyan-500/30 hover:border-cyan-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-cyan-400 bg-cyan-500/15 border-cyan-500/40',
+        template: {
+          id: 'template-focus-soundscape',
+          name: 'Soundscape',
+          widgetType: 'focus_soundscape' as WidgetType,
+          w: 2, h: 3,
+          icon: 'focus_soundscape' as const,
+          color: 'cyan',
+        },
+      },
+      {
+        id: 'water_tracker',
+        label: 'Water Tracker',
+        description: 'Tap +/- cups against a daily target with streak',
+        icon: <Droplet className="w-[2rem] h-[2rem] text-sky-400" />,
+        iconBg: 'bg-sky-500/15',
+        border: 'border-sky-500/30 hover:border-sky-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-sky-400 bg-sky-500/15 border-sky-500/40',
+        template: {
+          id: 'template-water-tracker',
+          name: 'Water',
+          widgetType: 'water_tracker' as WidgetType,
+          w: 2, h: 2,
+          icon: 'water_tracker' as const,
+          color: 'sky',
+        },
+      },
+      {
+        id: 'mood_checkin',
+        label: 'Mood Check-in',
+        description: 'Daily emoji mood with a 30-day heatmap',
+        icon: <Smile className="w-[2rem] h-[2rem] text-violet-400" />,
+        iconBg: 'bg-violet-500/15',
+        border: 'border-violet-500/30 hover:border-violet-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-violet-400 bg-violet-500/15 border-violet-500/40',
+        template: {
+          id: 'template-mood-checkin',
+          name: 'Mood',
+          widgetType: 'mood_checkin' as WidgetType,
+          w: 3, h: 2,
+          icon: 'mood_checkin' as const,
+          color: 'violet',
+        },
+      },
+      {
+        id: 'standup_roller',
+        label: 'Standup Roller',
+        description: 'Roster + Roll button to shuffle the speaking order',
+        icon: <Users className="w-[2rem] h-[2rem] text-emerald-400" />,
+        iconBg: 'bg-emerald-500/15',
+        border: 'border-emerald-500/30 hover:border-emerald-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/40',
+        template: {
+          id: 'template-standup-roller',
+          name: 'Standup',
+          widgetType: 'standup_roller' as WidgetType,
+          w: 3, h: 3,
+          icon: 'standup_roller' as const,
+          color: 'emerald',
         },
       },
     ] as const;

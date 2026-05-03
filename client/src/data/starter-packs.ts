@@ -17,7 +17,11 @@ export type StarterTileType =
   | 'quick_launch'
   | 'big_text_marquee'
   | 'network_light'
-  | 'photo_loop';
+  | 'photo_loop'
+  | 'focus_soundscape'
+  | 'water_tracker'
+  | 'mood_checkin'
+  | 'standup_roller';
 
 export interface StarterTile {
   type: StarterTileType;

@@ -25,6 +25,10 @@ import { PhotoLoopWidget } from './photo-loop-widget';
 import { NoteWidget } from './note-widget';
 import { SpacerWidget } from './spacer-widget';
 import { ImageWidget } from './image-widget';
+import { FocusSoundscapeWidget } from './focus-soundscape-widget';
+import { WaterTrackerWidget } from './water-tracker-widget';
+import { MoodCheckinWidget } from './mood-checkin-widget';
+import { StandupRollerWidget } from './standup-roller-widget';
 
 export interface WidgetRendererArgs {
   widget: Widget;
@@ -97,6 +101,18 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   ),
   spacer: () => <SpacerWidget />,
   image: ({ widget }) => <ImageWidget widget={widget} />,
+  focus_soundscape: ({ widget, onUpdate }) => (
+    <FocusSoundscapeWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
+  water_tracker: ({ widget, onUpdate }) => (
+    <WaterTrackerWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
+  mood_checkin: ({ widget, onUpdate }) => (
+    <MoodCheckinWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
+  standup_roller: ({ widget, onUpdate }) => (
+    <StandupRollerWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
   // Closure-bound on dashboard state (iframe refs / seek mode / inline
   // input). Rendered inline by pages/dashboard.tsx via <VideoWidget />.
   video: () => false,

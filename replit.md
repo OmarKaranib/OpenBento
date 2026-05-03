@@ -18,7 +18,7 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 - **Donation Model:** A single expanding "Buy Me a Coffee" donation block appears for all users on a 10-day cooldown; there are no premium tiers or paywalls.
 
 **Technical Implementations & Feature Specifications:**
-- **Dynamic Widget System:** Supports a wide array of widget types including Video, Note, Spacer, Image, Clock, Crisis Ticker, Markets Ticker, Weather, Dictionary, QR Portal, World Clocks, Countdown, GitHub Pulse, RSS Headlines, Habit Tracker, Quick Launch, Big Text Marquee, Network Light, and Photo Loop.
+- **Dynamic Widget System:** Supports a wide array of widget types including Video, Note, Spacer, Image, Clock, Crisis Ticker, Markets Ticker, Weather, Dictionary, QR Portal, World Clocks, Countdown, GitHub Pulse, RSS Headlines, Habit Tracker, Quick Launch, Big Text Marquee, Network Light, Photo Loop, Focus Soundscape, Water Tracker, Mood Check-in, and Standup Roller.
 - **Layout Management:** Features an "Edit Layout Mode" for drag-to-resize, settings, and deletion, and a "Fullscreen Mode" using the browser's Fullscreen API. Widgets snap to a 12x6 grid with collision prevention.
 - **Widget Sidebar ("Block Library"):** A slide-out sidebar provides tabbed widget templates and preset live stream channels, allowing content swapping within existing widgets.
 - **Persistence:** Widget layouts and content are saved to `localStorage` for guest users.
@@ -39,7 +39,12 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
   - **Saved layouts + scheduled rotations:** signed-in users can save the current dashboard as a named layout (e.g. "Morning", "Evening") and attach a weekly schedule (`day-of-week + HH:MM`). An in-process scheduler ticks every 60s; matching entries push their layout snapshot to the target room and stamp `lastFiredAt`.
   - **TV overlay:** auto-hides 4s after the layout identity changes, shows TV name, current layout name, and "Next: X in Ym". A persistent reconnect banner appears whenever the WebSocket is down.
   - **Onboarding:** the first-run coachmark flow now ends on the Cast button so guests discover the feature immediately.
-- **Theming for Productivity Widgets:** Productivity and personal widgets (Habit Tracker, Quick Launch, Big Text Marquee, Network Light, Photo Loop) dynamically adjust text, accent, border, and surface colors based on the widget's background color to ensure readability.
+- **Theming for Productivity Widgets:** Productivity and personal widgets (Habit Tracker, Quick Launch, Big Text Marquee, Network Light, Photo Loop, Focus Soundscape, Water Tracker, Mood Check-in, Standup Roller) dynamically adjust text, accent, border, and surface colors based on the widget's background color to ensure readability.
+- **Wellness & Focus Pack:**
+  - **Focus Soundscape:** Five procedurally-generated ambient loops (Rain, Cafe, Fire, Forest, Waves) built from white/brown noise + biquad filters in the Web Audio API — no audio assets bundled. Honors the master mute (widget.isMuted) and the per-widget volume slider. Audio only starts on a user-gesture play click; switching presets rebuilds the graph in-place.
+  - **Water Tracker:** Tap +/- cups against a configurable daily target (1–20). Streak counts consecutive days the target was met; today is allowed to be short without immediately killing the streak (resumes from yesterday). Per-day cup totals are persisted with a rolling 90-day trim so the widget blob never grows unbounded; resets at local midnight via a self-rescheduling timer.
+  - **Mood Check-in:** Five-emoji daily picker (Great → Bad) with a 30-day heatmap (5×6 grid, newest bottom-right). Long-press any cell (~550ms pointerdown) to clear that day. Persisted with a rolling 60-day trim.
+  - **Standup Roller:** Manage a roster (max 30 names), hit Roll to shuffle the speaking order using a seeded mulberry32 RNG. The seed is persisted with `standupOrder`/`standupSeed` so the order is stable across reloads and cloud-sync round-trips and trivially testable.
 
 **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core` for drag-and-drop, `lucide-react` for icons, `localStorage` for persistence, and `qrcode.react` for QR generation.
 
@@ -53,7 +58,7 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 A `check` workflow gates the codebase against a clean baseline:
 - `npx tsc --noEmit` — must report **zero** TypeScript errors. Anything new fails the gate.
 - `npx tsx --test tests/server/markets.test.ts tests/client/markets-symbols.test.ts tests/server/cast-schedule.test.ts` — markets ticker server + symbol-resolution unit tests **and** Cast scheduler tests (firing + unpair-stops-pushes).
-- `node --test tests/client/use-cloud-sync.test.mjs` — cross-device dashboard cloud-sync hook unit tests.
+- `node --test tests/client/use-cloud-sync.test.mjs tests/client/wellness-pack.test.mjs` — cross-device dashboard cloud-sync hook unit tests **and** Wellness pack streak/seeded-shuffle tests (Water Tracker streak math + Standup Roller deterministic shuffle).
 
 Run all three locally with the `check` workflow (or copy the command above). A red `check` workflow blocks the task from being marked complete.
 
