@@ -10,7 +10,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Widget, WidgetType, WidgetRenderer } from '@/App';
 import { VideoWidget } from '@/widgets/video-widget';
 import { YouTubePlayer } from '@/components/youtube-player';
-import { SavedChannel, loadPersonalLibrary, savePersonalLibrary } from '@/components/widget-sidebar';
+import { SavedChannel, loadPersonalLibrary, savePersonalLibrary, TRENDING_CHANNELS } from '@/components/widget-sidebar';
 import { useStreamHealing } from '@/hooks/use-stream-healing';
 import { useToast } from '@/hooks/use-toast';
 import { FloatingTutorial } from '@/components/floating-tutorial';
@@ -293,8 +293,27 @@ const MasterControlDashboard = ({
       );
       btn?.click();
     },
+    openDevWidgets: () => navigate('/dev/widgets'),
     openFeedbackIdea: () => navigate('/feedback?category=idea'),
     openFeedbackBug: () => navigate('/feedback?category=bug'),
+    // Surface the user's saved channels (their curated stream presets)
+    // as one-shot Add commands. Falls back to the bundled FALLBACK list
+    // (currently empty) when no saved channels exist, but the structure
+    // is here for when bundled curated streams are added later.
+    streamPresets: [
+      ...loadPersonalLibrary(),
+      ...TRENDING_CHANNELS.map((c): SavedChannel => ({
+        id: c.id,
+        name: c.name,
+        url: c.url,
+        iconType: c.iconType,
+        category: c.category,
+        platform: c.platform,
+        channelId: c.channelId,
+        videoId: c.videoId,
+        savedAt: 0,
+      })),
+    ],
     promptText: (msg, def) => window.prompt(msg, def),
     confirm: (msg) => window.confirm(msg),
   }), [

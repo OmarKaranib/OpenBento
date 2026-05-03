@@ -136,8 +136,10 @@ function makeHost(overrides: Partial<CommandHostBag> = {}): {
     openThemes: spy('openThemes') as unknown as CommandHostBag['openThemes'],
     openBlockLibrary: spy('openBlockLibrary') as unknown as CommandHostBag['openBlockLibrary'],
     openCastSettings: spy('openCastSettings') as unknown as CommandHostBag['openCastSettings'],
+    openDevWidgets: spy('openDevWidgets') as unknown as CommandHostBag['openDevWidgets'],
     openFeedbackIdea: spy('openFeedbackIdea') as unknown as CommandHostBag['openFeedbackIdea'],
     openFeedbackBug: spy('openFeedbackBug') as unknown as CommandHostBag['openFeedbackBug'],
+    streamPresets: [],
     promptText: () => 'NewName',
     confirm: () => true,
     ...overrides,
@@ -164,8 +166,45 @@ test('buildCommands: produces add / pages / actions commands and skips active pa
   assert.ok(cmds.some((c) => c.id === 'action-themes'));
   assert.ok(cmds.some((c) => c.id === 'action-cast'));
   assert.ok(cmds.some((c) => c.id === 'action-block-library'));
+  assert.ok(cmds.some((c) => c.id === 'action-dev-widgets'));
   assert.ok(cmds.some((c) => c.id === 'action-feedback-idea'));
   assert.ok(cmds.some((c) => c.id === 'action-feedback-bug'));
+});
+
+test('buildCommands: action-dev-widgets fires openDevWidgets host callback', () => {
+  const { host, calls } = makeHost();
+  buildCommands(host).find((c) => c.id === 'action-dev-widgets')!.run();
+  assert.ok(calls.openDevWidgets);
+});
+
+test('buildCommands: streamPresets surface as Add commands with the right widget shape', () => {
+  const { host, calls } = makeHost({
+    streamPresets: [
+      {
+        id: 'sky-news',
+        name: 'Sky News',
+        url: 'https://youtube.com/@SkyNews',
+        iconType: 'news',
+        category: 'news',
+        platform: 'youtube',
+        channelId: 'UCoMdktPbSTixAyNGwb-UYkQ',
+        videoId: null,
+        savedAt: 0,
+      },
+    ],
+  });
+  const cmds = buildCommands(host);
+  const sky = cmds.find((c) => c.id === 'add-stream-sky-news');
+  assert.ok(sky, 'expected an add-stream- command for the saved channel');
+  assert.equal(sky!.section, 'add');
+  sky!.run();
+  assert.deepEqual(calls.setEditMode, [true]);
+  const args = calls.addWidget as unknown[];
+  assert.equal(args[0], 'video');
+  const extra = args[3] as Record<string, unknown>;
+  assert.equal(extra.url, 'https://youtube.com/@SkyNews');
+  assert.equal(extra.isYouTube, true);
+  assert.equal(extra.channelName, 'Sky News');
 });
 
 test('buildCommands: single page hides delete command', () => {
@@ -234,21 +273,33 @@ test('buildCommands: page-delete is gated on confirm()', () => {
 
 // ─── filterAndGroup ───────────────────────────────────────────────────────
 
-test('filterAndGroup: empty query returns recents + grouped sections', () => {
+test('filterAndGroup: empty query returns sections ordered add/pages/actions', () => {
   const { host } = makeHost();
   const cmds = buildCommands(host);
-  const out = filterAndGroup(cmds, '', ['add-clock', 'page-new']);
-  assert.equal(out.recents.length, 2);
-  assert.equal(out.recents[0].id, 'add-clock');
+  const out = filterAndGroup(cmds, '', []);
   const sections = out.groups.map((g) => g.section);
   assert.deepEqual(sections, ['add', 'pages', 'actions']);
+});
+
+test('filterAndGroup: recents float to top of their own section (not a separate group)', () => {
+  const { host } = makeHost();
+  const cmds = buildCommands(host);
+  // 'add-clock' is in the add section, 'page-new' is in pages.
+  const out = filterAndGroup(cmds, '', ['add-clock', 'page-new']);
+  // No top-level "recent" section — recents are interleaved.
+  const addGroup = out.groups.find((g) => g.section === 'add')!;
+  const pagesGroup = out.groups.find((g) => g.section === 'pages')!;
+  assert.equal(addGroup.items[0].id, 'add-clock', 'recent add command bubbles to top of Add');
+  assert.equal(pagesGroup.items[0].id, 'page-new', 'recent page command bubbles to top of Pages');
 });
 
 test('filterAndGroup: empty query ignores recent ids that no longer exist', () => {
   const { host } = makeHost();
   const cmds = buildCommands(host);
+  // 'nope' shouldn't crash or appear; 'add-clock' should still float to top.
   const out = filterAndGroup(cmds, '', ['nope', 'add-clock']);
-  assert.deepEqual(out.recents.map((c) => c.id), ['add-clock']);
+  const addGroup = out.groups.find((g) => g.section === 'add')!;
+  assert.equal(addGroup.items[0].id, 'add-clock');
 });
 
 test('filterAndGroup: non-empty query ranks "pomod" so Pomodoro is on top', () => {

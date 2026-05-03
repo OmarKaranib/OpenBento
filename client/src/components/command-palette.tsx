@@ -9,7 +9,7 @@
 // navigation (arrows / Enter / Esc), and recents persistence.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, Plus, Layers, Zap, Clock } from 'lucide-react';
+import { Search, Plus, Layers, Zap } from 'lucide-react';
 import {
   buildCommands,
   filterAndGroup,
@@ -45,19 +45,23 @@ export function CommandPalette({ isOpen, onOpen, onClose, host }: CommandPalette
   // Build commands fresh on each open so page list / toggle labels stay current.
   const commands = useMemo(() => buildCommands(host), [host]);
 
-  const { recents: recentCmds, groups } = useMemo(
+  const { groups } = useMemo(
     () => filterAndGroup(commands, query, recents),
     [commands, query, recents],
   );
 
-  // Flat list used for keyboard navigation. Order matches what's rendered:
-  // recents (when empty query) followed by each group in order.
+  // Flat list used for keyboard navigation. Order matches what's
+  // rendered: each group in order. Recents are floated to the top of
+  // their own section by filterAndGroup, so we don't render a separate
+  // "Recent" section.
   const flat: Command[] = useMemo(() => {
     const out: Command[] = [];
-    for (const c of recentCmds) out.push(c);
     for (const g of groups) for (const c of g.items) out.push(c);
     return out;
-  }, [recentCmds, groups]);
+  }, [groups]);
+
+  // Recent ids set so each row can render a subtle "recent" hint pip.
+  const recentSet = useMemo(() => new Set(recents), [recents]);
 
   // Reset when re-opened
   useEffect(() => {
@@ -207,18 +211,6 @@ export function CommandPalette({ isOpen, onOpen, onClose, host }: CommandPalette
             </div>
           ) : (
             <>
-              {recentCmds.length > 0 && (
-                <Section
-                  title="Recent"
-                  Icon={Clock}
-                  items={recentCmds}
-                  activeIdx={activeIdx}
-                  indexOf={indexOf}
-                  onPick={runCommand}
-                  onHover={setActiveIdx}
-                  testIdPrefix="recent"
-                />
-              )}
               {groups.map((g) => (
                 <Section
                   key={g.section}
@@ -230,6 +222,7 @@ export function CommandPalette({ isOpen, onOpen, onClose, host }: CommandPalette
                   onPick={runCommand}
                   onHover={setActiveIdx}
                   testIdPrefix={g.section}
+                  recentSet={recentSet}
                 />
               ))}
             </>
@@ -257,9 +250,10 @@ interface SectionProps {
   onPick: (cmd: Command) => void;
   onHover: (idx: number) => void;
   testIdPrefix: string;
+  recentSet: Set<string>;
 }
 
-function Section({ title, Icon, items, activeIdx, indexOf, onPick, onHover, testIdPrefix }: SectionProps) {
+function Section({ title, Icon, items, activeIdx, indexOf, onPick, onHover, testIdPrefix, recentSet }: SectionProps) {
   return (
     <div className="mb-[0.4rem]" data-testid={`section-${testIdPrefix}`}>
       <div className="flex items-center gap-[0.5rem] px-[1.2rem] py-[0.4rem] text-[0.7rem] font-bold text-slate-500 uppercase tracking-wider">
@@ -285,7 +279,16 @@ function Section({ title, Icon, items, activeIdx, indexOf, onPick, onHover, test
             }`}
             data-testid={`command-${cmd.id}`}
           >
-            <span className="flex-1 truncate">{cmd.label}</span>
+            <span className="flex-1 truncate flex items-center gap-[0.5rem]">
+              {recentSet.has(cmd.id) && (
+                <span
+                  className="inline-block w-[0.5rem] h-[0.5rem] rounded-full bg-cyan-400/80 flex-shrink-0"
+                  title="Recently used"
+                  aria-label="Recently used"
+                />
+              )}
+              <span className="truncate">{cmd.label}</span>
+            </span>
             {cmd.hint && (
               <span className="flex-shrink-0 text-[0.75rem] text-slate-500">{cmd.hint}</span>
             )}

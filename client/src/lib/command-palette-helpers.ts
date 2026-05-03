@@ -8,7 +8,7 @@
 
 import type { Widget, WidgetType } from '@/widgets/shared';
 import type { DashboardPage } from '@shared/dashboard-pages';
-import { WIDGET_TEMPLATES } from '@/components/widget-sidebar';
+import { WIDGET_TEMPLATES, type SavedChannel } from '@/components/widget-sidebar';
 import { SAMPLE_CUSTOM_WIDGETS } from '@shared/widget-sdk-protocol';
 
 export type CommandSection = 'add' | 'pages' | 'actions';
@@ -132,6 +132,10 @@ export interface CommandHostBag {
     h?: number,
     extraData?: Partial<Widget>,
   ) => string | null;
+  // Curated live-stream presets — the user's saved/personal channels
+  // surface as Add commands so they can drop a known good stream onto
+  // the dashboard with a single keystroke.
+  streamPresets: SavedChannel[];
   // Pages
   onAddPage: (name?: string) => void;
   onRenamePage: (id: string, name: string) => void;
@@ -144,6 +148,7 @@ export interface CommandHostBag {
   openThemes: () => void;
   openBlockLibrary: () => void;
   openCastSettings: () => void;
+  openDevWidgets: () => void;
   openFeedbackIdea: () => void;
   openFeedbackBug: () => void;
   // UI prompts (keep dialog logic out of helpers — host supplies them)
@@ -193,6 +198,38 @@ export function buildCommands(host: CommandHostBag): Command[] {
     keywords: ['custom', 'widget', 'sdk', 'iframe', 'url'],
     run: () => host.openBlockLibrary(),
   });
+
+  // Curated live-stream presets (saved channels). Each becomes a single
+  // command that drops a video widget pointed at the channel URL — the
+  // same flow as clicking the channel in the Block Library Streams tab.
+  for (const ch of host.streamPresets) {
+    out.push({
+      id: `add-stream-${ch.id}`,
+      section: 'add',
+      label: `Add ${ch.name} stream`,
+      hint: ch.platform === 'youtube' ? 'YouTube' : ch.platform === 'twitch' ? 'Twitch' : 'Kick',
+      keywords: [ch.name, 'stream', 'video', ch.platform, ch.category, 'live', 'channel'],
+      run: () => {
+        host.setEditMode(true);
+        // Mirror dashboard-shell.addVideoWidget shape so the resulting
+        // widget renders identically to a Block-Library click.
+        host.addWidget('video', 3, 2, {
+          url: ch.url,
+          isYouTube: ch.platform === 'youtube',
+          videoId: ch.videoId ?? null,
+          youtubeChannelId: ch.channelId ?? null,
+          channelName: ch.name,
+          channelHandle: ch.channelId ?? null,
+          isTwitch: ch.platform === 'twitch',
+          twitchChannel: ch.platform === 'twitch' ? (ch.channelId ?? ch.name) : null,
+          isKick: ch.platform === 'kick',
+          kickChannel: ch.platform === 'kick' ? (ch.channelId ?? ch.name) : null,
+          isLive: ch.platform === 'twitch' || ch.platform === 'kick',
+          lastRefresh: Date.now(),
+        } as Partial<Widget>);
+      },
+    });
+  }
 
   // ── Pages ────────────────────────────────────────────────────────────
   for (const p of host.pages) {
@@ -294,6 +331,14 @@ export function buildCommands(host: CommandHostBag): Command[] {
     run: () => host.openBlockLibrary(),
   });
   out.push({
+    id: 'action-dev-widgets',
+    section: 'actions',
+    label: 'Open /dev/widgets',
+    hint: 'Developer',
+    keywords: ['dev', 'widgets', 'developer', 'sdk', 'docs', 'sandbox'],
+    run: () => host.openDevWidgets(),
+  });
+  out.push({
     id: 'action-feedback-idea',
     section: 'actions',
     label: 'Submit feedback (idea)',
@@ -312,14 +357,15 @@ export function buildCommands(host: CommandHostBag): Command[] {
 }
 
 // ─── Filter + group ──────────────────────────────────────────────────────
-// Returns commands grouped by section, ordered:
-//   - When query is empty: recents pinned at top, then natural section order.
-//   - When query is non-empty: ranked by fuzzyScore desc.
-// Recents are returned as a separate "recents" slice the caller can render
-// above the sectioned list when query is empty.
+// Returns commands grouped by section. Per the spec, recently-used
+// commands "float to the top of their section" — they're not extracted
+// into a separate Recent group.
+//   - When query is empty: each section is sorted [recents-in-recent-order,
+//     then the rest in natural order].
+//   - When query is non-empty: each section is sorted by fuzzyScore desc.
+//     Recency is *not* used here — the user is searching, so relevance wins.
 
 export interface FilteredCommands {
-  recents: Command[];
   groups: { section: CommandSection; items: Command[] }[];
 }
 
@@ -331,16 +377,22 @@ export function filterAndGroup(
   recentIds: string[],
 ): FilteredCommands {
   const trimmed = query.trim();
+
   if (!trimmed) {
-    const byId = new Map(commands.map((c) => [c.id, c]));
-    const recents = recentIds
-      .map((id) => byId.get(id))
-      .filter((c): c is Command => !!c);
-    const groups = SECTION_ORDER.map((section) => ({
-      section,
-      items: commands.filter((c) => c.section === section),
-    })).filter((g) => g.items.length > 0);
-    return { recents, groups };
+    // Map id → recency rank (lower = more recent). Unknown ids = +Infinity.
+    const recentRank = new Map<string, number>();
+    recentIds.forEach((id, i) => recentRank.set(id, i));
+    const groups = SECTION_ORDER.map((section) => {
+      const items = commands.filter((c) => c.section === section);
+      // Stable partition: recents (preserving recents order) then the rest
+      // in natural insertion order.
+      const recent = items
+        .filter((c) => recentRank.has(c.id))
+        .sort((a, b) => (recentRank.get(a.id)! - recentRank.get(b.id)!));
+      const rest = items.filter((c) => !recentRank.has(c.id));
+      return { section, items: [...recent, ...rest] };
+    }).filter((g) => g.items.length > 0);
+    return { groups };
   }
 
   const scored: { cmd: Command; score: number }[] = [];
@@ -353,7 +405,7 @@ export function filterAndGroup(
     section,
     items: scored.filter((s) => s.cmd.section === section).map((s) => s.cmd),
   })).filter((g) => g.items.length > 0);
-  return { recents: [], groups };
+  return { groups };
 }
 
 export const SECTION_LABELS: Record<CommandSection, string> = {
