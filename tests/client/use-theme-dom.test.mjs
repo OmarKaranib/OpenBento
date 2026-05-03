@@ -129,6 +129,44 @@ test('writeThemeToDom: solid theme sets slot tint var, font, and themed class', 
 
   // (d) Dark/light mode is bridged via the injected setter.
   assert.equal(darkArg, !paper.lightMode);
+
+  // (e) Accent tokens are written to :root so the scoped rules in
+  //     index.css (body.ob-theme-active .dashboard-slot, :focus-visible,
+  //     hover ring, anchor color) actually pick up the curated colour.
+  //     This is the integration assertion guarding against regressions
+  //     where the variables exist on the Theme object but never reach
+  //     the live DOM. paper-light's accent is "#1f2937".
+  assert.equal(
+    document.documentElement.style.getPropertyValue('--ob-accent'),
+    paper.accent,
+    '--ob-accent must reach :root so themed surfaces re-tint',
+  );
+  assert.match(
+    document.documentElement.style.getPropertyValue('--ob-accent-soft'),
+    /^rgba\(\d+, \d+, \d+, 0?\.\d+\)$/,
+    '--ob-accent-soft must be a valid rgba() string for slot borders',
+  );
+});
+
+test('writeThemeToDom: switching themes updates --ob-accent in place (visible accent change)', async () => {
+  // Belt-and-braces check that the accent token is not "set once and
+  // forgotten" — applying a second theme must overwrite the value, which
+  // is what makes apply/preview visibly re-tint the dashboard accent.
+  const { writeThemeToDom } = await import('../../client/src/dashboard/use-theme.ts');
+  const { BUILT_IN_THEMES_BY_ID } = await import('../../shared/themes.ts');
+  const a = BUILT_IN_THEMES_BY_ID['paper-light'];     // accent #1f2937
+  const b = BUILT_IN_THEMES_BY_ID['midnight-ocean'];  // accent #22d3ee
+
+  writeThemeToDom(a, () => {});
+  assert.equal(document.documentElement.style.getPropertyValue('--ob-accent'), a.accent);
+
+  writeThemeToDom(b, () => {});
+  assert.equal(
+    document.documentElement.style.getPropertyValue('--ob-accent'),
+    b.accent,
+    'a second writeThemeToDom must overwrite --ob-accent (no caching)',
+  );
+  assert.notEqual(a.accent, b.accent, 'sanity: the two test themes must differ');
 });
 
 test('writeThemeToDom: gradient theme writes raw gradient to backgroundImage', async () => {
