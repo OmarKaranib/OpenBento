@@ -52,7 +52,7 @@ export const TriviaWidget: React.FC<Props> = ({ widget, onUpdate }) => {
           category: j.category, difficulty: j.difficulty,
         },
         triviaAnsweredIdx: null,
-        triviaCooldownUntil: 0,
+        triviaCooldownUntil: Date.now() + COOLDOWN_MS,
       });
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -93,7 +93,7 @@ export const TriviaWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   const fs = Math.max(11, Math.min(14, size.w * 0.034));
 
   const cooldownLeftSec = Math.ceil(cooldownRemaining / 1000);
-  const canRefetch = !loading && (answeredIdx == null || cooldownRemaining === 0);
+  const canRefetch = !loading && cooldownRemaining === 0;
 
   return (
     <div
@@ -254,9 +254,7 @@ export const TriviaWidget: React.FC<Props> = ({ widget, onUpdate }) => {
                   }}
                   data-testid={`trivia-next-${widget.id}`}
                 >
-                  {cooldownRemaining > 0 && answeredIdx != null
-                    ? `Next ${cooldownLeftSec}s`
-                    : 'Next →'}
+                  {cooldownRemaining > 0 ? `Next ${cooldownLeftSec}s` : 'Next →'}
                 </button>
               </div>
             </>
