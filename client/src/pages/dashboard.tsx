@@ -2082,6 +2082,21 @@ const MasterControlDashboard = ({
             >
               Privacy
             </Link>
+            <span className="text-slate-600">·</span>
+            <button
+              type="button"
+              onClick={() => {
+                const btn = document.querySelector<HTMLButtonElement>(
+                  '[data-testid="button-cast"]',
+                );
+                btn?.click();
+                btn?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+              }}
+              className="hover:text-cyan-300 transition-colors"
+              data-testid="link-dashboard-cast"
+            >
+              Cast OpenBento to a TV
+            </button>
           </div>
         </div>
       )}
