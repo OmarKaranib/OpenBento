@@ -1870,6 +1870,23 @@ const MasterControlDashboard = ({
               </div>
             </div>
 
+            {/* Always-visible icon-only "Add page" button. The full
+                "New page" entry also lives in the user-avatar
+                dropdown when logged in; this small button keeps the
+                action reachable for anonymous users (whose only
+                top-bar auth chrome is the Login button). */}
+            {!isAuthenticated && (
+              <button
+                onClick={() => onAddPage()}
+                className="menu-btn h-[3.2rem] w-[3.2rem] bg-emerald-600/70 hover:bg-emerald-500/80 slot-button font-semibold flex items-center justify-center transition-all duration-300 transform hover:scale-105 shadow-md text-white"
+                data-testid="button-add-page-anonymous"
+                title="Add a new dashboard page"
+                aria-label="Add a new dashboard page"
+              >
+                <Plus className="w-[1.4rem] h-[1.4rem]" />
+              </button>
+            )}
+
             {/* Login Button - Consistent height with other menu buttons - shown when NOT logged in */}
             {!isAuthenticated && (
               <button
@@ -1928,6 +1945,14 @@ const MasterControlDashboard = ({
                     Cast Settings
                   </button>
                   <button
+                    onClick={() => onAddPage()}
+                    className="w-full flex items-center gap-[0.8rem] px-[1.2rem] py-[1rem] text-[1.2rem] text-emerald-300 hover:bg-slate-700 transition-colors"
+                    data-testid="link-user-menu-add-page"
+                  >
+                    <Plus className="w-[1.4rem] h-[1.4rem]" />
+                    Add page
+                  </button>
+                  <button
                     onClick={onLogout}
                     className="w-full flex items-center gap-[0.8rem] px-[1.2rem] py-[1rem] text-[1.2rem] text-red-400 hover:bg-slate-700 transition-colors rounded-b-lg"
                     data-testid="button-logout"
@@ -1944,8 +1969,12 @@ const MasterControlDashboard = ({
         <div className="h-[0.2rem] bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full mt-[0.8rem]"></div>
 
         {/* Multi-Page Dashboards — scrollable tab strip. The component
-            hides itself (renders only the "+" button) until a 2nd page
-            exists, so existing single-page users see no visual change. */}
+            renders nothing at all in the single-page state (no
+            container, no "+" button) so the dashboard reclaims the
+            row of vertical space; the "Add page" action lives in the
+            top-bar menu (avatar dropdown + always-visible "+" for
+            anonymous users) instead. The strip reappears with its
+            inline icon-only "+" once a 2nd page exists. */}
         <PageTabsStrip
           pages={pages}
           activePageId={activePageId}

@@ -1,7 +1,9 @@
 // Multi-Page Dashboards — scrollable tab strip rendered between the
-// menu bar and the dashboard canvas. Hidden when there's only one
-// page (the "+" button alone is rendered so users can create a 2nd
-// page from any starting state).
+// menu bar and the dashboard canvas. The strip renders nothing at
+// all when only a single page exists; the "Add page" action lives
+// in the top-bar app menu in that case so the dashboard reclaims
+// the row of vertical space. Once 2+ pages exist, the strip
+// reappears with its inline icon-only "+" affordance.
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Star, Copy, Trash2, Check, X, Pencil } from 'lucide-react';
 import type { DashboardPage } from '@shared/dashboard-pages';
@@ -34,8 +36,9 @@ export function PageTabsStrip({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Hide the strip entirely until a 2nd page is created — but always
-  // keep a "+" affordance so users can grow into the feature.
+  // Render nothing at all until a 2nd page is created — the
+  // "Add page" action lives in the top-bar app menu in the
+  // single-page state so the dashboard canvas can use the row.
   const showStrip = pages.length >= 2;
 
   useEffect(() => {
@@ -44,6 +47,8 @@ export function PageTabsStrip({
       renameInputRef.current.select();
     }
   }, [renameId]);
+
+  if (!showStrip) return null;
 
   function startRename(p: DashboardPage) {
     setRenameId(p.id);
@@ -57,15 +62,13 @@ export function PageTabsStrip({
   return (
     <div
       className={`flex items-center gap-[0.4rem] px-[1rem] py-[0.5rem] overflow-x-auto scrollbar-thin ${
-        showStrip
-          ? isDarkMode
-            ? 'bg-slate-900/40 border-b border-slate-700/60'
-            : 'bg-white/40 border-b border-slate-300/60'
-          : ''
+        isDarkMode
+          ? 'bg-slate-900/40 border-b border-slate-700/60'
+          : 'bg-white/40 border-b border-slate-300/60'
       }`}
       data-testid="page-tabs-strip"
     >
-      {showStrip && pages.map((p) => {
+      {pages.map((p) => {
         const active = p.id === activePageId;
         const isRenaming = renameId === p.id;
         const isConfirmingDelete = confirmDeleteId === p.id;
@@ -188,7 +191,6 @@ export function PageTabsStrip({
         title="Add page"
       >
         <Plus className="w-[1rem] h-[1rem]" />
-        {showStrip ? '' : 'New page'}
       </button>
     </div>
   );
