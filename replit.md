@@ -49,6 +49,7 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 - `GET /api/trivia?difficulty=...`: Open Trivia DB proxy.
 - `GET /api/iss`: Server-proxied ISS position.
 - `GET /api/iss/pass?lat=&lon=`: Next-overhead-pass estimator for ISS.
+- `GET /api/wordle/today`: Returns `{ date, answer }` for the current UTC day, deterministically seeded from the shared `@shared/wordle-pool` module so server and client offline-fallback never diverge.
 - Cast to TV API endpoints for pairing, pushing snapshots, renaming, fetching, and unpairing cast rooms, and a WebSocket for real-time communication.
 
 ## External Dependencies
