@@ -8,7 +8,7 @@
     Flame, Grid3x3, Megaphone, Activity, ImageIcon,
     CloudRain, Droplet, Smile, Users,
     Sparkles, Sun, Globe2, Satellite,
-    CalendarDays, Quote as QuoteIcon, Puzzle, Brain,
+    CalendarDays, Quote as QuoteIcon, Puzzle, HelpCircle,
   } from 'lucide-react';
 
   const failedLogoCache = new Set<string>();
@@ -1105,7 +1105,7 @@
         id: 'trivia',
         label: 'Trivia',
         description: 'Multiple-choice trivia with running score',
-        icon: <Brain className="w-[2rem] h-[2rem] text-purple-400" />,
+        icon: <HelpCircle className="w-[2rem] h-[2rem] text-purple-400" />,
         iconBg: 'bg-purple-500/15',
         border: 'border-purple-500/30 hover:border-purple-400/60',
         cardBg: 'bg-slate-800/60',

@@ -25,6 +25,17 @@ export const QuoteWidget: React.FC<Props> = ({ widget, onUpdate }) => {
       const q = pickFallbackQuote(Date.now());
       onUpdate?.(widget.id, { quoteCurrent: q });
     }
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/quote');
+        if (!r.ok) return;
+        const j = await r.json() as { text?: string; author?: string };
+        if (cancelled || typeof j.text !== 'string' || j.text.trim().length === 0) return;
+        onUpdate?.(widget.id, { quoteCurrent: { text: j.text, author: typeof j.author === 'string' ? j.author : 'Unknown' } });
+      } catch { /* offline → keep fallback */ }
+    })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

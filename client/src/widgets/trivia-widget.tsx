@@ -1,6 +1,6 @@
 // Trivia — single MC question from /api/trivia, reveal + score + cooldown.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Brain, RefreshCw, Settings as SettingsIcon, X as XIcon } from 'lucide-react';
+import { HelpCircle, RefreshCw, Settings as SettingsIcon, X as XIcon } from 'lucide-react';
 import { MONO, Widget, isLightBg, qrIconBtnStyle, qrLabelStyle } from './shared';
 
 interface Props { widget: Widget; onUpdate?: (id: string, patch: Partial<Widget>) => void; }
@@ -114,7 +114,7 @@ export const TriviaWidget: React.FC<Props> = ({ widget, onUpdate }) => {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-        <Brain size={14} color={accent} />
+        <HelpCircle size={14} color={accent} />
         <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em' }}>
           TRIVIA
         </span>
