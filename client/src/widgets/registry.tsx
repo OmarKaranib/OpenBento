@@ -38,6 +38,7 @@ import { QuoteWidget } from './quote-widget';
 import { WordleWidget } from './wordle-widget';
 import { TriviaWidget } from './trivia-widget';
 import { AirQualityWidget } from './air-quality-widget';
+import { SketchPadWidget } from './sketch-pad-widget';
 
 export interface WidgetRendererArgs {
   widget: Widget;
@@ -148,6 +149,9 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   ),
   air_quality: ({ widget, onUpdate }) => (
     <AirQualityWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
+  sketch_pad: ({ widget, onUpdate }) => (
+    <SketchPadWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
   ),
   // Closure-bound on dashboard state (iframe refs / seek mode / inline
   // input). Rendered inline by pages/dashboard.tsx via <VideoWidget />.

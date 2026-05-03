@@ -37,7 +37,8 @@ export type WidgetType =
   | 'quote'
   | 'wordle'
   | 'trivia'
-  | 'air_quality';
+  | 'air_quality'
+  | 'sketch_pad';
 
 // ─── Widget Interface ─────────────────────────────────────────────────────────
 export interface Widget {
@@ -280,6 +281,21 @@ export interface Widget {
     } | null;
     cityLabel?: string;
   };
+  // ─── Sketch Pad ───────────────────────────────────────────────────
+  // Persisted drawing payload (PNG data URL plus its native pixel
+  // dimensions so we can correctly rescale on resize). format=v1
+  // means "raw PNG"; future versions can introduce stroke lists.
+  sketchPad?: {
+    format: 'v1';
+    dataUrl: string;
+    w: number;
+    h: number;
+  } | null;
+  // Last-used toolbar prefs — persisted so a fresh stroke after a
+  // page reload picks up where the user left off.
+  sketchColor?: string;
+  sketchSize?: 'S' | 'M' | 'L';
+  sketchEraser?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

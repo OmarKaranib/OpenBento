@@ -18,7 +18,7 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 - **Donation Model:** A single expanding "Buy Me a Coffee" donation block appears for all users on a 10-day cooldown.
 
 **Technical Implementations & Feature Specifications:**
-- **Dynamic Widget System:** Supports a wide array of widget types including Video, Note, Spacer, Image, Clock, Crisis Ticker, Markets Ticker, Weather, Dictionary, QR Portal, World Clocks, Countdown, GitHub Pulse, RSS Headlines, Habit Tracker, Quick Launch, Big Text Marquee, Network Light, Photo Loop, Focus Soundscape, Water Tracker, Mood Check-in, and Standup Roller.
+- **Dynamic Widget System:** Supports a wide array of widget types including Video, Note, Spacer, Image, Clock, Crisis Ticker, Markets Ticker, Weather, Dictionary, QR Portal, World Clocks, Countdown, GitHub Pulse, RSS Headlines, Habit Tracker, Quick Launch, Big Text Marquee, Network Light, Photo Loop, Focus Soundscape, Water Tracker, Mood Check-in, Standup Roller, and Sketch Pad.
 - **Layout Management:** Features an "Edit Layout Mode" for drag-to-resize, settings, and deletion, and a "Fullscreen Mode". Widgets snap to a 12x6 grid with collision prevention.
 - **Widget Sidebar ("Block Library"):** A slide-out sidebar provides tabbed widget templates and preset live stream channels.
 - **Persistence:** Widget layouts and content are saved to `localStorage` for guest users.
@@ -37,6 +37,7 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 - **Cast to TV Feature:** Allows casting the dashboard to browser-equipped TVs. Supports guest pairing and persistent "BENTO-XXXX" rooms for signed-in users, enabling multi-TV control and scheduled layout rotations.
 - **Theming for Productivity Widgets:** Productivity and personal widgets dynamically adjust colors for readability.
 - **Wellness & Focus Pack:** Includes Focus Soundscape (ambient loops), Water Tracker, Mood Check-in, and Standup Roller (randomized speaking order).
+- **Sketch Pad Widget:** Freehand drawing canvas with HTML5 pointer events (mouse/touch/stylus). Uses midpoint-quadratic-Bezier smoothing for fluid strokes, decimates redundant move events for performance, and renders at device-pixel resolution (×DPR, capped at 3) for crisp lines. Floating auto-hide toolbar (3 s) offers a colour palette + custom picker, S/M/L brush sizes, eraser, 20-step undo, clear, and PNG download. Drawings persist as a debounced PNG data URL on the widget (500 ms after last pointer-up) and are rescaled with a "contain" fit when the widget is resized so strokes are never cropped or distorted.
 - **Air Quality Widget:** Surfaces US AQI (EPA 6-band scale), dominant pollutant, a short EPA-aligned health blurb, and optional pollen levels for the user's location via Open-Meteo (no API key). Reuses the shared geolocation cache populated by Weather/Sun & Sky, exposes a settings popover (gear icon) with city search and pollen toggle, auto-refreshes every 30 min and on tab focus, and persists the last payload to `localStorage` so reloads/offline starts render a "stale"-badged value before the next fetch lands.
 
 **Tech Stack:** React with TypeScript, Tailwind CSS, `@dnd-kit/core` for drag-and-drop, `lucide-react` for icons, `localStorage` for persistence, and `qrcode.react` for QR generation.

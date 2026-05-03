@@ -9,7 +9,7 @@
     CloudRain, Droplet, Smile, Users,
     Sparkles, Sun, Globe2, Satellite,
     CalendarDays, Quote as QuoteIcon, Puzzle, HelpCircle,
-    Wind,
+    Wind, Brush,
   } from 'lucide-react';
 
   const failedLogoCache = new Set<string>();
@@ -182,7 +182,7 @@
     widgetType: WidgetType;
     w: number;
     h: number;
-    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'habit_tracker' | 'quick_launch' | 'big_text_marquee' | 'network_light' | 'photo_loop' | 'focus_soundscape' | 'water_tracker' | 'mood_checkin' | 'standup_roller' | 'lava_lamp' | 'sun_sky' | 'earth_night' | 'iss_tracker' | 'on_this_day' | 'quote' | 'wordle' | 'trivia' | 'air_quality' | 'default';
+    icon: 'video' | 'note' | 'spacer' | 'image' | 'clock' | 'crisis_ticker' | 'weather' | 'dictionary' | 'qr_generator' | 'markets_ticker' | 'world_clocks' | 'countdown' | 'github_pulse' | 'rss_headlines' | 'habit_tracker' | 'quick_launch' | 'big_text_marquee' | 'network_light' | 'photo_loop' | 'focus_soundscape' | 'water_tracker' | 'mood_checkin' | 'standup_roller' | 'lava_lamp' | 'sun_sky' | 'earth_night' | 'iss_tracker' | 'on_this_day' | 'quote' | 'wordle' | 'trivia' | 'air_quality' | 'sketch_pad' | 'default';
     color: string;
   }
 
@@ -219,6 +219,7 @@
     { id: 'template-wordle',           name: 'Wordle',     widgetType: 'wordle',           w: 3, h: 3, icon: 'wordle',           color: 'teal'    },
     { id: 'template-trivia',           name: 'Trivia',     widgetType: 'trivia',           w: 3, h: 3, icon: 'trivia',           color: 'purple'  },
     { id: 'template-air-quality',      name: 'Air Quality', widgetType: 'air_quality',     w: 2, h: 3, icon: 'air_quality',      color: 'emerald' },
+    { id: 'template-sketch-pad',       name: 'Sketch Pad', widgetType: 'sketch_pad',       w: 4, h: 3, icon: 'sketch_pad',       color: 'pink'    },
   ];
 
   function loadPersonalLibrary(): SavedChannel[] {
@@ -1137,6 +1138,24 @@
           w: 3, h: 3,
           icon: 'trivia' as const,
           color: 'purple',
+        },
+      },
+      {
+        id: 'sketch_pad',
+        label: 'Sketch Pad',
+        description: 'Freehand drawing canvas with brushes, eraser, undo & PNG export',
+        icon: <Brush className="w-[2rem] h-[2rem] text-pink-400" />,
+        iconBg: 'bg-pink-500/15',
+        border: 'border-pink-500/30 hover:border-pink-400/60',
+        cardBg: 'bg-slate-800/60',
+        badgeColor: 'text-pink-400 bg-pink-500/15 border-pink-500/40',
+        template: {
+          id: 'template-sketch-pad',
+          name: 'Sketch Pad',
+          widgetType: 'sketch_pad' as WidgetType,
+          w: 4, h: 3,
+          icon: 'sketch_pad' as const,
+          color: 'pink',
         },
       },
     ] as const;
