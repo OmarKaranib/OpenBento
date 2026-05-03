@@ -126,7 +126,7 @@ export const QuoteWidget: React.FC<Props> = ({ widget, onUpdate }) => {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
         <QuoteIcon size={14} color={accent} />
         <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em' }}>
-          QUOTE
+          QUOTE OF THE HOUR
         </span>
         {favs.length > 0 && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: clrMuted, fontFamily: MONO, fontSize: 9 }}>

@@ -116,7 +116,7 @@ export const TriviaWidget: React.FC<Props> = ({ widget, onUpdate }) => {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
         <HelpCircle size={14} color={accent} />
         <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em' }}>
-          TRIVIA
+          TRIVIA · HOURLY
         </span>
         <span style={{ color: clrMuted, fontFamily: MONO, fontSize: 9 }} data-testid={`trivia-score-${widget.id}`}>
           {score.correct}/{score.total}
