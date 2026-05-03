@@ -1,4 +1,10 @@
-// Unit tests for the use-cloud-sync hook (client/src/dashboard/use-cloud-sync.ts).
+// Unit tests for the use-cloud-sync hook
+// (client/src/dashboard/use-cloud-sync.ts).
+//
+// Runnable directly with `node --test tests/client/use-cloud-sync.test.mjs`
+// — no `tsx` CLI required. We register tsx as a Node module loader at the
+// top of this file so the dynamic import of the .ts hook source resolves
+// inside the same `node --test` process.
 //
 // We exercise the hook outside of a real React renderer by installing a
 // hand-rolled dispatcher onto React's internal hook slot. That lets us
@@ -6,92 +12,100 @@
 // assert on the network calls it makes.
 //
 // Coverage:
-//   1. Happy-path hydrate: cloud row returned → setWidgets called with
+//   1. Happy-path hydrate: cloud row returned -> setWidgets called with
 //      remote.widgets, no upload follows because the cached payload now
 //      matches local state.
 //   2. Empty-remote-skip: server returns {dashboard: null} (the "no row
-//      yet" shape) → setWidgets is NOT called and no POST is made.
-//   3. Unauthenticated: no userId → no fetch at all, hook is inert.
+//      yet" shape) -> setWidgets is NOT called and no POST is made.
+//   3. Unauthenticated: no userId -> no fetch at all, hook is inert.
+import { pathToFileURL } from 'node:url';
+import { register } from 'tsx/esm/api';
+
+// Register the tsx ESM loader so the subsequent dynamic import of the
+// hook's .ts source can be resolved without a separate CLI wrapper.
+// `tsx`'s own `register()` wraps node:module.register correctly for
+// Node 20 (which forbids the bare `--loader` flag).
+register({ parentURL: pathToFileURL('./').href });
+
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
 
-import { useCloudSync } from '../../client/src/dashboard/use-cloud-sync';
+const { useCloudSync } = await import(
+  '../../client/src/dashboard/use-cloud-sync.ts'
+);
 
-// ── Minimal React-hook dispatcher ───────────────────────────────────────────
+// --- Minimal React-hook dispatcher ----------------------------------------
 // React 18 looks up hook implementations on
 // __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher.current.
 // Swap it for our own and the hook can run outside a real renderer.
-const Internals = (React as any)
-  .__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+const Internals =
+  React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
 
-interface EffectSlot {
-  fn: () => void | (() => void);
-  deps?: ReadonlyArray<unknown>;
-  cleanup?: void | (() => void);
-}
-
-function runHookOnce<T>(hook: () => T): {
-  result: T;
-  runEffects: () => Promise<void>;
-  cleanup: () => void;
-} {
-  const states: unknown[] = [];
-  const refs: { current: unknown }[] = [];
-  const effects: EffectSlot[] = [];
+function runHookOnce(hook) {
+  const states = [];
+  const refs = [];
+  const effects = [];
   let sIdx = 0;
   let rIdx = 0;
-  let eIdx = 0;
 
   const dispatcher = {
-    useState: <S>(init: S | (() => S)) => {
+    useState(init) {
       const i = sIdx++;
       if (i >= states.length) {
-        states.push(typeof init === 'function' ? (init as () => S)() : init);
+        states.push(typeof init === 'function' ? init() : init);
       }
-      const setter = (next: S | ((prev: S) => S)) => {
-        states[i] =
-          typeof next === 'function'
-            ? (next as (prev: S) => S)(states[i] as S)
-            : next;
+      const setter = (next) => {
+        states[i] = typeof next === 'function' ? next(states[i]) : next;
       };
-      return [states[i] as S, setter] as const;
+      return [states[i], setter];
     },
-    useRef: <T>(init: T) => {
+    useRef(init) {
       const i = rIdx++;
       if (i >= refs.length) refs.push({ current: init });
       return refs[i];
     },
-    useCallback: <F extends Function>(fn: F) => fn,
-    useMemo: <V>(fn: () => V) => fn(),
-    useEffect: (fn: () => void | (() => void), deps?: ReadonlyArray<unknown>) => {
+    useCallback(fn) {
+      return fn;
+    },
+    useMemo(fn) {
+      return fn();
+    },
+    useEffect(fn, deps) {
       effects.push({ fn, deps });
     },
-    useLayoutEffect: (
-      fn: () => void | (() => void),
-      deps?: ReadonlyArray<unknown>,
-    ) => {
+    useLayoutEffect(fn, deps) {
       effects.push({ fn, deps });
     },
-    useContext: () => undefined,
-    useReducer: <S>(_reducer: unknown, init: S) => [init, () => {}] as const,
-    useImperativeHandle: () => {},
-    useDebugValue: () => {},
-    useTransition: () => [false, (cb: () => void) => cb()] as const,
-    useDeferredValue: <V>(v: V) => v,
-    useId: () => ':r:test:',
-    useSyncExternalStore: <V>(_sub: unknown, getSnap: () => V) => getSnap(),
-    useInsertionEffect: () => {},
+    useContext() {
+      return undefined;
+    },
+    useReducer(_reducer, init) {
+      return [init, () => {}];
+    },
+    useImperativeHandle() {},
+    useDebugValue() {},
+    useTransition() {
+      return [false, (cb) => cb()];
+    },
+    useDeferredValue(v) {
+      return v;
+    },
+    useId() {
+      return ':r:test:';
+    },
+    useSyncExternalStore(_sub, getSnap) {
+      return getSnap();
+    },
+    useInsertionEffect() {},
   };
 
   const prev = Internals.ReactCurrentDispatcher.current;
   Internals.ReactCurrentDispatcher.current = dispatcher;
-  let result: T;
   try {
     sIdx = 0;
     rIdx = 0;
-    eIdx = 0;
-    result = hook();
+    hook();
   } finally {
     Internals.ReactCurrentDispatcher.current = prev;
   }
@@ -100,7 +114,7 @@ function runHookOnce<T>(hook: () => T): {
     for (const e of effects) {
       const r = e.fn();
       if (typeof r === 'function') e.cleanup = r;
-      // Yield so any async work inside the effect can settle.
+      // Yield so async work inside the effect can settle.
       await new Promise((res) => setTimeout(res, 0));
     }
   };
@@ -109,16 +123,15 @@ function runHookOnce<T>(hook: () => T): {
       if (typeof e.cleanup === 'function') e.cleanup();
     }
   };
-  return { result, runEffects, cleanup };
+  return { runEffects, cleanup };
 }
 
-// ── Fake fetch ──────────────────────────────────────────────────────────────
-type FetchCall = { url: string; init?: RequestInit };
-function makeFetch(plan: Array<(call: FetchCall) => Response | Promise<Response>>) {
-  const calls: FetchCall[] = [];
+// --- Fake fetch -----------------------------------------------------------
+function makeFetch(plan) {
+  const calls = [];
   let i = 0;
-  const fn = async (url: string, init?: RequestInit): Promise<Response> => {
-    const call: FetchCall = { url, init };
+  const fn = async (url, init) => {
+    const call = { url, init };
     calls.push(call);
     const handler = plan[Math.min(i, plan.length - 1)];
     i++;
@@ -127,23 +140,23 @@ function makeFetch(plan: Array<(call: FetchCall) => Response | Promise<Response>
   return { fn, calls };
 }
 
-const json = (status: number, body: unknown): Response =>
+const json = (status, body) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
 
-function fakeSupabase(token: string | null) {
+function fakeSupabase(token) {
   return {
     auth: {
       getSession: async () => ({
         data: { session: token ? { access_token: token } : null },
       }),
     },
-  } as any;
+  };
 }
 
-// ── Tests ──────────────────────────────────────────────────────────────────
+// --- Tests ----------------------------------------------------------------
 test('Scenario 1: happy-path hydrate populates widgets from cloud row', async () => {
   const cloudWidgets = [
     { id: 'w1', type: 'clock', x: 0, y: 0, w: 3, h: 2 },
@@ -152,13 +165,13 @@ test('Scenario 1: happy-path hydrate populates widgets from cloud row', async ()
   const { fn: fetchFn, calls } = makeFetch([
     () => json(200, { dashboard: { widgets: cloudWidgets } }),
   ]);
-  (globalThis as any).fetch = fetchFn;
+  globalThis.fetch = fetchFn;
 
-  let received: unknown = null;
-  const setWidgets = (next: any) => {
+  let received = null;
+  const setWidgets = (next) => {
     received = next;
   };
-  const widgets: any[] = [];
+  const widgets = [];
   const widgetsRef = { current: widgets };
 
   const harness = runHookOnce(() =>
@@ -172,33 +185,32 @@ test('Scenario 1: happy-path hydrate populates widgets from cloud row', async ()
     }),
   );
   await harness.runEffects();
-  // Wait for the chained async work inside the hydration effect.
   await new Promise((r) => setTimeout(r, 50));
   harness.cleanup();
 
   assert.ok(calls.length >= 1, 'hydrate GET fires');
   assert.match(calls[0].url, /\/api\/dashboard/);
-  assert.equal(calls[0].init?.method ?? 'GET', 'GET');
+  assert.equal((calls[0].init && calls[0].init.method) || 'GET', 'GET');
   assert.deepEqual(received, cloudWidgets, 'setWidgets receives the cloud row');
-  // No POST should have happened — the hook hasn't seen a widget change yet.
-  const posts = calls.filter((c) => (c.init?.method ?? 'GET') === 'POST');
+  const posts = calls.filter(
+    (c) => ((c.init && c.init.method) || 'GET') === 'POST',
+  );
   assert.equal(posts.length, 0, 'no upload immediately after hydrate');
 });
 
 test('Scenario 2: empty-remote-skip leaves local state untouched', async () => {
   const { fn: fetchFn, calls } = makeFetch([
-    // Server says "this user has no cloud dashboard yet" by returning
-    // a row with no .dashboard key. The hook must treat this as a
-    // no-op and NOT clobber local widgets.
+    // Server says "no cloud dashboard yet" by returning .dashboard = null.
+    // The hook must treat this as a no-op and NOT clobber local widgets.
     () => json(200, { dashboard: null }),
   ]);
-  (globalThis as any).fetch = fetchFn;
+  globalThis.fetch = fetchFn;
 
   let setCalled = false;
   const setWidgets = () => {
     setCalled = true;
   };
-  const widgets: any[] = [
+  const widgets = [
     { id: 'local-1', type: 'clock', x: 0, y: 0, w: 3, h: 2 },
   ];
   const widgetsRef = { current: widgets };
@@ -219,19 +231,21 @@ test('Scenario 2: empty-remote-skip leaves local state untouched', async () => {
 
   assert.ok(calls.length >= 1, 'hydrate GET still fires');
   assert.equal(setCalled, false, 'setWidgets must NOT be called when remote is empty');
-  const posts = calls.filter((c) => (c.init?.method ?? 'GET') === 'POST');
+  const posts = calls.filter(
+    (c) => ((c.init && c.init.method) || 'GET') === 'POST',
+  );
   assert.equal(posts.length, 0, 'no immediate POST upload on empty-remote-skip');
 });
 
 test('Scenario 3: hook is inert for unauthenticated users', async () => {
   const { fn: fetchFn, calls } = makeFetch([]);
-  (globalThis as any).fetch = fetchFn;
+  globalThis.fetch = fetchFn;
 
   let setCalled = false;
   const setWidgets = () => {
     setCalled = true;
   };
-  const widgets: any[] = [];
+  const widgets = [];
   const widgetsRef = { current: widgets };
 
   const harness = runHookOnce(() =>
