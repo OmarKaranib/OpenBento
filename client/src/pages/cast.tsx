@@ -393,10 +393,12 @@ export default function CastPage() {
             if (prev && typeof next.pushedAt === "number" && next.pushedAt <= prev.pushedAt) {
               return prev;
             }
-            // Show overlay for 4s when the layout identity changes (or first
-            // snapshot ever). Any other content-only push leaves it hidden.
-            const sig = `${next.layoutId ?? ""}|${next.layoutName ?? ""}`;
-            if (sig !== lastLayoutSigRef.current) {
+            // Show overlay for 4s on the first snapshot ever, on any layout
+            // identity change, AND on any new manual push (no layout meta) so
+            // the headline overlay is always visible briefly when the screen
+            // changes.
+            const sig = `${next.layoutId ?? ""}|${next.layoutName ?? ""}|${next.pushedAt ?? ""}`;
+            if (!prev || sig !== lastLayoutSigRef.current) {
               lastLayoutSigRef.current = sig;
               setOverlayUntil(Date.now() + 4000);
             }
