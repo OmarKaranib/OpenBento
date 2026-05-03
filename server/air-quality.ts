@@ -16,6 +16,35 @@ export const AIR_QUALITY_STALE_MS  = 6  * 60 * 60_000;  // 6 h
 export const AIR_QUALITY_TIMEOUT_MS = 7_000;
 
 const OPEN_METEO_BASE = 'https://air-quality-api.open-meteo.com/v1/air-quality';
+const OPEN_METEO_GEOCODE = 'https://geocoding-api.open-meteo.com/v1/search';
+
+export interface GeocodeResult { lat: number; lon: number; label: string; }
+
+/**
+ * Tiny city-name → coords helper using Open-Meteo's free geocoder.
+ * Used by the route handler when the caller passes `?city=` instead
+ * of explicit coordinates. Returns `null` when nothing matches.
+ */
+export async function geocodeCity(name: string, fetchImpl: typeof fetch = globalThis.fetch as typeof fetch, timeoutMs = AIR_QUALITY_TIMEOUT_MS): Promise<GeocodeResult | null> {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  const url = `${OPEN_METEO_GEOCODE}?name=${encodeURIComponent(trimmed)}&count=1&language=en&format=json`;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetchImpl(url, { signal: ctrl.signal });
+    if (!r.ok) return null;
+    const j = await r.json() as { results?: Array<{ name?: string; country?: string; latitude?: number; longitude?: number }> };
+    const hit = j.results?.[0];
+    if (!hit || typeof hit.latitude !== 'number' || typeof hit.longitude !== 'number') return null;
+    const label = [hit.name, hit.country].filter(Boolean).join(', ') || trimmed;
+    return { lat: hit.latitude, lon: hit.longitude, label };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
 
 const CURRENT_FIELDS = [
   'us_aqi',

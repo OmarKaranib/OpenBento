@@ -5,7 +5,7 @@
 // persisted payload with a "stale" badge when upstream is unreachable.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Wind, Leaf, Search, RefreshCw, Flower2 } from 'lucide-react';
+import { Wind, Settings as SettingsIcon, RefreshCw, Flower2, X } from 'lucide-react';
 import { MONO, Widget, isLightBg } from './shared';
 import { getLastResolvedLocation, subscribeLocation, setLastResolvedLocation } from './weather-location';
 import {
@@ -23,22 +23,9 @@ interface Props { widget: Widget; onUpdate?: (id: string, patch: Partial<Widget>
 
 interface ResolvedLoc { lat: number; lon: number; label: string; }
 
-// Map a city name → lat/lon by piggy-backing on the existing /api/weather
-// route (which already does OpenWeather geocoding). We don't need the
-// weather payload itself, only the resolved coords.
-async function geocodeCity(city: string): Promise<ResolvedLoc | null> {
-  try {
-    const r = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
-    if (!r.ok) return null;
-    const j = await r.json() as { city?: string; lat?: number | null; lon?: number | null };
-    if (typeof j.lat !== 'number' || typeof j.lon !== 'number') return null;
-    return { lat: j.lat, lon: j.lon, label: j.city ?? city };
-  } catch { return null; }
-}
-
 export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 280, h: 220 });
   const [loc, setLoc] = useState<ResolvedLoc | null>(() => {
     if (typeof widget.airQualityLat === 'number' && typeof widget.airQualityLon === 'number') {
@@ -58,9 +45,8 @@ export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   const [stale, setStale] = useState<boolean>(() => widget.airQualityCurrent != null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [hover, setHover] = useState(false);
-  const [searchVal, setSearchVal] = useState('');
-  const [searchFocused, setSearchFocused] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [searchVal, setSearchVal] = useState(widget.airQualityCity ?? '');
 
   // Resize observer for responsive typography.
   useEffect(() => {
@@ -78,7 +64,6 @@ export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     const unsub = subscribeLocation((next) => {
       setLoc({ lat: next.lat, lon: next.lon, label: next.label });
     });
-    // Also try browser geolocation if no sibling has set it yet.
     if (!getLastResolvedLocation() && typeof navigator !== 'undefined' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -86,15 +71,24 @@ export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
           setLastResolvedLocation(next);
           setLoc(next);
         },
-        () => {
-          // Last resort — geocode London so the widget always shows something.
-          void geocodeCity('London').then(l => { if (l) setLoc(l); });
-        },
+        () => { /* will be resolved when user enters a city via the settings popover */ },
         { timeout: 5000, maximumAge: 600_000 },
       );
     }
     return unsub;
   }, [loc]);
+
+  // Close the settings popover when clicking outside it.
+  useEffect(() => {
+    if (!showSettings) return;
+    const onDoc = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setShowSettings(false);
+      }
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [showSettings]);
 
   const persist = useCallback((payload: AirQualityPayload, label: string) => {
     onUpdate?.(widget.id, {
@@ -123,7 +117,6 @@ export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
       return true;
     } catch (e) {
       if ((e as { name?: string })?.name === 'AbortError') return false;
-      // Keep last good payload visible with a stale badge.
       if (hasDataRef.current) setStale(true);
       setErr(e instanceof Error ? e.message : String(e));
       return false;
@@ -162,24 +155,38 @@ export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     };
   }, [loc?.lat, loc?.lon]);
 
-  const onSearch = async () => {
+  const onCommitCity = async () => {
     const trimmed = searchVal.trim();
     if (!trimmed) return;
     setLoading(true);
-    const resolved = await geocodeCity(trimmed);
-    if (resolved) {
-      setLoc(resolved);
+    setErr(null);
+    try {
+      const r = await fetch(`/api/air-quality?city=${encodeURIComponent(trimmed)}${widget.airQualityShowPollen !== false ? '&pollen=1' : ''}`);
+      if (r.status === 404) { setErr('City not found'); setTimeout(() => setErr(null), 2500); return; }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const payload = await r.json() as AirQualityPayload & { cityLabel?: string };
+      const label = payload.cityLabel ?? trimmed;
+      const next: ResolvedLoc = { lat: payload.lat, lon: payload.lon, label };
+      setLoc(next);
+      setData(payload);
+      setStale(payload.stale === true);
+      persist(payload, label);
       onUpdate?.(widget.id, {
-        airQualityCity: resolved.label,
-        airQualityLat:  resolved.lat,
-        airQualityLon:  resolved.lon,
+        airQualityCity: label,
+        airQualityLat:  payload.lat,
+        airQualityLon:  payload.lon,
       });
-      setSearchVal('');
-    } else {
-      setErr('City not found');
-      setTimeout(() => setErr(null), 2500);
+      setShowSettings(false);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const togglePollen = () => {
+    const next = !(widget.airQualityShowPollen !== false);
+    onUpdate?.(widget.id, { airQualityShowPollen: next });
   };
 
   // ── Theming
@@ -190,11 +197,13 @@ export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   const clrMuted   = light ? '#64748b' : '#94a3b8';
   const clrBorder  = light ? 'rgba(0,0,0,0.10)' : 'rgba(71,85,105,0.4)';
   const inputBg    = light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)';
+  const popoverBg  = light ? '#ffffff' : '#1e293b';
 
   const cat = aqiCategory(data?.aqi ?? null);
   const aqiText = data?.aqi != null ? Math.round(data.aqi).toString() : '—';
   const dominant = data?.dominant ?? null;
   const cityLabel = loc?.label ?? widget.airQualityCurrent?.cityLabel ?? '—';
+  const pollenOn = widget.airQualityShowPollen !== false;
 
   // Responsive scale.
   const s = Math.min(size.w, size.h);
@@ -202,14 +211,13 @@ export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   const labelFont = Math.max(10, Math.min(s * 0.06, 14));
   const cityFont  = Math.max(10, Math.min(s * 0.06, 13));
   const chipFont  = Math.max(9,  Math.min(s * 0.05, 11));
-  const showPollen = widget.airQualityShowPollen !== false && data?.pollen != null && size.h >= 220;
-  const showSearch = hover || searchFocused;
+  const adviceFont = Math.max(9, Math.min(s * 0.045, 11));
+  const showPollen = pollenOn && data?.pollen != null && size.h >= 220;
+  const showAdvice = data?.aqi != null && size.h >= 200;
 
   return (
     <div
       ref={containerRef}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
       style={{
         width: '100%', height: '100%', background: bgColor,
         borderRadius: 'var(--outer-radius)',
@@ -252,37 +260,28 @@ export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
         >
           <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
         </button>
+        <button
+          onClick={() => setShowSettings((v) => !v)}
+          title="Settings"
+          style={{
+            background: showSettings ? inputBg : 'transparent', border: 'none', cursor: 'pointer',
+            color: clrMuted, padding: 2, borderRadius: 4,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          data-testid={`air-quality-settings-${widget.id}`}
+        >
+          <SettingsIcon size={12} />
+        </button>
       </div>
 
-      {/* City line + (hover) search */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, minHeight: 18 }}>
-        {!showSearch ? (
-          <span
-            style={{ flex: 1, color: clrSubtle, fontFamily: MONO, fontSize: cityFont, letterSpacing: '0.06em', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-            data-testid={`air-quality-city-${widget.id}`}
-          >
-            {cityLabel}
-          </span>
-        ) : (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4, background: inputBg, border: `1px solid ${clrBorder}`, borderRadius: 6, padding: '2px 6px' }}>
-            <Search size={11} color={clrMuted} />
-            <input
-              ref={searchRef}
-              type="text"
-              value={searchVal}
-              onChange={(e) => setSearchVal(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void onSearch(); } }}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              placeholder="Search city…"
-              style={{
-                flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
-                color: clrPrimary, fontFamily: MONO, fontSize: cityFont, fontWeight: 600,
-              }}
-              data-testid={`air-quality-search-${widget.id}`}
-            />
-          </div>
-        )}
+      {/* City line */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, minHeight: 16 }}>
+        <span
+          style={{ flex: 1, color: clrSubtle, fontFamily: MONO, fontSize: cityFont, letterSpacing: '0.06em', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          data-testid={`air-quality-city-${widget.id}`}
+        >
+          {cityLabel}
+        </span>
       </div>
 
       {/* Big AQI block */}
@@ -320,6 +319,20 @@ export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
           </div>
         )}
       </div>
+
+      {/* Health advice blurb — short, themed by AQI band */}
+      {showAdvice && (
+        <div
+          style={{
+            flexShrink: 0, color: clrSubtle, fontFamily: MONO,
+            fontSize: adviceFont, lineHeight: 1.35, textAlign: 'center',
+            padding: '0 4px',
+          }}
+          data-testid={`air-quality-advice-${widget.id}`}
+        >
+          {cat.advice}
+        </div>
+      )}
 
       {/* Pollutant strip */}
       {data?.pollutants && size.h >= 170 && (
@@ -383,22 +396,97 @@ export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
         </div>
       )}
 
-      {/* Pollen toggle (hover-only) */}
-      {hover && (
-        <button
-          onClick={() => onUpdate?.(widget.id, { airQualityShowPollen: !(widget.airQualityShowPollen !== false) })}
+      {/* Settings popover */}
+      {showSettings && (
+        <div
+          ref={popoverRef}
           style={{
-            position: 'absolute', bottom: 6, right: 6,
-            background: inputBg, border: `1px solid ${clrBorder}`,
-            color: clrMuted, fontFamily: MONO, fontSize: 9, fontWeight: 700,
-            padding: '2px 6px', borderRadius: 4, cursor: 'pointer',
-            display: 'inline-flex', alignItems: 'center', gap: 3, letterSpacing: '0.04em',
+            position: 'absolute', top: 36, right: 8,
+            zIndex: 10, minWidth: 220, maxWidth: 'calc(100% - 16px)',
+            background: popoverBg, border: `1px solid ${clrBorder}`,
+            borderRadius: 8, padding: 10,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+            display: 'flex', flexDirection: 'column', gap: 8,
           }}
-          title={widget.airQualityShowPollen !== false ? 'Hide pollen' : 'Show pollen'}
-          data-testid={`air-quality-toggle-pollen-${widget.id}`}
+          data-testid={`air-quality-settings-popover-${widget.id}`}
         >
-          <Leaf size={9} /> {widget.airQualityShowPollen !== false ? 'POLLEN ON' : 'POLLEN OFF'}
-        </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ flex: 1, color: clrPrimary, fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Settings
+            </span>
+            <button
+              onClick={() => setShowSettings(false)}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: clrMuted, padding: 2, display: 'inline-flex' }}
+              title="Close"
+              data-testid={`air-quality-settings-close-${widget.id}`}
+            >
+              <X size={12} />
+            </button>
+          </div>
+
+          <label style={{ color: clrSubtle, fontFamily: MONO, fontSize: 10, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            City
+          </label>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <input
+              type="text"
+              value={searchVal}
+              onChange={(e) => setSearchVal(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void onCommitCity(); } }}
+              placeholder="e.g. London"
+              style={{
+                flex: 1, minWidth: 0, background: inputBg,
+                border: `1px solid ${clrBorder}`, borderRadius: 6, padding: '4px 8px',
+                color: clrPrimary, fontFamily: MONO, fontSize: 12, outline: 'none',
+              }}
+              data-testid={`air-quality-search-${widget.id}`}
+            />
+            <button
+              onClick={() => void onCommitCity()}
+              disabled={loading || !searchVal.trim()}
+              style={{
+                background: cat.color, color: cat.fg, border: 'none',
+                borderRadius: 6, padding: '4px 10px', cursor: loading || !searchVal.trim() ? 'default' : 'pointer',
+                fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+                opacity: loading || !searchVal.trim() ? 0.5 : 1,
+              }}
+              data-testid={`air-quality-search-submit-${widget.id}`}
+            >
+              SET
+            </button>
+          </div>
+
+          <button
+            onClick={togglePollen}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: inputBg, border: `1px solid ${clrBorder}`,
+              borderRadius: 6, padding: '6px 8px', cursor: 'pointer',
+              color: clrPrimary, fontFamily: MONO, fontSize: 11, fontWeight: 600,
+            }}
+            data-testid={`air-quality-toggle-pollen-${widget.id}`}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Flower2 size={11} color={pollenOn ? '#22c55e' : clrMuted} />
+              Pollen
+            </span>
+            <span style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: '0.06em',
+              padding: '1px 6px', borderRadius: 999,
+              color: pollenOn ? '#052e16' : clrMuted,
+              background: pollenOn ? '#22c55e' : 'transparent',
+              border: `1px solid ${pollenOn ? '#22c55e' : clrBorder}`,
+            }}>
+              {pollenOn ? 'ON' : 'OFF'}
+            </span>
+          </button>
+
+          {err && (
+            <div style={{ color: '#f59e0b', fontFamily: MONO, fontSize: 10, textAlign: 'center' }}>
+              {err}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

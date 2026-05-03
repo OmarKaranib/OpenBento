@@ -13,6 +13,7 @@ import {
   createAirQualityService,
   AIR_QUALITY_TTL_MS,
   AIR_QUALITY_STALE_MS,
+  geocodeCity,
 } from '../../server/air-quality';
 import { aqiCategory, dominantPollutant, pollenLevel, maxPollenLevel } from '../../shared/air-quality';
 
@@ -290,6 +291,26 @@ test('HTTP /api/air-quality: 400 on missing/invalid coords', async () => {
   } finally {
     await close();
   }
+});
+
+test('geocodeCity: maps a city name to {lat, lon, label} via Open-Meteo', async () => {
+  const calls: string[] = [];
+  const fakeFetch = async (input: any) => {
+    calls.push(typeof input === 'string' ? input : String(input));
+    return {
+      ok: true, status: 200,
+      json: async () => ({ results: [{ name: 'London', country: 'United Kingdom', latitude: 51.51, longitude: -0.13 }] }),
+    };
+  };
+  const hit = await geocodeCity('london', fakeFetch as any);
+  assert.deepEqual(hit, { lat: 51.51, lon: -0.13, label: 'London, United Kingdom' });
+  assert.match(calls[0], /name=london/);
+});
+
+test('geocodeCity: returns null for empty / no-match queries', async () => {
+  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ({ results: [] }) });
+  assert.equal(await geocodeCity('   ', fakeFetch as any), null);
+  assert.equal(await geocodeCity('asdfghjkl', fakeFetch as any), null);
 });
 
 test('HTTP /api/air-quality: 200 with payload on success', async () => {

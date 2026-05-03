@@ -11,7 +11,7 @@ import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema, in
 import { pickDailyWordleAnswer, wordleUtcDateKey } from "@shared/wordle-pool";
 import { getUncachableResendClient } from "./services/resend-client";
 import { createMarketsService, parseSymbols as parseMarketsSymbols } from "./markets";
-import { createAirQualityService } from "./air-quality";
+import { createAirQualityService, geocodeCity as geocodeAirQualityCity } from "./air-quality";
 import { LruTtlCache } from "./services/lruCache";
 import { attachSupabaseUser as attachSupabaseUserShared } from "./services/supabaseAuth";
 
@@ -1746,15 +1746,27 @@ export async function registerRoutes(
   // elsewhere and the widget hides the row).
   const airQualityService = createAirQualityService();
   app.get('/api/air-quality', async (req: Request, res: Response) => {
-    const lat = Number(req.query.lat);
-    const lon = Number(req.query.lon);
     const pollen = req.query.pollen === '1' || req.query.pollen === 'true';
+    let lat = Number(req.query.lat);
+    let lon = Number(req.query.lon);
+    let resolvedLabel: string | undefined;
+
+    // Optional city resolution — when the caller supplies ?city= without
+    // coords (or alongside them), we geocode via Open-Meteo's free API.
+    // Coords still win when both are present and valid.
+    const cityRaw = typeof req.query.city === 'string' ? req.query.city : '';
+    if (cityRaw && (!Number.isFinite(lat) || !Number.isFinite(lon))) {
+      const hit = await geocodeAirQualityCity(cityRaw);
+      if (!hit) return res.status(404).json({ error: 'City not found' });
+      lat = hit.lat; lon = hit.lon; resolvedLabel = hit.label;
+    }
+
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
-      return res.status(400).json({ error: 'lat/lon required and must be valid coordinates' });
+      return res.status(400).json({ error: 'lat/lon (or ?city=) required and must be valid coordinates' });
     }
     try {
       const payload = await airQualityService.getAirQuality({ lat, lon, includePollen: pollen });
-      res.json(payload);
+      res.json(resolvedLabel ? { ...payload, cityLabel: resolvedLabel } : payload);
     } catch (err) {
       console.error('[AirQuality] Fetch error:', err);
       res.status(503).json({ error: 'Service temporarily unavailable' });
