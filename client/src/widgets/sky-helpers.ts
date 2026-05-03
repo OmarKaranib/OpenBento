@@ -161,6 +161,32 @@ export function computeMoonPhase(now: Date): MoonPhase {
   };
 }
 
+// ─── Sun-arc render geometry ─────────────────────────────────────────────
+// Maps an arcFraction (0=sunrise, 1=sunset) to (x, y) on a half-ellipse
+// drawn from the bottom-left to the bottom-right of an `arcW × arcH` box,
+// inset by `dotR` so the sun glyph never clips. The mapping must satisfy:
+//   t=0   → (cx − rx, cy)        (sunrise on the LEFT edge)
+//   t=½   → (cx,      cy − ry)   (noon at the TOP)
+//   t=1   → (cx + rx, cy)        (sunset on the RIGHT edge)
+// Pure & deterministic so the widget UI math is unit-testable.
+export function sunArcPosition(
+  t: number,
+  arcW: number,
+  arcH: number,
+  dotR: number,
+): { x: number; y: number } {
+  const clamped = Math.max(0, Math.min(1, Number.isFinite(t) ? t : 0));
+  const cx = arcW / 2;
+  const cy = arcH;
+  const rx = arcW / 2 - dotR;
+  const ry = arcH - dotR;
+  const angle = Math.PI * clamped;
+  return {
+    x: cx - rx * Math.cos(angle),
+    y: cy - ry * Math.sin(angle),
+  };
+}
+
 // ─── Great-circle distance (km) for ISS overhead estimate ────────────────
 export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;

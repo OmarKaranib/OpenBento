@@ -9,6 +9,7 @@ import {
   computeMoonPhase,
   computeSunTimes,
   haversineKm,
+  sunArcPosition,
 } from '../../client/src/widgets/sky-helpers';
 
 // ─── Sunrise / sunset ───────────────────────────────────────────────────
@@ -105,4 +106,39 @@ test('haversineKm: London → New York is ~5570 km', () => {
 
 test('haversineKm: identical points return 0', () => {
   assert.equal(haversineKm(0, 0, 0, 0), 0);
+});
+
+// ─── Sun-arc render geometry ────────────────────────────────────────────
+// Regression test for the sunrise-left/sunset-right invariant. A previous
+// version of the widget mirrored the X axis, putting sunrise on the right
+// and sunset on the left. The arc geometry helper now lives in
+// sky-helpers.ts and is covered here.
+test('sunArcPosition: t=0 is on the LEFT (sunrise side), t=1 is on the RIGHT (sunset side)', () => {
+  const arcW = 200;
+  const arcH = 100;
+  const dotR = 8;
+  const sunrise = sunArcPosition(0, arcW, arcH, dotR);
+  const noon = sunArcPosition(0.5, arcW, arcH, dotR);
+  const sunset = sunArcPosition(1, arcW, arcH, dotR);
+  // Sunrise is on the left edge (cx − rx), sunset on the right (cx + rx).
+  assert.ok(sunrise.x < noon.x, `sunrise (${sunrise.x}) should be left of noon (${noon.x})`);
+  assert.ok(noon.x < sunset.x, `noon (${noon.x}) should be left of sunset (${sunset.x})`);
+  const EPS = 1e-9;
+  assert.ok(Math.abs(sunrise.x - dotR) < EPS, `sunrise.x ${sunrise.x} ≈ dotR`);
+  assert.ok(Math.abs(sunset.x - (arcW - dotR)) < EPS, `sunset.x ${sunset.x} ≈ arcW − dotR`);
+  // Sunrise/sunset both at horizon (cy), noon at the top.
+  assert.ok(Math.abs(sunrise.y - arcH) < EPS);
+  assert.ok(Math.abs(sunset.y - arcH) < EPS);
+  assert.ok(noon.y < sunrise.y, 'noon should be above the horizon');
+  assert.ok(Math.abs(noon.y - dotR) < EPS, `noon.y ${noon.y} ≈ dotR`);
+});
+
+test('sunArcPosition: clamps t outside [0,1] and tolerates NaN', () => {
+  const before = sunArcPosition(-2, 200, 100, 8);
+  const after = sunArcPosition(2, 200, 100, 8);
+  const nan = sunArcPosition(Number.NaN, 200, 100, 8);
+  const EPS = 1e-9;
+  assert.ok(Math.abs(before.x - 8) < EPS);          // clamped to t=0
+  assert.ok(Math.abs(after.x - (200 - 8)) < EPS);   // clamped to t=1
+  assert.ok(Math.abs(nan.x - 8) < EPS);             // NaN treated as t=0
 });

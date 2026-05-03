@@ -7,7 +7,7 @@ import {
   MONO, Widget, isLightBg,
   qrIconBtnStyle, qrInputStyle, qrLabelStyle,
 } from './shared';
-import { computeMoonPhase, computeSunTimes } from './sky-helpers';
+import { computeMoonPhase, computeSunTimes, sunArcPosition } from './sky-helpers';
 import { getLastResolvedLocation, subscribeLocation } from './weather-location';
 
 interface SunSkyProps {
@@ -148,9 +148,9 @@ export const SunSkyWidget: React.FC<SunSkyProps> = ({ widget, onUpdate }) => {
   const cy = arcH;
   const rx = arcW / 2 - dotR;
   const ry = arcH - dotR;
-  const angle = Math.PI * (1 - t); // 1 → π (left), 0 → 0 (right)
-  const sunX = cx + rx * Math.cos(angle) * -1; // mirror so 0 → left
-  const sunY = cy - ry * Math.sin(angle);
+  // Pure geometry helper — see sky-helpers.ts. Sunrise is on the LEFT,
+  // sunset on the RIGHT, noon at the TOP. Covered by a regression test.
+  const { x: sunX, y: sunY } = sunArcPosition(t, arcW, arcH, dotR);
 
   // Golden-hour countdown — show evening hour relative to sunset.
   const goldenLabel = (() => {
