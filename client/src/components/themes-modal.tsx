@@ -4,7 +4,7 @@
 // Pure presentational component; all the state-machine bits (apply,
 // preview, revert, save, delete, rename) are owned by useTheme().
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { X, Palette, Check, Trash2, Pencil, Plus } from 'lucide-react';
 import {
   type Theme,
@@ -28,6 +28,23 @@ export function ThemesModal({ isOpen, onClose, themeApi }: ThemesModalProps) {
   const previewTimerRef                = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoveringIdRef                  = useRef<string | null>(null);
 
+  // Wrap the parent-supplied onClose so every dismissal path (backdrop
+  // click, X button, Esc key) immediately reverts any in-flight hover
+  // preview and clears the auto-revert timer. Without this, a user who
+  // hovered a card and then dismissed within the 2-second hold window
+  // would see the previewed look linger on the dashboard until the
+  // timer ticked. The unmount cleanup below is still kept as a safety
+  // net for cases where the modal is torn down without a dismissal.
+  const closeAndRevert = useCallback(() => {
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    hoveringIdRef.current = null;
+    themeApi.revertPreview();
+    onClose();
+  }, [themeApi, onClose]);
+
   // Cancel any in-flight preview when the modal unmounts so a stuck
   // hover can't strand the dashboard on a non-applied theme.
   useEffect(() => {
@@ -39,18 +56,20 @@ export function ThemesModal({ isOpen, onClose, themeApi }: ThemesModalProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Esc closes the modal. Mirrors the onboarding modal pattern.
+  // Esc closes the modal. Mirrors the onboarding modal pattern. Routed
+  // through closeAndRevert so an Esc during hover-preview also reverts
+  // synchronously rather than waiting for the 2 s auto-revert timer.
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (saveDialogOpen) setSaveOpen(false);
-        else onClose();
+        else closeAndRevert();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, saveDialogOpen, onClose]);
+  }, [isOpen, saveDialogOpen, closeAndRevert]);
 
   if (!isOpen) return null;
 
@@ -88,12 +107,12 @@ export function ThemesModal({ isOpen, onClose, themeApi }: ThemesModalProps) {
     >
       <div
         className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
-        onClick={onClose}
+        onClick={closeAndRevert}
         data-testid="themes-modal-backdrop"
       />
       <div className="relative w-full max-w-[64rem] max-h-[85vh] flex flex-col bg-slate-900/95 border border-violet-500/40 rounded-2xl shadow-2xl shadow-violet-500/20 p-[2rem]">
         <button
-          onClick={onClose}
+          onClick={closeAndRevert}
           className="absolute top-[1rem] right-[1rem] w-9 h-9 flex items-center justify-center rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 transition-colors"
           aria-label="Close themes"
           data-testid="button-themes-close"
