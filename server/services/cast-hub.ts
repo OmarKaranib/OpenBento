@@ -202,6 +202,26 @@ function ensureCanWrite(room: CastRoom, requesterUserId: string | null): boolean
   return room.userId === requesterUserId;
 }
 
+// Recompute and push the "Next: X in Ym" overlay payload to every TV in the
+// room. Called after every schedule mutation and after the scheduler fires so
+// the overlay never goes stale until reconnect.
+async function broadcastNextScheduled(roomId: string): Promise<void> {
+  try {
+    const next = await computeNextScheduled(roomId);
+    const set = roomConns.get(roomId);
+    if (!set) return;
+    const payload = JSON.stringify({ type: "next-scheduled", next });
+    set.forEach((conn) => {
+      if (conn.role !== "tv") return;
+      if (conn.ws.readyState === WebSocket.OPEN) {
+        try { conn.ws.send(payload); } catch { /* ignore */ }
+      }
+    });
+  } catch (err) {
+    console.error("[Cast] broadcastNextScheduled failed:", err);
+  }
+}
+
 async function pushSnapshotToRoom(roomId: string, snapshot: CastSnapshot): Promise<boolean> {
   const approxBytes = Buffer.byteLength(JSON.stringify(snapshot), "utf8");
   if (approxBytes > SNAPSHOT_BYTES_LIMIT) return false;
@@ -261,6 +281,8 @@ async function runSchedulerTick(now: Date = new Date()): Promise<number> {
         .update(castSchedules)
         .set({ lastFiredAt: new Date() })
         .where(eq(castSchedules.id, entry.id));
+      // Refresh the TV overlay so "Next: …" reflects the new closest entry.
+      await broadcastNextScheduled(entry.roomId);
       fired++;
     } catch (err) {
       console.error("[Cast scheduler] entry failed:", err);
@@ -651,6 +673,7 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
           minuteOfDay: parsed.data.minuteOfDay,
         })
         .returning();
+      await broadcastNextScheduled(roomId);
       res.json({ schedule: row });
     },
   );
@@ -669,7 +692,13 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
         .limit(1);
       if (!row) return res.status(404).json({ error: "Schedule not found" });
       if (row.userId !== userId) return res.status(403).json({ error: "Not your schedule" });
+      const [full] = await db
+        .select({ roomId: castSchedules.roomId })
+        .from(castSchedules)
+        .where(eq(castSchedules.id, id))
+        .limit(1);
       await db.delete(castSchedules).where(eq(castSchedules.id, id));
+      if (full?.roomId) await broadcastNextScheduled(full.roomId);
       res.json({ ok: true });
     },
   );

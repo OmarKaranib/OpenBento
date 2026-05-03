@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Cast, Plus, X, Send, Pencil, Check, Trash2, Loader2, Calendar, Save,
+  Tv, Settings,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
@@ -84,6 +85,9 @@ export function CastPopover({
   const [layouts, setLayouts] = useState<SavedLayout[]>([]);
   const [savingLayout, setSavingLayout] = useState(false);
   const [layoutName, setLayoutName] = useState("");
+  const [tab, setTab] = useState<"pair" | "tvs" | "schedule">("pair");
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [pushingSelected, setPushingSelected] = useState(false);
   const popRef = useRef<HTMLDivElement | null>(null);
   const socketsRef = useRef<Map<string, WebSocket>>(new Map());
   const reconnectTimersRef = useRef<Map<string, number>>(new Map());
@@ -341,6 +345,47 @@ export function CastPopover({
     }
   }
 
+  function toggleSelected(roomId: string): void {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(roomId)) next.delete(roomId); else next.add(roomId);
+      return next;
+    });
+  }
+
+  async function handlePushSelected(): Promise<void> {
+    const ids = Array.from(selected).filter((id) => tvs.some((t) => t.roomId === id));
+    if (ids.length === 0) return;
+    setPushingSelected(true);
+    try {
+      const snapshot = buildCastSnapshot({ widgets, isDarkMode, masterMute });
+      const r = await authedFetch("POST", "/api/cast/push-many", { roomIds: ids, snapshot });
+      const data = await r.json().catch(() => ({ ok: ids.length, fail: 0 }));
+      const ok = typeof data?.ok === "number" ? data.ok : ids.length;
+      const fail = typeof data?.fail === "number" ? data.fail : 0;
+      setMeta((m) => {
+        const next = { ...m };
+        for (const id of ids) {
+          next[id] = { ...(next[id] ?? { online: true }), lastPushedAt: snapshot.pushedAt };
+        }
+        return next;
+      });
+      toast({
+        title: `Pushed to ${ok}/${ids.length} TV${ids.length === 1 ? "" : "s"}`,
+        description: fail > 0 ? `${fail} failed` : undefined,
+        variant: fail === ids.length ? "destructive" : undefined,
+      });
+    } catch (err) {
+      toast({
+        title: "Push failed",
+        description: err instanceof Error ? err.message : "Try again",
+        variant: "destructive",
+      });
+    } finally {
+      setPushingSelected(false);
+    }
+  }
+
   async function handlePushAll(): Promise<void> {
     if (tvs.length === 0) return;
     const snapshot = buildCastSnapshot({ widgets, isDarkMode, masterMute });
@@ -463,10 +508,10 @@ export function CastPopover({
           data-testid="popover-cast"
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="p-[1.2rem] border-b border-slate-700/40">
+          <div className="p-[1.2rem] pb-[0.6rem] border-b border-slate-700/40">
             <div className="flex items-center justify-between mb-[0.6rem]">
               <h3 className="text-[1.15rem] font-bold flex items-center gap-[0.5rem]">
-                <Cast className="w-[1.2rem] h-[1.2rem]" /> Cast to TV
+                <Cast className="w-[1.2rem] h-[1.2rem]" /> Cast Settings
               </h3>
               <button
                 onClick={() => setOpen(false)}
@@ -476,6 +521,39 @@ export function CastPopover({
                 <X className="w-[1.1rem] h-[1.1rem]" />
               </button>
             </div>
+            <div className="flex gap-[0.3rem]" role="tablist" aria-label="Cast settings tabs">
+              {([
+                { id: "pair", label: "Pair", icon: Plus },
+                { id: "tvs", label: `My TVs${tvs.length > 0 ? ` (${tvs.length})` : ""}`, icon: Tv },
+                { id: "schedule", label: "Schedule", icon: Settings },
+              ] as const).map((t) => {
+                const active = tab === t.id;
+                const Icon = t.icon;
+                return (
+                  <button
+                    key={t.id}
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTab(t.id)}
+                    className={`flex-1 h-[2.2rem] px-[0.6rem] rounded-md text-[0.85rem] font-semibold flex items-center justify-center gap-[0.3rem] transition-colors ${
+                      active
+                        ? "bg-fuchsia-600 text-white"
+                        : isDarkMode
+                          ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                    data-testid={`tab-cast-${t.id}`}
+                  >
+                    <Icon className="w-[0.9rem] h-[0.9rem]" />
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {tab === "pair" && (
+          <div className="p-[1.2rem] border-b border-slate-700/40">
             <p className={`text-[0.85rem] mb-[0.6rem] ${isDarkMode ? "text-slate-400" : "text-gray-600"}`}>
               On your TV, open <span className="font-mono">openbento.tv/cast</span> and enter the code shown.
               {isAuthenticated && (
@@ -530,20 +608,39 @@ export function CastPopover({
               </p>
             )}
           </div>
+          )}
 
+          {tab === "tvs" && (
           <div className="p-[1.2rem]">
-            <div className="flex items-center justify-between mb-[0.6rem]">
+            <div className="flex items-center justify-between mb-[0.6rem] gap-[0.4rem] flex-wrap">
               <span className={`text-[0.95rem] font-semibold ${isDarkMode ? "text-slate-300" : "text-gray-700"}`}>
                 Paired TVs ({tvs.length})
               </span>
               {tvs.length > 0 && (
-                <button
-                  onClick={handlePushAll}
-                  className="text-[0.85rem] px-[0.7rem] py-[0.3rem] rounded bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-semibold flex items-center gap-[0.3rem]"
-                  data-testid="button-cast-push-all"
-                >
-                  <Send className="w-[0.9rem] h-[0.9rem]" /> Push to all
-                </button>
+                <div className="flex gap-[0.3rem]">
+                  <button
+                    onClick={handlePushSelected}
+                    disabled={selected.size === 0 || pushingSelected}
+                    className={`text-[0.85rem] px-[0.7rem] py-[0.3rem] rounded font-semibold flex items-center gap-[0.3rem] ${
+                      selected.size === 0 || pushingSelected
+                        ? "bg-slate-600/40 text-slate-300 cursor-not-allowed"
+                        : "bg-cyan-600 hover:bg-cyan-500 text-white"
+                    }`}
+                    data-testid="button-cast-push-selected"
+                  >
+                    {pushingSelected
+                      ? <Loader2 className="w-[0.9rem] h-[0.9rem] animate-spin" />
+                      : <Send className="w-[0.9rem] h-[0.9rem]" />}
+                    Push to selected ({selected.size})
+                  </button>
+                  <button
+                    onClick={handlePushAll}
+                    className="text-[0.85rem] px-[0.7rem] py-[0.3rem] rounded bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-semibold flex items-center gap-[0.3rem]"
+                    data-testid="button-cast-push-all"
+                  >
+                    <Send className="w-[0.9rem] h-[0.9rem]" /> Push to all
+                  </button>
+                </div>
               )}
             </div>
 
@@ -566,6 +663,14 @@ export function CastPopover({
                       data-testid={`row-tv-${tv.roomId}`}
                     >
                       <div className="flex items-center justify-between gap-[0.5rem]">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(tv.roomId)}
+                          onChange={() => toggleSelected(tv.roomId)}
+                          className="w-[1rem] h-[1rem] cursor-pointer accent-fuchsia-500"
+                          aria-label={`Select ${tv.label}`}
+                          data-testid={`checkbox-tv-${tv.roomId}`}
+                        />
                         {isEditing ? (
                           <input
                             value={editLabel}
@@ -659,9 +764,10 @@ export function CastPopover({
               </ul>
             )}
           </div>
+          )}
 
-          {isAuthenticated && (
-            <div className="p-[1.2rem] border-t border-slate-700/40">
+          {tab === "schedule" && isAuthenticated && (
+            <div className="p-[1.2rem]">
               <div className="flex items-center justify-between mb-[0.5rem]">
                 <span className={`text-[0.95rem] font-semibold ${isDarkMode ? "text-slate-300" : "text-gray-700"}`}>
                   Saved layouts ({layouts.length})
@@ -688,7 +794,7 @@ export function CastPopover({
                 </button>
               </div>
               {layouts.length > 0 && (
-                <ul className="space-y-[0.3rem] max-h-[10rem] overflow-y-auto">
+                <ul className="space-y-[0.3rem] max-h-[10rem] overflow-y-auto mb-[0.8rem]">
                   {layouts.map((l) => (
                     <li
                       key={l.id}
@@ -710,11 +816,43 @@ export function CastPopover({
                   ))}
                 </ul>
               )}
+
+              <div className="border-t border-slate-700/30 pt-[0.7rem]">
+                <div className={`text-[0.95rem] font-semibold mb-[0.4rem] ${isDarkMode ? "text-slate-300" : "text-gray-700"}`}>
+                  Per-TV schedule
+                </div>
+                {tvs.length === 0 ? (
+                  <p className={`text-[0.8rem] italic ${isDarkMode ? "text-slate-500" : "text-gray-500"}`}>
+                    Pair a TV first, then schedule layouts for it.
+                  </p>
+                ) : (
+                  <ul className="space-y-[0.3rem]">
+                    {tvs.map((tv) => (
+                      <li
+                        key={tv.roomId}
+                        className={`flex items-center justify-between gap-[0.4rem] px-[0.6rem] py-[0.4rem] rounded text-[0.9rem] ${
+                          isDarkMode ? "bg-slate-800/40" : "bg-gray-100"
+                        }`}
+                        data-testid={`row-schedule-tv-${tv.roomId}`}
+                      >
+                        <span className="truncate flex-1">{tv.label}</span>
+                        <button
+                          onClick={() => setScheduleRoom(tv)}
+                          className="text-[0.8rem] px-[0.6rem] py-[0.25rem] rounded bg-cyan-600 hover:bg-cyan-500 text-white flex items-center gap-[0.3rem]"
+                          data-testid={`button-open-schedule-${tv.roomId}`}
+                        >
+                          <Calendar className="w-[0.85rem] h-[0.85rem]" /> Schedule
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
 
-          {!isAuthenticated && (
-            <div className={`p-[1rem] border-t border-slate-700/40 text-[0.8rem] italic ${isDarkMode ? "text-slate-500" : "text-gray-500"}`}>
+          {tab === "schedule" && !isAuthenticated && (
+            <div className={`p-[1.2rem] text-[0.85rem] italic ${isDarkMode ? "text-slate-500" : "text-gray-500"}`}>
               Sign in to save layouts and schedule them across the week.
             </div>
           )}
