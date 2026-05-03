@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, Dispatch, SetStateAction, MutableRefObject } from 'react';
 import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, RefreshCw, GripVertical, FileText, Square, Image as ImageIcon, Trash2, Settings, PanelLeftClose, PanelLeftOpen, Pause, Play, Maximize2, Minimize2, MoveDiagonal2, Sliders, LockKeyhole, AlertCircle, Star, Palette, Paintbrush, ImagePlus, Sun, Moon, LogIn, LogOut, User, Loader2, Shield, MessageSquare, Lightbulb, Bug, Tv } from 'lucide-react';
 import { Link } from 'wouter';
 import { ADMIN_EMAIL } from '@/pages/admin';
@@ -159,6 +159,14 @@ interface MasterControlDashboardProps {
   onDeletePage: (id: string) => void;
   onSetDefaultPage: (id: string) => void;
   onSetActivePage: (id: string) => void;
+  // Per-page visual override writers — invoked when the user picks a
+  // theme / background while a non-default page is active so the
+  // choice sticks to that page instead of leaking globally.
+  onSetPageTheme: (id: string, themeId: string | null) => void;
+  onSetPageBackground: (
+    id: string,
+    bg: { kind: 'color' | 'image' | 'gradient'; value: string } | null,
+  ) => void;
 }
 
 interface ResizeState {
@@ -202,6 +210,8 @@ const MasterControlDashboard = ({
   onDeletePage,
   onSetDefaultPage,
   onSetActivePage,
+  onSetPageTheme,
+  onSetPageBackground,
 }: MasterControlDashboardProps) => {
   const [masterMute, setMasterMute] = useState(true);
   const [resizing, setResizing] = useState<ResizeState | null>(null);
@@ -249,6 +259,38 @@ const MasterControlDashboard = ({
     setIsDarkMode,
   });
   const [themesModalOpen, setThemesModalOpen] = useState(false);
+
+  // When the user has 2+ pages, themes selected through the marketplace
+  // are persisted to the *active page* via onSetPageTheme/Background so
+  // each tab keeps its own look. With a single page we skip the save —
+  // the Theme is global by default and there's no other page to bleed
+  // into. This thin wrapper around themeApi is what we hand to the
+  // ThemesModal so the modal's existing apply/saveCurrent flow does
+  // the right thing for free.
+  const pageAwareThemeApi = useMemo(() => ({
+    ...themeApi,
+    applyTheme: (theme: typeof BUILT_IN_THEMES[number]) => {
+      themeApi.applyTheme(theme);
+      if (pages.length >= 2) {
+        onSetPageTheme(activePageId, theme.id);
+        onSetPageBackground(activePageId, theme.background);
+      }
+    },
+    deletePersonalTheme: (id: string) => {
+      themeApi.deletePersonalTheme(id);
+      // Clear *both* themeId and backgroundConfig on every page that
+      // was pinned to the now-deleted theme so they truly fall back
+      // to the global look on next switch (otherwise the apply effect
+      // keeps writing the old background even after the themeId is
+      // gone, leaving stale visuals behind).
+      for (const p of pages) {
+        if (p.themeId === id) {
+          onSetPageTheme(p.id, null);
+          onSetPageBackground(p.id, null);
+        }
+      }
+    },
+  }), [themeApi, pages, activePageId, onSetPageTheme, onSetPageBackground]);
 
   // Multi-Page per-page overrides — when the active page carries its
   // own themeId, apply it. When it carries a backgroundConfig, write
@@ -2235,7 +2277,7 @@ const MasterControlDashboard = ({
       <ThemesModal
         isOpen={themesModalOpen}
         onClose={() => setThemesModalOpen(false)}
-        themeApi={themeApi}
+        themeApi={pageAwareThemeApi}
       />
 
     </div>

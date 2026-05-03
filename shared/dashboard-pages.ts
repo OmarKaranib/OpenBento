@@ -249,6 +249,38 @@ export function deletePage(
   return { pages: remaining, activePageId: active };
 }
 
+// Per-page visual overrides. These let the dashboard remember a
+// distinct theme + background per page so flipping tabs atomically
+// swaps the look. Both ops are no-ops when the page id is unknown.
+
+export function setPageThemeId(
+  state: DashboardPagesState,
+  pageId: string,
+  themeId: string | null,
+): DashboardPagesState {
+  if (!state.pages.some(p => p.id === pageId)) return state;
+  return {
+    ...state,
+    pages: state.pages.map(p =>
+      p.id === pageId ? { ...p, themeId: themeId ?? null } : p,
+    ),
+  };
+}
+
+export function setPageBackground(
+  state: DashboardPagesState,
+  pageId: string,
+  bg: DashboardPage['backgroundConfig'],
+): DashboardPagesState {
+  if (!state.pages.some(p => p.id === pageId)) return state;
+  return {
+    ...state,
+    pages: state.pages.map(p =>
+      p.id === pageId ? { ...p, backgroundConfig: bg ?? null } : p,
+    ),
+  };
+}
+
 export function setDefaultPage(
   state: DashboardPagesState,
   pageId: string,

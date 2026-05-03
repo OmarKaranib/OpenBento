@@ -11,6 +11,8 @@ import {
   sanitizePages,
   setActivePage,
   setDefaultPage,
+  setPageThemeId,
+  setPageBackground,
   updateActivePageWidgets,
   newPageId,
   slugify,
@@ -119,6 +121,82 @@ test('duplicatePage clones widgets with fresh ids and a new page id', () => {
   assert.notEqual(dup.widgets[0].id, 'a', 'widget id rewritten');
   assert.equal(dup.isDefault, false);
   assert.equal(s.activePageId, dup.id);
+});
+
+test('per-page theme + background overrides round-trip independently across tab switches', () => {
+  // Page A and Page B carry distinct themeId + backgroundConfig.
+  // Verify each persists across active-page flips and a sanitize
+  // round-trip (the cloud-sync rehydration path).
+  let s = makeEmptyState();
+  const aId = s.pages[0].id;
+  s = addPage(s, 'Beta');
+  const bId = s.activePageId;
+  s = setPageThemeId(s, aId, 'theme-midnight-ocean');
+  s = setPageBackground(s, aId, { kind: 'color', value: '#001020' });
+  s = setPageThemeId(s, bId, 'theme-cyberpunk');
+  s = setPageBackground(s, bId, { kind: 'gradient', value: 'linear-gradient(45deg,#f0f,#0ff)' });
+  // Flip back and forth — each page must keep its own settings.
+  s = setActivePage(s, aId);
+  let active = s.pages.find(p => p.id === s.activePageId)!;
+  assert.equal(active.themeId, 'theme-midnight-ocean');
+  assert.deepEqual(active.backgroundConfig, { kind: 'color', value: '#001020' });
+  s = setActivePage(s, bId);
+  active = s.pages.find(p => p.id === s.activePageId)!;
+  assert.equal(active.themeId, 'theme-cyberpunk');
+  assert.equal(active.backgroundConfig?.kind, 'gradient');
+  // Sanitize round-trip — values survive serialization.
+  const round = sanitizePages(JSON.parse(JSON.stringify(s)))!;
+  const aRound = round.pages.find(p => p.id === aId)!;
+  const bRound = round.pages.find(p => p.id === bId)!;
+  assert.equal(aRound.themeId, 'theme-midnight-ocean');
+  assert.equal(bRound.themeId, 'theme-cyberpunk');
+  assert.deepEqual(aRound.backgroundConfig, { kind: 'color', value: '#001020' });
+  assert.equal(bRound.backgroundConfig?.kind, 'gradient');
+  // Setting on an unknown page id is a no-op.
+  const before = s;
+  const after = setPageThemeId(s, 'page-missing', 'theme-x');
+  assert.equal(after, before);
+});
+
+test('deletion fallback: clearing themeId AND backgroundConfig restores global look', () => {
+  // Mirrors the UI flow: a personal theme that the page is pinned to
+  // gets deleted, so the wrapped themeApi clears both themeId and
+  // backgroundConfig on every page that referenced it. Verify the
+  // resulting state truly falls back (no lingering background).
+  let s = makeEmptyState();
+  const aId = s.pages[0].id;
+  s = addPage(s, 'Beta');
+  const bId = s.activePageId;
+  s = setPageThemeId(s, aId, 'personal-foo');
+  s = setPageBackground(s, aId, { kind: 'color', value: '#abcdef' });
+  s = setPageThemeId(s, bId, 'personal-foo');
+  s = setPageBackground(s, bId, { kind: 'image', value: 'https://x/y.png' });
+  // Simulate the deletePersonalTheme cleanup loop from dashboard.tsx.
+  for (const p of s.pages) {
+    if (p.themeId === 'personal-foo') {
+      s = setPageThemeId(s, p.id, null);
+      s = setPageBackground(s, p.id, null);
+    }
+  }
+  const a = s.pages.find(p => p.id === aId)!;
+  const b = s.pages.find(p => p.id === bId)!;
+  assert.equal(a.themeId, null);
+  assert.equal(a.backgroundConfig, null);
+  assert.equal(b.themeId, null);
+  assert.equal(b.backgroundConfig, null);
+});
+
+test('duplicatePage carries themeId + backgroundConfig over to the copy', () => {
+  // Duplication should clone visual overrides too so users can fork a
+  // styled page and tweak the copy.
+  let s = makeEmptyState();
+  const id = s.pages[0].id;
+  s = setPageThemeId(s, id, 'theme-paper-light');
+  s = setPageBackground(s, id, { kind: 'image', value: 'https://x/y.png' });
+  s = duplicatePage(s, id);
+  const copy = s.pages.find(p => p.id === s.activePageId)!;
+  assert.equal(copy.themeId, 'theme-paper-light');
+  assert.deepEqual(copy.backgroundConfig, { kind: 'image', value: 'https://x/y.png' });
 });
 
 test('integration: switching active page does not bleed widget state across pages', () => {

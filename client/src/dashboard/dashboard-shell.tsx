@@ -39,7 +39,10 @@
     duplicatePage as duplicatePagePure,
     deletePage as deletePagePure,
     setDefaultPage as setDefaultPagePure,
+    setPageThemeId as setPageThemeIdPure,
+    setPageBackground as setPageBackgroundPure,
   } from '@shared/dashboard-pages';
+  import type { DashboardPage as DashboardPageType } from '@shared/dashboard-pages';
 
   const GRID_COLS = 12;
 
@@ -269,6 +272,12 @@ useEffect(() => {
   const handleDeletePage  = useCallback((id: string) => setPagesState(s => deletePagePure(s, id)), []);
   const handleSetDefaultPage = useCallback((id: string) => setPagesState(s => setDefaultPagePure(s, id)), []);
   const handleSetActivePage = useCallback((id: string) => setPagesState(s => setActivePagePure(s, id)), []);
+  const handleSetPageTheme  = useCallback((id: string, themeId: string | null) => setPagesState(s => setPageThemeIdPure(s, id, themeId)), []);
+  const handleSetPageBackground = useCallback(
+    (id: string, bg: DashboardPageType['backgroundConfig']) =>
+      setPagesState(s => setPageBackgroundPure(s, id, bg)),
+    [],
+  );
 
   const { ad, skipAd, triggerAd, isAdActive } = useViralAds(false, widgets, setWidgets);
 
@@ -818,6 +827,8 @@ const dashboardProps = {
   onDeletePage:        handleDeletePage,
   onSetDefaultPage:    handleSetDefaultPage,
   onSetActivePage:     handleSetActivePage,
+  onSetPageTheme:      handleSetPageTheme,
+  onSetPageBackground: handleSetPageBackground,
 };
 
 return (
