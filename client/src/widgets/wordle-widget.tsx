@@ -1,15 +1,9 @@
-// Daily Wordle — 5 letters, 6 guesses, one word per UTC day so every
-// player gets the same answer. State (guesses + win/loss) is persisted
-// per-day; opening the widget on a new UTC day resets the board.
-import React, { useEffect, useRef, useState } from 'react';
-import { Puzzle } from 'lucide-react';
+// Daily Wordle — 5 letters, 6 guesses, one word per UTC day.
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Delete, Puzzle } from 'lucide-react';
 import { MONO, Widget, isLightBg } from './shared';
 import { evaluateWordleGuess, pickDailyWord, utcDateKey, WORDLE_ANSWERS } from './play-helpers';
 
-// Server contract: { date: 'YYYY-MM-DD', answer: 'crane' }. We trust the
-// server as the canonical source of the daily word so the answer pool
-// can be rotated without a client deploy. The client-side pool in
-// play-helpers is kept only as a deterministic offline fallback.
 interface WordleTodayResp { date: string; answer: string; }
 
 interface Props { widget: Widget; onUpdate?: (id: string, patch: Partial<Widget>) => void; }
@@ -17,11 +11,16 @@ interface Props { widget: Widget; onUpdate?: (id: string, patch: Partial<Widget>
 const ROWS = 6;
 const COLS = 5;
 
-// A small extra acceptance pool (loaned letters) so common guesses
-// outside the answer set don't bounce. We accept any 5-letter alphabetic
-// guess; we just don't validate it against a full dictionary — the goal
-// here is a quick daily puzzle, not tournament-grade Wordle.
 const isAcceptableGuess = (s: string) => /^[a-z]{5}$/.test(s);
+
+const KEY_ROWS: readonly (readonly string[])[] = [
+  ['q','w','e','r','t','y','u','i','o','p'],
+  ['a','s','d','f','g','h','j','k','l'],
+  ['ENTER','z','x','c','v','b','n','m','BACK'],
+];
+
+type Verdict = 'correct' | 'present' | 'absent';
+const RANK: Record<Verdict, number> = { absent: 0, present: 1, correct: 2 };
 
 export const WordleWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,10 +35,8 @@ export const WordleWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     return () => ro.disconnect();
   }, []);
 
-  // Today's UTC date + answer. We don't memoise on mount — if the widget
-  // is left open across UTC midnight the date must advance, the board
-  // must clear, and the new daily word must be picked. Re-checking the
-  // UTC date once a minute is plenty of resolution and costs nothing.
+  // Polled rather than memoised so a tab left open across UTC midnight
+  // advances the date and resets the board.
   const [today, setToday] = useState(() => utcDateKey(new Date()));
   useEffect(() => {
     const tick = () => {
@@ -47,9 +44,6 @@ export const WordleWidget: React.FC<Props> = ({ widget, onUpdate }) => {
       setToday(prev => (prev === k ? prev : k));
     };
     const id = window.setInterval(tick, 60_000);
-    // Also fire when the tab regains focus / visibility — covers the
-    // case where the laptop was asleep through midnight and `setInterval`
-    // didn't fire on schedule.
     const onVisible = () => { if (!document.hidden) tick(); };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
@@ -60,9 +54,7 @@ export const WordleWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     };
   }, []);
 
-  // Canonical answer comes from the server; if /api/wordle/today is
-  // unreachable we fall back to the deterministic client pool so the
-  // game still works offline. Refetched whenever the UTC date advances.
+  // Canonical answer is server-owned; client pool is the offline fallback.
   const [serverAnswer, setServerAnswer] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -98,9 +90,8 @@ export const WordleWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   const status = widget.wordleStatus ?? 'playing';
   const finished = status !== 'playing' || guesses.length >= ROWS;
 
-  const submit = () => {
+  const submitGuess = (g: string) => {
     if (finished) return;
-    const g = draft.toLowerCase();
     if (!isAcceptableGuess(g)) {
       setShake(true);
       window.setTimeout(() => setShake(false), 380);
@@ -114,9 +105,37 @@ export const WordleWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     setDraft('');
   };
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') { e.preventDefault(); submit(); }
+  const onKeyTap = (k: string) => {
+    if (finished) return;
+    if (k === 'ENTER') { submitGuess(draft.toLowerCase()); return; }
+    if (k === 'BACK')  { setDraft(d => d.slice(0, -1)); return; }
+    if (draft.length >= COLS) return;
+    setDraft(d => (d + k).slice(0, COLS));
   };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (finished) return;
+    if (e.key === 'Enter')      { e.preventDefault(); submitGuess(draft.toLowerCase()); return; }
+    if (e.key === 'Backspace')  { e.preventDefault(); setDraft(d => d.slice(0, -1)); return; }
+    if (/^[a-zA-Z]$/.test(e.key) && draft.length < COLS) {
+      e.preventDefault();
+      setDraft(d => (d + e.key.toLowerCase()).slice(0, COLS));
+    }
+  };
+
+  // Per-key best-known status across all submitted guesses.
+  const keyStatus = useMemo(() => {
+    const m: Record<string, Verdict> = {};
+    for (const g of guesses) {
+      const verdicts = evaluateWordleGuess(g, answer);
+      for (let i = 0; i < g.length; i++) {
+        const ch = g[i];
+        const v = verdicts[i];
+        if (!m[ch] || RANK[v] > RANK[m[ch]]) m[ch] = v;
+      }
+    }
+    return m;
+  }, [guesses, answer]);
 
   // Theming
   const bgColor = widget.customColor ?? '#0f172a';
@@ -136,26 +155,35 @@ export const WordleWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     return { bg: light ? '#475569' : '#334155', bd: light ? '#475569' : '#334155', fg: '#ffffff' };
   };
 
-  // Tile size — fit COLS × ROWS into available area with 4px gaps and
-  // a header band reserved.
-  const headerBand = 36;
-  const inputBand = 36;
+  const headerBand = 28;
+  const keyboardBand = 96;
   const gridGap = 4;
-  const usableH = Math.max(60, size.h - 24 - headerBand - inputBand - 12);
+  const usableH = Math.max(60, size.h - 24 - headerBand - keyboardBand - 16);
   const usableW = Math.max(60, size.w - 24);
   const tileFromH = Math.floor((usableH - gridGap * (ROWS - 1)) / ROWS);
   const tileFromW = Math.floor((usableW - gridGap * (COLS - 1)) / COLS);
-  const tile = Math.max(20, Math.min(tileFromH, tileFromW, 56));
+  const tile = Math.max(20, Math.min(tileFromH, tileFromW, 50));
+
+  const keyColor = (k: string): { bg: string; bd: string; fg: string } => {
+    if (k === 'ENTER' || k === 'BACK') {
+      return { bg: light ? 'rgba(0,0,0,0.06)' : 'rgba(71,85,105,0.5)', bd: tileEmptyBd, fg: clrPrimary };
+    }
+    const v = keyStatus[k];
+    if (v) return tileColor(v);
+    return { bg: light ? 'rgba(0,0,0,0.04)' : 'rgba(71,85,105,0.35)', bd: tileEmptyBd, fg: clrPrimary };
+  };
 
   return (
     <div
       ref={containerRef}
+      tabIndex={0}
+      onKeyDown={onKeyDown}
       style={{
         width: '100%', height: '100%', background: bgColor,
         borderRadius: 'var(--outer-radius)',
         padding: 12, boxSizing: 'border-box', overflow: 'hidden',
         border: `1px solid ${clrBorder}`, position: 'relative',
-        display: 'flex', flexDirection: 'column', gap: 8,
+        display: 'flex', flexDirection: 'column', gap: 8, outline: 'none',
       }}
       data-testid={`wordle-widget-${widget.id}`}
     >
@@ -213,59 +241,64 @@ export const WordleWidget: React.FC<Props> = ({ widget, onUpdate }) => {
         })}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-        {!finished && (
-          <input
-            type="text"
-            value={draft}
-            onChange={e => {
-              const v = e.target.value.toLowerCase().replace(/[^a-z]/g, '').slice(0, COLS);
-              setDraft(v);
-            }}
-            onKeyDown={onKeyDown}
-            maxLength={COLS}
-            placeholder="Type a 5-letter word…"
-            style={{
-              flex: 1, padding: '6px 8px',
-              background: tileEmptyBg, border: `1px solid ${tileEmptyBd}`, borderRadius: 6,
-              color: clrPrimary, fontFamily: MONO, fontSize: 12, letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              outline: 'none',
-            }}
-            data-testid={`wordle-input-${widget.id}`}
-          />
-        )}
-        {!finished && (
-          <button
-            onClick={submit}
-            disabled={!isAcceptableGuess(draft.toLowerCase())}
-            style={{
-              padding: '6px 10px', borderRadius: 6,
-              background: isAcceptableGuess(draft.toLowerCase()) ? `${accent}33` : 'rgba(255,255,255,0.06)',
-              border: `1px solid ${isAcceptableGuess(draft.toLowerCase()) ? accent : 'rgba(255,255,255,0.10)'}`,
-              color: isAcceptableGuess(draft.toLowerCase()) ? accent : clrMuted,
-              fontFamily: MONO, fontSize: 11, fontWeight: 700,
-              cursor: isAcceptableGuess(draft.toLowerCase()) ? 'pointer' : 'default',
-            }}
-            data-testid={`wordle-submit-${widget.id}`}
-          >
-            ENTER
-          </button>
-        )}
-        {finished && (
-          <span
-            style={{
-              flex: 1,
-              color: status === 'won' ? '#22c55e' : (status === 'lost' ? '#f87171' : clrSubtle),
-              fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
-              textAlign: 'center',
-            }}
-            data-testid={`wordle-result-${widget.id}`}
-          >
+      {finished && (
+        <div
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+            flexShrink: 0,
+          }}
+          data-testid={`wordle-result-${widget.id}`}
+        >
+          <span style={{
+            color: status === 'won' ? '#22c55e' : '#f87171',
+            fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+          }}>
             {status === 'won' ? `Solved in ${guesses.length}/${ROWS}!` : `Word was ${answer.toUpperCase()}`}
           </span>
-        )}
-      </div>
+          <span
+            style={{ color: clrMuted, fontFamily: MONO, fontSize: 10 }}
+            data-testid={`wordle-come-back-${widget.id}`}
+          >
+            Come back tomorrow for a new word.
+          </span>
+        </div>
+      )}
+
+      {!finished && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }} data-testid={`wordle-keyboard-${widget.id}`}>
+          {KEY_ROWS.map((row, ri) => (
+            <div key={ri} style={{ display: 'flex', gap: 3, justifyContent: 'center' }}>
+              {row.map(k => {
+                const wide = k === 'ENTER' || k === 'BACK';
+                const c = keyColor(k);
+                return (
+                  <button
+                    key={k}
+                    onClick={() => onKeyTap(k)}
+                    style={{
+                      flex: wide ? '1.6 1 0' : '1 1 0',
+                      minWidth: 0,
+                      height: 28,
+                      padding: 0,
+                      background: c.bg, border: `1px solid ${c.bd}`, color: c.fg,
+                      borderRadius: 4,
+                      fontFamily: MONO, fontWeight: 700,
+                      fontSize: wide ? 9 : 11,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                      cursor: 'pointer',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                    data-testid={`wordle-key-${k.toLowerCase()}-${widget.id}`}
+                  >
+                    {k === 'BACK' ? <Delete size={12} /> : k}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
       <style>{`@keyframes wordleShake { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-4px)} 40%,60%{transform:translateX(4px)} }`}</style>
     </div>
   );

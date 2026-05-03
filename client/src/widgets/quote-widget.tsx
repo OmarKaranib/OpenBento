@@ -1,7 +1,4 @@
-// Random Quote / Fact — fetches from /api/quote (zenquotes.io proxy) and
-// falls back to a bundled offline pool when the upstream is unavailable.
-// Heart toggle pins the current quote into widget.quoteFavorites; when
-// offline / cooldown, the refresh button cycles through favourites.
+// Random Quote — /api/quote with offline fallback + favourites + hourly refresh.
 import React, { useEffect, useRef, useState } from 'react';
 import { Heart, Quote as QuoteIcon, RefreshCw, Star } from 'lucide-react';
 import { MONO, Widget, isLightBg, qrIconBtnStyle } from './shared';
@@ -23,8 +20,6 @@ export const QuoteWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     return () => ro.disconnect();
   }, []);
 
-  // First render: if no current quote, drop in a deterministic fallback so
-  // the widget never starts blank, and persist it.
   useEffect(() => {
     if (!widget.quoteCurrent) {
       const q = pickFallbackQuote(Date.now());
@@ -33,10 +28,7 @@ export const QuoteWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Quote of the hour — pull a fresh quote on the hour boundary so the
-  // widget stays alive without the user clicking refresh. Server caches
-  // upstream for 1 hour, so this is a cheap call. Also fires on tab
-  // focus in case the timer was throttled while the tab was hidden.
+  // Hourly auto-refresh; also fires on tab focus to recover from throttled timers.
   useEffect(() => {
     let active = true;
     const tick = async () => {
@@ -80,7 +72,6 @@ export const QuoteWidget: React.FC<Props> = ({ widget, onUpdate }) => {
       if (typeof j.text !== 'string' || j.text.trim().length === 0) throw new Error('Empty quote');
       onUpdate?.(widget.id, { quoteCurrent: { text: j.text, author: typeof j.author === 'string' ? j.author : 'Unknown' } });
     } catch (e) {
-      // Upstream unreachable — cycle locally so the button still feels live.
       setErr(e instanceof Error ? e.message : String(e));
       cycleFallback();
     } finally {

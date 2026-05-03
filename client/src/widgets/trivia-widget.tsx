@@ -1,7 +1,4 @@
-// Trivia — single multiple-choice question from /api/trivia (Open Trivia
-// DB proxy). After answering, reveals the correct choice, updates the
-// local score, and locks for a short cooldown before the next question
-// can be requested.
+// Trivia — single MC question from /api/trivia, reveal + score + cooldown.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Brain, RefreshCw, Settings as SettingsIcon, X as XIcon } from 'lucide-react';
 import { MONO, Widget, isLightBg, qrIconBtnStyle, qrLabelStyle } from './shared';
@@ -30,7 +27,7 @@ export const TriviaWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     return () => ro.disconnect();
   }, []);
 
-  // Tick once a second so the cooldown countdown updates.
+
   useEffect(() => {
     const id = setInterval(() => setNowTick(n => n + 1), 1000);
     return () => clearInterval(id);
@@ -64,7 +61,7 @@ export const TriviaWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     }
   };
 
-  // Auto-fetch first question.
+
   useEffect(() => {
     if (!current && !loading) void fetchOne();
     // eslint-disable-next-line react-hooks/exhaustive-deps

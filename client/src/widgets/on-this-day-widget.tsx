@@ -1,6 +1,4 @@
-// On This Day — Wikipedia historical events for today's MM/DD. Auto-rotates
-// through the day's events at a configurable cadence; clicking opens the
-// referenced Wikipedia page. Server caches upstream for 1 hour.
+// On This Day — Wikipedia historical events for today's MM/DD, auto-rotated.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, RefreshCw, Settings as SettingsIcon, X as XIcon } from 'lucide-react';
 import { MONO, Widget, isLightBg, qrIconBtnStyle, qrInputStyle, qrLabelStyle } from './shared';
@@ -45,7 +43,6 @@ export const OnThisDayWidget: React.FC<Props> = ({ widget, onUpdate }) => {
 
   useEffect(() => { void load(); }, []);
 
-  // Auto-rotate. Pauses when settings panel is open so the user can read.
   useEffect(() => {
     if (!payload || payload.events.length <= 1 || showSettings) return;
     const id = setInterval(() => {
