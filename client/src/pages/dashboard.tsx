@@ -16,6 +16,9 @@ import { NoteWidget } from '@/components/note-widget';
 import { AdBlock, AdBlockData } from '@/components/ad-block';
 import { CastPopover } from '@/components/cast-popover';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
+import { useAuth } from '@/hooks/use-auth';
+import { useTheme } from '@/dashboard/use-theme';
+import { ThemesModal } from '@/components/themes-modal';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;
@@ -205,6 +208,20 @@ const MasterControlDashboard = ({
   const clearHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clearHoldStartRef = useRef<number | null>(null);
   const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
+
+  // Themes Marketplace — useTheme owns personal themes + the active theme id
+  // and bridges into the existing isDarkMode state for true-light-mode
+  // coordination. Modal open state lives in this component so the menu
+  // button can toggle it.
+  const { supabase: themeSupabase } = useAuth();
+  const themeApi = useTheme({
+    isAuthenticated,
+    userId: user?.id,
+    supabaseClient: themeSupabase,
+    isDarkMode,
+    setIsDarkMode,
+  });
+  const [themesModalOpen, setThemesModalOpen] = useState(false);
 
   // Listen for personal library updates from sidebar
   useEffect(() => {
@@ -1584,6 +1601,17 @@ const MasterControlDashboard = ({
               {isDarkMode ? 'Dark' : 'Light'}
             </button>
 
+            {/* Themes Marketplace — opens the curated + personal themes modal */}
+            <button
+              onClick={() => setThemesModalOpen(true)}
+              className="menu-btn h-[3.2rem] px-[1.2rem] bg-violet-600/70 hover:bg-violet-500/80 slot-button font-semibold flex items-center gap-[0.6rem] transition-all duration-300 transform hover:scale-105 text-[1.2rem] leading-[3.2rem] shadow-md text-white"
+              data-testid="button-themes"
+              title="Browse themes"
+            >
+              <Palette className="w-[1.4rem] h-[1.4rem]" />
+              Themes
+            </button>
+
             {/* Cast to TV - Popover with paired TV list + manual push */}
             <CastPopover
               widgets={widgets}
@@ -2113,6 +2141,13 @@ const MasterControlDashboard = ({
           </div>
         </div>
       )}
+
+      {/* Themes Marketplace modal — controlled by the Themes button in the menu bar */}
+      <ThemesModal
+        isOpen={themesModalOpen}
+        onClose={() => setThemesModalOpen(false)}
+        themeApi={themeApi}
+      />
 
     </div>
   );

@@ -10,6 +10,11 @@ export const dashboards = pgTable("dashboards", {
   widgets: jsonb("widgets").notNull().default([]),
   bgColor: varchar("bg_color"),
   bgImage: text("bg_image"),
+  // Themes Marketplace — personal themes saved by the user via "Save current
+  // look", plus the id of the currently-applied theme (built-in or personal).
+  // Both default to empty so existing rows keep validating with no migration.
+  personalThemes: jsonb("personal_themes").notNull().default([]),
+  activeThemeId: varchar("active_theme_id"),
   isDefault: boolean("is_default").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

@@ -11,7 +11,7 @@ import type { Widget } from '@/App';
 export const ONBOARDING_FLAG = 'openBentoOnboarded';
 export const REPLAY_EVENT = 'openbento:replay-onboarding';
 
-type Phase = 'hidden' | 'welcome' | 'coach-block' | 'coach-edit' | 'coach-cast';
+type Phase = 'hidden' | 'welcome' | 'coach-block' | 'coach-edit' | 'coach-cast' | 'coach-themes';
 
 interface OnboardingFlowProps {
   setWidgets: (widgets: Widget[]) => void;
@@ -93,9 +93,10 @@ export function OnboardingFlow({
 
   // The welcome modal and the Block coachmark always advance to the next step;
   // only dismissing the *Edit* coachmark persists the onboarded flag.
-  const skipWelcome    = useCallback(() => setPhase('coach-block'), []);
-  const advanceToEdit  = useCallback(() => setPhase('coach-edit'),  []);
-  const advanceToCast  = useCallback(() => setPhase('coach-cast'),  []);
+  const skipWelcome     = useCallback(() => setPhase('coach-block'),  []);
+  const advanceToEdit   = useCallback(() => setPhase('coach-edit'),   []);
+  const advanceToCast   = useCallback(() => setPhase('coach-cast'),   []);
+  const advanceToThemes = useCallback(() => setPhase('coach-themes'), []);
 
   useEffect(() => {
     if (phase === 'hidden') return;
@@ -104,11 +105,12 @@ export function OnboardingFlow({
       if (phase === 'welcome')         skipWelcome();
       else if (phase === 'coach-block') advanceToEdit();
       else if (phase === 'coach-edit')  advanceToCast();
+      else if (phase === 'coach-cast')  advanceToThemes();
       else                              finish();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [phase, finish, skipWelcome, advanceToEdit, advanceToCast]);
+  }, [phase, finish, skipWelcome, advanceToEdit, advanceToCast, advanceToThemes]);
 
   // Track whether the channels response has resolved (success OR failure). We
   // can't simply check `channels.length > 0` because a failed fetch leaves it
@@ -206,7 +208,22 @@ export function OnboardingFlow({
         title="Cast to any TV"
         body={<>Tap <strong className="text-cyan-300">Cast</strong> to mirror this dashboard onto any TV — sign in to schedule layouts across the week.</>}
         step={3}
-        total={3}
+        total={4}
+        onNext={advanceToThemes}
+        nextLabel="Next"
+        onSkip={advanceToThemes}
+      />
+    );
+  }
+
+  if (phase === 'coach-themes') {
+    return (
+      <Coachmark
+        targetSelector='[data-testid="button-themes"]'
+        title="Make it yours with themes"
+        body={<>Tap <strong className="text-violet-300">Themes</strong> to swap the whole look — eight built-in styles, or save your current look as a personal theme.</>}
+        step={4}
+        total={4}
         onNext={finish}
         nextLabel="Done"
         onSkip={finish}
