@@ -6,6 +6,12 @@ import { Puzzle } from 'lucide-react';
 import { MONO, Widget, isLightBg } from './shared';
 import { evaluateWordleGuess, pickDailyWord, utcDateKey, WORDLE_ANSWERS } from './play-helpers';
 
+// Server contract: { date: 'YYYY-MM-DD', answer: 'crane' }. We trust the
+// server as the canonical source of the daily word so the answer pool
+// can be rotated without a client deploy. The client-side pool in
+// play-helpers is kept only as a deterministic offline fallback.
+interface WordleTodayResp { date: string; answer: string; }
+
 interface Props { widget: Widget; onUpdate?: (id: string, patch: Partial<Widget>) => void; }
 
 const ROWS = 6;
@@ -53,7 +59,31 @@ export const WordleWidget: React.FC<Props> = ({ widget, onUpdate }) => {
       window.removeEventListener('focus', onVisible);
     };
   }, []);
-  const answer = pickDailyWord(today, WORDLE_ANSWERS);
+
+  // Canonical answer comes from the server; if /api/wordle/today is
+  // unreachable we fall back to the deterministic client pool so the
+  // game still works offline. Refetched whenever the UTC date advances.
+  const [serverAnswer, setServerAnswer] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/wordle/today');
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = await r.json() as WordleTodayResp;
+        if (cancelled) return;
+        if (typeof j.answer === 'string' && /^[a-z]{5}$/i.test(j.answer)) {
+          setServerAnswer(j.answer.toLowerCase());
+        } else {
+          setServerAnswer(null);
+        }
+      } catch {
+        if (!cancelled) setServerAnswer(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [today]);
+  const answer = serverAnswer ?? pickDailyWord(today, WORDLE_ANSWERS);
 
   // Roll over guesses if the persisted date is stale.
   useEffect(() => {

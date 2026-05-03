@@ -146,7 +146,13 @@ export const OnThisDayWidget: React.FC<Props> = ({ widget, onUpdate }) => {
             </div>
           )}
           {!loading && !err && ev && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
+            <div
+              key={idx}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0,
+                animation: 'onThisDayFade 600ms ease',
+              }}
+            >
               <div style={{
                 color: accent, fontFamily: MONO, fontSize: Math.max(18, fs * 1.6),
                 fontWeight: 800, letterSpacing: '0.02em', flexShrink: 0,
@@ -162,27 +168,38 @@ export const OnThisDayWidget: React.FC<Props> = ({ widget, onUpdate }) => {
               }} data-testid={`on-this-day-text-${widget.id}`}>
                 {ev.text}
               </div>
-              {ev.pages.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flexShrink: 0 }}>
-                  {ev.pages.slice(0, 2).map(p => (
-                    <a
-                      key={p.url}
-                      href={p.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                        padding: '3px 8px', borderRadius: 6,
-                        background: `${accent}22`, border: `1px solid ${accent}`,
-                        color: accent, fontFamily: MONO, fontSize: 10, textDecoration: 'none',
-                      }}
-                      data-testid={`on-this-day-link-${widget.id}`}
-                    >
-                      {p.title} <ExternalLink size={9} />
-                    </a>
-                  ))}
-                </div>
-              )}
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                {ev.pages.slice(0, 2).map(p => (
+                  <a
+                    key={p.url}
+                    href={p.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '3px 8px', borderRadius: 6,
+                      background: `${accent}22`, border: `1px solid ${accent}`,
+                      color: accent, fontFamily: MONO, fontSize: 10, textDecoration: 'none',
+                    }}
+                    data-testid={`on-this-day-link-${widget.id}`}
+                  >
+                    {p.title} <ExternalLink size={9} />
+                  </a>
+                ))}
+                <a
+                  href="https://en.wikipedia.org/wiki/Wikipedia:On_this_day"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    marginLeft: 'auto',
+                    color: clrMuted, fontFamily: MONO, fontSize: 9,
+                    textDecoration: 'none', borderBottom: `1px dotted ${clrMuted}`,
+                  }}
+                  data-testid={`on-this-day-source-${widget.id}`}
+                >
+                  Source: Wikipedia
+                </a>
+              </div>
             </div>
           )}
           {!loading && !err && total > 1 && (
@@ -210,6 +227,7 @@ export const OnThisDayWidget: React.FC<Props> = ({ widget, onUpdate }) => {
           )}
         </div>
       )}
+      <style>{`@keyframes onThisDayFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
     </div>
   );
 };

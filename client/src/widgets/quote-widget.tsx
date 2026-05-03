@@ -33,6 +33,35 @@ export const QuoteWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Quote of the hour — pull a fresh quote on the hour boundary so the
+  // widget stays alive without the user clicking refresh. Server caches
+  // upstream for 1 hour, so this is a cheap call. Also fires on tab
+  // focus in case the timer was throttled while the tab was hidden.
+  useEffect(() => {
+    let active = true;
+    const tick = async () => {
+      if (!active) return;
+      try {
+        const r = await fetch('/api/quote');
+        if (!r.ok) return;
+        const j = await r.json() as { text?: string; author?: string };
+        if (!active || typeof j.text !== 'string' || j.text.trim().length === 0) return;
+        onUpdate?.(widget.id, { quoteCurrent: { text: j.text, author: typeof j.author === 'string' ? j.author : 'Unknown' } });
+      } catch { /* offline → keep current */ }
+    };
+    const id = window.setInterval(tick, 60 * 60_000);
+    const onVisible = () => { if (!document.hidden) void tick(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.id]);
+
   const cycleFallback = () => {
     cycleRef.current = (cycleRef.current + 1) >>> 0;
     const pool: readonly QuoteEntry[] = (widget.quoteFavorites && widget.quoteFavorites.length > 0)

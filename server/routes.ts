@@ -1818,6 +1818,58 @@ export async function registerRoutes(
   });
 
   // ─── Knowledge & Play pack ──────────────────────────────────────────────
+  // Server-owned Wordle answer pool. The client never ships this list — it
+  // asks /api/wordle/today for the per-UTC-day answer, so we control which
+  // word is canonical and can rotate the pool without a client update.
+  const WORDLE_SERVER_POOL: readonly string[] = [
+    'apple','beach','crane','drink','eagle','flame','grape','heart','image','joker',
+    'knife','lemon','mango','noble','ocean','piano','queen','river','stone','tiger',
+    'whale','yacht','zebra','adobe','bread','cabin','dance','enjoy','fable','glide',
+    'hover','irony','jolly','karma','laser','medal','novel','olive','peach','quirk',
+    'rapid','swift','torch','unity','venom','wagon','youth','adore','blade','crazy',
+    'daisy','eight','frost','giant','honey','index','jelly','lunar','magic','nerve',
+    'orbit','party','rebel','sugar','toast','urban','vivid','witch','agile','baker',
+    'cigar','dough','elite','flute','grasp','hatch','irate','jumpy','knack','liver',
+    'march','night','plant','quail','radio','salad','tooth','valve','water','yield',
+    'album','badge','candy','depth','event','fluid','glass','horse','ivory','jewel',
+    'kayak','large','metal','north','onion','pearl','quote','round','seven','table',
+    'under','virus','world','adapt','below','cargo','denim','elder','focus','grain',
+    'happy','infer','judge','kneel','lobby','movie','named','offer','paste','raise',
+    'sound','trick','until','vague','whirl','young','admit','blink','clean','elope',
+    'first','gauze','hardy','joint','known','later','medic','nylon','optic','pride',
+    'snake','treat','vinyl','widow','yodel','adopt','cloud','draft','equal','field',
+    'green','hello','input','light','money','niece','onset','plain','rocky','solid',
+    'today','upset','value','woven','adage','bagel','craft','dwell','envoy','farce',
+    'gusto','hippo','islet','jaunt','melon','nudge','oxide','pluck','queue','rusty',
+    'saint','torso','usher','vouch','waist','aside','bingo','civil','deity','epoch',
+    'fruit','gnome','heave','jaded','knoll','liner','mocha','noisy','pixel','reedy',
+    'satin','tweak','vista',
+  ];
+  const wordleHash = (s: string): number => {
+    let h = 0x811c9dc5 >>> 0;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return h >>> 0;
+  };
+  const utcDateKeyForReq = (d: Date): string => {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  // GET /api/wordle/today — { date: 'YYYY-MM-DD', answer: 'crane' } for the
+  // current UTC day. Deterministic so every player worldwide gets the
+  // same word. Computed in O(1); no caching layer needed.
+  app.get('/api/wordle/today', (_req: Request, res: Response) => {
+    const date = utcDateKeyForReq(new Date());
+    const idx = wordleHash(date) % WORDLE_SERVER_POOL.length;
+    res.json({ date, answer: WORDLE_SERVER_POOL[idx] });
+  });
+
+
   // GET /api/onthisday — Wikipedia REST `events` feed for today's MM/DD,
   // 1-hour cache (the upstream payload only changes once a day).
   interface OnThisDayEvent { year: number; text: string; pages: { title: string; url: string }[]; }
@@ -1861,7 +1913,10 @@ export async function registerRoutes(
   // user can't melt the upstream; the widget falls back to a bundled
   // pool when this endpoint is unavailable.
   interface QuotePayload { text: string; author: string; fetchedAt: number; }
-  const QUOTE_CACHE = new LruTtlCache<QuotePayload>({ max: 1, ttlMs: 5 * 60_000 });
+  // Quote of the hour — cached for 1 hour so a refresh-spam user can't
+  // hammer the upstream and so every client that polls hourly sees the
+  // same quote during a given clock hour.
+  const QUOTE_CACHE = new LruTtlCache<QuotePayload>({ max: 1, ttlMs: 60 * 60_000 });
   app.get('/api/quote', async (_req: Request, res: Response) => {
     const cached = QUOTE_CACHE.get('q');
     if (cached) return res.json(cached);
@@ -1893,13 +1948,15 @@ export async function registerRoutes(
   });
 
   // GET /api/trivia?difficulty=easy|medium|hard|any
-  // Proxies Open Trivia DB (no key). Decodes upstream HTML entities and
-  // returns a single multiple-choice question with its answer index. Not
-  // cached — every request must yield a fresh question.
+  // "Question of the Hour" — proxies Open Trivia DB (no key), decodes
+  // upstream HTML entities, returns a single MC question with its answer
+  // index. Cached per-difficulty for 1 hour so every client that hits
+  // this endpoint within the same clock hour gets the same question.
   interface TriviaPayload {
     question: string; choices: string[]; answerIdx: number;
     category: string; difficulty: string; fetchedAt: number;
   }
+  const TRIVIA_CACHE = new LruTtlCache<TriviaPayload>({ max: 8, ttlMs: 60 * 60_000 });
   const decodeHtml = (s: string): string => s
     .replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&apos;/g, "'")
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
@@ -1912,6 +1969,8 @@ export async function registerRoutes(
     const diff = String(req.query.difficulty ?? 'any');
     const allowed = new Set(['any', 'easy', 'medium', 'hard']);
     const difficulty = allowed.has(diff) ? diff : 'any';
+    const cached = TRIVIA_CACHE.get(difficulty);
+    if (cached) return res.json(cached);
     const params = new URLSearchParams({ amount: '1', type: 'multiple', encode: 'url3986' });
     if (difficulty !== 'any') params.set('difficulty', difficulty);
     const ctrl = new AbortController();
@@ -1951,6 +2010,7 @@ export async function registerRoutes(
         difficulty: dec(q.difficulty),
         fetchedAt: Date.now(),
       };
+      TRIVIA_CACHE.set(difficulty, payload);
       res.json(payload);
     } catch (err) {
       res.status(502).json({ error: err instanceof Error ? err.message : 'Trivia fetch failed' });
