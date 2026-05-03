@@ -150,8 +150,8 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   air_quality: ({ widget, onUpdate }) => (
     <AirQualityWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
   ),
-  sketch_pad: ({ widget, onUpdate }) => (
-    <SketchPadWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  sketch_pad: ({ widget, onUpdate, isDarkMode }) => (
+    <SketchPadWidget key={widget.id} widget={widget} onUpdate={onUpdate} isDarkMode={isDarkMode ?? true} />
   ),
   // Closure-bound on dashboard state (iframe refs / seek mode / inline
   // input). Rendered inline by pages/dashboard.tsx via <VideoWidget />.

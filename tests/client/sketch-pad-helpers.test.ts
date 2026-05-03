@@ -6,6 +6,9 @@ import {
   fitContain,
   brushPx,
   pushBounded,
+  acceptPrimaryPointer,
+  ownsPointer,
+  createDebouncedSaver,
   SKETCH_PALETTE,
   type Point,
 } from '../../shared/sketch-pad';
@@ -110,6 +113,75 @@ test('pushBounded enforces cap and is non-mutating', () => {
   for (let i = 0; i < 25; i++) acc = pushBounded(acc, i, 5);
   assert.equal(acc.length, 5);
   assert.deepEqual(acc, [20, 21, 22, 23, 24]);
+});
+
+test('acceptPrimaryPointer: only the first primary pointer wins', () => {
+  // No active stroke + primary pointer → accepted.
+  assert.equal(acceptPrimaryPointer(null, { pointerId: 7, isPrimary: true }),  7);
+  // Stroke already in flight → reject every subsequent down.
+  assert.equal(acceptPrimaryPointer(7,    { pointerId: 8, isPrimary: true }),  null);
+  // Explicit non-primary pointer (e.g. second finger of a pinch) → reject.
+  assert.equal(acceptPrimaryPointer(null, { pointerId: 9, isPrimary: false }), null);
+  // Pen events that don't set isPrimary still work (back-compat).
+  assert.equal(acceptPrimaryPointer(null, { pointerId: 3 }), 3);
+});
+
+test('ownsPointer: only the active pointer id matches', () => {
+  assert.equal(ownsPointer(7, 7), true);
+  assert.equal(ownsPointer(7, 8), false);
+  assert.equal(ownsPointer(null, 7), false);
+});
+
+test('createDebouncedSaver: schedule fires once after the delay', async () => {
+  let calls: number[] = [];
+  let timeouts: Array<{ cb: () => void; ms: number; id: number }> = [];
+  let nextId = 1;
+  const fakeSet = (cb: () => void, ms: number) => {
+    const id = nextId++; timeouts.push({ cb, ms, id }); return id as unknown as ReturnType<typeof setTimeout>;
+  };
+  const fakeClr = (t: ReturnType<typeof setTimeout>) => { timeouts = timeouts.filter(x => x.id !== (t as unknown as number)); };
+  const saver = createDebouncedSaver<number>((n) => calls.push(n), 500, { setTimeout: fakeSet, clearTimeout: fakeClr });
+  saver.schedule(1);
+  saver.schedule(2);  // resets the timer; only latest payload should fire
+  assert.equal(saver.isPending(), true);
+  assert.equal(timeouts.length, 1);
+  // Manually fire the scheduled callback to simulate the delay elapsing.
+  timeouts[0].cb();
+  assert.deepEqual(calls, [2]);
+  assert.equal(saver.isPending(), false);
+});
+
+test('createDebouncedSaver: flush() runs the latest payload synchronously', () => {
+  let calls: string[] = [];
+  let timeouts: Array<{ cb: () => void; id: number }> = [];
+  let nextId = 1;
+  const saver = createDebouncedSaver<string>((s) => calls.push(s), 500, {
+    setTimeout: (cb) => { const id = nextId++; timeouts.push({ cb, id }); return id as unknown as ReturnType<typeof setTimeout>; },
+    clearTimeout: (t) => { timeouts = timeouts.filter(x => x.id !== (t as unknown as number)); },
+  });
+  saver.schedule('hello');
+  assert.equal(saver.flush(), true);
+  assert.deepEqual(calls, ['hello']);
+  assert.equal(saver.isPending(), false);
+  // flush with nothing pending is a no-op.
+  assert.equal(saver.flush(), false);
+});
+
+test('createDebouncedSaver: cancel() drops pending invocation', () => {
+  let calls: number[] = [];
+  let timeouts: Array<{ cb: () => void; id: number }> = [];
+  let nextId = 1;
+  const saver = createDebouncedSaver<number>((n) => calls.push(n), 500, {
+    setTimeout: (cb) => { const id = nextId++; timeouts.push({ cb, id }); return id as unknown as ReturnType<typeof setTimeout>; },
+    clearTimeout: (t) => { timeouts = timeouts.filter(x => x.id !== (t as unknown as number)); },
+  });
+  saver.schedule(42);
+  saver.cancel();
+  assert.equal(saver.isPending(), false);
+  // Even if the original timeout reference somehow fires, the saver
+  // should not call the user fn — cancel() cleared `latest`. We can't
+  // re-fire the cleared timer here, so just assert nothing ran.
+  assert.deepEqual(calls, []);
 });
 
 test('SKETCH_PALETTE has stable swatch list', () => {

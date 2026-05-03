@@ -100,6 +100,76 @@ export const SKETCH_PALETTE: string[] = [
   '#ec4899', // pink
 ];
 
+// ─── Pointer routing ──────────────────────────────────────────────────
+// Sketch Pad accepts only one pointer at a time so a pinch / two-finger
+// scroll never accidentally draws two strokes. A pointer is accepted
+// when (a) no stroke is in progress, (b) the event is the primary
+// pointer (or primaryness is unknown — pen events sometimes lack it on
+// older browsers, so we accept when isPrimary is undefined).
+//
+// Returns the new active pointer id (or null if rejected). Caller stores
+// the id in a ref and only handles subsequent move/up/cancel events that
+// match it.
+export interface PointerInfo { pointerId: number; isPrimary?: boolean; pointerType?: string; }
+export function acceptPrimaryPointer(active: number | null, info: PointerInfo): number | null {
+  if (active !== null) return null;                      // already drawing
+  if (info.isPrimary === false) return null;             // explicit non-primary
+  return info.pointerId;
+}
+/** True when the in-flight stroke owns the given pointerId. */
+export function ownsPointer(active: number | null, pointerId: number): boolean {
+  return active !== null && active === pointerId;
+}
+
+// ─── Debounced saver ──────────────────────────────────────────────────
+// Tiny, framework-free helper that exposes schedule / flush / cancel.
+// Extracted so tests can verify (a) a scheduled flush eventually fires,
+// (b) flush() runs the latest payload synchronously, and (c) cancel()
+// drops any pending invocation. The widget uses this to persist the PNG
+// data URL 500 ms after the last pointer-up, with a final flush on
+// unmount so a stroke completed mid-debounce isn't lost.
+export interface DebouncedSaver<P> {
+  schedule: (payload: P) => void;
+  flush: () => boolean;
+  cancel: () => void;
+  isPending: () => boolean;
+}
+type TimerHandle = ReturnType<typeof setTimeout>;
+export function createDebouncedSaver<P>(
+  fn: (p: P) => void,
+  delayMs: number,
+  schedulers: { setTimeout: (cb: () => void, ms: number) => TimerHandle; clearTimeout: (t: TimerHandle) => void } = {
+    setTimeout: (cb, ms) => setTimeout(cb, ms),
+    clearTimeout: (t) => clearTimeout(t),
+  },
+): DebouncedSaver<P> {
+  let timer: TimerHandle | null = null;
+  let latest: { value: P } | null = null;
+  return {
+    schedule(payload) {
+      latest = { value: payload };
+      if (timer !== null) schedulers.clearTimeout(timer);
+      timer = schedulers.setTimeout(() => {
+        timer = null;
+        const snap = latest; latest = null;
+        if (snap) fn(snap.value);
+      }, delayMs);
+    },
+    flush() {
+      if (timer !== null) { schedulers.clearTimeout(timer); timer = null; }
+      if (!latest) return false;
+      const snap = latest; latest = null;
+      fn(snap.value);
+      return true;
+    },
+    cancel() {
+      if (timer !== null) { schedulers.clearTimeout(timer); timer = null; }
+      latest = null;
+    },
+    isPending() { return timer !== null; },
+  };
+}
+
 /**
  * Bounded undo stack. Pushing past `cap` discards the oldest entry so
  * the in-memory snapshot list never grows without bound. We store

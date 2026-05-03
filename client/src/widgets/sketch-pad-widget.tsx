@@ -15,23 +15,34 @@ import {
   brushPx,
   fitContain,
   pushBounded,
+  acceptPrimaryPointer,
+  ownsPointer,
+  createDebouncedSaver,
   SKETCH_PALETTE,
   type Point,
   type BrushSize,
+  type DebouncedSaver,
 } from '@shared/sketch-pad';
 
 const SAVE_DEBOUNCE_MS  = 500;
 const TOOLBAR_HIDE_MS   = 3000;
 const UNDO_CAP          = 20;
 
-interface Props { widget: Widget; onUpdate?: (id: string, patch: Partial<Widget>) => void; }
+interface Props {
+  widget: Widget;
+  onUpdate?: (id: string, patch: Partial<Widget>) => void;
+  isDarkMode?: boolean;
+}
 
-export const SketchPadWidget: React.FC<Props> = ({ widget, onUpdate }) => {
+export const SketchPadWidget: React.FC<Props> = ({ widget, onUpdate, isDarkMode = true }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const ctxRef       = useRef<CanvasRenderingContext2D | null>(null);
   const ptsRef       = useRef<Point[]>([]);
-  const drawingRef   = useRef(false);
+  // Active pointer id — null when no stroke is in progress. Used to
+  // ignore non-primary pointers (pinch / multi-touch) so the user can
+  // still pinch-zoom or two-finger-scroll without leaving stray ink.
+  const activePointerRef = useRef<number | null>(null);
   const dprRef       = useRef<number>(1);
   // Bumped on every surface re-init so async Image.onload callbacks
   // know they've been superseded and skip drawing into a stale canvas.
@@ -41,7 +52,6 @@ export const SketchPadWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   const [toolbarVisible, setToolbarVisible] = useState(true);
   const [showPalette, setShowPalette] = useState(false);
   const hideTimerRef = useRef<number | null>(null);
-  const saveTimerRef = useRef<number | null>(null);
 
   // Toolbar prefs come from the widget; default to a sensible ink
   // colour. We keep local state so toggle clicks feel snappy and only
@@ -50,9 +60,11 @@ export const SketchPadWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   const [size,    setSize]    = useState<BrushSize>((widget.sketchSize ?? 'M') as BrushSize);
   const [eraser,  setEraser]  = useState<boolean>(widget.sketchEraser === true);
 
-  // Theme — match other widgets: customColor or a sensible default,
-  // and a high-contrast canvas background that flips for light themes.
-  const bgColor = widget.customColor ?? '#1e293b';
+  // Theme — match other widgets: customColor wins, otherwise default
+  // to the dashboard's dark/light mode so the surface feels native to
+  // the active theme. light/dark booleans then drive the canvas
+  // background and toolbar/text contrast.
+  const bgColor = widget.customColor ?? (isDarkMode ? '#1e293b' : '#f8fafc');
   const light   = isLightBg(bgColor);
   const canvasBg = light ? '#ffffff' : '#0f172a';
   const clrPrimary = light ? '#0f172a' : '#e2e8f0';
@@ -76,35 +88,37 @@ export const SketchPadWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     bumpToolbar();
     return () => {
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
-      if (saveTimerRef.current) {
-        window.clearTimeout(saveTimerRef.current);
-        saveCanvas();
-      }
+      // Force a synchronous flush of any pending debounced PNG save so a
+      // stroke completed inside the debounce window survives unmount /
+      // navigation. The saver itself is no-op if nothing is pending.
+      saverRef.current?.flush();
     };
-    // saveCanvas/bumpToolbar are stable enough; mount/unmount-only effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Persistence helpers
   const onUpdateRef = useRef(onUpdate);
   useEffect(() => { onUpdateRef.current = onUpdate; }, [onUpdate]);
-  const saveCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    try {
-      const dataUrl = canvas.toDataURL('image/png');
-      onUpdateRef.current?.(widget.id, {
-        sketchPad: { format: 'v1', dataUrl, w: canvas.width, h: canvas.height },
-        sketchColor: color, sketchSize: size, sketchEraser: eraser,
-      });
-    } catch (e) {
-      console.warn('[SketchPad] toDataURL failed:', e);
-    }
-  }, [widget.id, color, size, eraser]);
-  const scheduleSave = useCallback(() => {
-    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = window.setTimeout(saveCanvas, SAVE_DEBOUNCE_MS);
-  }, [saveCanvas]);
+  const prefsRef = useRef({ color, size, eraser });
+  useEffect(() => { prefsRef.current = { color, size, eraser }; }, [color, size, eraser]);
+  const saverRef = useRef<DebouncedSaver<null> | null>(null);
+  if (!saverRef.current) {
+    saverRef.current = createDebouncedSaver<null>(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        const { color: c, size: s, eraser: e } = prefsRef.current;
+        onUpdateRef.current?.(widget.id, {
+          sketchPad: { format: 'v1', dataUrl, w: canvas.width, h: canvas.height },
+          sketchColor: c, sketchSize: s, sketchEraser: e,
+        });
+      } catch (err) {
+        console.warn('[SketchPad] toDataURL failed:', err);
+      }
+    }, SAVE_DEBOUNCE_MS);
+  }
+  const scheduleSave = useCallback(() => { saverRef.current?.schedule(null); }, []);
 
   // ── Resize handling: re-create the device-pixel surface and re-paint
   // the most recently persisted PNG into it (contain fit so nothing is
@@ -201,20 +215,26 @@ export const SketchPadWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   // ── Pointer event handlers
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current; if (!canvas) return;
+    // Primary-pointer guard: ignore secondary touches (pinch / two-finger
+    // scroll) and re-entrant pointer-downs while a stroke is in flight.
+    const accepted = acceptPrimaryPointer(activePointerRef.current, {
+      pointerId: e.pointerId, isPrimary: e.isPrimary, pointerType: e.pointerType,
+    });
+    if (accepted === null) return;
+    activePointerRef.current = accepted;
     // Snapshot pre-stroke for undo BEFORE we start drawing.
     try {
       const snap = canvas.toDataURL('image/png');
       setUndoStack(prev => pushBounded(prev, snap, UNDO_CAP));
     } catch { /* may fail if tainted; undo is best-effort */ }
-    canvas.setPointerCapture(e.pointerId);
-    drawingRef.current = true;
+    try { canvas.setPointerCapture(e.pointerId); } catch { /* noop */ }
     const rect = canvas.getBoundingClientRect();
     ptsRef.current = [{ x: e.clientX - rect.left, y: e.clientY - rect.top }];
     bumpToolbar();
   }, [bumpToolbar]);
 
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drawingRef.current) return;
+    if (!ownsPointer(activePointerRef.current, e.pointerId)) return;
     const canvas = canvasRef.current; if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const pt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -227,8 +247,8 @@ export const SketchPadWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   }, [flushStroke]);
 
   const endStroke = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drawingRef.current) return;
-    drawingRef.current = false;
+    if (!ownsPointer(activePointerRef.current, e.pointerId)) return;
+    activePointerRef.current = null;
     try { canvasRef.current?.releasePointerCapture(e.pointerId); } catch { /* noop */ }
     flushStroke();
     ptsRef.current = [];
