@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "widgets": [
+    {
+      "id": "pomodoro",
+      "name": "Pomodoro Timer",
+      "author": "OpenBento",
+      "description": "A 25/5 focus timer that demonstrates setState / getState round-trip and theme bridging.",
+      "category": "productivity",
+      "version": "1.0.0",
+      "url": "/examples/widgets/pomodoro/index.html",
+      "tags": ["focus", "timer", "productivity"]
+    },
+    {
+      "id": "hello-world",
+      "name": "Hello, World",
+      "author": "OpenBento",
+      "description": "The smallest possible OpenBento widget — a friendly greeter that mirrors the host theme.",
+      "category": "fun",
+      "version": "1.0.0",
+      "url": "/examples/widgets/hello-world/index.html",
+      "tags": ["sample", "starter"]
+    },
+    {
+      "id": "click-counter",
+      "name": "Click Counter",
+      "author": "OpenBento",
+      "description": "A persistent click counter that demonstrates the setState round-trip with the host.",
+      "category": "utility",
+      "version": "1.0.0",
+      "url": "/examples/widgets/click-counter/index.html",
+      "tags": ["counter", "state", "sample"]
+    },
+    {
+      "id": "public-quote",
+      "name": "Daily Quote",
+      "author": "OpenBento",
+      "description": "Fetches a fresh inspirational quote on demand from a public API. Demonstrates network access.",
+      "category": "fun",
+      "version": "1.0.0",
+      "url": "/examples/widgets/public-quote/index.html",
+      "tags": ["quote", "fetch", "sample"]
+    }
+  ]
+}

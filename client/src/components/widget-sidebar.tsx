@@ -450,6 +450,10 @@
     onImageUpload?: (imageUrl: string) => void;
     isAuthenticated?: boolean;
     openLoginModal?: (reason?: string) => void;
+    /** When set, opens the Custom Widget add modal pre-filled with this
+     *  URL (used by the /widgets marketplace install handoff). */
+    pendingInstallUrl?: string | null;
+    onPendingInstallConsumed?: () => void;
   }
 
   export function WidgetSidebar({
@@ -465,6 +469,8 @@
     onImageUpload,
     isAuthenticated = false,
     openLoginModal,
+    pendingInstallUrl = null,
+    onPendingInstallConsumed,
   }: WidgetSidebarProps) {
     const [activeTab, setActiveTab]             = useState<SidebarTab>('streams');
     const [activeCategory, setActiveCategory]   = useState<ContentCategory>('all');
@@ -478,6 +484,16 @@
     const [customUrlInput, setCustomUrlInput]     = useState('');
     const [customTrusted, setCustomTrusted]       = useState(false);
     const customUrlValid = isAllowedCustomWidgetUrl(customUrlInput);
+    // Marketplace handoff: pop the Custom Widget modal pre-filled.
+    useEffect(() => {
+      if (!pendingInstallUrl) return;
+      setActiveTab('widgets');
+      setCustomUrlInput(pendingInstallUrl);
+      setCustomTrusted(false);
+      setCustomModalOpen(true);
+      onPendingInstallConsumed?.();
+    }, [pendingInstallUrl, onPendingInstallConsumed]);
+
     const submitCustomWidget = (url: string, trusted: boolean) => {
       if (!isAllowedCustomWidgetUrl(url)) return;
       onCustomWidgetAdd?.(url, { trusted });
@@ -1610,6 +1626,16 @@
                       data-testid="link-custom-widget-docs"
                     >
                       Read the SDK docs <ExternalLink className="w-[1rem] h-[1rem]" />
+                    </a>
+                    {' \u00B7 '}
+                    <a
+                      href="/widgets"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-400 hover:underline inline-flex items-center gap-[0.2rem]"
+                      data-testid="link-custom-widget-marketplace"
+                    >
+                      Browse marketplace <ExternalLink className="w-[1rem] h-[1rem]" />
                     </a>
                   </div>
                 </div>

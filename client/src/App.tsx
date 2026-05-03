@@ -28,6 +28,7 @@ import Terms from '@/pages/terms';
 import Privacy from '@/pages/privacy';
 import Feedback from '@/pages/feedback';
 import DevWidgets from '@/pages/dev-widgets';
+import Marketplace from '@/pages/marketplace';
 import type { Widget, WidgetType } from '@/widgets/shared';
 import { WidgetRenderer } from '@/widgets/widget-renderer';
 
@@ -67,6 +68,7 @@ function App() {
             <Route path="/privacy"  component={Privacy} />
             <Route path="/feedback" component={Feedback} />
             <Route path="/dev/widgets" component={DevWidgets} />
+            <Route path="/widgets" component={Marketplace} />
             <Route path="/cast">
               {() => (
                 <Suspense fallback={<div className="w-screen h-screen bg-slate-950" />}>

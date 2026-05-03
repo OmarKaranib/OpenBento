@@ -31,6 +31,14 @@ export default function DevWidgetsPage() {
         >
           <ArrowLeft size={16} /> Back to dashboard
         </Link>
+        {' '}
+        <Link
+          href="/widgets"
+          data-testid="link-dev-widgets-marketplace"
+          style={{ color: '#22d3ee', display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 24, marginLeft: 16, textDecoration: 'none' }}
+        >
+          Marketplace →
+        </Link>
 
         <h1 style={{ fontSize: 32, fontWeight: 800, marginBottom: 8 }}>Widget SDK</h1>
         <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 32 }}>

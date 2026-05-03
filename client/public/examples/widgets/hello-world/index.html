@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hello, World — OpenBento Sample Widget</title>
+  <script src="/sdk/widget-sdk.v1.js"></script>
+  <style>
+    :root { --bg: #0f172a; --fg: #e2e8f0; --accent: #22d3ee; --muted: #64748b; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body {
+      background: var(--bg); color: var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; padding: 16px; transition: background 200ms, color 200ms;
+      text-align: center;
+    }
+    h1 { font-size: clamp(20px, 6vw, 36px); margin: 0; color: var(--accent); }
+    p  { font-size: 13px; color: var(--muted); margin: 0; }
+    .wave { font-size: clamp(40px, 14vw, 80px); line-height: 1; animation: wave 2s ease-in-out infinite; transform-origin: 70% 70%; display: inline-block; }
+    @keyframes wave {
+      0%, 60%, 100% { transform: rotate(0deg); }
+      10% { transform: rotate(14deg); }
+      20% { transform: rotate(-8deg); }
+      30% { transform: rotate(14deg); }
+      40% { transform: rotate(-4deg); }
+      50% { transform: rotate(10deg); }
+    }
+  </style>
+</head>
+<body>
+  <span class="wave" aria-hidden="true">👋</span>
+  <h1>Hello, World</h1>
+  <p>This widget is running inside an OpenBento sandbox.</p>
+
+  <script>
+    OpenBento.onTheme(function (t) {
+      document.documentElement.style.setProperty('--bg',     t.bg || (t.dark ? '#0f172a' : '#f8fafc'));
+      document.documentElement.style.setProperty('--fg',     t.dark ? '#e2e8f0' : '#0f172a');
+      document.documentElement.style.setProperty('--accent', t.accent || '#22d3ee');
+    });
+    OpenBento.ready({ name: 'Hello World', version: '1.0.0' });
+  </script>
+</body>
+</html>

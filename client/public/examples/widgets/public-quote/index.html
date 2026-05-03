@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Daily Quote — OpenBento Sample Widget</title>
+  <script src="/sdk/widget-sdk.v1.js"></script>
+  <style>
+    :root { --bg: #0f172a; --fg: #e2e8f0; --accent: #22d3ee; --muted: #64748b; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body {
+      background: var(--bg); color: var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; padding: 20px; transition: background 200ms, color 200ms;
+      text-align: center;
+    }
+    .quote  { font-size: clamp(14px, 2.6vw, 20px); font-style: italic; line-height: 1.45; max-width: 90%; }
+    .author { font-size: 12px; color: var(--muted); }
+    button {
+      background: var(--accent); color: #0f172a; border: none;
+      border-radius: 8px; padding: 8px 14px; font-size: 13px;
+      font-weight: 700; cursor: pointer;
+    }
+    button:hover { filter: brightness(1.08); }
+    .err    { color: #f87171; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="quote" id="quote">Loading a fresh quote…</div>
+  <div class="author" id="author"></div>
+  <button id="refresh" type="button">New quote</button>
+
+  <script>
+    (function () {
+      var $q = document.getElementById('quote');
+      var $a = document.getElementById('author');
+
+      function load() {
+        $q.textContent = 'Loading…';
+        $a.textContent = '';
+        $q.classList.remove('err');
+        // Public CORS-friendly quote API. Falls back gracefully on error.
+        fetch('https://api.quotable.io/random', { cache: 'no-store' })
+          .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+          .then(function (j) {
+            $q.textContent = '\u201C' + j.content + '\u201D';
+            $a.textContent = '\u2014 ' + j.author;
+            OpenBento.setState({ last: { content: j.content, author: j.author, ts: Date.now() } })
+              .catch(function () {});
+          })
+          .catch(function () {
+            $q.classList.add('err');
+            $q.textContent = 'Could not fetch a new quote. Try again in a moment.';
+          });
+      }
+
+      document.getElementById('refresh').addEventListener('click', load);
+
+      OpenBento.onTheme(function (t) {
+        document.documentElement.style.setProperty('--bg',     t.bg || (t.dark ? '#0f172a' : '#f8fafc'));
+        document.documentElement.style.setProperty('--fg',     t.dark ? '#e2e8f0' : '#0f172a');
+        document.documentElement.style.setProperty('--accent', t.accent || '#22d3ee');
+      });
+
+      OpenBento.ready({ name: 'Daily Quote', version: '1.0.0' });
+      OpenBento.getState().then(function (saved) {
+        if (saved && saved.last && typeof saved.last.content === 'string') {
+          $q.textContent = '\u201C' + saved.last.content + '\u201D';
+          $a.textContent = '\u2014 ' + (saved.last.author || 'unknown');
+        } else {
+          load();
+        }
+      }).catch(load);
+    })();
+  </script>
+</body>
+</html>

@@ -77,6 +77,7 @@ const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
 const [activeId, setActiveId]             = useState<UniqueIdentifier | null>(null);
 const [isEditMode, setIsEditMode]         = useState(false);
 const [urlInputValue, setUrlInputValue]   = useState('');
+const [pendingInstallUrl, setPendingInstallUrl] = useState<string | null>(null);
 const [isFullscreen, setIsFullscreen]     = useState(false);
 const [ghostPosition, setGhostPosition]   = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 const [loginModalOpen, setLoginModalOpen]         = useState(false);
@@ -224,6 +225,25 @@ useEffect(() => {
       : prev,
   );
   deepLinkAppliedRef.current = true;
+}, [location]);
+
+// ?install=<url> — handoff from the /widgets marketplace. Opens the
+// Block Library, switches to the Widgets tab, and pre-fills the
+// Custom Widget add modal with the requested URL. The trust banner
+// remains the user's explicit opt-in (handled inside the modal +
+// CustomWidget host runtime). The param is stripped from the URL
+// once consumed so reloads don't re-open the modal.
+useEffect(() => {
+  if (typeof window === 'undefined') return;
+  try {
+    const url = new URL(window.location.href);
+    const requested = url.searchParams.get('install');
+    if (!requested) return;
+    setPendingInstallUrl(requested);
+    setSidebarOpen(true);
+    url.searchParams.delete('install');
+    window.history.replaceState(null, '', url.toString());
+  } catch {/* */}
 }, [location]);
 
 // Mirror the active page id into the URL as `?page=<id>` so reloads
@@ -885,6 +905,8 @@ return (
             onImageUpload={handleImageUpload}
             isAuthenticated={isAuthenticated}
             openLoginModal={openLoginModal}
+            pendingInstallUrl={pendingInstallUrl}
+            onPendingInstallConsumed={() => setPendingInstallUrl(null)}
           />
         )}
         <MasterControlDashboard {...dashboardProps} />
