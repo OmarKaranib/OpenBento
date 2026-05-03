@@ -11,7 +11,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ArrowLeft, Search, Plus, Mail, Code2, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Search, Plus, Mail, Code2, ShieldAlert, Github } from 'lucide-react';
 import {
   parseMarketplaceManifest,
   MARKETPLACE_CATEGORIES,
@@ -228,27 +228,64 @@ export default function MarketplacePage() {
           style={{
             marginTop: 48, padding: '24px 20px', borderRadius: 12,
             background: '#0f172a', border: '1px solid #1e293b',
-            display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+            display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16,
           }}
           data-testid="marketplace-submit-footer"
         >
-          <div>
+          <div style={{ flex: '1 1 320px', minWidth: 260 }}>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Built a widget?</h2>
-            <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: 13 }}>
-              Open a PR with your manifest entry, or email us a link.
+            <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: 13, lineHeight: 1.5 }}>
+              Open a pull request adding your entry to{' '}
+              <code style={{ background: '#020617', padding: '1px 6px', borderRadius: 4, fontSize: 12 }}>
+                client/public/marketplace/widgets.json
+              </code>
+              , or email us a link. Each entry must include{' '}
+              <code style={{ background: '#020617', padding: '1px 6px', borderRadius: 4, fontSize: 12 }}>
+                id, name, author, description, category, version, url
+              </code>
+              {' '}— see the{' '}
+              <Link href="/dev/widgets" style={{ color: '#22d3ee' }} data-testid="link-marketplace-schema-docs">
+                SDK docs
+              </Link>
+              {' '}for the manifest schema and the trust/sandbox model.
             </p>
           </div>
-          <a
-            href="mailto:hello@openbento.dev?subject=Widget%20Marketplace%20Submission"
-            data-testid="link-marketplace-submit"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              padding: '10px 16px', background: '#22d3ee', color: '#0f172a',
-              borderRadius: 8, fontWeight: 700, fontSize: 13, textDecoration: 'none',
-            }}
-          >
-            <Mail size={14} /> Submit your widget
-          </a>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <a
+              href="https://github.com/openbento/dashboard"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="link-marketplace-github"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '10px 16px', background: 'rgba(255,255,255,0.06)', color: '#e2e8f0',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8, fontWeight: 700, fontSize: 13, textDecoration: 'none',
+              }}
+            >
+              <Github size={14} /> GitHub repo
+            </a>
+            <a
+              href={'mailto:hello@openbento.dev?subject=' + encodeURIComponent('Widget Marketplace Submission')
+                + '&body=' + encodeURIComponent(
+                  'Hi OpenBento team!\n\nI built a Custom Widget I would like added to the marketplace.\n\n'
+                  + 'Manifest entry (paste into client/public/marketplace/widgets.json under "widgets"):\n\n'
+                  + '{\n  "id": "my-widget",\n  "name": "My Widget",\n  "author": "Your Name",\n'
+                  + '  "description": "What it does in one line.",\n  "category": "productivity",\n'
+                  + '  "version": "1.0.0",\n  "url": "https://example.com/my-widget/index.html",\n'
+                  + '  "tags": ["optional"]\n}\n\n'
+                  + 'My widget loads /sdk/widget-sdk.v1.js and only uses postMessage (no eval, no top-nav).\n\n'
+                  + 'Live preview URL: \nGitHub source: \n')}
+              data-testid="link-marketplace-submit"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '10px 16px', background: '#22d3ee', color: '#0f172a',
+                borderRadius: 8, fontWeight: 700, fontSize: 13, textDecoration: 'none',
+              }}
+            >
+              <Mail size={14} /> Submit your widget
+            </a>
+          </div>
         </footer>
       </div>
     </div>
