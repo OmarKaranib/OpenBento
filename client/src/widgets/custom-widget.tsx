@@ -14,9 +14,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ShieldAlert, RefreshCw, Settings as SettingsIcon, ExternalLink } from 'lucide-react';
 import type { Widget } from './shared';
 import {
-  ClientMessageSchema,
-  applyClientMessage,
   isAllowedCustomWidgetUrl,
+  routeIframeMessage,
   PROTOCOL_VERSION,
   type HostMessage,
   type ThemeBundle,
@@ -66,37 +65,25 @@ export function CustomWidget({ widget, isDarkMode, onUpdate }: CustomWidgetProps
     if (!trusted || !valid) return;
 
     const handler = (e: MessageEvent) => {
-      // Ignore everything that isn't from *our* iframe.
-      const target = iframeRef.current?.contentWindow;
-      if (!target || e.source !== target) return;
-
-      const parsed = ClientMessageSchema.safeParse(e.data);
-      if (!parsed.success) return; // silently drop malformed messages
-
-      const msg = parsed.data;
-      const state = (widgetRef.current.customWidgetState ?? {}) as Record<string, unknown>;
-      const theme = buildThemeBundle(widgetRef.current, isDarkRef.current);
-      const { nextState, response } = applyClientMessage(state, msg, theme);
-
-      if (msg.type === 'setState') {
-        widgetRef.current = { ...widgetRef.current, customWidgetState: nextState };
-        onUpdate?.(widgetRef.current.id, { customWidgetState: nextState });
-      }
-      if (msg.type === 'ready' && msg.payload) {
-        // Persist the version the widget reports so the settings popover
-        // can show it without round-tripping through getState.
-        const v = (msg.payload as { version?: string; name?: string }).version;
-        if (v && v !== widgetRef.current.customWidgetVersion) {
-          widgetRef.current = { ...widgetRef.current, customWidgetVersion: v };
-          onUpdate?.(widgetRef.current.id, { customWidgetVersion: v });
-        }
-      }
-      if (msg.type === 'refresh') {
-        // Treat as "remount me".
-        setIframeKey(k => k + 1);
-      }
-
-      if (response) post(response);
+      routeIframeMessage(
+        { source: e.source, data: e.data },
+        {
+          iframeWindow: iframeRef.current?.contentWindow,
+          getState: () => (widgetRef.current.customWidgetState ?? {}) as Record<string, unknown>,
+          getTheme: () => buildThemeBundle(widgetRef.current, isDarkRef.current),
+          setState: (next) => {
+            widgetRef.current = { ...widgetRef.current, customWidgetState: next };
+            onUpdate?.(widgetRef.current.id, { customWidgetState: next });
+          },
+          setVersion: (v) => {
+            if (v === widgetRef.current.customWidgetVersion) return;
+            widgetRef.current = { ...widgetRef.current, customWidgetVersion: v };
+            onUpdate?.(widgetRef.current.id, { customWidgetVersion: v });
+          },
+          post,
+          onRefreshRequest: () => setIframeKey((k) => k + 1),
+        },
+      );
     };
 
     window.addEventListener('message', handler);

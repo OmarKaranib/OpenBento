@@ -72,28 +72,79 @@ export const HostMessageSchema = z.discriminatedUnion('type', [
 export type HostMessage = z.infer<typeof HostMessageSchema>;
 
 // ─── URL allow / deny ─────────────────────────────────────────────────────
-// v1 policy: only http(s) URLs or same-origin absolute paths (e.g. our own
-// /examples/widgets/<sample>). Explicitly blocks javascript:, data:, file:,
-// blob:, vbscript:, and protocol-relative `//host/...` URLs.
-const ALLOWED_PROTOCOLS = ['http:', 'https:'];
-const DENY_PREFIXES = [
+// The host evaluates every custom-widget URL against a *configurable*
+// allow/deny pattern policy before mounting the iframe. The default policy
+// (DEFAULT_CUSTOM_WIDGET_URL_POLICY) hard-codes the v1 contract:
+//   • only http: and https: URLs
+//   • plus same-origin absolute paths (e.g. our /examples/widgets/<id>)
+//   • protocol-relative `//host/...` URLs are always blocked
+//   • dangerous schemes (javascript:, data:, file:, blob:, vbscript:,
+//     about:) are always blocked, even if you add them to allowedSchemes.
+//
+// Hosts can supply additional `allowPatterns` / `denyPatterns` (matched
+// against the trimmed URL) to express things like "only widgets on our
+// CDN" or "block this specific compromised vendor". `denyPatterns` are
+// always evaluated first, so a deny match wins over any allow match.
+const ALWAYS_DENY_SCHEMES = [
   'javascript:', 'data:', 'file:', 'blob:', 'vbscript:', 'about:',
 ];
 
-export function isAllowedCustomWidgetUrl(raw: unknown): raw is string {
+export interface CustomWidgetUrlPolicy {
+  /** URL schemes considered safe (e.g. ['http:', 'https:']). */
+  allowedSchemes?: string[];
+  /** When true, same-origin absolute paths beginning with `/` are allowed. */
+  allowSameOriginPaths?: boolean;
+  /** Extra regexes — a URL is allowed if it matches any one of these
+   *  *in addition to* the scheme/path checks. */
+  allowPatterns?: RegExp[];
+  /** Extra regexes — a URL is rejected outright if it matches any of these,
+   *  regardless of scheme. Evaluated before everything else. */
+  denyPatterns?: RegExp[];
+}
+
+export const DEFAULT_CUSTOM_WIDGET_URL_POLICY: Required<CustomWidgetUrlPolicy> = {
+  allowedSchemes: ['http:', 'https:'],
+  allowSameOriginPaths: true,
+  allowPatterns: [],
+  denyPatterns: [],
+};
+
+export function isAllowedCustomWidgetUrl(
+  raw: unknown,
+  policy: CustomWidgetUrlPolicy = {},
+): raw is string {
   if (typeof raw !== 'string') return false;
   const trimmed = raw.trim();
   if (!trimmed) return false;
   const lower = trimmed.toLowerCase();
-  for (const bad of DENY_PREFIXES) if (lower.startsWith(bad)) return false;
+
+  // 1. Hard-coded never-allow schemes (cannot be overridden).
+  for (const bad of ALWAYS_DENY_SCHEMES) if (lower.startsWith(bad)) return false;
+
+  // 2. Caller-supplied deny patterns win over any allow rule.
+  const merged: Required<CustomWidgetUrlPolicy> = {
+    ...DEFAULT_CUSTOM_WIDGET_URL_POLICY,
+    ...policy,
+  };
+  for (const re of merged.denyPatterns) if (re.test(trimmed)) return false;
+
+  // 3. Protocol-relative URLs (`//evil.com/...`) are always blocked.
   if (trimmed.startsWith('//')) return false;
-  if (trimmed.startsWith('/')) return true; // same-origin absolute path
+
+  // 4. Same-origin absolute paths.
+  if (trimmed.startsWith('/')) return merged.allowSameOriginPaths === true;
+
+  // 5. Otherwise, must parse as a URL with an allowed scheme — or match
+  //    one of the explicit allowPatterns (which can opt in to e.g.
+  //    custom protocols if a host really wants to).
   try {
     const u = new URL(trimmed);
-    return ALLOWED_PROTOCOLS.includes(u.protocol);
+    if (merged.allowedSchemes.includes(u.protocol)) return true;
   } catch {
-    return false;
+    /* fall through */
   }
+  for (const re of merged.allowPatterns) if (re.test(trimmed)) return true;
+  return false;
 }
 
 // ─── Built-in sample registry ─────────────────────────────────────────────
@@ -125,6 +176,43 @@ export const SAMPLE_CUSTOM_WIDGETS: ReadonlyArray<SampleCustomWidget> = [
 export interface ApplyClientMessageResult {
   nextState: Record<string, unknown>;
   response: HostMessage | null;
+}
+
+// ─── Host iframe message router ───────────────────────────────────────────
+// Pure helper that wraps the source-check + Zod validation + reducer call
+// the host runtime performs on every incoming postMessage. Lifted out of
+// custom-widget.tsx so it can be unit-tested without a DOM/JSDOM (the
+// caller injects a fake event with `source` + `data` and assertion-friendly
+// callbacks for state / version / post). Two router instances created with
+// different `iframeWindow` references will *never* observe each other's
+// state because the source-check on line 1 rejects non-matching events.
+export interface HostMessageRouterContext {
+  iframeWindow: unknown;                              // contentWindow ref to compare e.source against
+  getState: () => Record<string, unknown>;
+  getTheme: () => ThemeBundle;
+  setState: (next: Record<string, unknown>) => void;
+  setVersion: (version: string) => void;
+  post: (msg: HostMessage) => void;
+  onRefreshRequest: () => void;
+}
+
+export function routeIframeMessage(
+  event: { source?: unknown; data?: unknown },
+  ctx: HostMessageRouterContext,
+): void {
+  if (!ctx.iframeWindow || event.source !== ctx.iframeWindow) return;
+  const parsed = ClientMessageSchema.safeParse(event.data);
+  if (!parsed.success) return; // silently drop malformed messages
+
+  const msg = parsed.data;
+  const { nextState, response } = applyClientMessage(ctx.getState(), msg, ctx.getTheme());
+
+  if (msg.type === 'setState') ctx.setState(nextState);
+  if (msg.type === 'ready' && msg.payload && typeof msg.payload.version === 'string') {
+    ctx.setVersion(msg.payload.version);
+  }
+  if (msg.type === 'refresh') ctx.onRefreshRequest();
+  if (response) ctx.post(response);
 }
 
 export function applyClientMessage(

@@ -154,3 +154,43 @@ test('SAMPLE_CUSTOM_WIDGETS entries all have allowed URLs', () => {
 test('PROTOCOL_VERSION is locked to 1', () => {
   assert.equal(PROTOCOL_VERSION, 1);
 });
+
+// ─── Configurable allow / deny pattern policy ─────────────────────────────
+test('isAllowedCustomWidgetUrl honours caller-supplied denyPatterns (deny wins)', () => {
+  const policy = { denyPatterns: [/evil\.com/i] };
+  assert.equal(isAllowedCustomWidgetUrl('https://evil.com/x.html', policy), false);
+  assert.equal(isAllowedCustomWidgetUrl('https://EVIL.com/x.html', policy), false);
+  assert.equal(isAllowedCustomWidgetUrl('https://safe.com/x.html', policy), true);
+});
+
+test('isAllowedCustomWidgetUrl can restrict to a CDN allow-list', () => {
+  // Tighter policy: same-origin paths off, only the CDN host allowed.
+  const policy = {
+    allowSameOriginPaths: false,
+    allowedSchemes: [], // disable the default http(s) blanket
+    allowPatterns: [/^https:\/\/cdn\.openbento\.dev\//],
+  };
+  assert.equal(isAllowedCustomWidgetUrl('https://cdn.openbento.dev/widgets/x.html', policy), true);
+  assert.equal(isAllowedCustomWidgetUrl('https://other.com/widget.html', policy), false);
+  assert.equal(isAllowedCustomWidgetUrl('/examples/widgets/pomodoro/index.html', policy), false);
+});
+
+test('isAllowedCustomWidgetUrl: dangerous schemes can NEVER be re-allowed via policy', () => {
+  // Even if a misguided host adds 'javascript:' to allowedSchemes (or matches
+  // it via allowPatterns), the hard-coded ALWAYS_DENY_SCHEMES list wins.
+  const policy = {
+    allowedSchemes: ['javascript:'],
+    allowPatterns: [/^javascript:/i, /^data:/i],
+  };
+  assert.equal(isAllowedCustomWidgetUrl('javascript:alert(1)', policy), false);
+  assert.equal(isAllowedCustomWidgetUrl('data:text/html,<x>', policy), false);
+});
+
+test('isAllowedCustomWidgetUrl: default policy is unchanged when no policy is passed', () => {
+  // Sanity check — adding the policy parameter must not have shifted any
+  // existing behavior for existing call sites that pass no second arg.
+  assert.equal(isAllowedCustomWidgetUrl('https://example.com/x'), true);
+  assert.equal(isAllowedCustomWidgetUrl('/examples/widgets/pomodoro/index.html'), true);
+  assert.equal(isAllowedCustomWidgetUrl('javascript:alert(1)'), false);
+  assert.equal(isAllowedCustomWidgetUrl('//evil.com/x'), false);
+});
