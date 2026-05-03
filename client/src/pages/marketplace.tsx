@@ -69,7 +69,10 @@ export default function MarketplacePage() {
       })
       .then((raw) => {
         if (cancelledRef.current) return;
-        const { widgets: parsed } = parseMarketplaceManifest(raw);
+        const { widgets: parsed, invalidCount } = parseMarketplaceManifest(raw);
+        if (invalidCount > 0) {
+          console.warn(`[Marketplace] skipped ${invalidCount} invalid manifest entr${invalidCount === 1 ? 'y' : 'ies'}`);
+        }
         setWidgets(parsed);
       })
       .catch((e) => {

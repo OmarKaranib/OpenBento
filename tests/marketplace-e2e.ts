@@ -18,6 +18,7 @@
  */
 
 import { parseMarketplaceManifest } from '../shared/marketplace-manifest';
+import { isAllowedCustomWidgetUrl } from '../shared/widget-sdk-protocol';
 
 const APP_URL = process.env.APP_URL || 'http://localhost:5000';
 
@@ -68,6 +69,21 @@ async function main() {
   // 5. Dashboard root reachable — install handoff target.
   const rootRes = await fetch(`${APP_URL}/`);
   check('GET / (install handoff target) returns 200', rootRes.status === 200, rootRes.status);
+
+  // 6. Install handoff URL contract — round-trip every widget through the
+  //    exact encode/decode the page + dashboard-shell uses, and verify the
+  //    decoded URL passes the same Custom Widget allow-list the modal uses.
+  for (const w of widgets) {
+    const installPath = '/?install=' + encodeURIComponent(w.url);
+    const parsed = new URL(installPath, APP_URL);
+    const decoded = parsed.searchParams.get('install');
+    check(`install param round-trips for ${w.id}`, decoded === w.url, { decoded, original: w.url });
+    check(
+      `decoded install URL passes isAllowedCustomWidgetUrl for ${w.id}`,
+      isAllowedCustomWidgetUrl(decoded ?? '', APP_URL),
+      decoded,
+    );
+  }
 
   if (failures > 0) {
     console.error(`\nFAILED: ${failures} check(s) failed.`);
