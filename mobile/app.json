@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "OpenBento",
+    "slug": "openbento-mobile",
+    "scheme": "openbento",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#020617"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "tv.openbento.mobile"
+    },
+    "android": {
+      "package": "tv.openbento.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#020617"
+      }
+    },
+    "extra": {
+      "supabaseUrl": "",
+      "supabaseAnonKey": "",
+      "apiBaseUrl": ""
+    }
+  }
+}
