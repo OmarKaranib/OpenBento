@@ -314,9 +314,16 @@
     };
     const logoUrl  = getLogoUrl();
     const showLogo = logoUrl && !logoError;
-    const fallbackBg =
-      { news: 'bg-blue-500', science: 'bg-purple-500', gaming: 'bg-green-500', finance: 'bg-amber-500' }[channel.iconType] ??
-      'bg-cyan-500';
+    // Typed lookup so iconType === 'default' is a real key, not an
+    // implicit fallback that the type checker has to look the other way on.
+    const FALLBACK_BG: Record<typeof channel.iconType, string> = {
+      news:    'bg-blue-500',
+      science: 'bg-purple-500',
+      gaming:  'bg-green-500',
+      finance: 'bg-amber-500',
+      default: 'bg-cyan-500',
+    };
+    const fallbackBg = FALLBACK_BG[channel.iconType];
 
     return (
       <div

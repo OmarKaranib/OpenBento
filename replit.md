@@ -43,6 +43,14 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 - `GET /api/ping?url=`: Lightweight uptime probe for Network Light widget.
 - Cast to TV API endpoints for pairing, pushing snapshots, renaming, fetching, and unpairing cast rooms, and a WebSocket for real-time communication.
 
+## Quality Gates
+A `check` workflow gates the codebase against a clean baseline:
+- `npx tsc --noEmit` — must report **zero** TypeScript errors. Anything new fails the gate.
+- `npx tsx --test tests/server/markets.test.ts tests/client/markets-symbols.test.ts` — markets ticker server + symbol-resolution unit tests.
+- `node --test tests/client/use-cloud-sync.test.mjs` — cross-device dashboard cloud-sync hook unit tests.
+
+Run all three locally with the `check` workflow (or copy the command above). A red `check` workflow blocks the task from being marked complete.
+
 ## External Dependencies
 - **YouTube IFrame API:** For YouTube video control.
 - **Twitch Embeds:** For integrating Twitch streams.

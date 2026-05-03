@@ -170,12 +170,14 @@ export function useAuth() {
    * Sign up new user with email/password
    */
   const signUp = async (email: string, password: string) => {
+    if (!supabase) return null;
+    const client = supabase;
     setError(null);
     
     try {
       const result = await withRetry(
         async () => {
-          const { data, error } = await supabase.auth.signUp({
+          const { data, error } = await client.auth.signUp({
             email,
             password,
             options: {
@@ -204,12 +206,14 @@ export function useAuth() {
    * Sign in existing user with email/password
    */
   const signIn = async (email: string, password: string) => {
+    if (!supabase) return null;
+    const client = supabase;
     setError(null);
     
     try {
       const result = await withRetry(
         async () => {
-          const { data, error } = await supabase.auth.signInWithPassword({
+          const { data, error } = await client.auth.signInWithPassword({
             email,
             password,
           });
@@ -242,12 +246,14 @@ export function useAuth() {
       queryParams?: Record<string, string>;
     }
   ) => {
+    if (!supabase) return null;
+    const client = supabase;
     setError(null);
 
     try {
       const result = await withRetry(
         async () => {
-          const { data, error } = await supabase.auth.signInWithOAuth({
+          const { data, error } = await client.auth.signInWithOAuth({
             provider,
             options: {
               redirectTo: options?.redirectTo ?? `${window.location.origin}/auth/callback`,
@@ -277,12 +283,14 @@ export function useAuth() {
     token: string,
     type: 'signup' | 'email' | 'recovery' | 'invite' | 'magiclink' | 'email_change' = 'signup'
   ) => {
+    if (!supabase) return null;
+    const client = supabase;
     setError(null);
 
     try {
       const result = await withRetry(
         async () => {
-          const { data, error } = await supabase.auth.verifyOtp({
+          const { data, error } = await client.auth.verifyOtp({
             email,
             token,
             type,
@@ -306,12 +314,18 @@ export function useAuth() {
    * Sign out current user
    */
   const logout = async () => {
+    if (!supabase) {
+      setUser(null);
+      setIsAuthenticated(false);
+      return;
+    }
+    const client = supabase;
     setError(null);
     
     try {
       await withRetry(
         async () => {
-          const { error } = await supabase.auth.signOut();
+          const { error } = await client.auth.signOut();
           if (error) throw error;
         },
         'signOut'
@@ -335,12 +349,14 @@ export function useAuth() {
    * Reset password for user
    */
   const resetPassword = async (email: string) => {
+    if (!supabase) return null;
+    const client = supabase;
     setError(null);
     
     try {
       const result = await withRetry(
         async () => {
-          const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+          const { data, error } = await client.auth.resetPasswordForEmail(email, {
             redirectTo: `${window.location.origin}/auth/reset-password`,
           });
           if (error) throw error;
@@ -362,12 +378,14 @@ export function useAuth() {
    * Update user password
    */
   const updatePassword = async (newPassword: string) => {
+    if (!supabase) return null;
+    const client = supabase;
     setError(null);
     
     try {
       const result = await withRetry(
         async () => {
-          const { data, error } = await supabase.auth.updateUser({
+          const { data, error } = await client.auth.updateUser({
             password: newPassword,
           });
           if (error) throw error;

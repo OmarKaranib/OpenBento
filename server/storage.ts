@@ -242,7 +242,9 @@ export class DatabaseStorage implements IStorage {
     this.feedbackCooldowns.set(clientIp, Date.now());
     if (this.feedbackCooldowns.size > 10000) {
       const cutoff = Date.now() - 3600000;
-      for (const [ip, ts] of this.feedbackCooldowns) {
+      // Array.from() avoids needing --downlevelIteration for Map iteration
+      // in tsconfig — the smaller of the two fixes the task notes call out.
+      for (const [ip, ts] of Array.from(this.feedbackCooldowns.entries())) {
         if (ts < cutoff) this.feedbackCooldowns.delete(ip);
       }
     }
