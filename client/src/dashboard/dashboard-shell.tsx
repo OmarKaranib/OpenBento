@@ -1,25 +1,17 @@
 // Dashboard shell — extracted from App.tsx during the
-  // widget modularization refactor. Owns the entire AppContent body:
+  // widget modularization refactor. Owns the dashboard tree:
   // auth/login modal wiring, drag-and-drop layout, the cloud-sync hook
   // call, and every per-widget add/edit/move/delete callback.
   //
-  // App.tsx now just composes providers around <DashboardShell />.
-  import React, { useState, useCallback, useRef, useEffect, useMemo, Suspense } from 'react';
+  // App.tsx owns the route table and providers; this component is mounted
+  // by the "/" and "/auth/reset-password" routes.
+  import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
   import { useAuth } from '@/hooks/use-auth';
   import { LoginModal } from '@/components/login-modal';
   import { useViralAds } from '@/components/ad-block';
   import { searchChannelLiveStream } from '@/lib/stream-api';
-  import { Switch, Route, useLocation } from 'wouter';
-  import { Toaster } from '@/components/ui/toaster';
-  import { TooltipProvider } from '@/components/ui/tooltip';
-  import NotFound from '@/pages/not-found';
+  import { useLocation } from 'wouter';
   import MasterControlDashboard from '@/pages/dashboard';
-  import Admin from '@/pages/admin';
-  import Terms from '@/pages/terms';
-  import Privacy from '@/pages/privacy';
-  import Feedback from '@/pages/feedback';
-  import { lazy } from 'react';
-  const CastPage = lazy(() => import('@/pages/cast'));
   import { WidgetSidebar, TrendingChannel, WidgetTemplate } from '@/components/widget-sidebar';
   import { OnboardingFlow } from '@/components/onboarding-flow';
   import {
@@ -121,7 +113,7 @@ const [widgets, setWidgets] = useState<Widget[]>(() => {
           y:              w.y              ?? 0,
           w:              w.w              ?? 3,
           h:              w.h              ?? 2,
-          refreshCounter: (w as any).refreshCounter ?? (w as any).iframeKey ?? 0,
+          refreshCounter: w.refreshCounter ?? w.iframeKey ?? 0,
           channelName:    stripLegacyPrefix(w.channelName),
           noteContent:    w.type === 'note' ? (w.noteContent ?? '') : w.noteContent,
           clockUse24Hour: w.clockUse24Hour ?? false,
@@ -682,7 +674,7 @@ const dashboardProps = {
 };
 
 return (
-  <TooltipProvider>
+  <>
     <LoginModal
       isOpen={loginModalOpen}
       onClose={() => {
@@ -729,26 +721,7 @@ return (
             openLoginModal={openLoginModal}
           />
         )}
-        <Switch>
-          <Route path="/">
-            {() => <MasterControlDashboard {...dashboardProps} />}
-          </Route>
-          <Route path="/auth/reset-password">
-            {() => <MasterControlDashboard {...dashboardProps} />}
-          </Route>
-          <Route path="/admin"    component={Admin} />
-          <Route path="/terms"    component={Terms} />
-          <Route path="/privacy"  component={Privacy} />
-          <Route path="/feedback" component={Feedback} />
-          <Route path="/cast">
-            {() => (
-              <Suspense fallback={<div className="w-screen h-screen bg-slate-950" />}>
-                <CastPage />
-              </Suspense>
-            )}
-          </Route>
-          <Route component={NotFound} />
-        </Switch>
+        <MasterControlDashboard {...dashboardProps} />
       </SortableContext>
 
       <DragOverlay>
@@ -766,7 +739,6 @@ return (
         ) : null}
       </DragOverlay>
     </DndContext>
-    <Toaster />
-  </TooltipProvider>
+  </>
 );
 }

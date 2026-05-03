@@ -55,6 +55,9 @@ export interface Widget {
   lastRefresh?: number;
   // Nuclear Refresh Fix — use in JSX: key={`${widget.id}-${widget.refreshCounter ?? 0}`}
   refreshCounter?: number;
+  // Legacy alias for refreshCounter from older saved layouts. Read in
+  // dashboard-shell hydration; never written by new code.
+  iframeKey?: number;
   isOffline?: boolean;
   isLive?: boolean;
   isPlayingLatestVideo?: boolean;
