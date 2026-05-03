@@ -178,7 +178,7 @@ export interface Widget {
   // Procedurally-generated ambient loop (Web Audio). Honors the
   // master-mute (widget.isMuted) and per-widget volume already on
   // the base Widget. soundscape selects the noise/filter recipe.
-  soundscape?: 'rain' | 'cafe' | 'fire' | 'forest' | 'waves';
+  soundscape?: 'rain' | 'brown' | 'fire' | 'forest' | 'waves';
   // ─── Water Tracker ────────────────────────────────────────────────
   // Cups consumed per local-day (YYYY-MM-DD → integer cups). Streak
   // is derived from consecutive days that hit waterTarget.

@@ -1,9 +1,16 @@
-// Focus Soundscape — procedurally-generated ambient loop. No audio
-// assets required: each preset wires up a noise buffer through a
-// filter chain in the Web Audio API. Honors widget.isMuted (master
-// mute) and widget.volume (0-100). Productivity theming via isLightBg.
+// Focus Soundscape — bundled royalty-free ambient loops shipped as WAV
+// assets in /sounds/wellness/. Each WAV is pre-conditioned (filter chain
+// + 150ms equal-power seam crossfade applied at build time by
+// scripts/generate-soundscapes.mjs) so AudioBufferSourceNode.loop = true
+// produces no click at the boundary. The widget fetches + decodes the
+// asset on first play, caches the AudioBuffer for the lifetime of the
+// AudioContext, and routes through a GainNode so widget.isMuted /
+// widget.volume can be applied without rebuilding the graph.
+//
+// Honors widget.isMuted (master mute, default unmuted) and
+// widget.volume (0-100). Productivity theming via isLightBg.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CloudRain, Coffee, Flame, type LucideIcon, Pause, Play, Settings as SettingsIcon, TreePine, Volume2, Waves, X as XIcon } from 'lucide-react';
+import { CloudRain, Flame, type LucideIcon, Pause, Play, Settings as SettingsIcon, TreePine, Volume2, Waves, Wind, X as XIcon } from 'lucide-react';
 import { MONO, Widget, isLightBg, qrIconBtnStyle } from './shared';
 
 interface FocusSoundscapeProps {
@@ -13,122 +20,61 @@ interface FocusSoundscapeProps {
 
 type SoundKey = NonNullable<Widget['soundscape']>;
 
-const SOUND_OPTIONS: { key: SoundKey; label: string; Icon: LucideIcon }[] = [
-  { key: 'rain',   label: 'Rain',   Icon: CloudRain },
-  { key: 'cafe',   label: 'Cafe',   Icon: Coffee },
-  { key: 'fire',   label: 'Fire',   Icon: Flame },
-  { key: 'forest', label: 'Forest', Icon: TreePine },
-  { key: 'waves',  label: 'Waves',  Icon: Waves },
+const SOUND_OPTIONS: { key: SoundKey; label: string; Icon: LucideIcon; asset: string }[] = [
+  { key: 'rain',   label: 'Rain',   Icon: CloudRain, asset: '/sounds/wellness/rain.wav' },
+  { key: 'brown',  label: 'Brown',  Icon: Wind,      asset: '/sounds/wellness/brown.wav' },
+  { key: 'fire',   label: 'Fire',   Icon: Flame,     asset: '/sounds/wellness/fire.wav' },
+  { key: 'forest', label: 'Forest', Icon: TreePine,  asset: '/sounds/wellness/forest.wav' },
+  { key: 'waves',  label: 'Waves',  Icon: Waves,     asset: '/sounds/wellness/waves.wav' },
 ];
 
 interface AudioGraph {
   ctx: AudioContext;
   src: AudioBufferSourceNode;
   gain: GainNode;
-  extras: AudioNode[];
 }
 
-// Generate a noise buffer that loops seamlessly. We fill `seconds` of
-// noise, then equal-power crossfade the last `xfade` samples back into
-// the first `xfade` samples and trim the buffer so the new tail is the
-// faded region. Looping that buffer end→start sounds continuous (no
-// click at the seam) — the equivalent of shipping a pre-conditioned
-// loop asset, just generated on first play and reused across loops.
-function buildNoiseBuffer(ctx: AudioContext, kind: 'white' | 'brown'): AudioBuffer {
-  const seconds = 4;
-  const sampleRate = ctx.sampleRate;
-  const xfade = Math.floor(0.05 * sampleRate); // 50ms crossfade
-  const total = seconds * sampleRate;
-  const raw = new Float32Array(total + xfade);
-  if (kind === 'white') {
-    for (let i = 0; i < raw.length; i++) raw[i] = Math.random() * 2 - 1;
-  } else {
-    let last = 0;
-    for (let i = 0; i < raw.length; i++) {
-      const w = Math.random() * 2 - 1;
-      last = (last + 0.02 * w) / 1.02;
-      raw[i] = last * 3.5;
-    }
-  }
-  // Equal-power crossfade: head[i]*cos + tail[i]*sin so |head|² + |tail|² = 1.
-  for (let i = 0; i < xfade; i++) {
-    const t = i / xfade;
-    const a = Math.cos(t * Math.PI / 2);
-    const b = Math.sin(t * Math.PI / 2);
-    raw[i] = raw[i] * a + raw[total + i] * b;
-  }
-  const buf = ctx.createBuffer(1, total, sampleRate);
-  buf.getChannelData(0).set(raw.subarray(0, total));
-  return buf;
+// Module-scoped decode cache, keyed by sound preset. Lives across widget
+// remounts but is cheap (~150KB per buffer) and avoids re-fetching the
+// asset every time the user pauses+plays or switches presets.
+const bufferCache = new Map<SoundKey, AudioBuffer>();
+const inflightCache = new Map<SoundKey, Promise<AudioBuffer>>();
+
+async function loadBuffer(ctx: AudioContext, sound: SoundKey): Promise<AudioBuffer> {
+  const cached = bufferCache.get(sound);
+  if (cached) return cached;
+  const inflight = inflightCache.get(sound);
+  if (inflight) return inflight;
+  const opt = SOUND_OPTIONS.find(o => o.key === sound) ?? SOUND_OPTIONS[0];
+  const p = (async () => {
+    const res = await fetch(opt.asset);
+    if (!res.ok) throw new Error(`fetch ${opt.asset} → ${res.status}`);
+    const arr = await res.arrayBuffer();
+    const buf = await ctx.decodeAudioData(arr);
+    bufferCache.set(sound, buf);
+    inflightCache.delete(sound);
+    return buf;
+  })();
+  inflightCache.set(sound, p);
+  return p;
 }
 
-function buildGraph(ctx: AudioContext, sound: SoundKey): AudioGraph {
-  const isBrown = sound === 'waves' || sound === 'fire' || sound === 'forest' || sound === 'cafe';
-  const buf = buildNoiseBuffer(ctx, isBrown ? 'brown' : 'white');
+function buildGraph(ctx: AudioContext, buffer: AudioBuffer): AudioGraph {
   const src = ctx.createBufferSource();
-  src.buffer = buf;
+  src.buffer = buffer;
   src.loop = true;
-
   const gain = ctx.createGain();
   gain.gain.value = 0;
-  const extras: AudioNode[] = [];
-
-  let head: AudioNode = src;
-
-  switch (sound) {
-    case 'rain': {
-      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 900;
-      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass';  lp.frequency.value = 6500;
-      head.connect(hp); hp.connect(lp); head = lp;
-      extras.push(hp, lp);
-      break;
-    }
-    case 'cafe': {
-      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800;
-      head.connect(lp); head = lp;
-      extras.push(lp);
-      break;
-    }
-    case 'fire': {
-      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500;
-      head.connect(lp); head = lp;
-      extras.push(lp);
-      break;
-    }
-    case 'forest': {
-      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.7;
-      head.connect(bp); head = bp;
-      extras.push(bp);
-      break;
-    }
-    case 'waves': {
-      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 800;
-      // Slow LFO modulating gain to simulate swelling waves.
-      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.18;
-      const lfoGain = ctx.createGain(); lfoGain.gain.value = 0.55;
-      const swell = ctx.createGain(); swell.gain.value = 0.45;
-      lfo.connect(lfoGain); lfoGain.connect(swell.gain);
-      head.connect(lp); lp.connect(swell); head = swell;
-      lfo.start();
-      extras.push(lp, lfo, lfoGain, swell);
-      break;
-    }
-  }
-
-  head.connect(gain);
+  src.connect(gain);
   gain.connect(ctx.destination);
   src.start();
-  return { ctx, src, gain, extras };
+  return { ctx, src, gain };
 }
 
 function disposeGraph(g: AudioGraph): void {
   try { g.src.stop(); } catch { /* already stopped */ }
   try { g.src.disconnect(); } catch { /* noop */ }
   try { g.gain.disconnect(); } catch { /* noop */ }
-  for (const n of g.extras) {
-    try { (n as AudioScheduledSourceNode).stop?.(); } catch { /* noop */ }
-    try { n.disconnect(); } catch { /* noop */ }
-  }
   g.ctx.close().catch(() => {});
 }
 
@@ -137,9 +83,13 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
   const [size, setSize] = useState(280);
   const [showSettings, setShowSettings] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
   const graphRef = useRef<AudioGraph | null>(null);
-  const rebuildTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  // Token bumped on every play/stop/preset switch; async loaders compare
+  // against this to detect a cancelled request and bail without leaking
+  // an AudioContext or a stale graph.
+  const reqIdRef = useRef(0);
 
   useEffect(() => {
     const el = containerRef.current; if (!el) return;
@@ -152,13 +102,12 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
 
   const sound = widget.soundscape ?? 'rain';
   const volume = widget.volume ?? 40;
-  // Master mute contract: only true if the dashboard explicitly muted this
-  // widget. New widgets default to UNMUTED so a user-gesture play actually
-  // produces sound at the chosen volume — they still won't hear anything
-  // until they click Play (autoplay policy guarantees this).
+  // Master mute contract: only true if the dashboard explicitly muted
+  // this widget. Defaults to unmuted so a user-gesture play actually
+  // produces sound at the chosen volume.
   const muted = widget.isMuted === true;
 
-  // Effective gain: 0 when muted or volume === 0.
+  // Effective gain: 0 when muted, volume === 0, or paused.
   const effGain = useMemo(
     () => (muted || volume === 0 || !playing) ? 0 : Math.min(0.45, (volume / 100) * 0.45),
     [muted, volume, playing],
@@ -171,66 +120,66 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
     g.gain.gain.linearRampToValueAtTime(effGain, g.ctx.currentTime + 0.12);
   }, [effGain]);
 
-  // Tear down graph + clear any pending rebuild timer on unmount.
+  // Tear down graph + invalidate any in-flight loaders on unmount.
   useEffect(() => {
     return () => {
       mountedRef.current = false;
-      if (rebuildTimerRef.current) { clearTimeout(rebuildTimerRef.current); rebuildTimerRef.current = null; }
+      reqIdRef.current += 1;
       if (graphRef.current) { disposeGraph(graphRef.current); graphRef.current = null; }
     };
   }, []);
 
   const stopAudio = useCallback(() => {
+    reqIdRef.current += 1;
     if (graphRef.current) { disposeGraph(graphRef.current); graphRef.current = null; }
     setPlaying(false);
+    setLoading(false);
   }, []);
 
-  const startAudio = useCallback(() => {
+  // Start playback for the given preset. Async because the first play of
+  // a preset has to fetch + decode the bundled WAV.
+  const startAudio = useCallback(async (which: SoundKey) => {
     if (graphRef.current) return;
+    const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return;
+    const ctx = new Ctor();
+    const myReq = ++reqIdRef.current;
+    setLoading(true);
     try {
-      const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!Ctor) return;
-      const ctx = new Ctor();
-      const g = buildGraph(ctx, sound);
+      const buf = await loadBuffer(ctx, which);
+      // Bail if we were cancelled (unmount, stop, or preset switch) while
+      // the asset was decoding.
+      if (!mountedRef.current || reqIdRef.current !== myReq) {
+        ctx.close().catch(() => {});
+        return;
+      }
+      const g = buildGraph(ctx, buf);
       g.gain.gain.value = 0;
       g.gain.gain.linearRampToValueAtTime(effGain, ctx.currentTime + 0.25);
       graphRef.current = g;
       setPlaying(true);
     } catch (err) {
       console.warn('[Soundscape] failed to start:', err);
+      ctx.close().catch(() => {});
+    } finally {
+      if (mountedRef.current && reqIdRef.current === myReq) setLoading(false);
     }
-  }, [sound, effGain]);
+  }, [effGain]);
 
-  // Switching sound while playing rebuilds the graph.
+  // Switching sound while playing tears down + restarts on the new asset.
   const selectSound = (next: SoundKey) => {
     if (next === sound) return;
     onUpdate?.(widget.id, { soundscape: next });
-    if (playing) {
-      stopAudio();
-      // Cancel any in-flight rebuild before scheduling a new one.
-      if (rebuildTimerRef.current) { clearTimeout(rebuildTimerRef.current); rebuildTimerRef.current = null; }
-      // Rebuild on next paint — ref already cleared. Abort if unmounted
-      // so a late timer can't resurrect an AudioContext after teardown.
-      rebuildTimerRef.current = setTimeout(() => {
-        rebuildTimerRef.current = null;
-        if (!mountedRef.current) return;
-        try {
-          const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-          if (!Ctor) return;
-          const ctx = new Ctor();
-          const g = buildGraph(ctx, next);
-          g.gain.gain.value = 0;
-          g.gain.gain.linearRampToValueAtTime(effGain, ctx.currentTime + 0.25);
-          graphRef.current = g;
-          setPlaying(true);
-        } catch { /* swallow */ }
-      }, 60);
+    if (playing || loading) {
+      if (graphRef.current) { disposeGraph(graphRef.current); graphRef.current = null; }
+      setPlaying(false);
+      void startAudio(next);
     }
   };
 
   const togglePlay = () => {
-    if (playing) stopAudio();
-    else startAudio();
+    if (playing || loading) stopAudio();
+    else void startAudio(sound);
   };
 
   const setVolume = (v: number) => {
@@ -251,6 +200,7 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
 
   const ActiveIcon = (SOUND_OPTIONS.find(s => s.key === sound) ?? SOUND_OPTIONS[0]).Icon;
   const fs = Math.max(11, Math.min(15, size * 0.045));
+  const status = muted ? 'MUTED' : (loading ? 'LOADING' : (playing ? 'PLAYING' : 'PAUSED'));
 
   return (
     <div
@@ -278,7 +228,7 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
           SOUNDSCAPE
         </span>
         <span style={{ color: clrMuted, fontFamily: MONO, fontSize: 9, textTransform: 'uppercase' }}>
-          {muted ? 'MUTED' : (playing ? 'PLAYING' : 'PAUSED')}
+          {status}
         </span>
       </div>
 
@@ -298,7 +248,7 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
             </button>
           </div>
           <p style={{ color: '#94a3b8', fontFamily: MONO, fontSize: 10, margin: 0 }}>
-            Procedurally generated — no downloads, respects master mute.
+            Bundled ambient loops (~170KB each). Respects master mute.
           </p>
         </div>
       )}
@@ -348,6 +298,7 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
                 color: playing && !muted ? bgColor : clrPrimary,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer',
+                opacity: loading ? 0.6 : 1,
               }}
               title={playing ? 'Pause' : 'Play'}
               data-testid={`soundscape-play-${widget.id}`}
