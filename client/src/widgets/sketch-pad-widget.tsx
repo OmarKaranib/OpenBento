@@ -66,7 +66,10 @@ export const SketchPadWidget: React.FC<Props> = ({ widget, onUpdate, isDarkMode 
   // background and toolbar/text contrast.
   const bgColor = widget.customColor ?? (isDarkMode ? '#1e293b' : '#f8fafc');
   const light   = isLightBg(bgColor);
-  const canvasBg = light ? '#ffffff' : '#0f172a';
+  // When the user has explicitly chosen a custom color the whole
+  // surface (container + canvas) follows it; otherwise we default to
+  // the dashboard's high-contrast white/dark drawing surface.
+  const canvasBg = widget.customColor ?? (light ? '#ffffff' : '#0f172a');
   const clrPrimary = light ? '#0f172a' : '#e2e8f0';
   const clrMuted   = light ? '#64748b' : '#94a3b8';
   const clrBorder  = light ? 'rgba(0,0,0,0.10)' : 'rgba(71,85,105,0.4)';
@@ -100,7 +103,18 @@ export const SketchPadWidget: React.FC<Props> = ({ widget, onUpdate, isDarkMode 
   const onUpdateRef = useRef(onUpdate);
   useEffect(() => { onUpdateRef.current = onUpdate; }, [onUpdate]);
   const prefsRef = useRef({ color, size, eraser });
-  useEffect(() => { prefsRef.current = { color, size, eraser }; }, [color, size, eraser]);
+  // Mirror toolbar prefs into a ref AND persist them eagerly on change
+  // so a user who only tweaks the color/size/eraser (no new stroke)
+  // still has their choice survive a reload. We skip the very first
+  // render so initial-mount state doesn't trigger an extra onUpdate.
+  const prefsHydratedRef = useRef(false);
+  useEffect(() => {
+    prefsRef.current = { color, size, eraser };
+    if (!prefsHydratedRef.current) { prefsHydratedRef.current = true; return; }
+    onUpdateRef.current?.(widget.id, {
+      sketchColor: color, sketchSize: size, sketchEraser: eraser,
+    });
+  }, [color, size, eraser, widget.id]);
   const saverRef = useRef<DebouncedSaver<null> | null>(null);
   if (!saverRef.current) {
     saverRef.current = createDebouncedSaver<null>(() => {
