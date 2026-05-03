@@ -84,11 +84,13 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
     startReveal(next.length);
   };
 
-  // Reset hides the revealed list so the user can re-roll without
-  // distraction; the persisted order is left intact so refresh shows it.
+  // Reset clears the current roll state (both the revealed list and the
+  // persisted shuffled order/seed) so a refresh won't bring it back. The
+  // roster is preserved.
   const reset = () => {
     if (revealTimer.current) { clearInterval(revealTimer.current); revealTimer.current = null; }
     setRevealCount(0);
+    onUpdate?.(widget.id, { standupOrder: [], standupSeed: undefined });
   };
 
   const bgColor    = widget.customColor ?? '#0d2818';

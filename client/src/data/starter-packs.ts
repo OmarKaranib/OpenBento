@@ -87,6 +87,25 @@ export const STARTER_PACKS: StarterPack[] = [
     ],
   },
   {
+    id: 'wellness',
+    emoji: '🧘',
+    label: 'Focus & Wellness',
+    description: 'Soundscape, water, mood, standup, clock and a quick note.',
+    tiles: [
+      { type: 'focus_soundscape', x: 0, y: 0, w: 3, h: 3 },
+      { type: 'water_tracker',    x: 3, y: 0, w: 3, h: 3 },
+      { type: 'mood_checkin',     x: 6, y: 0, w: 3, h: 3 },
+      { type: 'standup_roller',   x: 9, y: 0, w: 3, h: 3 },
+      { type: 'clock',            x: 0, y: 3, w: 4, h: 2 },
+      { type: 'habit_tracker',    x: 4, y: 3, w: 4, h: 2 },
+      {
+        type: 'note',
+        noteContent: '## Today\n\n- [ ] Drink water\n- [ ] Walk\n- [ ] Reset',
+        x: 8, y: 3, w: 4, h: 2,
+      },
+    ],
+  },
+  {
     id: 'empty',
     emoji: '✨',
     label: 'Empty Canvas',
