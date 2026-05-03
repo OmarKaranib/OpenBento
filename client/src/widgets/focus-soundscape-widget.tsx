@@ -136,7 +136,11 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
 
   const sound = widget.soundscape ?? 'rain';
   const volume = widget.volume ?? 40;
-  const muted = widget.isMuted !== false; // default muted
+  // Master mute contract: only true if the dashboard explicitly muted this
+  // widget. New widgets default to UNMUTED so a user-gesture play actually
+  // produces sound at the chosen volume — they still won't hear anything
+  // until they click Play (autoplay policy guarantees this).
+  const muted = widget.isMuted === true;
 
   // Effective gain: 0 when muted or volume === 0.
   const effGain = useMemo(

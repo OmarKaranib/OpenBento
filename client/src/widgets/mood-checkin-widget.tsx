@@ -67,7 +67,6 @@ export const MoodCheckinWidget: React.FC<MoodCheckinProps> = ({ widget, onUpdate
   const light      = isLightBg(bgColor);
   const accent     = light ? '#7c3aed' : '#c4b5fd';
   const clrPrimary = light ? '#0f172a' : '#e2e8f0';
-  const clrSubtle  = light ? '#475569' : '#cbd5e1';
   const clrMuted   = light ? '#64748b' : '#64748b';
   const clrBorder  = light ? 'rgba(0,0,0,0.10)' : 'rgba(71,85,105,0.4)';
   const clrCellBg  = light ? 'rgba(0,0,0,0.06)' : 'rgba(15,23,42,0.55)';
@@ -172,7 +171,7 @@ export const MoodCheckinWidget: React.FC<MoodCheckinProps> = ({ widget, onUpdate
       </div>
 
       <span style={{
-        color: clrSubtle, fontFamily: MONO, fontSize: 9,
+        color: clrPrimary, fontFamily: MONO, fontSize: 9, opacity: 0.7,
         textAlign: 'center', marginTop: 4,
       }} data-testid={`mood-streak-${widget.id}`}>
         {(() => {
@@ -180,8 +179,6 @@ export const MoodCheckinWidget: React.FC<MoodCheckinProps> = ({ widget, onUpdate
           return `${logged}/30 days logged`;
         })()}
       </span>
-      {/* Hide unused name imports keeping clrPrimary for future inline labels */}
-      <span style={{ display: 'none' }}>{clrPrimary}</span>
     </div>
   );
 };

@@ -2,7 +2,7 @@
 // speaking order using a seeded RNG so the result is stable across
 // reloads / cloud-sync round-trips and easy to test.
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus as PlusIcon, Settings as SettingsIcon, Shuffle, Trash2, Users, X as XIcon } from 'lucide-react';
+import { Plus as PlusIcon, RotateCcw, Settings as SettingsIcon, Shuffle, Trash2, Users, X as XIcon } from 'lucide-react';
 import { MONO, Widget, isLightBg, qrIconBtnStyle, qrInputStyle, seededShuffle } from './shared';
 
 interface StandupRollerProps {
@@ -10,11 +10,19 @@ interface StandupRollerProps {
   onUpdate?: (widgetId: string, patch: Partial<Widget>) => void;
 }
 
+const REVEAL_INTERVAL_MS = 320;
+
 export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUpdate }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState(280);
   const [showSettings, setShowSettings] = useState(false);
   const [draftName, setDraftName] = useState('');
+  // Sequential reveal: how many entries of `order` are currently visible.
+  // Starts at full when the page loads (so we don't replay the animation
+  // every refresh), but drops to 0 + ticks back up on Roll / Reset.
+  const [revealCount, setRevealCount] = useState<number>(Number.MAX_SAFE_INTEGER);
+  const revealTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     const el = containerRef.current; if (!el) return;
@@ -22,6 +30,26 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+    if (revealTimer.current) { clearInterval(revealTimer.current); revealTimer.current = null; }
+  }, []);
+
+  const startReveal = (total: number) => {
+    if (revealTimer.current) { clearInterval(revealTimer.current); revealTimer.current = null; }
+    setRevealCount(0);
+    let n = 0;
+    revealTimer.current = setInterval(() => {
+      if (!mountedRef.current) return;
+      n += 1;
+      setRevealCount(n);
+      if (n >= total && revealTimer.current) {
+        clearInterval(revealTimer.current);
+        revealTimer.current = null;
+      }
+    }, REVEAL_INTERVAL_MS);
+  };
 
   const names = widget.standupNames ?? [];
   // Display order: persisted shuffled order if the name set is unchanged,
@@ -53,6 +81,14 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
     const next = seededShuffle(names, seed);
     onUpdate?.(widget.id, { standupOrder: next, standupSeed: seed });
+    startReveal(next.length);
+  };
+
+  // Reset hides the revealed list so the user can re-roll without
+  // distraction; the persisted order is left intact so refresh shows it.
+  const reset = () => {
+    if (revealTimer.current) { clearInterval(revealTimer.current); revealTimer.current = null; }
+    setRevealCount(0);
   };
 
   const bgColor    = widget.customColor ?? '#0d2818';
@@ -158,24 +194,38 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
 
       {!showSettings && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button
-            onClick={roll}
-            disabled={names.length < 2}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              padding: '8px 10px', borderRadius: 6,
-              background: names.length < 2 ? clrInert : `${accent}22`,
-              border: `1px solid ${names.length < 2 ? clrInertBd : accent}`,
-              color: names.length < 2 ? clrMuted : accent,
-              fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
-              cursor: names.length < 2 ? 'default' : 'pointer',
-              flexShrink: 0,
-            }}
-            data-testid={`standup-roll-${widget.id}`}
-          >
-            <Shuffle size={12} />
-            ROLL ORDER
-          </button>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <button
+              onClick={roll}
+              disabled={names.length < 2}
+              style={{
+                flex: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                padding: '8px 10px', borderRadius: 6,
+                background: names.length < 2 ? clrInert : `${accent}22`,
+                border: `1px solid ${names.length < 2 ? clrInertBd : accent}`,
+                color: names.length < 2 ? clrMuted : accent,
+                fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+                cursor: names.length < 2 ? 'default' : 'pointer',
+              }}
+              data-testid={`standup-roll-${widget.id}`}
+            >
+              <Shuffle size={12} />
+              ROLL ORDER
+            </button>
+            <button
+              onClick={reset}
+              disabled={revealCount === 0 || order.length === 0}
+              title="Hide the order so you can re-roll"
+              style={{
+                ...qrIconBtnStyle(),
+                opacity: (revealCount === 0 || order.length === 0) ? 0.4 : 1,
+              }}
+              data-testid={`standup-reset-${widget.id}`}
+            >
+              <RotateCcw size={12} />
+            </button>
+          </div>
 
           {names.length === 0 && (
             <button
@@ -198,7 +248,7 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
               listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4,
             }}
           >
-            {order.map((n, i) => (
+            {order.slice(0, revealCount).map((n, i) => (
               <li
                 key={`${n}-${i}`}
                 style={{
@@ -206,6 +256,8 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
                   padding: '6px 8px', borderRadius: 6,
                   background: i === 0 ? `${accent}22` : clrCellBg,
                   border: `1px solid ${i === 0 ? accent : clrCellBdr}`,
+                  // Tiny enter animation as each entry is revealed.
+                  animation: 'standupSlideIn 240ms ease both',
                 }}
                 data-testid={`standup-order-item-${i}-${widget.id}`}
               >
@@ -227,6 +279,18 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
                 </span>
               </li>
             ))}
+            {order.length > 0 && revealCount < order.length && (
+              <li
+                aria-hidden
+                style={{
+                  padding: '6px 8px', color: clrMuted, fontFamily: MONO, fontSize: 10,
+                  letterSpacing: '0.08em',
+                }}
+              >
+                …revealing
+              </li>
+            )}
+            <style>{`@keyframes standupSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
           </ol>
         </div>
       )}

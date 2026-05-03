@@ -71,7 +71,12 @@ export const WaterTrackerWidget: React.FC<WaterTrackerProps> = ({ widget, onUpda
   const clrInertBd = light ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.08)';
   const clrTrack   = light ? 'rgba(0,0,0,0.08)' : 'rgba(15,23,42,0.55)';
 
-  const big = Math.max(28, Math.min(72, size * 0.20));
+  // Progress ring sizing — diameter scales with widget, stroke ~10% of radius.
+  const ringD     = Math.max(80, Math.min(160, size * 0.46));
+  const ringR     = ringD / 2 - 8;
+  const ringCirc  = 2 * Math.PI * ringR;
+  const ringDash  = ringCirc * (1 - pct / 100);
+  const cupsFs    = Math.max(20, Math.min(40, ringD * 0.26));
 
   return (
     <div
@@ -130,8 +135,43 @@ export const WaterTrackerWidget: React.FC<WaterTrackerProps> = ({ widget, onUpda
       )}
 
       {!showSettings && (
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flex: 1 }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 8 }}>
+          {/* SVG progress ring with cup count in the centre */}
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            <svg
+              width={ringD} height={ringD} viewBox={`0 0 ${ringD} ${ringD}`}
+              data-testid={`water-progress-${widget.id}`}
+              style={{ display: 'block' }}
+            >
+              <circle
+                cx={ringD / 2} cy={ringD / 2} r={ringR}
+                stroke={clrTrack} strokeWidth={Math.max(6, ringR * 0.20)} fill="none"
+              />
+              <circle
+                cx={ringD / 2} cy={ringD / 2} r={ringR}
+                stroke={accent} strokeWidth={Math.max(6, ringR * 0.20)} fill="none"
+                strokeLinecap="round"
+                strokeDasharray={ringCirc}
+                strokeDashoffset={ringDash}
+                transform={`rotate(-90 ${ringD / 2} ${ringD / 2})`}
+                style={{ transition: 'stroke-dashoffset 0.35s ease' }}
+              />
+            </svg>
+            <div style={{
+              position: 'absolute', display: 'flex', flexDirection: 'column',
+              alignItems: 'center', gap: 0, pointerEvents: 'none',
+            }}>
+              <div style={{ color: clrPrimary, fontFamily: MONO, fontSize: cupsFs, fontWeight: 800, lineHeight: 1 }}>
+                {cups}<span style={{ color: clrMuted, fontSize: cupsFs * 0.42, fontWeight: 700 }}>/{target}</span>
+              </div>
+              <div style={{ color: clrMuted, fontFamily: MONO, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
+                {pct >= 100 ? 'goal met' : 'cups today'}
+              </div>
+            </div>
+          </div>
+
+          {/* +/- controls */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexShrink: 0 }}>
             <button
               onClick={() => setCups(cups - 1)}
               disabled={cups <= 0}
@@ -146,14 +186,6 @@ export const WaterTrackerWidget: React.FC<WaterTrackerProps> = ({ widget, onUpda
             >
               <Minus size={Math.max(14, size * 0.05)} />
             </button>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-              <div style={{ color: clrPrimary, fontFamily: MONO, fontSize: big, fontWeight: 800, lineHeight: 1 }}>
-                {cups}<span style={{ color: clrMuted, fontSize: big * 0.45, fontWeight: 700 }}> / {target}</span>
-              </div>
-              <div style={{ color: clrMuted, fontFamily: MONO, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                cups today
-              </div>
-            </div>
             <button
               onClick={() => setCups(cups + 1)}
               style={{
@@ -166,26 +198,6 @@ export const WaterTrackerWidget: React.FC<WaterTrackerProps> = ({ widget, onUpda
             >
               <Plus size={Math.max(14, size * 0.05)} />
             </button>
-          </div>
-
-          <div style={{ flexShrink: 0 }}>
-            <div style={{
-              width: '100%', height: 8, borderRadius: 4,
-              background: clrTrack, overflow: 'hidden',
-            }} data-testid={`water-progress-${widget.id}`}>
-              <div style={{
-                width: `${pct}%`, height: '100%',
-                background: pct >= 100 ? accent : `linear-gradient(90deg, ${accent}99, ${accent})`,
-                transition: 'width 0.25s ease',
-              }} />
-            </div>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', marginTop: 4,
-              color: clrMuted, fontFamily: MONO, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em',
-            }}>
-              <span>{pct}%</span>
-              <span>{pct >= 100 ? 'goal met' : `${Math.max(0, target - cups)} to go`}</span>
-            </div>
           </div>
         </div>
       )}
