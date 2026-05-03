@@ -52,7 +52,7 @@ Twitch and Kick channels use their respective embed iframes directly (no API nee
 
 ### Premium / Paywall
 
-`profiles.isPremium` boolean controls access. Free tier is limited to 6 widgets; `ad-block.tsx` is rendered for free users. Stripe webhooks (`server/webhookHandlers.ts`) flip `isPremium = true` on subscription activation. Coupon codes: `BENTO2FREE`, `FREE2BENTO`.
+OpenBento is fully free and ad-supported. There is no premium tier, no paywall, and no payment processing. The dashboard is identical for guests and signed-in users; signing in only enables optional cross-device cloud sync of layouts/themes/pages.
 
 ### API Routes
 
@@ -60,7 +60,6 @@ All defined in `server/routes.ts`. Key groups:
 - `/api/stream-status`, `/api/stream/heal`, `/api/youtube/*` — stream/media
 - `/api/dashboard`, `/api/library` — user dashboard and channel library
 - `/api/admin/*` — admin-only (gated by `ADMIN_EMAIL` env var)
-- `/api/stripe/webhook` — Stripe event handling
 - `/api/weather`, `/api/news`, `/api/zoom/signature` — third-party widget data
 - `/api/feedback` — public, no auth required
 
@@ -75,7 +74,6 @@ Uses **Wouter** (not React Router). Routes defined in `client/src/App.tsx`:
 
 Required at runtime (see `.replit` for Replit-managed secrets):
 - `DATABASE_URL` — PostgreSQL connection string
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
 - `YOUTUBE_API_KEY`
 - `OPENWEATHER_API_KEY`, `NEWS_API_KEY`
 - `RESEND_API_KEY`
