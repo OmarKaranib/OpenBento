@@ -16,7 +16,7 @@ import { NoteWidget } from '@/components/note-widget';
 import { AdBlock, AdBlockData } from '@/components/ad-block';
 import { CastPopover } from '@/components/cast-popover';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
-import { useAuth } from '@/hooks/use-auth';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { useTheme } from '@/dashboard/use-theme';
 import { ThemesModal } from '@/components/themes-modal';
 
@@ -138,6 +138,9 @@ interface MasterControlDashboardProps {
   onLogout: () => void;
   isAuthenticated: boolean;
   openLoginModal: (reason?: string) => void;
+  /** Shared supabase client owned by dashboard-shell. Passed through so
+   *  dashboard does not call useAuth() a second time just to read it. */
+  supabaseClient: SupabaseClient | null;
   ad: AdBlockData | null;
   skipAd: () => void;
   triggerAd: () => void;
@@ -175,7 +178,8 @@ const MasterControlDashboard = ({
   ad,
   skipAd,
   triggerAd,
-  isAdActive
+  isAdActive,
+  supabaseClient,
 }: MasterControlDashboardProps) => {
   const [masterMute, setMasterMute] = useState(true);
   const [resizing, setResizing] = useState<ResizeState | null>(null);
@@ -212,12 +216,13 @@ const MasterControlDashboard = ({
   // Themes Marketplace — useTheme owns personal themes + the active theme id
   // and bridges into the existing isDarkMode state for true-light-mode
   // coordination. Modal open state lives in this component so the menu
-  // button can toggle it.
-  const { supabase: themeSupabase } = useAuth();
+  // button can toggle it. The supabase client is plumbed in via props
+  // (owned by dashboard-shell) so we don't open a duplicate useAuth()
+  // subscription here.
   const themeApi = useTheme({
     isAuthenticated,
     userId: user?.id,
-    supabaseClient: themeSupabase,
+    supabaseClient,
     isDarkMode,
     setIsDarkMode,
   });

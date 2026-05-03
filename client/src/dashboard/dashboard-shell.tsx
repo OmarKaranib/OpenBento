@@ -671,6 +671,10 @@ const dashboardProps = {
   skipAd,
   triggerAd,
   isAdActive,
+  // Pass the shared supabase client through props so the dashboard
+  // doesn't have to call useAuth() a second time just to get it. This
+  // keeps a single auth-hook subscription per render tree.
+  supabaseClient,
   onRefreshWidget:     handleRefreshWidget,
   onToggleClockFormat: handleToggleClockFormat,
   onColorChange:       handleClockColorChange,
