@@ -400,16 +400,35 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
     cloudUploadTimerRef.current = setTimeout(async () => {
       const token = await getToken();
       if (!token) return;
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      };
+      const themeBody = JSON.stringify({ personalThemes, activeThemeId });
       try {
         const res = await fetch('/api/dashboard', {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ personalThemes, activeThemeId }),
+          headers,
+          body: themeBody,
         });
-        if (res.ok) lastUploadedRef.current = payload;
+        if (res.ok) {
+          lastUploadedRef.current = payload;
+          return;
+        }
+        // 404 race: this user has no dashboard row yet (first sign-in
+        // before use-cloud-sync has uploaded its initial widget payload).
+        // PATCH won't auto-create the row, so fall back to POST with an
+        // empty widgets array so the row exists; subsequent widget
+        // changes will overwrite the widgets field via the cloud-sync
+        // hook's normal POST/PATCH path.
+        if (res.status === 404) {
+          const created = await fetch('/api/dashboard', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ widgets: [], personalThemes, activeThemeId }),
+          });
+          if (created.ok) lastUploadedRef.current = payload;
+        }
       } catch { /* silent — localStorage stays the source of truth */ }
     }, 1500);
     return () => {
