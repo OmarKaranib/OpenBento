@@ -41,7 +41,7 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
   - **Onboarding:** the first-run coachmark flow now ends on the Cast button so guests discover the feature immediately.
 - **Theming for Productivity Widgets:** Productivity and personal widgets (Habit Tracker, Quick Launch, Big Text Marquee, Network Light, Photo Loop, Focus Soundscape, Water Tracker, Mood Check-in, Standup Roller) dynamically adjust text, accent, border, and surface colors based on the widget's background color to ensure readability.
 - **Wellness & Focus Pack:**
-  - **Focus Soundscape:** Five procedurally-generated ambient loops (Rain, Cafe, Fire, Forest, Waves) built from white/brown noise + biquad filters in the Web Audio API — no audio assets bundled. Honors the master mute (widget.isMuted) and the per-widget volume slider. Audio only starts on a user-gesture play click; switching presets rebuilds the graph in-place.
+  - **Focus Soundscape:** Five procedurally-generated ambient loops (Rain, Cafe, Fire, Forest, Waves) built from white/brown noise + biquad filters in the Web Audio API — no audio assets bundled. Each noise buffer is generated once on first play and crossfaded at the seam (50ms equal-power cosine/sine ramp) so the looped source has no audible click at the boundary. Honors the master mute (widget.isMuted, default unmuted) and the per-widget volume slider. Audio only starts on a user-gesture play click; switching presets rebuilds the graph in-place with leak protection (mountedRef + cleared rebuild timer on unmount).
   - **Water Tracker:** Tap +/- cups against a configurable daily target (1–20). Streak counts consecutive days the target was met; today is allowed to be short without immediately killing the streak (resumes from yesterday). Per-day cup totals are persisted with a rolling 90-day trim so the widget blob never grows unbounded; resets at local midnight via a self-rescheduling timer.
   - **Mood Check-in:** Five-emoji daily picker (Great → Bad) with a 30-day heatmap (5×6 grid, newest bottom-right). Long-press any cell (~550ms pointerdown) to clear that day. Persisted with a rolling 60-day trim.
   - **Standup Roller:** Manage a roster (max 30 names), hit Roll to shuffle the speaking order using a seeded mulberry32 RNG. The seed is persisted with `standupOrder`/`standupSeed` so the order is stable across reloads and cloud-sync round-trips and trivially testable.
@@ -57,8 +57,8 @@ The dashboard is built on a 12-column magnetic grid system, designed for high cu
 ## Quality Gates
 A `check` workflow gates the codebase against a clean baseline:
 - `npx tsc --noEmit` — must report **zero** TypeScript errors. Anything new fails the gate.
-- `npx tsx --test tests/server/markets.test.ts tests/client/markets-symbols.test.ts tests/server/cast-schedule.test.ts` — markets ticker server + symbol-resolution unit tests **and** Cast scheduler tests (firing + unpair-stops-pushes).
-- `node --test tests/client/use-cloud-sync.test.mjs tests/client/wellness-pack.test.mjs` — cross-device dashboard cloud-sync hook unit tests **and** Wellness pack streak/seeded-shuffle tests (Water Tracker streak math + Standup Roller deterministic shuffle).
+- `npx tsx --test tests/server/markets.test.ts tests/client/markets-symbols.test.ts tests/server/cast-schedule.test.ts tests/client/wellness-pack.test.ts` — markets ticker server + symbol-resolution unit tests, Cast scheduler tests (firing + unpair-stops-pushes), **and** Wellness pack helper tests (Water Tracker `computeStreak` math + Standup Roller `seededShuffle` determinism, importing the real `client/src/widgets/wellness-helpers.ts` module so any drift fails the gate).
+- `node --test tests/client/use-cloud-sync.test.mjs` — cross-device dashboard cloud-sync hook unit tests.
 
 Run all three locally with the `check` workflow (or copy the command above). A red `check` workflow blocks the task from being marked complete.
 

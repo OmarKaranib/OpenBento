@@ -28,21 +28,37 @@ interface AudioGraph {
   extras: AudioNode[];
 }
 
+// Generate a noise buffer that loops seamlessly. We fill `seconds` of
+// noise, then equal-power crossfade the last `xfade` samples back into
+// the first `xfade` samples and trim the buffer so the new tail is the
+// faded region. Looping that buffer end→start sounds continuous (no
+// click at the seam) — the equivalent of shipping a pre-conditioned
+// loop asset, just generated on first play and reused across loops.
 function buildNoiseBuffer(ctx: AudioContext, kind: 'white' | 'brown'): AudioBuffer {
   const seconds = 4;
   const sampleRate = ctx.sampleRate;
-  const buf = ctx.createBuffer(1, seconds * sampleRate, sampleRate);
-  const data = buf.getChannelData(0);
+  const xfade = Math.floor(0.05 * sampleRate); // 50ms crossfade
+  const total = seconds * sampleRate;
+  const raw = new Float32Array(total + xfade);
   if (kind === 'white') {
-    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    for (let i = 0; i < raw.length; i++) raw[i] = Math.random() * 2 - 1;
   } else {
     let last = 0;
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < raw.length; i++) {
       const w = Math.random() * 2 - 1;
       last = (last + 0.02 * w) / 1.02;
-      data[i] = last * 3.5;
+      raw[i] = last * 3.5;
     }
   }
+  // Equal-power crossfade: head[i]*cos + tail[i]*sin so |head|² + |tail|² = 1.
+  for (let i = 0; i < xfade; i++) {
+    const t = i / xfade;
+    const a = Math.cos(t * Math.PI / 2);
+    const b = Math.sin(t * Math.PI / 2);
+    raw[i] = raw[i] * a + raw[total + i] * b;
+  }
+  const buf = ctx.createBuffer(1, total, sampleRate);
+  buf.getChannelData(0).set(raw.subarray(0, total));
   return buf;
 }
 
