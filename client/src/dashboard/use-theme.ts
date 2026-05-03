@@ -61,7 +61,10 @@ export interface UseThemeApi {
 
 // ─── DOM writer (the only side-effecting code in this module) ───────────────
 
-function writeThemeToDom(theme: Theme, setIsDarkMode: (v: boolean) => void): void {
+// Exported so the integration test can drive it directly against a
+// minimal document/window shim (see tests/client/use-theme-dom.test.mjs).
+// Production code only calls it through applyTheme/previewTheme/revertPreview.
+export function writeThemeToDom(theme: Theme, setIsDarkMode: (v: boolean) => void): void {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   const vars = themeToCssVars(theme);

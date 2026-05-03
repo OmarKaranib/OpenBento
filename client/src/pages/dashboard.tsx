@@ -1363,12 +1363,13 @@ const MasterControlDashboard = ({
       className={`h-screen overflow-hidden font-sans flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:pl-[32rem]' : ''}`} 
       style={{ 
         padding: isFullscreen && !headerVisible ? '0' : '1.6rem',
-        // When a theme is active, defer to the body background that
-        // useTheme writes (color / image / gradient). Otherwise keep the
-        // legacy hardcoded backdrop so unthemed sessions look unchanged.
-        background: themeApi.activeThemeId
-          ? 'transparent'
-          : (isDarkMode ? '#0f172a' : '#F8F9FA'),
+        // Background is driven by the body's .ob-theme-active class
+        // (added by useTheme.writeThemeToDom for both APPLY and PREVIEW).
+        // When that class is present, an !important rule in index.css
+        // forces this container transparent so the body bg shows through —
+        // including during hover-preview before any theme has been
+        // applied. Otherwise this hardcoded backdrop wins.
+        background: isDarkMode ? '#0f172a' : '#F8F9FA',
         color: isDarkMode ? '#f1f5f9' : '#1A1A1A'
       }}
       data-testid="main-dashboard"

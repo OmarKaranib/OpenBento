@@ -254,10 +254,18 @@ body.light-theme [class*="rounded-full"][class*="bg-slate-800"] {
   color: #374151 !important;
 }
 
-/* Themes Marketplace — when a theme is active, the body owns the global
-   background (color / image / gradient) and the dashboard's outer container
-   becomes transparent (see dashboard.tsx). The starry-night layer is also
-   suppressed so theme imagery isn't double-painted. */
+/* Themes Marketplace — when a theme is active (real OR live preview), the
+   body owns the global background (color / image / gradient) and the
+   dashboard's outer container must become transparent so it shows through.
+   We override here with !important because the dashboard sets its
+   background via an inline style attribute. Driving this off the body
+   class (set by writeThemeToDom for both apply AND preview) is what makes
+   hover-preview visible even for first-time users who haven't applied
+   any theme yet. The starry-night overlay is also suppressed to avoid
+   double-painting on top of theme imagery. */
+body.ob-theme-active [data-testid="main-dashboard"] {
+  background: transparent !important;
+}
 body.ob-theme-active .starry-night {
   display: none !important;
 }
@@ -659,9 +667,14 @@ body {
   position: relative;
   overflow: hidden;
   min-height: 0;
-  /* Semi-transparent default background to show global canvas - increased opacity for visibility */
-  --slot-bg-rgb: 15, 23, 42;
-  background: rgba(var(--slot-bg-rgb), 0.35);
+  /* Semi-transparent default background to show global canvas. The triplet
+     comes from the active Theme's --slot-bg-rgb (set on :root by
+     useTheme.writeThemeToDom). When no theme is active we fall back to
+     slate-900 via the var() fallback — keeping the legacy look. We avoid
+     defining --slot-bg-rgb locally on .dashboard-slot itself, because a
+     local definition would shadow the inherited theme value and pin every
+     widget to slate-900 forever. */
+  background: rgba(var(--slot-bg-rgb, 15, 23, 42), 0.35);
   /* Border is more visible - thicker and higher contrast */
   border: 2px solid rgba(148, 163, 184, 0.55);
   box-shadow: 
