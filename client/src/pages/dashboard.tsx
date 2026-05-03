@@ -21,6 +21,7 @@ import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api'
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useTheme } from '@/dashboard/use-theme';
 import { BUILT_IN_THEMES } from '@shared/themes';
+import { planPageVisuals, EMPTY_PAGE_VISUAL_PREV, type BodyBgStyles } from '@/dashboard/page-visuals';
 import { ThemesModal } from '@/components/themes-modal';
 
 const GRID_COLS = 12;
@@ -293,43 +294,67 @@ const MasterControlDashboard = ({
   }), [themeApi, pages, activePageId, onSetPageTheme, onSetPageBackground]);
 
   // Multi-Page per-page overrides — when the active page carries its
-  // own themeId, apply it. When it carries a backgroundConfig, write
-  // the body background directly (theme-style). Both fields are
-  // optional; when null the page inherits whatever the user last
-  // applied globally. Re-runs on every page switch so flipping tabs
-  // atomically swaps look + canvas alongside widgets.
-  const lastAppliedPageThemeRef = useRef<string | null>(null);
+  // own themeId/backgroundConfig, apply them. When it does NOT, we
+  // must explicitly restore whatever was applied *before* any per-page
+  // override took effect (otherwise the previous tab's visuals bleed
+  // through into a tab that was meant to inherit the global look).
+  //
+  // Strategy: the first time we apply a per-page override, snapshot
+  // the current global theme id + body background styles. On every
+  // subsequent page switch, if the newly-active page has no override
+  // for a given dimension, restore the snapshot for that dimension.
+  // The snapshot is refreshed whenever an override is *cleared* by
+  // a switch back to a no-override page (so a later global theme
+  // change after that point becomes the new fallback baseline).
+  const pageVisualPrevRef = useRef(EMPTY_PAGE_VISUAL_PREV);
   useEffect(() => {
     const active = pages.find(p => p.id === activePageId);
     if (!active) return;
-    // Theme override
-    if (active.themeId && active.themeId !== lastAppliedPageThemeRef.current) {
-      const all = [...BUILT_IN_THEMES, ...themeApi.personalThemes];
-      const found = all.find(t => t.id === active.themeId);
-      if (found) {
-        themeApi.applyTheme(found);
-        lastAppliedPageThemeRef.current = active.themeId;
+    const body = typeof document !== 'undefined' ? document.body : null;
+    const readBody = (): BodyBgStyles | null => body ? {
+      backgroundImage: body.style.backgroundImage,
+      backgroundColor: body.style.backgroundColor,
+      backgroundSize: body.style.backgroundSize,
+      backgroundPosition: body.style.backgroundPosition,
+      backgroundAttachment: body.style.backgroundAttachment,
+    } : null;
+    const { commands, next } = planPageVisuals(
+      pageVisualPrevRef.current,
+      { themeId: active.themeId ?? null, backgroundConfig: active.backgroundConfig ?? null },
+      { themeId: themeApi.activeThemeId, bg: readBody() },
+    );
+    const allThemes = [...BUILT_IN_THEMES, ...themeApi.personalThemes];
+    for (const cmd of commands) {
+      if (cmd.kind === 'apply-theme') {
+        const t = allThemes.find(x => x.id === cmd.themeId);
+        if (t) themeApi.applyTheme(t);
+      } else if (cmd.kind === 'restore-theme') {
+        const t = cmd.themeId ? allThemes.find(x => x.id === cmd.themeId) : null;
+        if (t) themeApi.applyTheme(t);
+      } else if (cmd.kind === 'apply-bg' && body) {
+        const bg = cmd.bg;
+        if (bg.kind === 'color') {
+          body.style.backgroundImage = 'none';
+          body.style.backgroundColor = bg.value;
+        } else {
+          body.style.backgroundImage = bg.kind === 'image' ? `url("${bg.value}")` : bg.value;
+          body.style.backgroundColor = 'transparent';
+          body.style.backgroundSize = 'cover';
+          body.style.backgroundPosition = 'center';
+          body.style.backgroundAttachment = 'fixed';
+        }
+      } else if (cmd.kind === 'restore-bg' && body) {
+        const snap = cmd.bg;
+        if (snap) {
+          body.style.backgroundImage = snap.backgroundImage;
+          body.style.backgroundColor = snap.backgroundColor;
+          body.style.backgroundSize = snap.backgroundSize;
+          body.style.backgroundPosition = snap.backgroundPosition;
+          body.style.backgroundAttachment = snap.backgroundAttachment;
+        }
       }
-    } else if (!active.themeId) {
-      lastAppliedPageThemeRef.current = null;
     }
-    // Background override
-    if (active.backgroundConfig && typeof document !== 'undefined' && document.body) {
-      const bg = active.backgroundConfig;
-      const body = document.body;
-      if (bg.kind === 'color') {
-        body.style.backgroundImage = 'none';
-        body.style.backgroundColor = bg.value;
-      } else {
-        body.style.backgroundImage = bg.kind === 'image'
-          ? `url("${bg.value}")`
-          : bg.value;
-        body.style.backgroundColor = 'transparent';
-        body.style.backgroundSize = 'cover';
-        body.style.backgroundPosition = 'center';
-        body.style.backgroundAttachment = 'fixed';
-      }
-    }
+    pageVisualPrevRef.current = next;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activePageId, pages]);
 
