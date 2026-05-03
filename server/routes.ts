@@ -1742,6 +1742,81 @@ export async function registerRoutes(
   // upstream isn't hammered when many widgets refresh in parallel.
   interface IssPayload { lat: number; lon: number; altitudeKm: number | null; velocityKmh: number | null; ts: number; }
   const ISS_CACHE = new LruTtlCache<IssPayload>({ max: 1, ttlMs: 25_000 });
+  // Next-overhead-pass estimator. Uses wheretheiss.at's `/positions`
+  // endpoint, which accepts up to 10 timestamps per call and runs SGP4
+  // server-side to predict ISS positions. We sample 20 points (two
+  // batches) over the next ~95 minutes (one full orbit) and return the
+  // timestamp of closest approach to the supplied (lat, lon).
+  interface IssPassPayload { atTs: number; minDistanceKm: number; willPassOverhead: boolean; }
+  const ISS_PASS_CACHE = new LruTtlCache<IssPassPayload>({ max: 64, ttlMs: 5 * 60_000 });
+  app.get('/api/iss/pass', async (req: Request, res: Response) => {
+    const lat = Number(req.query.lat);
+    const lon = Number(req.query.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+      return res.status(400).json({ error: 'lat/lon required and must be valid coordinates' });
+    }
+    const cacheKey = `${lat.toFixed(2)}:${lon.toFixed(2)}`;
+    const cached = ISS_PASS_CACHE.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    // Sample every ~5 min over 95 min = 19 timestamps. Split into two
+    // wheretheiss.at calls (10 ts max per request).
+    const nowSec = Math.floor(Date.now() / 1000);
+    const stepSec = 5 * 60;
+    const totalPts = 19;
+    const tsList = Array.from({ length: totalPts }, (_, i) => nowSec + i * stepSec);
+    const batches: number[][] = [tsList.slice(0, 10), tsList.slice(10)];
+
+    // Local haversine — keep server-side dependency-free.
+    const haversine = (la1: number, lo1: number, la2: number, lo2: number): number => {
+      const R = 6371;
+      const dLat = (la2 - la1) * Math.PI / 180;
+      const dLon = (lo2 - lo1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+    };
+
+    try {
+      const positions: Array<{ ts: number; lat: number; lon: number }> = [];
+      for (const batch of batches) {
+        if (batch.length === 0) continue;
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6_000);
+        const url = `https://api.wheretheiss.at/v1/satellites/25544/positions?timestamps=${batch.join(',')}`;
+        const r = await fetch(url, { signal: ctrl.signal });
+        clearTimeout(t);
+        if (!r.ok) return res.status(502).json({ error: `Upstream ${r.status}` });
+        const arr = await r.json() as Array<{ timestamp?: number; latitude?: number; longitude?: number }>;
+        for (const p of arr) {
+          if (typeof p.timestamp === 'number' && typeof p.latitude === 'number' && typeof p.longitude === 'number') {
+            positions.push({ ts: p.timestamp, lat: p.latitude, lon: p.longitude });
+          }
+        }
+      }
+      if (positions.length === 0) {
+        return res.status(502).json({ error: 'No upstream positions' });
+      }
+      let best = positions[0];
+      let bestD = haversine(lat, lon, best.lat, best.lon);
+      for (const p of positions.slice(1)) {
+        const d = haversine(lat, lon, p.lat, p.lon);
+        if (d < bestD) { bestD = d; best = p; }
+      }
+      const payload: IssPassPayload = {
+        atTs: best.ts * 1000,
+        minDistanceKm: bestD,
+        // ISS visibility footprint is ~2000 km radius; below that the
+        // station is at least theoretically above the local horizon.
+        willPassOverhead: bestD < 2000,
+      };
+      ISS_PASS_CACHE.set(cacheKey, payload);
+      res.json(payload);
+    } catch (err) {
+      res.status(502).json({ error: err instanceof Error ? err.message : 'ISS pass fetch failed' });
+    }
+  });
+
   app.get('/api/iss', async (_req: Request, res: Response) => {
     try {
       const cached = ISS_CACHE.get('iss');

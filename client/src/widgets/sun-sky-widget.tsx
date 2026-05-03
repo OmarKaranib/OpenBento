@@ -8,6 +8,7 @@ import {
   qrIconBtnStyle, qrInputStyle, qrLabelStyle,
 } from './shared';
 import { computeMoonPhase, computeSunTimes } from './sky-helpers';
+import { getLastResolvedLocation, subscribeLocation } from './weather-location';
 
 interface SunSkyProps {
   widget: Widget;
@@ -55,24 +56,36 @@ export const SunSkyWidget: React.FC<SunSkyProps> = ({ widget, onUpdate }) => {
   }, []);
 
   // Resolve location on mount or when overrides change.
+  // Precedence: explicit override → Weather widget's last resolved location
+  // → city geocode → browser geolocation → London fallback. We also
+  // subscribe to weather updates so a later weather resolve replaces our
+  // London fallback transparently.
   useEffect(() => {
     let cancelled = false;
+    const useOverride = widget.sunLat != null && widget.sunLon != null;
+    const useCity = !!widget.sunCity;
+
+    if (useOverride) {
+      setResolved({ lat: widget.sunLat!, lon: widget.sunLon!, label: widget.sunCity ?? 'Custom' });
+      return;
+    }
+
     (async () => {
-      // 1) Explicit override coordinates win.
-      if (widget.sunLat != null && widget.sunLon != null) {
-        if (!cancelled) {
-          setResolved({ lat: widget.sunLat, lon: widget.sunLon, label: widget.sunCity ?? 'Custom' });
-        }
+      // 1) Reuse Weather widget's already-resolved location (no extra
+      //    geolocation prompt or geocode round-trip).
+      const cached = getLastResolvedLocation();
+      if (!useCity && cached) {
+        if (!cancelled) setResolved({ lat: cached.lat, lon: cached.lon, label: cached.label });
         return;
       }
       // 2) City name override → geocode via /api/weather.
-      if (widget.sunCity) {
+      if (useCity) {
         try {
-          const r = await fetch(`/api/weather?city=${encodeURIComponent(widget.sunCity)}`);
+          const r = await fetch(`/api/weather?city=${encodeURIComponent(widget.sunCity!)}`);
           if (r.ok) {
             const j = await r.json();
             if (!cancelled && typeof j?.lat === 'number' && typeof j?.lon === 'number') {
-              setResolved({ lat: j.lat, lon: j.lon, label: j.city ?? widget.sunCity });
+              setResolved({ lat: j.lat, lon: j.lon, label: j.city ?? widget.sunCity! });
               return;
             }
           }
@@ -97,7 +110,16 @@ export const SunSkyWidget: React.FC<SunSkyProps> = ({ widget, onUpdate }) => {
       // 4) London fallback.
       if (!cancelled) setResolved({ lat: 51.5074, lon: -0.1278, label: 'London' });
     })();
-    return () => { cancelled = true; };
+
+    // Subscribe to later Weather resolves so we upgrade off the fallback
+    // as soon as a Weather widget elsewhere on the dashboard resolves.
+    const unsubscribe = (!useOverride && !useCity)
+      ? subscribeLocation(loc => {
+          if (!cancelled) setResolved({ lat: loc.lat, lon: loc.lon, label: loc.label });
+        })
+      : null;
+
+    return () => { cancelled = true; unsubscribe?.(); };
   }, [widget.sunCity, widget.sunLat, widget.sunLon]);
 
   const sun = useMemo(() => {

@@ -22,10 +22,18 @@ interface IssPosition {
   ts: number;
 }
 
+interface IssPass {
+  atTs: number;
+  minDistanceKm: number;
+  willPassOverhead: boolean;
+}
+
 export const IssTrackerWidget: React.FC<IssTrackerProps> = ({ widget, onUpdate }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 280, h: 200 });
   const [pos, setPos] = useState<IssPosition | null>(null);
+  const [pass, setPass] = useState<IssPass | null>(null);
+  const [nowTick, setNowTick] = useState(Date.now());
   const [err, setErr] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [cityInput, setCityInput] = useState(widget.issCity ?? '');
@@ -84,6 +92,37 @@ export const IssTrackerWidget: React.FC<IssTrackerProps> = ({ widget, onUpdate }
     })();
     return () => { cancelled = true; };
   }, [widget.issCity, widget.issLat, widget.issLon, widget.id, onUpdate]);
+
+  // Tick once a minute so the "passing over X in Ym" countdown updates.
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Fetch next-pass prediction whenever the configured city resolves.
+  // Server response is cached for 5 min, so refetch on that cadence.
+  useEffect(() => {
+    if (widget.issLat == null || widget.issLon == null) {
+      setPass(null);
+      return;
+    }
+    let cancelled = false;
+    const ctrl = new AbortController();
+    const fetchPass = async () => {
+      try {
+        const r = await fetch(`/api/iss/pass?lat=${widget.issLat}&lon=${widget.issLon}`, { signal: ctrl.signal });
+        if (!r.ok) return;
+        const j = await r.json() as IssPass;
+        if (cancelled) return;
+        if (typeof j?.atTs === 'number' && typeof j?.minDistanceKm === 'number') {
+          setPass(j);
+        }
+      } catch { /* ignore — keep last value */ }
+    };
+    void fetchPass();
+    const id = setInterval(fetchPass, 5 * 60_000);
+    return () => { cancelled = true; ctrl.abort(); clearInterval(id); };
+  }, [widget.issLat, widget.issLon]);
 
   const distance = useMemo(() => {
     if (!pos || widget.issLat == null || widget.issLon == null) return null;
@@ -215,15 +254,24 @@ export const IssTrackerWidget: React.FC<IssTrackerProps> = ({ widget, onUpdate }
             <span>Vel: {pos?.velocityKmh != null ? `${Math.round(pos.velocityKmh).toLocaleString()} km/h` : '—'}</span>
           </div>
           <div style={{ fontFamily: MONO, fontSize: 11, color: clrMuted, textAlign: 'center' }}>
-            {err
-              ? `ISS: ${err}`
-              : distance != null
-                ? distance < 2000
-                  ? `Above ${widget.issCity} now (~${Math.round(distance)} km)`
-                  : `~${Math.round(distance).toLocaleString()} km from ${widget.issCity}`
-                : widget.issCity
-                  ? `Tracking ${widget.issCity}…`
-                  : 'Set a reference city in settings'}
+            {(() => {
+              if (err) return `ISS: ${err}`;
+              if (distance == null) {
+                return widget.issCity ? `Tracking ${widget.issCity}…` : 'Set a reference city in settings';
+              }
+              const overheadNow = distance < 2000;
+              const distLine = overheadNow
+                ? `Above ${widget.issCity} now (~${Math.round(distance)} km)`
+                : `~${Math.round(distance).toLocaleString()} km from ${widget.issCity}`;
+              // Next-pass line, when we have a prediction and it's in the future.
+              if (pass && pass.willPassOverhead && pass.atTs > nowTick) {
+                const minutes = Math.max(0, Math.round((pass.atTs - nowTick) / 60_000));
+                if (minutes > 0 && !overheadNow) {
+                  return `${distLine} · Passing over ${widget.issCity} in ${minutes}m`;
+                }
+              }
+              return distLine;
+            })()}
           </div>
         </div>
       )}

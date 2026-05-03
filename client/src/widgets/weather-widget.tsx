@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Cloud, CloudDrizzle, CloudLightning, CloudRain, CloudSnow, Cloudy, Search, Sun, Wind } from 'lucide-react';
 import { MONO, Widget } from './shared';
+import { setLastResolvedLocation } from './weather-location';
 
 type WeatherIconType = 'sun' | 'cloud' | 'cloud-rain' | 'cloud-snow' | 'cloud-lightning' | 'wind' | 'cloud-drizzle' | 'cloudy';
 
@@ -134,6 +135,11 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
       if (!mountedRef.current) return false;
       setData(w);
       setWeatherError(false);
+      // Share the resolved location with sibling widgets (Sun & Sky,
+      // ISS Tracker) so they don't re-prompt for geolocation.
+      if (typeof w.lat === 'number' && typeof w.lon === 'number') {
+        setLastResolvedLocation({ lat: w.lat, lon: w.lon, label: w.city ?? 'Here' });
+      }
       // Forecast — best-effort, prefer lat/lon from current weather response
       const fcQs = (w.lat != null && w.lon != null)
         ? `lat=${w.lat}&lon=${w.lon}`

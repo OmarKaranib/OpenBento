@@ -86,25 +86,16 @@ export const EarthNightWidget: React.FC<EarthNightProps> = ({ widget, onUpdate }
           }}
           data-testid={`earth-night-globe-${widget.id}`}
         >
-          {/* Slowly rotating "land lights" layer — schematic dotted texture */}
+          {/* Cached night-lights raster — bundled as /earth/night-lights.svg
+              and reused across instances. Scrolls horizontally to give the
+              illusion of rotation. */}
           <div
             style={{
               position: 'absolute', inset: 0,
-              backgroundImage:
-                `radial-gradient(circle at 22% 38%, rgba(253,224,71,0.50) 0 1.2%, transparent 1.5%),
-                 radial-gradient(circle at 32% 30%, rgba(253,224,71,0.40) 0 0.8%, transparent 1.1%),
-                 radial-gradient(circle at 28% 55%, rgba(250,204,21,0.45) 0 1.0%, transparent 1.3%),
-                 radial-gradient(circle at 48% 35%, rgba(253,224,71,0.55) 0 1.1%, transparent 1.4%),
-                 radial-gradient(circle at 55% 48%, rgba(250,204,21,0.40) 0 0.9%, transparent 1.2%),
-                 radial-gradient(circle at 64% 30%, rgba(253,224,71,0.55) 0 1.0%, transparent 1.3%),
-                 radial-gradient(circle at 72% 60%, rgba(250,204,21,0.40) 0 0.7%, transparent 1.0%),
-                 radial-gradient(circle at 78% 40%, rgba(253,224,71,0.50) 0 1.1%, transparent 1.4%),
-                 radial-gradient(circle at 85% 25%, rgba(250,204,21,0.40) 0 0.6%, transparent 0.9%),
-                 radial-gradient(circle at 18% 70%, rgba(253,224,71,0.40) 0 0.8%, transparent 1.1%),
-                 #04122a`,
-              animation: `earth-spin ${rotationSeconds}s linear infinite`,
+              backgroundImage: 'url(/earth/night-lights.svg), linear-gradient(#04122a, #04122a)',
               backgroundSize: '200% 100%',
-              backgroundRepeat: 'repeat',
+              backgroundRepeat: 'repeat-x',
+              animation: `earth-spin ${rotationSeconds}s linear infinite`,
             }}
           />
           {/* Day-side glow: a soft highlight anchored to sub-solar longitude. */}

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Schematic Earth at Night equirectangular tile (2:1).
+  Hand-authored continent silhouettes + city-light dot clusters.
+  Bundled as a static asset so the browser caches it once, decoded
+  on first paint, and reused across instances of the Earth at Night
+  widget. Intentionally low-res / low-detail: this is a stylised
+  reference, not a satellite product.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2000 1000" preserveAspectRatio="none">
+  <defs>
+    <radialGradient id="cityGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fde68a" stop-opacity="0.95"/>
+      <stop offset="60%" stop-color="#fbbf24" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" x="0" y="0" width="14" height="14" patternUnits="userSpaceOnUse">
+      <circle cx="7" cy="7" r="0.8" fill="#fde68a" fill-opacity="0.55"/>
+    </pattern>
+  </defs>
+  <!-- Deep ocean background -->
+  <rect width="2000" height="1000" fill="#020617"/>
+  <!-- Continent silhouettes (very rough hand polygons) -->
+  <g fill="#0b1d2e" stroke="#0e2438" stroke-width="1">
+    <!-- North America -->
+    <path d="M120,180 L360,140 L520,200 L560,330 L500,420 L420,500 L360,520 L300,460 L260,400 L200,360 L150,300 Z"/>
+    <!-- Central + South America -->
+    <path d="M460,520 L520,540 L560,640 L540,780 L500,860 L460,820 L440,720 L460,620 Z"/>
+    <!-- Greenland -->
+    <path d="M600,120 L700,110 L740,180 L700,240 L640,220 L600,180 Z"/>
+    <!-- Europe -->
+    <path d="M860,220 L1020,200 L1080,280 L1040,340 L960,360 L900,320 L860,280 Z"/>
+    <!-- Africa -->
+    <path d="M940,380 L1080,360 L1180,460 L1180,620 L1100,760 L1020,780 L960,700 L940,560 Z"/>
+    <!-- Asia -->
+    <path d="M1100,180 L1500,160 L1700,260 L1660,400 L1480,440 L1300,420 L1180,360 L1120,280 Z"/>
+    <!-- India / SE Asia -->
+    <path d="M1340,440 L1440,440 L1500,540 L1460,600 L1380,580 L1340,520 Z"/>
+    <!-- Australia -->
+    <path d="M1620,640 L1820,620 L1860,720 L1780,780 L1660,760 L1620,700 Z"/>
+    <!-- Antarctica strip -->
+    <path d="M0,920 L2000,920 L2000,990 L0,990 Z"/>
+  </g>
+  <!-- Land "ambient lights" texture overlay -->
+  <g opacity="0.55">
+    <path d="M120,180 L360,140 L520,200 L560,330 L500,420 L420,500 L360,520 L300,460 L260,400 L200,360 L150,300 Z" fill="url(#dots)"/>
+    <path d="M860,220 L1020,200 L1080,280 L1040,340 L960,360 L900,320 L860,280 Z" fill="url(#dots)"/>
+    <path d="M1100,180 L1500,160 L1700,260 L1660,400 L1480,440 L1300,420 L1180,360 L1120,280 Z" fill="url(#dots)"/>
+    <path d="M940,380 L1080,360 L1180,460 L1180,620 L1100,760 L1020,780 L960,700 L940,560 Z" fill="url(#dots)"/>
+    <path d="M460,520 L520,540 L560,640 L540,780 L500,860 L460,820 L440,720 L460,620 Z" fill="url(#dots)"/>
+    <path d="M1620,640 L1820,620 L1860,720 L1780,780 L1660,760 L1620,700 Z" fill="url(#dots)"/>
+    <path d="M1340,440 L1440,440 L1500,540 L1460,600 L1380,580 L1340,520 Z" fill="url(#dots)"/>
+  </g>
+  <!-- Major-city megalight clusters -->
+  <g>
+    <!-- North-east US corridor -->
+    <circle cx="430" cy="280" r="22" fill="url(#cityGlow)"/>
+    <circle cx="460" cy="290" r="18" fill="url(#cityGlow)"/>
+    <circle cx="400" cy="310" r="14" fill="url(#cityGlow)"/>
+    <!-- US west coast -->
+    <circle cx="220" cy="330" r="16" fill="url(#cityGlow)"/>
+    <circle cx="200" cy="380" r="14" fill="url(#cityGlow)"/>
+    <!-- Mexico City -->
+    <circle cx="360" cy="470" r="14" fill="url(#cityGlow)"/>
+    <!-- São Paulo / Rio -->
+    <circle cx="540" cy="700" r="16" fill="url(#cityGlow)"/>
+    <circle cx="520" cy="720" r="12" fill="url(#cityGlow)"/>
+    <circle cx="480" cy="760" r="10" fill="url(#cityGlow)"/>
+    <!-- Western Europe -->
+    <circle cx="940" cy="280" r="18" fill="url(#cityGlow)"/>
+    <circle cx="970" cy="270" r="14" fill="url(#cityGlow)"/>
+    <circle cx="1000" cy="290" r="12" fill="url(#cityGlow)"/>
+    <circle cx="980" cy="320" r="10" fill="url(#cityGlow)"/>
+    <!-- Cairo / Nile -->
+    <circle cx="1080" cy="420" r="14" fill="url(#cityGlow)"/>
+    <!-- Lagos / West Africa -->
+    <circle cx="980" cy="540" r="12" fill="url(#cityGlow)"/>
+    <!-- South Africa -->
+    <circle cx="1080" cy="760" r="10" fill="url(#cityGlow)"/>
+    <!-- India -->
+    <circle cx="1380" cy="500" r="20" fill="url(#cityGlow)"/>
+    <circle cx="1400" cy="520" r="16" fill="url(#cityGlow)"/>
+    <circle cx="1360" cy="540" r="14" fill="url(#cityGlow)"/>
+    <!-- Eastern China -->
+    <circle cx="1560" cy="360" r="22" fill="url(#cityGlow)"/>
+    <circle cx="1600" cy="380" r="20" fill="url(#cityGlow)"/>
+    <circle cx="1540" cy="400" r="16" fill="url(#cityGlow)"/>
+    <!-- Japan / Korea -->
+    <circle cx="1700" cy="360" r="16" fill="url(#cityGlow)"/>
+    <circle cx="1680" cy="340" r="12" fill="url(#cityGlow)"/>
+    <!-- SE Asia -->
+    <circle cx="1500" cy="540" r="12" fill="url(#cityGlow)"/>
+    <circle cx="1480" cy="580" r="10" fill="url(#cityGlow)"/>
+    <!-- Australia (Sydney/Melbourne) -->
+    <circle cx="1820" cy="720" r="12" fill="url(#cityGlow)"/>
+    <circle cx="1780" cy="740" r="10" fill="url(#cityGlow)"/>
+  </g>
+  <!-- Subtle equator hint -->
+  <line x1="0" y1="500" x2="2000" y2="500" stroke="#0c1a2c" stroke-width="1" stroke-dasharray="4 8" opacity="0.4"/>
+</svg>
