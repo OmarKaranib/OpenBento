@@ -22,6 +22,24 @@
   import type { Widget, WidgetType } from '@/widgets/shared';
   import { WidgetRenderer } from '@/widgets/widget-renderer';
   import { useCloudSync } from '@/dashboard/use-cloud-sync';
+  import {
+    type DashboardPagesState,
+    type DashboardPageWidget,
+    PAGES_STORAGE_KEY,
+    ACTIVE_PAGE_ID_KEY,
+    LEGACY_WIDGETS_KEY,
+    sanitizePages,
+    migrateLegacyWidgets,
+    makeEmptyState,
+    getActivePage,
+    updateActivePageWidgets,
+    setActivePage as setActivePagePure,
+    addPage as addPagePure,
+    renamePage as renamePagePure,
+    duplicatePage as duplicatePagePure,
+    deletePage as deletePagePure,
+    setDefaultPage as setDefaultPagePure,
+  } from '@shared/dashboard-pages';
 
   const GRID_COLS = 12;
 
@@ -91,41 +109,121 @@ const sensors = useSensors(
   useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
 );
 
-const getDefaultWidgets = (): Widget[] => [];
-
-const [widgets, setWidgets] = useState<Widget[]>(() => {
-  const saved = localStorage.getItem('openBentoWidgets');
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved);
-      return parsed
-        // Drop legacy 'zoom' widgets persisted before the type was removed.
-        // Otherwise they render as unknown ghost tiles for returning users.
-        .filter((w: Widget) => (w.type as string) !== 'zoom')
-        .map((w: Widget) => ({
-          ...w,
-          isMuted:        w.isMuted        ?? true,
-          isPaused:       w.isPaused       ?? false,
-          volume:         w.volume         ?? 0,
-          previousVolume: w.previousVolume ?? 50,
-          isOffline:      w.isOffline      ?? false,
-          x:              w.x              ?? 0,
-          y:              w.y              ?? 0,
-          w:              w.w              ?? 3,
-          h:              w.h              ?? 2,
-          refreshCounter: w.refreshCounter ?? w.iframeKey ?? 0,
-          channelName:    stripLegacyPrefix(w.channelName),
-          noteContent:    w.type === 'note' ? (w.noteContent ?? '') : w.noteContent,
-          clockUse24Hour: w.clockUse24Hour ?? false,
-        }));
-    } catch {
-      return getDefaultWidgets();
-    }
+// Hydrate the widget array from a single legacy `openBentoWidgets`
+// string, applying the same defaults the previous code applied.
+function hydrateLegacyWidgets(saved: string | null): Widget[] {
+  if (!saved) return [];
+  try {
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((w: Widget) => (w.type as string) !== 'zoom')
+      .map((w: Widget) => ({
+        ...w,
+        isMuted:        w.isMuted        ?? true,
+        isPaused:       w.isPaused       ?? false,
+        volume:         w.volume         ?? 0,
+        previousVolume: w.previousVolume ?? 50,
+        isOffline:      w.isOffline      ?? false,
+        x:              w.x              ?? 0,
+        y:              w.y              ?? 0,
+        w:              w.w              ?? 3,
+        h:              w.h              ?? 2,
+        refreshCounter: w.refreshCounter ?? w.iframeKey ?? 0,
+        channelName:    stripLegacyPrefix(w.channelName),
+        noteContent:    w.type === 'note' ? (w.noteContent ?? '') : w.noteContent,
+        clockUse24Hour: w.clockUse24Hour ?? false,
+      }));
+  } catch {
+    return [];
   }
-  return getDefaultWidgets();
+}
+
+// Multi-Page Dashboards — pagesState is the source of truth. Hydration
+// order: 1) `openBentoPages` (current schema) → 2) legacy
+// `openBentoWidgets` wrapped as a Home page → 3) empty Home.
+// `?page=` URL deep-link is applied below in an effect after wouter
+// is mounted so it can override the persisted active page.
+const [pagesState, setPagesState] = useState<DashboardPagesState>(() => {
+  if (typeof window === 'undefined') return makeEmptyState();
+  try {
+    const raw = localStorage.getItem(PAGES_STORAGE_KEY);
+    if (raw) {
+      const parsed = sanitizePages(JSON.parse(raw));
+      if (parsed) {
+        const persistedActive = localStorage.getItem(ACTIVE_PAGE_ID_KEY);
+        if (persistedActive && parsed.pages.some(p => p.id === persistedActive)) {
+          return { ...parsed, activePageId: persistedActive };
+        }
+        return parsed;
+      }
+    }
+  } catch {/* fall through to legacy migration */}
+  const legacy = hydrateLegacyWidgets(localStorage.getItem(LEGACY_WIDGETS_KEY));
+  return migrateLegacyWidgets(legacy as unknown as DashboardPageWidget[]);
 });
 
+const pagesStateRef = useRef<DashboardPagesState>(pagesState);
+useEffect(() => { pagesStateRef.current = pagesState; }, [pagesState]);
+
+// Derived view-model — children continue to consume `widgets` /
+// `setWidgets` so their internals are unaffected. `setWidgets` only
+// writes to the active page so other pages stay isolated.
+const widgets: Widget[] = useMemo(
+  () => getActivePage(pagesState).widgets as unknown as Widget[],
+  [pagesState],
+);
+
+const setWidgets = useCallback<React.Dispatch<React.SetStateAction<Widget[]>>>(
+  (updater) => {
+    setPagesState(prev => {
+      const active = getActivePage(prev);
+      const nextWidgets = typeof updater === 'function'
+        ? (updater as (w: Widget[]) => Widget[])(active.widgets as unknown as Widget[])
+        : updater;
+      return updateActivePageWidgets(prev, nextWidgets as unknown as DashboardPageWidget[]);
+    });
+  },
+  [],
+);
+
 useEffect(() => { widgetsRef.current = widgets; }, [widgets]);
+
+// Persist pagesState to localStorage so guests + signed-in offline
+// reloads land on the same page collection. Mirrors the legacy
+// `openBentoWidgets` to the active page's widgets so any code paths
+// still reading the legacy key (Cast snapshot helpers, etc.) keep
+// working during the transition.
+useEffect(() => {
+  try {
+    localStorage.setItem(PAGES_STORAGE_KEY, JSON.stringify(pagesState));
+    localStorage.setItem(ACTIVE_PAGE_ID_KEY, pagesState.activePageId);
+    const active = getActivePage(pagesState);
+    localStorage.setItem(LEGACY_WIDGETS_KEY, JSON.stringify(active.widgets));
+  } catch {/* private mode — accept loss */}
+}, [pagesState]);
+
+// ?page= deep-link — applied once after the first paint and whenever
+// the URL changes. Falls back silently when the requested page
+// doesn't exist (stale link).
+useEffect(() => {
+  if (typeof window === 'undefined') return;
+  const params = new URLSearchParams(window.location.search);
+  const requested = params.get('page');
+  if (!requested) return;
+  setPagesState(prev =>
+    prev.pages.some(p => p.id === requested)
+      ? setActivePagePure(prev, requested)
+      : prev,
+  );
+  // Eagerly clear the param so user-initiated tab clicks don't
+  // visually conflict with a stale deep-link.
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('page');
+    window.history.replaceState(null, '', url.toString());
+  } catch {/* */}
+}, [location]);
 
   // Cloud sync (logged-in users only). See client/src/dashboard/use-cloud-sync.ts
   // for the full hydrate-then-debounced-upload state machine.
@@ -134,10 +232,18 @@ useEffect(() => { widgetsRef.current = widgets; }, [widgets]);
     isAuthenticated,
     userId: user?.id,
     supabaseClient,
-    widgets,
-    setWidgets,
-    widgetsRef,
+    pagesState,
+    setPagesState,
+    pagesStateRef,
   });
+
+  // ── Page management API exposed to MasterControlDashboard ─────────────
+  const handleAddPage     = useCallback((name?: string) => setPagesState(s => addPagePure(s, name ?? 'New Page')), []);
+  const handleRenamePage  = useCallback((id: string, name: string) => setPagesState(s => renamePagePure(s, id, name)), []);
+  const handleDuplicatePage = useCallback((id: string) => setPagesState(s => duplicatePagePure(s, id)), []);
+  const handleDeletePage  = useCallback((id: string) => setPagesState(s => deletePagePure(s, id)), []);
+  const handleSetDefaultPage = useCallback((id: string) => setPagesState(s => setDefaultPagePure(s, id)), []);
+  const handleSetActivePage = useCallback((id: string) => setPagesState(s => setActivePagePure(s, id)), []);
 
   const { ad, skipAd, triggerAd, isAdActive } = useViralAds(false, widgets, setWidgets);
 
@@ -678,6 +784,15 @@ const dashboardProps = {
   onRefreshWidget:     handleRefreshWidget,
   onToggleClockFormat: handleToggleClockFormat,
   onColorChange:       handleClockColorChange,
+  // Multi-Page Dashboards — pages collection + management API
+  pages:               pagesState.pages,
+  activePageId:        pagesState.activePageId,
+  onAddPage:           handleAddPage,
+  onRenamePage:        handleRenamePage,
+  onDuplicatePage:     handleDuplicatePage,
+  onDeletePage:        handleDeletePage,
+  onSetDefaultPage:    handleSetDefaultPage,
+  onSetActivePage:     handleSetActivePage,
 };
 
 return (

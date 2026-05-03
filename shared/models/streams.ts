@@ -15,6 +15,13 @@ export const dashboards = pgTable("dashboards", {
   // Both default to empty so existing rows keep validating with no migration.
   personalThemes: jsonb("personal_themes").notNull().default([]),
   activeThemeId: varchar("active_theme_id"),
+  // Multi-Page Dashboards — `pages` is the source-of-truth collection
+  // for signed-in users; the legacy single `widgets` column is kept for
+  // backward compatibility (mirrored to the active page's widgets on
+  // upload). `activePageId` records the last selected tab so the
+  // returning user lands on the same page across devices.
+  pages: jsonb("pages").notNull().default([]),
+  activePageId: varchar("active_page_id"),
   isDefault: boolean("is_default").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

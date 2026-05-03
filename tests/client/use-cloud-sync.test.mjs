@@ -157,31 +157,53 @@ function fakeSupabase(token) {
 }
 
 // --- Tests ----------------------------------------------------------------
+// Multi-Page Dashboards refactor: the hook now operates on the full
+// pages collection. We keep the same three scenarios (happy-path
+// hydrate, empty-remote-skip, unauthenticated-no-op) but assert
+// against pagesState instead of a flat widgets array.
+
+const emptyPagesState = () => ({
+  pages: [
+    { id: 'page-home', name: 'Home', isDefault: true, widgets: [], createdAt: 0 },
+  ],
+  activePageId: 'page-home',
+});
+
+const pagesStateWith = (widgets) => ({
+  pages: [
+    { id: 'page-home', name: 'Home', isDefault: true, widgets, createdAt: 0 },
+  ],
+  activePageId: 'page-home',
+});
+
 test('Scenario 1: happy-path hydrate populates widgets from cloud row', async () => {
   const cloudWidgets = [
     { id: 'w1', type: 'clock', x: 0, y: 0, w: 3, h: 2 },
     { id: 'w2', type: 'note', x: 3, y: 0, w: 3, h: 2, noteContent: 'hi' },
   ];
+  // The server still returns the legacy `widgets` shape on rows that
+  // pre-date the multi-page rollout — the hook must wrap it as a
+  // one-page Home via migrateLegacyWidgets.
   const { fn: fetchFn, calls } = makeFetch([
     () => json(200, { dashboard: { widgets: cloudWidgets } }),
   ]);
   globalThis.fetch = fetchFn;
 
   let received = null;
-  const setWidgets = (next) => {
+  const setPagesState = (next) => {
     received = next;
   };
-  const widgets = [];
-  const widgetsRef = { current: widgets };
+  const pagesState = emptyPagesState();
+  const pagesStateRef = { current: pagesState };
 
   const harness = runHookOnce(() =>
     useCloudSync({
       isAuthenticated: true,
       userId: 'user-1',
       supabaseClient: fakeSupabase('token-abc'),
-      widgets,
-      setWidgets,
-      widgetsRef,
+      pagesState,
+      setPagesState,
+      pagesStateRef,
     }),
   );
   await harness.runEffects();
@@ -191,7 +213,13 @@ test('Scenario 1: happy-path hydrate populates widgets from cloud row', async ()
   assert.ok(calls.length >= 1, 'hydrate GET fires');
   assert.match(calls[0].url, /\/api\/dashboard/);
   assert.equal((calls[0].init && calls[0].init.method) || 'GET', 'GET');
-  assert.deepEqual(received, cloudWidgets, 'setWidgets receives the cloud row');
+  assert.ok(received, 'setPagesState was called');
+  assert.equal(received.pages.length, 1, 'legacy row maps to a single Home page');
+  assert.deepEqual(
+    received.pages[0].widgets,
+    cloudWidgets,
+    'active page widgets mirror the cloud row',
+  );
   const posts = calls.filter(
     (c) => ((c.init && c.init.method) || 'GET') === 'POST',
   );
@@ -201,28 +229,28 @@ test('Scenario 1: happy-path hydrate populates widgets from cloud row', async ()
 test('Scenario 2: empty-remote-skip leaves local state untouched', async () => {
   const { fn: fetchFn, calls } = makeFetch([
     // Server says "no cloud dashboard yet" by returning .dashboard = null.
-    // The hook must treat this as a no-op and NOT clobber local widgets.
+    // The hook must treat this as a no-op and NOT clobber local pages.
     () => json(200, { dashboard: null }),
   ]);
   globalThis.fetch = fetchFn;
 
   let setCalled = false;
-  const setWidgets = () => {
+  const setPagesState = () => {
     setCalled = true;
   };
-  const widgets = [
+  const pagesState = pagesStateWith([
     { id: 'local-1', type: 'clock', x: 0, y: 0, w: 3, h: 2 },
-  ];
-  const widgetsRef = { current: widgets };
+  ]);
+  const pagesStateRef = { current: pagesState };
 
   const harness = runHookOnce(() =>
     useCloudSync({
       isAuthenticated: true,
       userId: 'user-2',
       supabaseClient: fakeSupabase('token-xyz'),
-      widgets,
-      setWidgets,
-      widgetsRef,
+      pagesState,
+      setPagesState,
+      pagesStateRef,
     }),
   );
   await harness.runEffects();
@@ -230,7 +258,7 @@ test('Scenario 2: empty-remote-skip leaves local state untouched', async () => {
   harness.cleanup();
 
   assert.ok(calls.length >= 1, 'hydrate GET still fires');
-  assert.equal(setCalled, false, 'setWidgets must NOT be called when remote is empty');
+  assert.equal(setCalled, false, 'setPagesState must NOT be called when remote is empty');
   const posts = calls.filter(
     (c) => ((c.init && c.init.method) || 'GET') === 'POST',
   );
@@ -242,20 +270,20 @@ test('Scenario 3: hook is inert for unauthenticated users', async () => {
   globalThis.fetch = fetchFn;
 
   let setCalled = false;
-  const setWidgets = () => {
+  const setPagesState = () => {
     setCalled = true;
   };
-  const widgets = [];
-  const widgetsRef = { current: widgets };
+  const pagesState = emptyPagesState();
+  const pagesStateRef = { current: pagesState };
 
   const harness = runHookOnce(() =>
     useCloudSync({
       isAuthenticated: false,
       userId: undefined,
       supabaseClient: fakeSupabase(null),
-      widgets,
-      setWidgets,
-      widgetsRef,
+      pagesState,
+      setPagesState,
+      pagesStateRef,
     }),
   );
   await harness.runEffects();
@@ -263,5 +291,5 @@ test('Scenario 3: hook is inert for unauthenticated users', async () => {
   harness.cleanup();
 
   assert.equal(calls.length, 0, 'no network when unauthenticated');
-  assert.equal(setCalled, false, 'no setWidgets when unauthenticated');
+  assert.equal(setCalled, false, 'no setPagesState when unauthenticated');
 });

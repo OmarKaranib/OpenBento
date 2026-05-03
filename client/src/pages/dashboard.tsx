@@ -15,6 +15,8 @@ import { FloatingTutorial } from '@/components/floating-tutorial';
 import { NoteWidget } from '@/components/note-widget';
 import { AdBlock, AdBlockData } from '@/components/ad-block';
 import { CastPopover } from '@/components/cast-popover';
+import { PageTabsStrip } from '@/components/page-tabs-strip';
+import type { DashboardPage } from '@shared/dashboard-pages';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useTheme } from '@/dashboard/use-theme';
@@ -145,6 +147,17 @@ interface MasterControlDashboardProps {
   skipAd: () => void;
   triggerAd: () => void;
   isAdActive: boolean;
+  // Multi-Page Dashboards — page collection + management API. The
+  // tab strip is rendered inside this component (between the menu
+  // bar and the canvas) so it shares the dark/light theme state.
+  pages: DashboardPage[];
+  activePageId: string;
+  onAddPage: (name?: string) => void;
+  onRenamePage: (id: string, name: string) => void;
+  onDuplicatePage: (id: string) => void;
+  onDeletePage: (id: string) => void;
+  onSetDefaultPage: (id: string) => void;
+  onSetActivePage: (id: string) => void;
 }
 
 interface ResizeState {
@@ -180,6 +193,14 @@ const MasterControlDashboard = ({
   triggerAd,
   isAdActive,
   supabaseClient,
+  pages,
+  activePageId,
+  onAddPage,
+  onRenamePage,
+  onDuplicatePage,
+  onDeletePage,
+  onSetDefaultPage,
+  onSetActivePage,
 }: MasterControlDashboardProps) => {
   const [masterMute, setMasterMute] = useState(true);
   const [resizing, setResizing] = useState<ResizeState | null>(null);
@@ -257,18 +278,11 @@ const MasterControlDashboard = ({
     }
   }, [isDarkMode]);
 
-  // Auto-save widgets to localStorage so layouts persist across refreshes
-  // for both signed-in users and guests. When a guest signs up later,
-  // their existing layout is preserved locally and continues to work.
-  const widgetsJsonRef = useRef<string>('');
-  useEffect(() => {
-    const widgetsJson = JSON.stringify(widgets);
-    // Only save if actual content changed (not just reference)
-    if (widgetsJson !== widgetsJsonRef.current) {
-      widgetsJsonRef.current = widgetsJson;
-      localStorage.setItem('openBentoWidgets', widgetsJson);
-    }
-  }, [widgets]);
+  // Multi-Page Dashboards — pages persistence is owned by
+  // dashboard-shell (writes to `openBentoPages` + mirrors the active
+  // page widgets to the legacy `openBentoWidgets` key). The previous
+  // per-component widgets save was removed to avoid double-writing
+  // (and clobbering) the legacy mirror managed upstream.
 
   // On logout (authenticated → unauthenticated transition only), clear the
   // Personal Library since it is an authenticated-only feature
@@ -1210,7 +1224,10 @@ const MasterControlDashboard = ({
   };
 
   const handleSaveLayout = () => {
-    localStorage.setItem('openBentoWidgets', JSON.stringify(widgets));
+    // Pages persistence is owned by dashboard-shell, which writes
+    // `openBentoPages` (and mirrors the active page widgets to the
+    // legacy `openBentoWidgets` key) on every state change. The Save
+    // button is now purely a UX affordance — flash and exit edit mode.
 
     const saveButton = document.getElementById('save-button');
     if (saveButton) {
@@ -1623,12 +1640,16 @@ const MasterControlDashboard = ({
               Themes
             </button>
 
-            {/* Cast to TV - Popover with paired TV list + manual push */}
+            {/* Cast to TV - Popover with paired TV list + manual push.
+                The page selector inside the popover lets the user
+                push a different page than the one they're viewing. */}
             <CastPopover
               widgets={widgets}
               isDarkMode={isDarkMode}
               masterMute={masterMute}
               isAuthenticated={isAuthenticated}
+              pages={pages}
+              activePageId={activePageId}
             />
 
             {/* Request Dropdown */}
@@ -1734,6 +1755,21 @@ const MasterControlDashboard = ({
         </div>
 
         <div className="h-[0.2rem] bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full mt-[0.8rem]"></div>
+
+        {/* Multi-Page Dashboards — scrollable tab strip. The component
+            hides itself (renders only the "+" button) until a 2nd page
+            exists, so existing single-page users see no visual change. */}
+        <PageTabsStrip
+          pages={pages}
+          activePageId={activePageId}
+          onActivate={onSetActivePage}
+          onAdd={() => onAddPage()}
+          onRename={onRenamePage}
+          onDuplicate={onDuplicatePage}
+          onDelete={onDeletePage}
+          onSetDefault={onSetDefaultPage}
+          isDarkMode={isDarkMode}
+        />
       </div>
 
 

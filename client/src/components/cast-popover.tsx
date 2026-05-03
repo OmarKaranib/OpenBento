@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Cast, Plus, X, Send, Pencil, Check, Trash2, Loader2, Calendar, Save,
   Tv, Settings,
@@ -13,12 +13,19 @@ import {
 } from "@/lib/cast-snapshot";
 import type { Widget } from "@/App";
 import type { CastSnapshot } from "@shared/schema";
+import type { DashboardPage } from "@shared/dashboard-pages";
 
 interface CastPopoverProps {
   widgets: Widget[];
   isDarkMode: boolean;
   masterMute: boolean;
   isAuthenticated?: boolean;
+  /** Multi-Page Dashboards — when present, the popover renders a
+   *  page selector and pushes the selected page's widgets instead
+   *  of the currently-viewed `widgets` prop. Defaults to the
+   *  active page if a selection hasn't been made yet. */
+  pages?: DashboardPage[];
+  activePageId?: string;
 }
 
 interface RoomMeta {
@@ -71,7 +78,37 @@ export function CastPopover({
   isDarkMode,
   masterMute,
   isAuthenticated = false,
+  pages,
+  activePageId,
 }: CastPopoverProps) {
+  // Page selector — defaults to the dashboard's active page. The
+  // selector is only rendered when the user has 2+ pages. When the
+  // selected page is the active one, we keep using the live `widgets`
+  // prop so toggles like mute reflect immediately. For other pages
+  // we read from the pages collection directly.
+  // We track whether the user has *explicitly* picked a page so that
+  // tab switches in the dashboard keep moving the selector along
+  // until the user opts out by choosing a different page in the
+  // popover. Without this the selector would freeze to whatever the
+  // active page was on first render and silently push stale pages.
+  const userPickedRef = useRef(false);
+  const [selectedPageId, setSelectedPageIdState] = useState<string | null>(activePageId ?? null);
+  const setSelectedPageId = useCallback((id: string) => {
+    userPickedRef.current = true;
+    setSelectedPageIdState(id);
+  }, []);
+  useEffect(() => {
+    if (!userPickedRef.current && activePageId) {
+      setSelectedPageIdState(activePageId);
+    }
+  }, [activePageId]);
+  const effectiveWidgets: Widget[] = (() => {
+    if (!pages || pages.length === 0) return widgets;
+    const id = selectedPageId ?? activePageId;
+    if (!id || id === activePageId) return widgets;
+    const p = pages.find((pp) => pp.id === id);
+    return p ? (p.widgets as unknown as Widget[]) : widgets;
+  })();
   const [open, setOpen] = useState(false);
   const [tvs, setTVs] = useState<PairedTV[]>(() => loadPairedTVs());
   const [code, setCode] = useState("");
@@ -324,7 +361,7 @@ export function CastPopover({
   async function handlePush(roomId: string): Promise<void> {
     setPushingRoom(roomId);
     try {
-      const snapshot = buildCastSnapshot({ widgets, isDarkMode, masterMute });
+      const snapshot = buildCastSnapshot({ widgets: effectiveWidgets, isDarkMode, masterMute });
       // Use authedFetch (sends Bearer token) — persistent BENTO rooms now run
       // through attachSupabaseUser + ownership check, so cookie-only requests
       // would 403 even for the owner.
@@ -358,7 +395,7 @@ export function CastPopover({
     if (ids.length === 0) return;
     setPushingSelected(true);
     try {
-      const snapshot = buildCastSnapshot({ widgets, isDarkMode, masterMute });
+      const snapshot = buildCastSnapshot({ widgets: effectiveWidgets, isDarkMode, masterMute });
       const r = await authedFetch("POST", "/api/cast/push-many", { roomIds: ids, snapshot });
       const data = await r.json().catch(() => ({ ok: ids.length, fail: 0 }));
       const ok = typeof data?.ok === "number" ? data.ok : ids.length;
@@ -388,7 +425,7 @@ export function CastPopover({
 
   async function handlePushAll(): Promise<void> {
     if (tvs.length === 0) return;
-    const snapshot = buildCastSnapshot({ widgets, isDarkMode, masterMute });
+    const snapshot = buildCastSnapshot({ widgets: effectiveWidgets, isDarkMode, masterMute });
     let ok = 0, fail = 0;
     await Promise.all(
       tvs.map(async (tv) => {
@@ -442,7 +479,7 @@ export function CastPopover({
     if (!name) { toast({ title: "Layout needs a name", variant: "destructive" }); return; }
     setSavingLayout(true);
     try {
-      const snapshot = buildCastSnapshot({ widgets, isDarkMode, masterMute });
+      const snapshot = buildCastSnapshot({ widgets: effectiveWidgets, isDarkMode, masterMute });
       const r = await authedFetch("POST", "/api/cast/layouts", { name, snapshot });
       const data = await r.json();
       setLayouts((prev) => [...prev, data.layout]);
@@ -612,6 +649,30 @@ export function CastPopover({
 
           {tab === "tvs" && (
           <div className="p-[1.2rem]">
+            {/* Multi-Page Dashboards — page selector. Hidden when the
+                user only has one page so the popover stays uncluttered
+                for everyone except multi-page power users. */}
+            {pages && pages.length > 1 && (
+              <div className="mb-[0.7rem]">
+                <label className={`block text-[0.75rem] font-semibold mb-[0.25rem] ${isDarkMode ? "text-slate-400" : "text-gray-600"}`}>
+                  Page to push
+                </label>
+                <select
+                  value={selectedPageId ?? activePageId ?? pages[0].id}
+                  onChange={(e) => setSelectedPageId(e.target.value)}
+                  className={`w-full h-[2.2rem] px-[0.6rem] rounded border text-[0.9rem] ${
+                    isDarkMode ? "bg-slate-800 border-slate-600 text-white" : "bg-gray-50 border-gray-300"
+                  }`}
+                  data-testid="select-cast-page"
+                >
+                  {pages.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}{p.id === activePageId ? " (current)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex items-center justify-between mb-[0.6rem] gap-[0.4rem] flex-wrap">
               <span className={`text-[0.95rem] font-semibold ${isDarkMode ? "text-slate-300" : "text-gray-700"}`}>
                 Paired TVs ({tvs.length})
