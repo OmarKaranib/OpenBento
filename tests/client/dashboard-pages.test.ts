@@ -121,6 +121,63 @@ test('duplicatePage clones widgets with fresh ids and a new page id', () => {
   assert.equal(s.activePageId, dup.id);
 });
 
+test('integration: switching active page does not bleed widget state across pages', () => {
+  // Build two pages with distinct widget arrays, then flip the active
+  // page back and forth and verify each page keeps its own widgets.
+  // This protects against the regression the architect flagged where
+  // setWidgets-on-active accidentally writes through to other pages.
+  let s = makeEmptyState();
+  s = updateActivePageWidgets(s, [
+    { id: 'h1', type: 'note', x: 0, y: 0, w: 2, h: 2 },
+  ] as any);
+  s = addPage(s, 'Work');
+  const workId = s.activePageId;
+  s = updateActivePageWidgets(s, [
+    { id: 'w1', type: 'clock', x: 0, y: 0, w: 1, h: 1 },
+    { id: 'w2', type: 'weather', x: 1, y: 0, w: 2, h: 2 },
+  ] as any);
+  // Flip back to Home
+  const homeId = s.pages.find(p => p.name === 'Home')!.id;
+  s = setActivePage(s, homeId);
+  let active = s.pages.find(p => p.id === s.activePageId)!;
+  assert.equal(active.widgets.length, 1);
+  assert.equal(active.widgets[0].id, 'h1');
+  // Mutate Home — must not touch Work
+  s = updateActivePageWidgets(s, [
+    { id: 'h1', type: 'note', x: 0, y: 0, w: 2, h: 2 },
+    { id: 'h2', type: 'spacer', x: 2, y: 0, w: 1, h: 1 },
+  ] as any);
+  const work = s.pages.find(p => p.id === workId)!;
+  assert.equal(work.widgets.length, 2, 'Work was not mutated by Home write');
+  assert.equal(work.widgets[0].id, 'w1');
+  // Flip to Work — its widgets must be untouched
+  s = setActivePage(s, workId);
+  active = s.pages.find(p => p.id === s.activePageId)!;
+  assert.equal(active.widgets.length, 2);
+  assert.deepEqual(active.widgets.map(w => w.id), ['w1', 'w2']);
+});
+
+test('integration: ?page= deep-link round-trips through setActivePage', () => {
+  // Simulates the dashboard-shell deep-link effect: a URL carrying a
+  // valid page id flips activePageId; an unknown id is a no-op.
+  let s = makeEmptyState();
+  s = addPage(s, 'Stream');
+  const streamId = s.pages.find(p => p.name === 'Stream')!.id;
+  const homeId = s.pages.find(p => p.name === 'Home')!.id;
+  // Active page is currently Stream (addPage flips active). Simulate
+  // a deep-link to Home.
+  s = s.pages.some(p => p.id === homeId) ? setActivePage(s, homeId) : s;
+  assert.equal(s.activePageId, homeId);
+  // Deep-link to Stream
+  s = s.pages.some(p => p.id === streamId) ? setActivePage(s, streamId) : s;
+  assert.equal(s.activePageId, streamId);
+  // Stale link — unknown id leaves state unchanged.
+  const before = s.activePageId;
+  const requested = 'page-does-not-exist';
+  s = s.pages.some(p => p.id === requested) ? setActivePage(s, requested) : s;
+  assert.equal(s.activePageId, before);
+});
+
 test('deletePage promotes the neighbor when a non-first default is removed', () => {
   // Build a 3-page state where the MIDDLE page is the default. The
   // architect flagged that previous behavior always promoted index 0;

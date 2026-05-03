@@ -204,26 +204,51 @@ useEffect(() => {
 }, [pagesState]);
 
 // ?page= deep-link — applied once after the first paint and whenever
-// the URL changes. Falls back silently when the requested page
-// doesn't exist (stale link).
+// wouter's location changes. We *keep* the param in the URL after
+// applying it (so the tab is bookmarkable / shareable) and rely on
+// the second effect below to keep the URL in sync as the user switches
+// tabs. Falls back silently when the requested page doesn't exist.
+const deepLinkAppliedRef = useRef(false);
 useEffect(() => {
   if (typeof window === 'undefined') return;
+  if (deepLinkAppliedRef.current) return;
   const params = new URLSearchParams(window.location.search);
   const requested = params.get('page');
-  if (!requested) return;
+  if (!requested) { deepLinkAppliedRef.current = true; return; }
   setPagesState(prev =>
     prev.pages.some(p => p.id === requested)
       ? setActivePagePure(prev, requested)
       : prev,
   );
-  // Eagerly clear the param so user-initiated tab clicks don't
-  // visually conflict with a stale deep-link.
+  deepLinkAppliedRef.current = true;
+}, [location]);
+
+// Mirror the active page id into the URL as `?page=<id>` so reloads
+// and shares re-open the same tab. Uses replaceState (not pushState)
+// to avoid polluting browser history with every tab click — users
+// rarely want a Back button per tab. Skips the write until the deep
+// link has been resolved so we don't clobber the incoming param on
+// first paint.
+useEffect(() => {
+  if (typeof window === 'undefined') return;
+  if (!deepLinkAppliedRef.current) return;
   try {
     const url = new URL(window.location.href);
-    url.searchParams.delete('page');
+    const current = url.searchParams.get('page');
+    // Only write the param when the user has multiple pages — keeps
+    // single-page URLs clean.
+    if (pagesState.pages.length <= 1) {
+      if (current) {
+        url.searchParams.delete('page');
+        window.history.replaceState(null, '', url.toString());
+      }
+      return;
+    }
+    if (current === pagesState.activePageId) return;
+    url.searchParams.set('page', pagesState.activePageId);
     window.history.replaceState(null, '', url.toString());
   } catch {/* */}
-}, [location]);
+}, [pagesState.activePageId, pagesState.pages.length]);
 
   // Cloud sync (logged-in users only). See client/src/dashboard/use-cloud-sync.ts
   // for the full hydrate-then-debounced-upload state machine.

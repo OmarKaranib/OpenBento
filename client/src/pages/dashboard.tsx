@@ -20,6 +20,7 @@ import type { DashboardPage } from '@shared/dashboard-pages';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useTheme } from '@/dashboard/use-theme';
+import { BUILT_IN_THEMES } from '@shared/themes';
 import { ThemesModal } from '@/components/themes-modal';
 
 const GRID_COLS = 12;
@@ -248,6 +249,47 @@ const MasterControlDashboard = ({
     setIsDarkMode,
   });
   const [themesModalOpen, setThemesModalOpen] = useState(false);
+
+  // Multi-Page per-page overrides — when the active page carries its
+  // own themeId, apply it. When it carries a backgroundConfig, write
+  // the body background directly (theme-style). Both fields are
+  // optional; when null the page inherits whatever the user last
+  // applied globally. Re-runs on every page switch so flipping tabs
+  // atomically swaps look + canvas alongside widgets.
+  const lastAppliedPageThemeRef = useRef<string | null>(null);
+  useEffect(() => {
+    const active = pages.find(p => p.id === activePageId);
+    if (!active) return;
+    // Theme override
+    if (active.themeId && active.themeId !== lastAppliedPageThemeRef.current) {
+      const all = [...BUILT_IN_THEMES, ...themeApi.personalThemes];
+      const found = all.find(t => t.id === active.themeId);
+      if (found) {
+        themeApi.applyTheme(found);
+        lastAppliedPageThemeRef.current = active.themeId;
+      }
+    } else if (!active.themeId) {
+      lastAppliedPageThemeRef.current = null;
+    }
+    // Background override
+    if (active.backgroundConfig && typeof document !== 'undefined' && document.body) {
+      const bg = active.backgroundConfig;
+      const body = document.body;
+      if (bg.kind === 'color') {
+        body.style.backgroundImage = 'none';
+        body.style.backgroundColor = bg.value;
+      } else {
+        body.style.backgroundImage = bg.kind === 'image'
+          ? `url("${bg.value}")`
+          : bg.value;
+        body.style.backgroundColor = 'transparent';
+        body.style.backgroundSize = 'cover';
+        body.style.backgroundPosition = 'center';
+        body.style.backgroundAttachment = 'fixed';
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePageId, pages]);
 
   // Listen for personal library updates from sidebar
   useEffect(() => {
