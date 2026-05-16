@@ -475,6 +475,7 @@
     const [activeTab, setActiveTab]             = useState<SidebarTab>('streams');
     const [activeCategory, setActiveCategory]   = useState<ContentCategory>('all');
     const [searchQuery, setSearchQuery]         = useState('');
+    const [widgetSearchQuery, setWidgetSearchQuery] = useState('');
     const [liveStatuses, setLiveStatuses]       = useState<Record<string, LiveStatus>>({});
     const [personalLibrary, setPersonalLibrary] = useState<SavedChannel[]>(() => loadPersonalLibrary());
     const [blockedChannels, setBlockedChannels] = useState<BlockedChannel[]>(() => loadBlockedChannels());
@@ -1213,6 +1214,23 @@
       },
     ] as const;
 
+    const normalizedWidgetSearch = widgetSearchQuery.trim().toLowerCase();
+    const filteredAvailableWidgets = normalizedWidgetSearch
+      ? availableWidgets.filter((w) => {
+          const fields = [
+            w.label,
+            w.description,
+            w.id,
+            w.template.name,
+            w.template.widgetType,
+            w.template.color,
+          ];
+          return fields.some((field) =>
+            String(field).toLowerCase().includes(normalizedWidgetSearch)
+          );
+        })
+      : availableWidgets;
+
     return (
       <>
         <div
@@ -1518,32 +1536,62 @@
                   </p>
                 </div>
 
+                <div className="relative">
+                  <Search className="absolute left-[1rem] top-1/2 -translate-y-1/2 w-[1.6rem] h-[1.6rem] text-slate-500" />
+                  <input
+                    type="text"
+                    value={widgetSearchQuery}
+                    onChange={(e) => setWidgetSearchQuery(e.target.value)}
+                    placeholder="Search widgets..."
+                    className="w-full pl-[3.6rem] pr-[3.6rem] py-[0.8rem] bg-slate-800 border border-slate-700 slot-button focus:border-cyan-500 focus:outline-none transition-colors text-[1.2rem] placeholder:text-slate-600"
+                    data-testid="input-search-widgets"
+                  />
+                  {widgetSearchQuery.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => setWidgetSearchQuery('')}
+                      className="absolute right-[0.8rem] top-1/2 -translate-y-1/2 p-[0.4rem] rounded-md hover:bg-slate-700 transition-colors"
+                      aria-label="Clear widget search"
+                      data-testid="button-clear-widget-search"
+                    >
+                      <X className="w-[1.3rem] h-[1.3rem] text-slate-500 hover:text-slate-300" />
+                    </button>
+                  )}
+                </div>
+
                 <div>
                   <p className="text-[0.95rem] font-bold text-slate-500 uppercase tracking-[0.1em] mb-[1rem]">Available</p>
-                  <div className="grid grid-cols-2 gap-[0.8rem]">
-                    {availableWidgets.map((w) => (
-                      <button
-                        key={w.id}
-                        onClick={() => {
-                          if (w.id === 'custom_widget') { setCustomModalOpen(true); return; }
-                          onTemplateClick?.(w.template);
-                        }}
-                        className={`group relative flex flex-col items-center justify-center gap-[0.8rem] p-[1.4rem] rounded-xl border ${w.border} ${w.cardBg} transition-all duration-200 hover:scale-[1.03] hover:shadow-lg active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500`}
-                        data-testid={`widget-library-${w.id}`}
-                      >
-                        <div className={`w-[4rem] h-[4rem] rounded-xl ${w.iconBg} border border-slate-700/50 flex items-center justify-center group-hover:border-slate-600 transition-colors`}>
-                          {w.icon}
-                        </div>
-                        <div className="text-center">
-                          <p className="text-[1.15rem] font-semibold text-slate-200 leading-tight">{w.label}</p>
-                          <p className="text-[0.95rem] text-slate-500 mt-[0.2rem] leading-snug">{w.description}</p>
-                        </div>
-                        <span className={`absolute top-[0.7rem] right-[0.7rem] text-[0.8rem] font-bold px-[0.55rem] py-[0.2rem] rounded-full border ${w.badgeColor}`}>
-                          ADD
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                  {filteredAvailableWidgets.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-[0.8rem]">
+                      {filteredAvailableWidgets.map((w) => (
+                        <button
+                          key={w.id}
+                          onClick={() => {
+                            if (w.id === 'custom_widget') { setCustomModalOpen(true); return; }
+                            onTemplateClick?.(w.template);
+                          }}
+                          className={`group relative flex flex-col items-center justify-center gap-[0.8rem] p-[1.4rem] rounded-xl border ${w.border} ${w.cardBg} transition-all duration-200 hover:scale-[1.03] hover:shadow-lg active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500`}
+                          data-testid={`widget-library-${w.id}`}
+                        >
+                          <div className={`w-[4rem] h-[4rem] rounded-xl ${w.iconBg} border border-slate-700/50 flex items-center justify-center group-hover:border-slate-600 transition-colors`}>
+                            {w.icon}
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[1.15rem] font-semibold text-slate-200 leading-tight">{w.label}</p>
+                            <p className="text-[0.95rem] text-slate-500 mt-[0.2rem] leading-snug">{w.description}</p>
+                          </div>
+                          <span className={`absolute top-[0.7rem] right-[0.7rem] text-[0.8rem] font-bold px-[0.55rem] py-[0.2rem] rounded-full border ${w.badgeColor}`}>
+                            ADD
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-[3rem] bg-slate-800/30 border border-dashed border-slate-700 rounded-xl">
+                      <Search className="w-[3rem] h-[3rem] text-slate-700 mx-auto mb-[1rem]" />
+                      <p className="text-[1.2rem] text-slate-500">No widgets found</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
