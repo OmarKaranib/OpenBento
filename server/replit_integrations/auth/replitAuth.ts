@@ -8,6 +8,29 @@ import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { authStorage } from "./storage";
 
+const REQUIRED_REPLIT_AUTH_ENV = ["REPL_ID", "SESSION_SECRET", "DATABASE_URL"] as const;
+
+function getMissingReplitAuthEnv(): string[] {
+  return REQUIRED_REPLIT_AUTH_ENV.filter((name) => !process.env[name]);
+}
+
+function isProduction(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
+function registerDisabledAuthRoutes(app: Express, missingEnv: string[]) {
+  const message =
+    `Replit OIDC auth is disabled in local development. Missing env vars: ${missingEnv.join(", ")}`;
+
+  app.get(["/api/login", "/api/callback"], (_req, res) => {
+    res.status(503).json({ message });
+  });
+
+  app.get("/api/logout", (_req, res) => {
+    res.redirect("/");
+  });
+}
+
 const getOidcConfig = memoize(
   async () => {
     return await client.discovery(
@@ -19,6 +42,13 @@ const getOidcConfig = memoize(
 );
 
 export function getSession() {
+  const missingEnv = getMissingReplitAuthEnv();
+  if (missingEnv.length > 0) {
+    throw new Error(
+      `Missing required Replit auth env var(s): ${missingEnv.join(", ")}`
+    );
+  }
+
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
@@ -61,6 +91,21 @@ async function upsertUser(claims: any) {
 }
 
 export async function setupAuth(app: Express) {
+  const missingEnv = getMissingReplitAuthEnv();
+  if (missingEnv.length > 0) {
+    if (isProduction()) {
+      throw new Error(
+        `Missing required Replit auth env var(s): ${missingEnv.join(", ")}`
+      );
+    }
+
+    console.warn(
+      `[Auth] Replit OIDC auth disabled for local development. Missing env vars: ${missingEnv.join(", ")}`
+    );
+    registerDisabledAuthRoutes(app, missingEnv);
+    return;
+  }
+
   app.set("trust proxy", 1);
   app.use(getSession());
   app.use(passport.initialize());
@@ -132,8 +177,10 @@ export async function setupAuth(app: Express) {
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
+  const isPassportAuthenticated =
+    typeof req.isAuthenticated === "function" && req.isAuthenticated();
 
-  if (!req.isAuthenticated() || !user.expires_at) {
+  if (!isPassportAuthenticated || !user?.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
