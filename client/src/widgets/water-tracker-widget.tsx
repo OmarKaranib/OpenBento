@@ -87,9 +87,18 @@ export const WaterTrackerWidget: React.FC<WaterTrackerProps> = ({ widget, onUpda
       }}
       data-testid={`water-tracker-widget-${widget.id}`}
     >
-      <div className="widget-hover-cog" style={{ position: 'absolute', top: 8, right: 8, zIndex: 5 }}>
-        <button onClick={() => setShowSettings(s => !s)} style={qrIconBtnStyle()} title="Water settings" data-testid={`water-settings-toggle-${widget.id}`}>
-          <SettingsIcon size={11} />
+      {/* Single toggle button: gear when closed, X when open */}
+      <div
+        className={showSettings ? undefined : 'widget-hover-cog'}
+        style={{ position: 'absolute', top: 8, right: 8, zIndex: 6 }}
+      >
+        <button
+          onClick={() => setShowSettings(s => !s)}
+          style={qrIconBtnStyle()}
+          title={showSettings ? 'Close settings' : 'Water settings'}
+          data-testid={`water-settings-toggle-${widget.id}`}
+        >
+          {showSettings ? <XIcon size={11} /> : <SettingsIcon size={11} />}
         </button>
       </div>
 
@@ -106,6 +115,7 @@ export const WaterTrackerWidget: React.FC<WaterTrackerProps> = ({ widget, onUpda
         </span>
       </div>
 
+      {/* Settings overlay — no X button inside; toggle button above handles close */}
       {showSettings && (
         <div
           style={{
@@ -115,11 +125,8 @@ export const WaterTrackerWidget: React.FC<WaterTrackerProps> = ({ widget, onUpda
           onKeyDown={e => e.stopPropagation()}
           data-testid={`water-settings-panel-${widget.id}`}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingRight: 28 }}>
             <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>Daily target (cups)</span>
-            <button onClick={() => setShowSettings(false)} style={qrIconBtnStyle()} data-testid={`water-settings-close-${widget.id}`}>
-              <XIcon size={11} />
-            </button>
           </div>
           <span style={qrLabelStyle()}>Target: {target}</span>
           <input
