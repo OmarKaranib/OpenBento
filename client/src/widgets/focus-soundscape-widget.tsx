@@ -199,9 +199,18 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
       }}
       data-testid={`focus-soundscape-widget-${widget.id}`}
     >
-      <div className="widget-hover-cog" style={{ position: 'absolute', top: 8, right: 8, transition: 'opacity 0.15s', zIndex: 5 }}>
-        <button onClick={() => setShowSettings(s => !s)} style={qrIconBtnStyle()} title="Sound settings" data-testid={`soundscape-settings-toggle-${widget.id}`}>
-          <SettingsIcon size={11} />
+      {/* Single toggle button: gear when closed, X when open */}
+      <div
+        className={showSettings ? undefined : 'widget-hover-cog'}
+        style={{ position: 'absolute', top: 8, right: 8, transition: 'opacity 0.15s', zIndex: 6 }}
+      >
+        <button
+          onClick={() => setShowSettings(s => !s)}
+          style={qrIconBtnStyle()}
+          title={showSettings ? 'Close settings' : 'Sound settings'}
+          data-testid={`soundscape-settings-toggle-${widget.id}`}
+        >
+          {showSettings ? <XIcon size={11} /> : <SettingsIcon size={11} />}
         </button>
       </div>
 
@@ -215,6 +224,7 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
         </span>
       </div>
 
+      {/* Settings overlay — no X button inside; toggle button above handles close */}
       {showSettings && (
         <div
           style={{
@@ -224,11 +234,8 @@ export const FocusSoundscapeWidget: React.FC<FocusSoundscapeProps> = ({ widget, 
           onKeyDown={e => e.stopPropagation()}
           data-testid={`soundscape-settings-panel-${widget.id}`}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingRight: 28 }}>
             <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>Soundscape</span>
-            <button onClick={() => setShowSettings(false)} style={qrIconBtnStyle()} data-testid={`soundscape-settings-close-${widget.id}`}>
-              <XIcon size={11} />
-            </button>
           </div>
           <p style={{ color: '#94a3b8', fontFamily: MONO, fontSize: 10, margin: 0 }}>
             Bundled ambient loops (~170KB each). Respects master mute.
