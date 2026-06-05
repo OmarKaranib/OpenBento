@@ -112,9 +112,18 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
       }}
       data-testid={`standup-roller-widget-${widget.id}`}
     >
-      <div className="widget-hover-cog" style={{ position: 'absolute', top: 8, right: 8, zIndex: 5 }}>
-        <button onClick={() => setShowSettings(s => !s)} style={qrIconBtnStyle()} title="Roster" data-testid={`standup-settings-toggle-${widget.id}`}>
-          <SettingsIcon size={11} />
+      {/* Single toggle button: gear when closed, X when open */}
+      <div
+        className={showSettings ? undefined : 'widget-hover-cog'}
+        style={{ position: 'absolute', top: 8, right: 8, zIndex: 6 }}
+      >
+        <button
+          onClick={() => setShowSettings(s => !s)}
+          style={qrIconBtnStyle()}
+          title={showSettings ? 'Close roster' : 'Roster'}
+          data-testid={`standup-settings-toggle-${widget.id}`}
+        >
+          {showSettings ? <XIcon size={11} /> : <SettingsIcon size={11} />}
         </button>
       </div>
 
@@ -128,6 +137,7 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
         </span>
       </div>
 
+      {/* Settings overlay — no X button inside; toggle button above handles close */}
       {showSettings && (
         <div
           style={{
@@ -137,11 +147,8 @@ export const StandupRollerWidget: React.FC<StandupRollerProps> = ({ widget, onUp
           onKeyDown={e => e.stopPropagation()}
           data-testid={`standup-settings-panel-${widget.id}`}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingRight: 28 }}>
             <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>Roster</span>
-            <button onClick={() => setShowSettings(false)} style={qrIconBtnStyle()} data-testid={`standup-settings-close-${widget.id}`}>
-              <XIcon size={11} />
-            </button>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <input
