@@ -1,6 +1,6 @@
 // Auto-extracted from App.tsx during widget modularization.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, CheckSquare, Flame, Plus as PlusIcon, Settings as SettingsIcon, Square as SquareIcon, Trash2, X as XIcon } from 'lucide-react';
+import { CheckSquare, Flame, Plus as PlusIcon, Settings as SettingsIcon, Square as SquareIcon, Trash2, X as XIcon } from 'lucide-react';
 import { MONO, Widget, isLightBg, qrIconBtnStyle, qrInputStyle } from './shared';
 
 interface HabitTrackerProps {
@@ -90,10 +90,6 @@ export const HabitTrackerWidget: React.FC<HabitTrackerProps> = ({ widget, onUpda
     setHabits(habits.map(h => h.id === id ? { ...h, name } : h));
   };
 
-  // Theme awareness: use the per-widget colour droplet as the
-  // background (Task #10 Clock/Countdown/WorldClocks pattern). When
-  // the user picks a light bg we flip text + borders dark via
-  // `isLightBg` so the widget reads cleanly in any theme.
   const bgColor    = widget.customColor ?? '#0f172a';
   const light      = isLightBg(bgColor);
   const accent     = light ? '#dc2626' : '#fb7185';
@@ -121,21 +117,21 @@ export const HabitTrackerWidget: React.FC<HabitTrackerProps> = ({ widget, onUpda
       }}
       data-testid={`habit-tracker-widget-${widget.id}`}
     >
-      {/* Hover-only cog */}
+      {/* Single toggle button: gear when closed, X when open */}
       <div
-        className="widget-hover-cog"
+        className={showSettings ? undefined : 'widget-hover-cog'}
         style={{
           position: 'absolute', top: 8, right: 8,
-          transition: 'opacity 0.15s', zIndex: 5,
+          transition: 'opacity 0.15s', zIndex: 6,
         }}
       >
         <button
           onClick={() => setShowSettings(s => !s)}
           style={qrIconBtnStyle()}
-          title="Habit settings"
+          title={showSettings ? 'Close settings' : 'Habit settings'}
           data-testid={`habit-settings-toggle-${widget.id}`}
         >
-          <SettingsIcon size={11} />
+          {showSettings ? <XIcon size={11} /> : <SettingsIcon size={11} />}
         </button>
       </div>
 
@@ -152,7 +148,7 @@ export const HabitTrackerWidget: React.FC<HabitTrackerProps> = ({ widget, onUpda
         </span>
       </div>
 
-      {/* Settings overlay */}
+      {/* Settings overlay — no X button inside; toggle button above handles close */}
       {showSettings && (
         <div
           style={{
@@ -164,17 +160,10 @@ export const HabitTrackerWidget: React.FC<HabitTrackerProps> = ({ widget, onUpda
           onKeyDown={e => e.stopPropagation()}
           data-testid={`habit-settings-panel-${widget.id}`}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingRight: 28 }}>
             <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>
               Edit habits
             </span>
-            <button
-              onClick={() => setShowSettings(false)}
-              style={qrIconBtnStyle()}
-              data-testid={`habit-settings-close-${widget.id}`}
-            >
-              <XIcon size={11} />
-            </button>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <input
@@ -248,13 +237,11 @@ export const HabitTrackerWidget: React.FC<HabitTrackerProps> = ({ widget, onUpda
           )}
           {habits.map(h => {
             const checkedToday = h.days.includes(today);
-            // Streak = consecutive days back from today (or yesterday
-            // if today not yet checked) where the habit was checked.
             let streak = 0;
             for (let i = 0; i < 60; i++) {
               const k = offsetDayKey(-i);
               if (h.days.includes(k)) streak++;
-              else if (i === 0) continue; // today blank doesn't kill streak yet
+              else if (i === 0) continue;
               else break;
             }
             return (
@@ -324,8 +311,3 @@ export const HabitTrackerWidget: React.FC<HabitTrackerProps> = ({ widget, onUpda
     </div>
   );
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  QuickLaunchWidget — grid of named URL tiles (2/3/4 cols).
-// ─────────────────────────────────────────────────────────────────────────────
-
