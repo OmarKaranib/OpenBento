@@ -26,9 +26,6 @@ export const PhotoLoopWidget: React.FC<PhotoLoopProps> = ({ widget, onUpdate }) 
   const photos = widget.photoUrls ?? [];
   const intervalSec = widget.photoIntervalSec ?? 5;
   const fit = widget.photoFit ?? 'cover';
-  // Theme awareness: photos look best framed in black, but the user
-  // can override via the colour droplet — we then flip the border
-  // and accent contrast accordingly (Task #10 Clock-family pattern).
   const bgColor   = widget.customColor ?? '#000';
   const light     = isLightBg(bgColor);
   const accent    = light ? '#7c3aed' : '#c084fc';
@@ -91,56 +88,81 @@ export const PhotoLoopWidget: React.FC<PhotoLoopProps> = ({ widget, onUpdate }) 
       }}
       data-testid={`photo-loop-widget-${widget.id}`}
     >
-      <div
-        className="widget-hover-cog"
-        style={{
-          position: 'absolute', top: 8, right: 8,
-          transition: 'opacity 0.15s', zIndex: 5,
-          display: 'flex', gap: 4,
-        }}
-      >
-        {photos.length > 1 && (
-          <>
-            <button
-              onClick={() => setIdx(i => (i - 1 + photos.length) % photos.length)}
-              style={qrIconBtnStyle()}
-              title="Previous"
-              data-testid={`photo-loop-prev-${widget.id}`}
-            >
-              <ChevronLeft size={11} />
-            </button>
-            <button
-              onClick={() => setPaused(p => !p)}
-              style={{
-                ...qrIconBtnStyle(),
-                color: paused ? accent : '#cbd5e1',
-                borderColor: paused ? accent : 'rgba(255,255,255,0.1)',
-              }}
-              title={paused ? 'Resume slideshow' : 'Pause slideshow'}
-              data-testid={`photo-loop-${paused ? 'play' : 'pause'}-${widget.id}`}
-            >
-              {paused ? <PlayIcon size={11} /> : <PauseIcon size={11} />}
-            </button>
-            <button
-              onClick={() => setIdx(i => (i + 1) % photos.length)}
-              style={qrIconBtnStyle()}
-              title="Next"
-              data-testid={`photo-loop-next-${widget.id}`}
-            >
-              <ChevronRight size={11} />
-            </button>
-          </>
-        )}
-        <button
-          onClick={() => setShowSettings(s => !s)}
-          style={qrIconBtnStyle()}
-          title="Photo settings"
-          data-testid={`photo-loop-settings-toggle-${widget.id}`}
-        >
-          <SettingsIcon size={11} />
-        </button>
-      </div>
+      {/*
+        Two sibling button groups at top-right:
 
+        1. widget-hover-cog (hover-only): prev/pause/next + Gear.
+           Rendered only when settings is CLOSED. All four buttons
+           vanish together on hover-out.
+        2. Always-visible X: rendered only when settings is OPEN.
+           Sits at z-index 6 so it clears the overlay (z-index 4)
+           and is never hidden by hover CSS.
+      */}
+      {!showSettings && (
+        <div
+          className="widget-hover-cog"
+          style={{
+            position: 'absolute', top: 8, right: 8,
+            transition: 'opacity 0.15s', zIndex: 5,
+            display: 'flex', gap: 4,
+          }}
+        >
+          {photos.length > 1 && (
+            <>
+              <button
+                onClick={() => setIdx(i => (i - 1 + photos.length) % photos.length)}
+                style={qrIconBtnStyle()}
+                title="Previous"
+                data-testid={`photo-loop-prev-${widget.id}`}
+              >
+                <ChevronLeft size={11} />
+              </button>
+              <button
+                onClick={() => setPaused(p => !p)}
+                style={{
+                  ...qrIconBtnStyle(),
+                  color: paused ? accent : '#cbd5e1',
+                  borderColor: paused ? accent : 'rgba(255,255,255,0.1)',
+                }}
+                title={paused ? 'Resume slideshow' : 'Pause slideshow'}
+                data-testid={`photo-loop-${paused ? 'play' : 'pause'}-${widget.id}`}
+              >
+                {paused ? <PlayIcon size={11} /> : <PauseIcon size={11} />}
+              </button>
+              <button
+                onClick={() => setIdx(i => (i + 1) % photos.length)}
+                style={qrIconBtnStyle()}
+                title="Next"
+                data-testid={`photo-loop-next-${widget.id}`}
+              >
+                <ChevronRight size={11} />
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => setShowSettings(true)}
+            style={qrIconBtnStyle()}
+            title="Photo settings"
+            data-testid={`photo-loop-settings-toggle-${widget.id}`}
+          >
+            <SettingsIcon size={11} />
+          </button>
+        </div>
+      )}
+      {showSettings && (
+        <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 6 }}>
+          <button
+            onClick={() => setShowSettings(false)}
+            style={qrIconBtnStyle()}
+            title="Close settings"
+            data-testid={`photo-loop-settings-toggle-${widget.id}`}
+          >
+            <XIcon size={11} />
+          </button>
+        </div>
+      )}
+
+      {/* Settings overlay — no X button inside; toggle button above handles close */}
       {showSettings && (
         <div
           style={{
@@ -152,17 +174,10 @@ export const PhotoLoopWidget: React.FC<PhotoLoopProps> = ({ widget, onUpdate }) 
           onKeyDown={e => e.stopPropagation()}
           data-testid={`photo-loop-settings-panel-${widget.id}`}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingRight: 28 }}>
             <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>
               Photo Loop
             </span>
-            <button
-              onClick={() => setShowSettings(false)}
-              style={qrIconBtnStyle()}
-              data-testid={`photo-loop-settings-close-${widget.id}`}
-            >
-              <XIcon size={11} />
-            </button>
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             <input
@@ -334,8 +349,3 @@ export const PhotoLoopWidget: React.FC<PhotoLoopProps> = ({ widget, onUpdate }) 
     </div>
   );
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  WidgetRenderer
-// ─────────────────────────────────────────────────────────────────────────────
-
