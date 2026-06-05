@@ -28,18 +28,11 @@ export const BigTextMarqueeWidget: React.FC<BigTextMarqueeProps> = ({ widget, on
   const text = widget.marqueeText ?? 'ON AIR';
   const mode = widget.marqueeMode ?? 'static';
   const speed = widget.marqueeSpeed ?? 120;
-  // Theme awareness: bg comes from marqueeBgColor (or customColor as
-  // fallback) so the widget already follows the user's theme via the
-  // colour droplet. We flip the auto-fg accent and border when the
-  // chosen bg is light enough to need dark contrast.
   const bg = widget.marqueeBgColor ?? widget.customColor ?? '#1e0b2e';
   const light = isLightBg(bg);
   const fg = widget.marqueeFgColor ?? (light ? '#9d174d' : '#f9a8d4');
   const clrBorder = light ? 'rgba(0,0,0,0.12)' : 'rgba(71,85,105,0.4)';
 
-  // For static mode, fit-to-width: shrink font until single-line text
-  // fits in 90% of width. We bisect rather than measuring per-character
-  // because ResizeObserver retriggers on every resize anyway.
   useEffect(() => {
     if (mode !== 'static') return;
     const container = containerRef.current;
@@ -56,8 +49,6 @@ export const BigTextMarqueeWidget: React.FC<BigTextMarqueeProps> = ({ widget, on
     setStaticFs(lo);
   }, [text, mode, size.w, size.h]);
 
-  // Scroll mode duration in seconds — derived from text width and speed.
-  // Re-measured whenever text or width changes.
   const [scrollDur, setScrollDur] = useState(8);
   useEffect(() => {
     if (mode !== 'scroll') return;
@@ -87,23 +78,26 @@ export const BigTextMarqueeWidget: React.FC<BigTextMarqueeProps> = ({ widget, on
           100% { transform: translateX(-100%); }
         }
       `}</style>
+
+      {/* Single toggle button: gear when closed, X when open */}
       <div
-        className="widget-hover-cog"
+        className={showSettings ? undefined : 'widget-hover-cog'}
         style={{
           position: 'absolute', top: 8, right: 8,
-          transition: 'opacity 0.15s', zIndex: 5,
+          transition: 'opacity 0.15s', zIndex: 6,
         }}
       >
         <button
           onClick={() => setShowSettings(s => !s)}
           style={qrIconBtnStyle()}
-          title="Marquee settings"
+          title={showSettings ? 'Close settings' : 'Marquee settings'}
           data-testid={`marquee-settings-toggle-${widget.id}`}
         >
-          <SettingsIcon size={11} />
+          {showSettings ? <XIcon size={11} /> : <SettingsIcon size={11} />}
         </button>
       </div>
 
+      {/* Settings overlay — no X button inside; toggle button above handles close */}
       {showSettings && (
         <div
           style={{
@@ -115,17 +109,10 @@ export const BigTextMarqueeWidget: React.FC<BigTextMarqueeProps> = ({ widget, on
           onKeyDown={e => e.stopPropagation()}
           data-testid={`marquee-settings-panel-${widget.id}`}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingRight: 28 }}>
             <span style={{ flex: 1, color: fg, fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>
               Big Text
             </span>
-            <button
-              onClick={() => setShowSettings(false)}
-              style={qrIconBtnStyle()}
-              data-testid={`marquee-settings-close-${widget.id}`}
-            >
-              <XIcon size={11} />
-            </button>
           </div>
           <input
             type="text"
@@ -231,8 +218,3 @@ export const BigTextMarqueeWidget: React.FC<BigTextMarqueeProps> = ({ widget, on
     </div>
   );
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  NetworkLightWidget — pings a URL, shows green/red dot + latency.
-// ─────────────────────────────────────────────────────────────────────────────
-
