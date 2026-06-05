@@ -76,14 +76,49 @@ export const OnThisDayWidget: React.FC<Props> = ({ widget, onUpdate }) => {
       }}
       data-testid={`on-this-day-widget-${widget.id}`}
     >
-      <div className="widget-hover-cog" style={{ position: 'absolute', top: 8, right: 8, zIndex: 5, display: 'flex', gap: 4 }}>
-        <button onClick={() => void load()} style={qrIconBtnStyle()} title="Refresh" data-testid={`on-this-day-refresh-${widget.id}`}>
-          <RefreshCw size={11} />
-        </button>
-        <button onClick={() => setShowSettings(s => !s)} style={qrIconBtnStyle()} title="Settings" data-testid={`on-this-day-settings-toggle-${widget.id}`}>
-          <SettingsIcon size={11} />
-        </button>
-      </div>
+      {/*
+        Two sibling button groups at top-right:
+
+        1. widget-hover-cog (hover-only): Refresh + Gear. Shown when settings
+           is CLOSED. Gear opens settings.
+        2. Always-visible X: shown only when settings is OPEN. Sits at z-index 6
+           so it clears the overlay (z-index 4) and is never hidden by hover CSS.
+      */}
+      {!showSettings && (
+        <div
+          className="widget-hover-cog"
+          style={{ position: 'absolute', top: 8, right: 8, zIndex: 5, display: 'flex', gap: 4 }}
+        >
+          <button
+            onClick={() => void load()}
+            style={qrIconBtnStyle()}
+            title="Refresh"
+            data-testid={`on-this-day-refresh-${widget.id}`}
+          >
+            <RefreshCw size={11} />
+          </button>
+          <button
+            onClick={() => setShowSettings(true)}
+            style={qrIconBtnStyle()}
+            title="Settings"
+            data-testid={`on-this-day-settings-toggle-${widget.id}`}
+          >
+            <SettingsIcon size={11} />
+          </button>
+        </div>
+      )}
+      {showSettings && (
+        <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 6 }}>
+          <button
+            onClick={() => setShowSettings(false)}
+            style={qrIconBtnStyle()}
+            title="Close settings"
+            data-testid={`on-this-day-settings-toggle-${widget.id}`}
+          >
+            <XIcon size={11} />
+          </button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
         <CalendarDays size={14} color={accent} />
@@ -97,6 +132,7 @@ export const OnThisDayWidget: React.FC<Props> = ({ widget, onUpdate }) => {
         )}
       </div>
 
+      {/* Settings overlay — no X button inside; toggle button above handles close */}
       {showSettings && (
         <div
           style={{
@@ -106,11 +142,8 @@ export const OnThisDayWidget: React.FC<Props> = ({ widget, onUpdate }) => {
           onKeyDown={e => e.stopPropagation()}
           data-testid={`on-this-day-settings-panel-${widget.id}`}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingRight: 28 }}>
             <span style={{ flex: 1, color: accent, fontFamily: MONO, fontSize: 11, fontWeight: 700 }}>Settings</span>
-            <button onClick={() => setShowSettings(false)} style={qrIconBtnStyle()} data-testid={`on-this-day-settings-close-${widget.id}`}>
-              <XIcon size={11} />
-            </button>
           </div>
           <label style={qrLabelStyle()}>
             Rotate every (seconds)
