@@ -1,15 +1,10 @@
-name: Supabase Keep Alive
+name: Ping Supabase
 on:
   schedule:
-    - cron: '0 0 */3 * *'
-  workflow_dispatch:
-
+    - cron: '0 0 * * *'
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Database
-        run: |
-          curl -X GET "${{ secrets.SUPABASE_URL }}/auth/v1/health" \
-          -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-          -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
+      - name: Send Ping
+        run: curl -s "${{ secrets.VITE_SUPABASE_URL }}" > /dev/null
