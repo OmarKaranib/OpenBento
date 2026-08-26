@@ -33,14 +33,14 @@ export interface LibraryItem {
   name: string;
   url: string;
   platform: string;
-  channelId?: string;
-  videoId?: string;
-  logoUrl?: string;
-  category?: string;
-  isLive?: boolean;
-  customColor?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  channelId?: string | null;
+  videoId?: string | null;
+  logoUrl?: string | null;
+  category?: string | null;
+  isLive?: boolean | null;
+  customColor?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 let cachedStreamStatus: { [channelId: string]: StreamStatus } = {};
