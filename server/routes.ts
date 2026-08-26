@@ -3,7 +3,6 @@ import { createServer, type Server } from "http";
 import { isIP } from "net";
 import { storage } from "./storage";
 import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from "./link-refresher";
-import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerChannel } from "./services/pulse-cache";
 import { setupCastHub } from "./services/cast-hub";
 import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, verifyVideoIsLive, searchChannelLiveStream, checkVideoLiveStatusById } from "./services/youtube-api";
@@ -43,105 +42,6 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  await setupAuth(app);
-  registerAuthRoutes(app);
-
-  // Custom signup route with timeout and proper error handling
-  app.post("/api/auth/signup", async (req: Request, res: Response) => {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
-    }
-
-    console.log('[Signup Debug] Attempting signup for:', email);
-
-    try {
-      const supabaseUrl = process.env.VITE_SUPABASE_URL;
-      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-      if (!supabaseUrl || !serviceRoleKey) {
-        console.error('[Signup Debug] Error details: Supabase credentials not configured');
-        return res.status(500).json({ error: "Server configuration error - missing Supabase credentials" });
-      }
-
-      // Create AbortController with strict 10-second timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      try {
-        console.log('[Signup Debug] Making Supabase signup request...');
-
-        // Use Supabase Admin API with service role key (admin) to bypass rate limits
-        const response = await fetch(`${supabaseUrl}/auth/v1/signup`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${serviceRoleKey}`,
-            'apikey': serviceRoleKey,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ email, password }),
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        const data = await response.json();
-        console.log('[Signup Debug] Supabase response status:', response.status);
-
-        if (!response.ok) {
-          // Handle specific error cases
-          if (data.error_description?.includes('already registered') || data.msg?.includes('already registered')) {
-            console.error('[Signup Debug] Error details: User already exists -', email);
-            return res.status(409).json({ error: 'User already exists' });
-          }
-
-          const errorMessage = data.error_description || data.msg || data.error || 'Signup failed';
-          console.error('[Signup Debug] Error details:', {
-            status: response.status,
-            error: data.error,
-            message: errorMessage,
-            email: email,
-            fullResponse: data
-          });
-
-          return res.status(response.status).json({ error: errorMessage });
-        }
-
-        console.log('[Signup Debug] User created successfully:', email);
-        res.json({
-          user: data.user,
-          session: data.session,
-          message: 'Signup successful'
-        });
-
-      } catch (fetchError: any) {
-        clearTimeout(timeoutId);
-
-        if (fetchError.name === 'AbortError') {
-          console.error('[Signup Debug] Error details: Request timeout after 10 seconds for:', email);
-          return res.status(504).json({ error: 'Signup timed out - please try again' });
-        }
-
-        console.error('[Signup Debug] Error details:', fetchError);
-        return res.status(500).json({
-          error: fetchError.message || 'Network error during signup'
-        });
-      }
-
-    } catch (error: any) {
-      console.error('[Signup Debug] Error details:', {
-        message: error.message,
-        name: error.name,
-        stack: error.stack,
-        email: email
-      });
-      return res.status(500).json({
-        error: error.message || 'An unexpected error occurred during signup'
-      });
-    }
-  });
-
   startLinkRefresher();
 
   initializePulseCache();
@@ -660,12 +560,14 @@ export async function registerRoutes(
   // Admin Channel Management Routes
   const isAdmin = (req: Request): boolean => {
     const user = (req as any).user;
-    // Replit Auth stores email in claims.email, Supabase stores directly on user
-    const email = user?.claims?.email || user?.email;
+    const email = user?.email;
     const isAdminUser = isAdminEmail(email || '');
-    console.log('[Admin] Auth check - user:', user?.claims?.sub, 'email:', email, 'isAdmin:', isAdminUser);
     return isAdminUser;
   };
+
+  // The main app signs users in through Supabase. Verify that same Supabase
+  // access token before any admin route checks the user's email.
+  app.use("/api/admin", attachSupabaseUser);
 
   app.get("/api/admin/channels", async (req: Request, res: Response) => {
     if (!isAdmin(req)) {

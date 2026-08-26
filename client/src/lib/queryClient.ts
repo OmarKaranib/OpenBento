@@ -1,4 +1,21 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { buildApiHeaders, shouldAttachAdminToken } from "@/lib/api-auth";
+
+async function getRequestHeaders(url: string, hasJsonBody: boolean): Promise<Record<string, string>> {
+  // Admin routes are protected by Supabase. Send the current user's access
+  // token only to our own admin API, never to third-party URLs.
+  if (shouldAttachAdminToken(url) && supabase) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      return buildApiHeaders(hasJsonBody, session?.access_token);
+    } catch (error) {
+      console.warn("[API] Could not read the Supabase session:", error);
+    }
+  }
+
+  return buildApiHeaders(hasJsonBody);
+}
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -14,7 +31,7 @@ export async function apiRequest(
 ): Promise<Response> {
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: await getRequestHeaders(url, data !== undefined),
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -29,7 +46,9 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = queryKey.join("/") as string;
+    const res = await fetch(url, {
+      headers: await getRequestHeaders(url, false),
       credentials: "include",
     });
 

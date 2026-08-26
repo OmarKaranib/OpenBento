@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLocation, Link } from 'wouter';
-import { useReplitAuth } from '@/hooks/use-replit-auth';
+import { useAuth } from '@/hooks/use-auth';
 import { usePageMeta } from '@/hooks/use-page-meta';
 import { Footer } from '@/components/footer';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -118,7 +118,7 @@ export default function Admin() {
     title: 'Admin Dashboard',
     description: 'OpenBento administrator console for managing users, channels, and feedback.',
   });
-  const { user, isLoading, isAuthenticated, login } = useReplitAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
@@ -542,12 +542,12 @@ export default function Admin() {
             <h1 className="text-2xl font-bold text-white mb-2">Admin Login Required</h1>
             <p className="text-slate-400 mb-6">Please log in with your admin account to access this page.</p>
             <button
-              onClick={login}
+              onClick={() => setLocation('/')}
               className="flex items-center gap-2 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white font-medium transition-colors mx-auto"
               data-testid="button-admin-login"
             >
               <LogIn className="w-5 h-5" />
-              Login with Replit
+              Go to Dashboard to Log In
             </button>
             <Link href="/" className="text-slate-400 hover:text-slate-300 text-sm mt-4 inline-block">
               Back to Dashboard
