@@ -31,7 +31,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
 
-const { useCloudSync } = await import(
+const { canWriteCloudDashboard, useCloudSync } = await import(
   '../../client/src/dashboard/use-cloud-sync.ts'
 );
 
@@ -174,6 +174,13 @@ const pagesStateWith = (widgets) => ({
     { id: 'page-home', name: 'Home', isDefault: true, widgets, createdAt: 0 },
   ],
   activePageId: 'page-home',
+});
+
+test('cloud writes stay locked unless cloud loading succeeded', () => {
+  assert.equal(canWriteCloudDashboard('idle'), false);
+  assert.equal(canWriteCloudDashboard('loading'), false);
+  assert.equal(canWriteCloudDashboard('failed'), false);
+  assert.equal(canWriteCloudDashboard('ready'), true);
 });
 
 test('Scenario 1: happy-path hydrate populates widgets from cloud row', async () => {

@@ -30,11 +30,11 @@ Drizzle ORM with PostgreSQL. Schema files live in `shared/models/`:
 
 `shared/schema.ts` re-exports all models as a barrel. Use `npm run db:push` (not migrations) to apply schema changes.
 
-### Authentication — Dual Path
+### Authentication
 
-Two auth systems coexist:
-1. **Replit OIDC** (`server/replit_integrations/auth/`) — Passport.js + OpenID Connect, session stored in PostgreSQL via `connect-pg-simple`, 7-day TTL, httpOnly cookie
-2. **Supabase** (`client/src/lib/supabase.ts`) — Email/password + Google OAuth on the client side with PKCE flow; `use-auth.ts` includes 3-attempt exponential backoff retry logic
+Supabase is the only authentication system. The client signs users in through
+`client/src/lib/supabase.ts`; protected server routes verify the Supabase Bearer
+token through `server/services/supabaseAuth.ts`.
 
 ### Widget System
 
@@ -72,10 +72,11 @@ Uses **Wouter** (not React Router). Routes defined in `client/src/App.tsx`:
 
 ### Environment Variables
 
-Required at runtime (see `.replit` for Replit-managed secrets):
-- `DATABASE_URL` — PostgreSQL connection string
+Required at runtime:
+- `DATABASE_URL` — Supabase PostgreSQL connection string in production
 - `YOUTUBE_API_KEY`
 - `OPENWEATHER_API_KEY`, `NEWS_API_KEY`
 - `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
 - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (client-side)
 - `ADMIN_EMAIL` — comma-separated list for admin access

@@ -9,7 +9,6 @@
 // `__castSchedulerForTests` so we don't have to wait 60s of real time.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { db } from "../../server/db";
 import {
   castRooms,
   castLayouts,
@@ -17,7 +16,24 @@ import {
   type CastSnapshot,
 } from "../../shared/schema";
 import { eq } from "drizzle-orm";
-import { __castSchedulerForTests } from "../../server/services/cast-hub";
+
+const testDatabaseUrl = process.env.TEST_DATABASE_URL?.trim();
+if (testDatabaseUrl) {
+  process.env.DATABASE_URL = testDatabaseUrl;
+}
+
+async function loadDatabaseTestDependencies() {
+  const [{ db }, { __castSchedulerForTests }] = await Promise.all([
+    import("../../server/db"),
+    import("../../server/services/cast-hub"),
+  ]);
+  return { db, __castSchedulerForTests };
+}
+
+const databaseTest = (
+  name: string,
+  fn: () => Promise<void>,
+) => test(name, { skip: testDatabaseUrl ? false : "TEST_DATABASE_URL is not configured" }, fn);
 
 function snapshotFor(label: string): CastSnapshot {
   return {
@@ -33,6 +49,7 @@ function snapshotFor(label: string): CastSnapshot {
 }
 
 async function makeRoom(userId: string, code: string): Promise<string> {
+  const { db } = await loadDatabaseTestDependencies();
   const [row] = await db
     .insert(castRooms)
     .values({
@@ -45,6 +62,7 @@ async function makeRoom(userId: string, code: string): Promise<string> {
 }
 
 async function makeLayout(userId: string, name: string, snap: CastSnapshot): Promise<string> {
+  const { db } = await loadDatabaseTestDependencies();
   const [row] = await db
     .insert(castLayouts)
     .values({ userId, name, snapshot: snap as unknown as object })
@@ -52,7 +70,8 @@ async function makeLayout(userId: string, name: string, snap: CastSnapshot): Pro
   return row.id;
 }
 
-test("scheduler tick fires entry matching current weekday + minute", async () => {
+databaseTest("scheduler tick fires entry matching current weekday + minute", async () => {
+  const { db, __castSchedulerForTests } = await loadDatabaseTestDependencies();
   const userId = `test-user-${Date.now()}-a`;
   const code = `BENTO-T${Date.now().toString(36).slice(-3).toUpperCase()}`;
   const roomId = await makeRoom(userId, code);
@@ -91,7 +110,8 @@ test("scheduler tick fires entry matching current weekday + minute", async () =>
   await db.delete(castLayouts).where(eq(castLayouts.id, layoutId));
 });
 
-test("unpairing a room stops the scheduler from pushing to it", async () => {
+databaseTest("unpairing a room stops the scheduler from pushing to it", async () => {
+  const { db, __castSchedulerForTests } = await loadDatabaseTestDependencies();
   const userId = `test-user-${Date.now()}-b`;
   const code = `BENTO-U${Date.now().toString(36).slice(-3).toUpperCase()}`;
   const roomId = await makeRoom(userId, code);

@@ -5,7 +5,7 @@ User-agent: *
 Allow: /
 
 # Sitemap location
-Sitemap: https://openbento.replit.app/sitemap.xml
+Sitemap: https://openbento.tv/sitemap.xml
 
 # Allow AI crawlers explicitly
 User-agent: GPTBot

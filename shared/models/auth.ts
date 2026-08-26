@@ -1,8 +1,7 @@
 import { sql } from "drizzle-orm";
 import { boolean, index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 
-// Session storage table.
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
+// Legacy session table retained to avoid a destructive database migration.
 export const sessions = pgTable(
   "sessions",
   {
@@ -13,8 +12,7 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)]
 );
 
-// User storage table.
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
+// Legacy user table retained to avoid a destructive database migration.
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),

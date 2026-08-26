@@ -33,6 +33,12 @@ interface UseCloudSyncArgs {
   pagesStateRef: React.MutableRefObject<DashboardPagesState>;
 }
 
+export type CloudHydrationStatus = 'idle' | 'loading' | 'ready' | 'failed';
+
+export function canWriteCloudDashboard(status: CloudHydrationStatus): boolean {
+  return status === 'ready';
+}
+
 export function useCloudSync({
   isAuthenticated,
   userId,
@@ -41,7 +47,7 @@ export function useCloudSync({
   setPagesState,
   pagesStateRef,
 }: UseCloudSyncArgs): void {
-  const [hydrationStatus, setHydrationStatus] = useState<'idle' | 'loading' | 'done'>('idle');
+  const [hydrationStatus, setHydrationStatus] = useState<CloudHydrationStatus>('idle');
   const cloudSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastCloudPayloadRef = useRef<string>('');
   const hydrationAttemptIdRef = useRef<string>('');
@@ -81,7 +87,7 @@ export function useCloudSync({
           retryTimer = setTimeout(() => runHydration(attempt + 1), 300 * Math.pow(2, attempt));
           return;
         }
-        if (!cancelled) setHydrationStatus('done');
+        if (!cancelled) setHydrationStatus('failed');
         return;
       }
       try {
@@ -89,39 +95,67 @@ export function useCloudSync({
           headers: { Authorization: `Bearer ${token}` },
         });
         if (cancelled) return;
-        if (res.ok) {
-          const body = await res.json();
-          const remote = body?.dashboard;
-          // Prefer the remote `pages` collection. Fall back to the legacy
-          // single `widgets` array (one-page Home) when the user hasn't
-          // synced post-migration yet.
-          let resolved: DashboardPagesState | null = null;
-          if (remote && Array.isArray(remote.pages) && remote.pages.length > 0) {
-            resolved = sanitizePages({
-              pages: remote.pages,
-              activePageId: remote.activePageId,
-            });
-          } else if (remote && Array.isArray(remote.widgets) && remote.widgets.length > 0) {
-            resolved = migrateLegacyWidgets(remote.widgets);
-          }
-          if (resolved) {
-            const localActive = getActivePage(pagesStateRef.current);
-            const localHasContent =
-              pagesStateRef.current.pages.length > 1 || localActive.widgets.length > 0;
-            // First sign-in from an existing guest: keep local content
-            // when remote is genuinely empty (no widgets across pages).
-            const remoteEmpty = resolved.pages.every(p => p.widgets.length === 0)
-              && resolved.pages.length === 1;
-            if (!(remoteEmpty && localHasContent)) {
-              setPagesState(resolved);
-              lastCloudPayloadRef.current = JSON.stringify(resolved);
-            }
+        if (!res.ok) {
+          setHydrationStatus('failed');
+          return;
+        }
+
+        const body = await res.json();
+        if (!body || !Object.prototype.hasOwnProperty.call(body, 'dashboard')) {
+          setHydrationStatus('failed');
+          return;
+        }
+
+        const remote = body.dashboard;
+        // Prefer the remote `pages` collection. Fall back to the legacy
+        // single `widgets` array when the user has not synced post-migration.
+        let resolved: DashboardPagesState | null = null;
+        if (remote && Array.isArray(remote.pages) && remote.pages.length > 0) {
+          resolved = sanitizePages({
+            pages: remote.pages,
+            activePageId: remote.activePageId,
+          });
+        }
+        if (!resolved && remote && Array.isArray(remote.widgets) && remote.widgets.length > 0) {
+          resolved = migrateLegacyWidgets(remote.widgets);
+        }
+        if (
+          !resolved
+          && remote
+          && Array.isArray(remote.pages)
+          && remote.pages.length === 0
+          && Array.isArray(remote.widgets)
+          && remote.widgets.length === 0
+        ) {
+          resolved = migrateLegacyWidgets([]);
+        }
+
+        // A malformed cloud row must never unlock writes. Otherwise stale
+        // local data could replace the only good server copy.
+        if (remote && !resolved) {
+          setHydrationStatus('failed');
+          return;
+        }
+
+        if (resolved) {
+          const localActive = getActivePage(pagesStateRef.current);
+          const localHasContent =
+            pagesStateRef.current.pages.length > 1 || localActive.widgets.length > 0;
+          // First sign-in from an existing guest: keep local content
+          // when remote is genuinely empty (no widgets across pages).
+          const remoteEmpty = resolved.pages.every(p => p.widgets.length === 0)
+            && resolved.pages.length === 1;
+          if (!(remoteEmpty && localHasContent)) {
+            setPagesState(resolved);
+            lastCloudPayloadRef.current = JSON.stringify(resolved);
           }
         }
+
+        setHydrationStatus('ready');
       } catch {
         // Network/API error — keep local state.
+        if (!cancelled) setHydrationStatus('failed');
       }
-      if (!cancelled) setHydrationStatus('done');
     };
 
     runHydration();
@@ -133,7 +167,7 @@ export function useCloudSync({
 
   useEffect(() => {
     if (!isAuthenticated || !userId) return;
-    if (hydrationStatus !== 'done') return;
+    if (!canWriteCloudDashboard(hydrationStatus)) return;
     const payload = JSON.stringify(pagesState);
     if (payload === lastCloudPayloadRef.current) return;
     if (cloudSyncTimerRef.current) clearTimeout(cloudSyncTimerRef.current);

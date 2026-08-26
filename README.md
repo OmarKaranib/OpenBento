@@ -66,8 +66,7 @@ Example Markdown once assets exist:
 - TanStack Query
 - Express 5
 - PostgreSQL with Drizzle ORM
-- Supabase client auth
-- Replit OIDC server auth integration
+- Supabase authentication and PostgreSQL
 - WebSocket support for cast features
 
 ## Quick Start
@@ -107,15 +106,16 @@ npm run dev        # Start Express + Vite on port 5000
 npm run build      # Build client to dist/public and server to dist/index.cjs
 npm run start      # Run the production server
 npm run check      # Run TypeScript type checking with no emit
+npm test           # Run the automated test suite
 npm run db:push    # Push Drizzle schema changes to PostgreSQL
 ```
 
-There is no configured test runner at the moment. Before opening a pull request,
-run:
+Tests use Node's built-in test runner. Before opening a pull request, run:
 
 ```bash
 npm run check
 npm run build
+npm test
 ```
 
 ## Environment Variables
@@ -131,6 +131,7 @@ YOUTUBE_API_KEY=
 OPENWEATHER_API_KEY=
 NEWS_API_KEY=
 RESEND_API_KEY=
+RESEND_FROM_EMAIL=
 SUPABASE_SERVICE_ROLE_KEY=
 ADMIN_EMAIL=
 PORT=5000
@@ -145,6 +146,8 @@ VITE_SUPABASE_ANON_KEY=
 
 Notes:
 
+- In production, `DATABASE_URL` must be a Supabase PostgreSQL connection string.
+- `RESEND_FROM_EMAIL` must use a sender/domain verified in your Resend account.
 - `VITE_*` variables are exposed to browser code. Only put public client values
   there.
 - Server-only secrets such as database URLs, service role keys, and third-party

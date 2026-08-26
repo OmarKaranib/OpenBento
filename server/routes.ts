@@ -6,9 +6,9 @@ import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from ".
 import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerChannel } from "./services/pulse-cache";
 import { setupCastHub } from "./services/cast-hub";
 import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, verifyVideoIsLive, searchChannelLiveStream, checkVideoLiveStatusById } from "./services/youtube-api";
-import { insertUserLibrarySchema, insertDashboardSchema, insertChannelSchema, insertFeedbackSchema } from "@shared/schema";
+import { insertUserLibrarySchema, insertDashboardSchema, updateDashboardSchema, insertChannelSchema, insertFeedbackSchema } from "@shared/schema";
 import { pickDailyWordleAnswer, wordleUtcDateKey } from "@shared/wordle-pool";
-import { getUncachableResendClient } from "./services/resend-client";
+import { getResendClient } from "./services/resend-client";
 import { createMarketsService, parseSymbols as parseMarketsSymbols } from "./markets";
 import { createAirQualityService, geocodeCity as geocodeAirQualityCity } from "./air-quality";
 import { LruTtlCache } from "./services/lruCache";
@@ -28,8 +28,8 @@ const isAdminEmail = (email: string): boolean => {
 // Supabase Bearer-token middleware.
 //
 // The /api/dashboard cloud-sync routes need to identify the caller from a
-// Supabase access token (sent as `Authorization: Bearer …`) instead of a
-// passport session cookie. We verify the token by hitting Supabase's
+// Supabase access token sent as `Authorization: Bearer …`. We verify the token
+// by hitting Supabase's
 // `/auth/v1/user` endpoint (cheap and reliable) and cache the result for 5
 // minutes so we don't make a network call on every save.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -545,7 +545,12 @@ export async function registerRoutes(
     }
 
     try {
-      const dashboard = await storage.updateDashboard(userId, req.body);
+      const validation = updateDashboardSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: validation.error.message });
+      }
+
+      const dashboard = await storage.updateDashboard(userId, validation.data);
 
       if (!dashboard) {
         return res.status(404).json({ error: "Dashboard not found" });
@@ -741,7 +746,7 @@ export async function registerRoutes(
 
       // Send email notification
       try {
-        const { client, fromEmail } = await getUncachableResendClient();
+        const { client, fromEmail } = getResendClient();
         const categoryLabel = feedbackType === 'idea' ? 'New Idea' : 'Bug Report';
         const escapeHtml = (str: string) => str
           .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

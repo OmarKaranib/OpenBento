@@ -35,8 +35,14 @@ export const insertDashboardSchema = createInsertSchema(dashboards).omit({
   updatedAt: true,
 });
 
+export const updateDashboardSchema = insertDashboardSchema
+  .omit({ userId: true })
+  .partial()
+  .strict();
+
 export type Dashboard = typeof dashboards.$inferSelect;
 export type InsertDashboard = z.infer<typeof insertDashboardSchema>;
+export type UpdateDashboard = z.infer<typeof updateDashboardSchema>;
 
 export interface DashboardWidget {
   id: string;

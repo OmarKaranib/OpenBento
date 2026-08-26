@@ -982,7 +982,7 @@ const MasterControlDashboard = ({
 
   // CRITICAL FIX: Dynamic Twitch Parent Detection
   const getTwitchEmbedUrl = (channel: string): string => {
-    // Use dynamic hostname detection for any Replit subdomain
+    // Use the current hostname so Twitch embeds work on every deployment.
     return `https://player.twitch.tv/?channel=${channel}&parent=${window.location.hostname}&muted=true&autoplay=true`;
   };
 

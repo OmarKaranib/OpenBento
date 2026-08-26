@@ -31,4 +31,4 @@ OpenBento Dashboard is a customizable bento-style mission control interface for 
 - POST /api/streams/heal - Trigger stream healing for broken videos
 
 ## Contact
-Website: https://openbento.replit.app
+Website: https://openbento.tv
