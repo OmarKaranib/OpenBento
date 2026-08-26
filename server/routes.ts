@@ -425,6 +425,10 @@ export async function registerRoutes(
     }
   });
 
+  // Personal-library data belongs to the signed-in Supabase user. The old
+  // Replit session middleware was removed, so verify the Bearer token here.
+  app.use("/api/library", attachSupabaseUser);
+
   app.get("/api/library", async (req: Request, res: Response) => {
     const userId = (req as any).userId || (req as any).user?.id;
 

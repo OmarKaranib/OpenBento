@@ -1,4 +1,15 @@
+import { buildApiHeaders } from './api-auth';
+import { supabase } from './supabase';
+
 const API_BASE = '';
+
+async function getLibraryHeaders(hasJsonBody = false): Promise<Record<string, string>> {
+  const { data: { session } } = supabase
+    ? await supabase.auth.getSession()
+    : { data: { session: null } };
+
+  return buildApiHeaders(hasJsonBody, session?.access_token);
+}
 
 export interface StreamStatus {
   channelName: string;
@@ -228,6 +239,7 @@ export async function validateVideo(videoId: string): Promise<{
 export async function fetchUserLibrary(): Promise<LibraryItem[]> {
   try {
     const response = await fetch(`${API_BASE}/api/library`, {
+      headers: await getLibraryHeaders(),
       credentials: 'include',
     });
     
@@ -248,7 +260,7 @@ export async function addToLibrary(item: Omit<LibraryItem, 'id' | 'userId' | 'cr
   try {
     const response = await fetch(`${API_BASE}/api/library`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getLibraryHeaders(true),
       credentials: 'include',
       body: JSON.stringify(item),
     });
@@ -267,6 +279,7 @@ export async function removeFromLibrary(id: string): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE}/api/library/${id}`, {
       method: 'DELETE',
+      headers: await getLibraryHeaders(),
       credentials: 'include',
     });
     
@@ -281,7 +294,7 @@ export async function updateLibraryItem(id: string, updates: Partial<LibraryItem
   try {
     const response = await fetch(`${API_BASE}/api/library/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getLibraryHeaders(true),
       credentials: 'include',
       body: JSON.stringify(updates),
     });
