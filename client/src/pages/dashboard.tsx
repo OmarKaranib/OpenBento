@@ -16,6 +16,7 @@ import {
   savePersonalLibrary,
   type SavedChannel,
 } from '@/lib/personal-library';
+import { syncPersonalLibraryWithCloud } from '@/lib/personal-library-sync';
 import { useStreamHealing } from '@/hooks/use-stream-healing';
 import { useToast } from '@/hooks/use-toast';
 import { FloatingTutorial } from '@/components/floating-tutorial';
@@ -434,6 +435,21 @@ const MasterControlDashboard = ({
     window.addEventListener('personalLibraryUpdated', handleLibraryUpdate);
     return () => window.removeEventListener('personalLibraryUpdated', handleLibraryUpdate);
   }, []);
+
+  // Load the signed-in user's cloud library. Existing browser-only saves are
+  // uploaded once, so enabling sync does not erase work from older versions.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let cancelled = false;
+    void syncPersonalLibraryWithCloud().then(channels => {
+      if (!cancelled && channels) setPersonalLibrary(channels);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   // Theme toggle effect - apply dark/light mode using class on document element
   useEffect(() => {

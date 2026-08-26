@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   libraryItemToSavedChannel,
   mergeSavedChannels,
+  reconcilePersonalLibrary,
   savedChannelIdentity,
   savedChannelToLibraryItem,
   type SavedChannel,
@@ -65,4 +66,40 @@ test('local records only send fields accepted by the cloud API', () => {
     videoId: undefined,
     category: 'Space',
   });
+});
+
+test('reconciliation uploads old browser-only saves without duplicating cloud entries', async () => {
+  const alreadySynced = channel({ id: 'old-local-id' });
+  const browserOnly = channel({ id: 'browser-id', channelId: 'new-channel', name: 'New channel' });
+  const uploads: string[] = [];
+
+  const result = await reconcilePersonalLibrary(
+    [alreadySynced, browserOnly],
+    [{
+      id: 'server-existing',
+      userId: 'user-1',
+      name: 'NASA',
+      url: 'https://youtube.com/@nasa',
+      platform: 'youtube',
+      channelId: 'UCNASA',
+    }],
+    async item => {
+      uploads.push(item.channelId || '');
+      return {
+        ...item,
+        id: 'server-new',
+        userId: 'user-1',
+        createdAt: '2026-08-27T00:00:00.000Z',
+      };
+    },
+  );
+
+  assert.deepEqual(uploads, ['new-channel']);
+  assert.deepEqual(result.map(item => item.id), ['server-existing', 'server-new']);
+});
+
+test('reconciliation keeps a local save when its upload fails', async () => {
+  const browserOnly = channel({ id: 'browser-id' });
+  const result = await reconcilePersonalLibrary([browserOnly], [], async () => null);
+  assert.deepEqual(result, [browserOnly]);
 });

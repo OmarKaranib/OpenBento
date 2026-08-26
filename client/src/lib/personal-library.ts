@@ -105,3 +105,22 @@ export function savedChannelToLibraryItem(channel: SavedChannel) {
     category: channel.category,
   };
 }
+
+export async function reconcilePersonalLibrary(
+  localChannels: SavedChannel[],
+  cloudItems: LibraryItem[],
+  upload: (item: ReturnType<typeof savedChannelToLibraryItem>) => Promise<LibraryItem | null>,
+): Promise<SavedChannel[]> {
+  const cloudChannels = cloudItems.map(libraryItemToSavedChannel);
+  const cloudIdentities = new Set(cloudChannels.map(savedChannelIdentity));
+  const uploadedOrLocal: SavedChannel[] = [];
+
+  for (const localChannel of localChannels) {
+    if (cloudIdentities.has(savedChannelIdentity(localChannel))) continue;
+
+    const uploaded = await upload(savedChannelToLibraryItem(localChannel));
+    uploadedOrLocal.push(uploaded ? libraryItemToSavedChannel(uploaded) : localChannel);
+  }
+
+  return mergeSavedChannels(cloudChannels, uploadedOrLocal);
+}

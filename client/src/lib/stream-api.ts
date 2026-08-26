@@ -236,7 +236,7 @@ export async function validateVideo(videoId: string): Promise<{
   }
 }
 
-export async function fetchUserLibrary(): Promise<LibraryItem[]> {
+export async function fetchUserLibrary(): Promise<LibraryItem[] | null> {
   try {
     const response = await fetch(`${API_BASE}/api/library`, {
       headers: await getLibraryHeaders(),
@@ -244,7 +244,7 @@ export async function fetchUserLibrary(): Promise<LibraryItem[]> {
     });
     
     if (!response.ok) {
-      if (response.status === 401) return [];
+      if (response.status === 401) return null;
       throw new Error('Failed to fetch library');
     }
     
@@ -252,7 +252,7 @@ export async function fetchUserLibrary(): Promise<LibraryItem[]> {
     return data.items || [];
   } catch (error) {
     console.error('[StreamAPI] Fetch library failed:', error);
-    return [];
+    return null;
   }
 }
 
