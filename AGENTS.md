@@ -69,14 +69,16 @@ npm run dev        # Start Express + Vite dev server on port 5000
 npm run build      # Build client to dist/public and server to dist/index.cjs
 npm run start      # Run production server
 npm run check      # TypeScript type checking, no emit
+npm test           # Run the automated test suite
 npm run db:push    # Push Drizzle schema changes to PostgreSQL
 ```
 
-No test runner is configured. Before committing, always run:
+Before committing, always run:
 
 ```bash
 npm run check
 npm run build
+npm test
 ```
 
 ## Widget Architecture
