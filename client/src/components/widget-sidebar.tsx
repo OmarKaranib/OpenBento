@@ -119,24 +119,13 @@
   import { CSS } from '@dnd-kit/utilities';
   import { WidgetType } from '@/App';
   import { useQuery } from '@tanstack/react-query';
+  import {
+    loadPersonalLibrary,
+    savePersonalLibrary,
+    type SavedChannel,
+  } from '@/lib/personal-library';
 
-  const PERSONAL_LIBRARY_KEY = 'openBentoPersonalLibrary';
   const BLOCKED_CHANNELS_KEY = 'openBentoBlockedChannels';
-
-  export interface SavedChannel {
-    id: string;
-    name: string;
-    url: string;
-    iconType: 'news' | 'science' | 'finance' | 'gaming' | 'default';
-    category: string;
-    platform: 'youtube' | 'twitch' | 'kick';
-    channelId?: string;
-    videoId?: string | null;
-    verifiedLiveId?: string | null;
-    latestVideoId?: string | null;
-    isManualOverride?: boolean;
-    savedAt: number;
-  }
 
   export interface BlockedChannel {
     id: string;
@@ -225,19 +214,6 @@
     { id: 'template-air-quality',      name: 'Air Quality', widgetType: 'air_quality',     w: 2, h: 3, icon: 'air_quality',      color: 'emerald' },
     { id: 'template-sketch-pad',       name: 'Sketch Pad', widgetType: 'sketch_pad',       w: 4, h: 3, icon: 'sketch_pad',       color: 'pink'    },
   ];
-
-  function loadPersonalLibrary(): SavedChannel[] {
-    try {
-      const stored = localStorage.getItem(PERSONAL_LIBRARY_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
-  }
-
-  function savePersonalLibrary(channels: SavedChannel[]): void {
-    try {
-      localStorage.setItem(PERSONAL_LIBRARY_KEY, JSON.stringify(channels));
-    } catch (e) { console.error('[Personal Library] Save error:', e); }
-  }
 
   function loadBlockedChannels(): BlockedChannel[] {
     try {
@@ -1748,4 +1724,5 @@
     );
   }
 
-  export { FALLBACK_CHANNELS as TRENDING_CHANNELS, loadPersonalLibrary, savePersonalLibrary };
+  export { FALLBACK_CHANNELS as TRENDING_CHANNELS };
+  export type { SavedChannel } from '@/lib/personal-library';

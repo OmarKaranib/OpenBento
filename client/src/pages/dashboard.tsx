@@ -10,7 +10,12 @@ import { CSS } from '@dnd-kit/utilities';
 import { Widget, WidgetType, WidgetRenderer } from '@/App';
 import { VideoWidget } from '@/widgets/video-widget';
 import { YouTubePlayer } from '@/components/youtube-player';
-import { SavedChannel, loadPersonalLibrary, savePersonalLibrary, TRENDING_CHANNELS } from '@/components/widget-sidebar';
+import { TRENDING_CHANNELS } from '@/components/widget-sidebar';
+import {
+  loadPersonalLibrary,
+  savePersonalLibrary,
+  type SavedChannel,
+} from '@/lib/personal-library';
 import { useStreamHealing } from '@/hooks/use-stream-healing';
 import { useToast } from '@/hooks/use-toast';
 import { FloatingTutorial } from '@/components/floating-tutorial';
