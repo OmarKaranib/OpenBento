@@ -5,6 +5,8 @@ import {
   canWriteCloudThemesForUser,
   canAdoptLocalThemes,
   shouldKeepGuestThemeValue,
+  saveCloudThemes,
+  themeWriteRetryDelay,
 } from '../../client/src/dashboard/use-theme';
 
 test('theme writes stay locked until cloud hydration succeeds', () => {
@@ -25,6 +27,37 @@ test('guest theme values only win when the cloud value is empty', () => {
   assert.equal(shouldKeepGuestThemeValue(null, true, true), false);
   assert.equal(shouldKeepGuestThemeValue('user-a', false, true), false);
   assert.equal(shouldKeepGuestThemeValue(null, false, false), false);
+});
+
+test('failed theme writes get two retries and then stop', () => {
+  assert.equal(themeWriteRetryDelay(0), 1000);
+  assert.equal(themeWriteRetryDelay(1), 2000);
+  assert.equal(themeWriteRetryDelay(2), null);
+});
+
+test('theme cloud save uses PATCH and creates a missing dashboard row', async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const request = async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(url), init });
+    return new Response('{}', { status: calls.length === 1 ? 404 : 200 });
+  };
+
+  assert.equal(await saveCloudThemes([], null, 'theme-token', request), true);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].init?.method, 'PATCH');
+  assert.equal(calls[1].init?.method, 'POST');
+  assert.equal((calls[0].init?.headers as Record<string, string>).Authorization, 'Bearer theme-token');
+});
+
+test('theme cloud save reports HTTP and network failures', async () => {
+  assert.equal(
+    await saveCloudThemes([], null, 'token', async () => new Response('{}', { status: 503 })),
+    false,
+  );
+  assert.equal(
+    await saveCloudThemes([], null, 'token', async () => { throw new Error('offline'); }),
+    false,
+  );
 });
 
 test('theme hydration for one account never unlocks another account', () => {
