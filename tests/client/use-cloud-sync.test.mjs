@@ -31,7 +31,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
 
-const { canWriteCloudDashboard, useCloudSync } = await import(
+const {
+  canWriteCloudDashboard,
+  cloudWriteRetryDelay,
+  saveCloudDashboard,
+  useCloudSync,
+} = await import(
   '../../client/src/dashboard/use-cloud-sync.ts'
 );
 
@@ -181,6 +186,42 @@ test('cloud writes stay locked unless cloud loading succeeded', () => {
   assert.equal(canWriteCloudDashboard('loading'), false);
   assert.equal(canWriteCloudDashboard('failed'), false);
   assert.equal(canWriteCloudDashboard('ready'), true);
+});
+
+test('failed cloud writes get two retries and then stop', () => {
+  assert.equal(cloudWriteRetryDelay(0), 1000);
+  assert.equal(cloudWriteRetryDelay(1), 2000);
+  assert.equal(cloudWriteRetryDelay(2), null);
+});
+
+test('saveCloudDashboard sends the active page and full pages collection', async () => {
+  const pagesState = pagesStateWith([
+    { id: 'local-1', type: 'clock', x: 0, y: 0, w: 3, h: 2 },
+  ]);
+  const { fn: fetchFn, calls } = makeFetch([
+    () => json(200, { dashboard: {} }),
+  ]);
+
+  assert.equal(await saveCloudDashboard(pagesState, 'token-save', fetchFn), true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].init.method, 'POST');
+  assert.equal(calls[0].init.headers.Authorization, 'Bearer token-save');
+  const body = JSON.parse(calls[0].init.body);
+  assert.equal(body.activePageId, 'page-home');
+  assert.deepEqual(body.widgets, pagesState.pages[0].widgets);
+  assert.deepEqual(body.pages, pagesState.pages);
+});
+
+test('saveCloudDashboard reports HTTP and network failures', async () => {
+  const pagesState = emptyPagesState();
+  assert.equal(
+    await saveCloudDashboard(pagesState, 'token', async () => json(503, {})),
+    false,
+  );
+  assert.equal(
+    await saveCloudDashboard(pagesState, 'token', async () => { throw new Error('offline'); }),
+    false,
+  );
 });
 
 test('Scenario 1: happy-path hydrate populates widgets from cloud row', async () => {

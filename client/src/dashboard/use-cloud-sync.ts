@@ -9,7 +9,7 @@
 //   2. After every pages-state change (debounced 1.5s), POST with a
 //      Bearer access token from the live Supabase session.
 // Guests are unaffected — localStorage stays the only source of truth.
-// Network failures silently fall back to localStorage.
+// Failed cloud writes retry twice before falling back to localStorage.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type DashboardPagesState,
@@ -37,6 +37,38 @@ export type CloudHydrationStatus = 'idle' | 'loading' | 'ready' | 'failed';
 
 export function canWriteCloudDashboard(status: CloudHydrationStatus): boolean {
   return status === 'ready';
+}
+
+const CLOUD_WRITE_RETRY_DELAYS = [1000, 2000] as const;
+
+export function cloudWriteRetryDelay(failedAttempt: number): number | null {
+  return CLOUD_WRITE_RETRY_DELAYS[failedAttempt] ?? null;
+}
+
+export async function saveCloudDashboard(
+  pagesState: DashboardPagesState,
+  token: string,
+  request: typeof fetch = fetch,
+): Promise<boolean> {
+  try {
+    const active = getActivePage(pagesState);
+    const res = await request('/api/dashboard', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name: 'My Dashboard',
+        widgets: active.widgets,
+        pages: pagesState.pages,
+        activePageId: pagesState.activePageId,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export function useCloudSync({
@@ -171,35 +203,34 @@ export function useCloudSync({
     const payload = JSON.stringify(pagesState);
     if (payload === lastCloudPayloadRef.current) return;
     if (cloudSyncTimerRef.current) clearTimeout(cloudSyncTimerRef.current);
-    cloudSyncTimerRef.current = setTimeout(async () => {
+    let cancelled = false;
+
+    const runCloudWrite = async (attempt = 0) => {
       const token = await getSupabaseAccessToken();
-      if (!token) return;
-      try {
-        const active = getActivePage(pagesState);
-        const res = await fetch('/api/dashboard', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          // Mirror the active page's widgets into the legacy `widgets`
-          // column so older clients (and the existing /api/cast push
-          // path) keep functioning during the rollout.
-          body: JSON.stringify({
-            name: 'My Dashboard',
-            widgets: active.widgets,
-            pages: pagesState.pages,
-            activePageId: pagesState.activePageId,
-          }),
-        });
-        if (res.ok) {
-          lastCloudPayloadRef.current = payload;
-        }
-      } catch {
-        // Silent fail — localStorage is still the ground truth.
+      if (cancelled) return;
+
+      const saved = token
+        ? await saveCloudDashboard(pagesState, token)
+        : false;
+      if (cancelled) return;
+
+      if (saved) {
+        lastCloudPayloadRef.current = payload;
+        return;
       }
-    }, 1500);
+
+      const retryDelay = cloudWriteRetryDelay(attempt);
+      if (retryDelay !== null) {
+        cloudSyncTimerRef.current = setTimeout(
+          () => void runCloudWrite(attempt + 1),
+          retryDelay,
+        );
+      }
+    };
+
+    cloudSyncTimerRef.current = setTimeout(() => void runCloudWrite(), 1500);
     return () => {
+      cancelled = true;
       if (cloudSyncTimerRef.current) clearTimeout(cloudSyncTimerRef.current);
     };
   }, [pagesState, isAuthenticated, userId, hydrationStatus, getSupabaseAccessToken]);
