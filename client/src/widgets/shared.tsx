@@ -88,6 +88,11 @@ export interface Widget {
   // Markets Ticker — list of symbols to track (uppercase, e.g. ['BTC','SPY']).
   // Persisted with the widget; defaults to BTC/ETH/SPY/AAPL on first add.
   marketsSymbols?: string[];
+  // Weather — remember the user's chosen city and temperature unit.
+  weatherCity?: string;
+  weatherLat?: number;
+  weatherLon?: number;
+  weatherUseFahrenheit?: boolean;
   // Crisis Ticker — per-widget filter knobs forwarded as /api/news query
   // params. crisisSources is a comma-list of NewsAPI source IDs (mutually
   // exclusive with crisisCategory upstream). crisisCategory is one of
@@ -596,4 +601,3 @@ export {
       />
     );
   };
-  

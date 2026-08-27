@@ -73,7 +73,9 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   markets_ticker: ({ widget, onUpdate }) => (
     <MarketsTickerWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
   ),
-  weather: ({ widget }) => <WeatherWidget key={widget.id} widget={widget} />,
+  weather: ({ widget, onUpdate }) => (
+    <WeatherWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
+  ),
   dictionary: ({ widget, onUpdate }) => (
     <DictionaryWidget key={widget.id} widget={widget} onUpdate={onUpdate} />
   ),

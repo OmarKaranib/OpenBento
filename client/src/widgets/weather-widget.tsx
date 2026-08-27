@@ -87,14 +87,32 @@ const weatherGradient = (icon: WeatherIconType): string => {
 
 interface WeatherWidgetProps {
   widget: Widget;
+  onUpdate?: (widgetId: string, patch: Partial<Widget>) => void;
 }
 
-export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
+type WeatherQuery =
+  | { kind: 'coords'; lat: number; lon: number }
+  | { kind: 'city'; city: string };
+
+export function savedWeatherQuery(widget: Widget): WeatherQuery | null {
+  if (
+    Number.isFinite(widget.weatherLat) &&
+    Number.isFinite(widget.weatherLon) &&
+    Math.abs(widget.weatherLat!) <= 90 &&
+    Math.abs(widget.weatherLon!) <= 180
+  ) {
+    return { kind: 'coords', lat: widget.weatherLat!, lon: widget.weatherLon! };
+  }
+  const city = widget.weatherCity?.trim();
+  return city ? { kind: 'city', city } : null;
+}
+
+export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget, onUpdate }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const searchRef    = useRef<HTMLInputElement>(null);
   const [cw, setCw]  = useState(280);
   const [ch, setCh]  = useState(200);
-  const [useFahrenheit, setUseFahrenheit] = useState(false);
+  const [useFahrenheit, setUseFahrenheit] = useState(widget.weatherUseFahrenheit ?? false);
   const [isHovered, setIsHovered]         = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [data, setData]           = useState<WeatherEntry>(FALLBACK_WEATHER['London']);
@@ -122,9 +140,9 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
   // ── Loader: fetch current weather + 3-day forecast for either a city
   //    name or coordinates. Used for both initial load and city search.
   const loadWeather = useCallback(async (
-    query: { kind: 'coords'; lat: number; lon: number } | { kind: 'city'; city: string },
+    query: WeatherQuery,
     mountedRef: { current: boolean }
-  ): Promise<boolean> => {
+  ): Promise<WeatherEntry | null> => {
     const qs = query.kind === 'coords'
       ? `lat=${query.lat}&lon=${query.lon}`
       : `city=${encodeURIComponent(query.city)}`;
@@ -132,7 +150,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
       const resp = await fetch(`/api/weather?${qs}`);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const w = await resp.json() as WeatherEntry;
-      if (!mountedRef.current) return false;
+      if (!mountedRef.current) return null;
       setData(w);
       setWeatherError(false);
       // Share the resolved location with sibling widgets (Sun & Sky,
@@ -155,13 +173,17 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
       } catch {
         if (mountedRef.current) setForecast([]);
       }
-      return true;
+      return w;
     } catch (err) {
       console.warn('[WeatherWidget] Failed to fetch weather:', err);
       if (mountedRef.current) setWeatherError(true);
-      return false;
+      return null;
     }
   }, []);
+
+  useEffect(() => {
+    setUseFahrenheit(widget.weatherUseFahrenheit ?? false);
+  }, [widget.weatherUseFahrenheit]);
 
   useEffect(() => {
     const mountedRef = { current: true };
@@ -169,6 +191,16 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
     const fallbackToLondon = () => {
       void loadWeather({ kind: 'city', city: 'London' }, mountedRef);
     };
+
+    const savedQuery = savedWeatherQuery(widget);
+    if (savedQuery) {
+      void loadWeather(savedQuery, mountedRef).then((result) => {
+        if (!result && mountedRef.current) fallbackToLondon();
+      });
+      return () => {
+        mountedRef.current = false;
+      };
+    }
 
     if (typeof navigator !== 'undefined' && navigator.geolocation) {
       let resolved = false;
@@ -188,7 +220,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
           void loadWeather(
             { kind: 'coords', lat: pos.coords.latitude, lon: pos.coords.longitude },
             mountedRef
-          ).then((ok) => { if (!ok && mountedRef.current) fallbackToLondon(); });
+          ).then((result) => { if (!result && mountedRef.current) fallbackToLondon(); });
         },
         () => {
           if (resolved) return;
@@ -206,7 +238,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
       mountedRef.current = false;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [loadWeather]);
+  }, [loadWeather, widget.weatherCity, widget.weatherLat, widget.weatherLon]);
 
   useEffect(() => {
     if (showControls && searchRef.current) searchRef.current.focus();
@@ -218,11 +250,16 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
     setIsSearching(true);
     setSearchErr('');
     const mountedRef = { current: true };
-    const ok = await loadWeather({ kind: 'city', city: trimmed }, mountedRef);
-    if (!ok) {
+    const result = await loadWeather({ kind: 'city', city: trimmed }, mountedRef);
+    if (!result) {
       setSearchErr('City not found');
       setTimeout(() => setSearchErr(''), 2500);
     } else {
+      onUpdate?.(widget.id, {
+        weatherCity: result.city,
+        weatherLat: typeof result.lat === 'number' ? result.lat : undefined,
+        weatherLon: typeof result.lon === 'number' ? result.lon : undefined,
+      });
       setSearchVal('');
     }
     setIsSearching(false);
@@ -508,7 +545,12 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
         zIndex:        10,
       }}>
         <button
-          onClick={(e) => { e.stopPropagation(); setUseFahrenheit(f => !f); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            const next = !useFahrenheit;
+            setUseFahrenheit(next);
+            onUpdate?.(widget.id, { weatherUseFahrenheit: next });
+          }}
           style={{
             background:    'rgba(255,255,255,0.08)',
             border:        '1px solid #334155',
