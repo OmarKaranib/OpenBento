@@ -90,9 +90,18 @@ export function shouldKeepGuestThemeValue(
 }
 
 const THEME_WRITE_RETRY_DELAYS = [1000, 2000] as const;
+const THEME_READ_RETRY_DELAYS = [500, 1500] as const;
 
 export function themeWriteRetryDelay(failedAttempt: number): number | null {
   return THEME_WRITE_RETRY_DELAYS[failedAttempt] ?? null;
+}
+
+export function themeReadRetryDelay(failedAttempt: number): number | null {
+  return THEME_READ_RETRY_DELAYS[failedAttempt] ?? null;
+}
+
+export function shouldRetryThemeRead(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
 }
 
 export async function saveCloudThemes(
@@ -462,17 +471,27 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
     hydrationReadyUserIdRef.current = '';
     setCloudHydrationStatus('loading');
     let cancelled = false;
-    (async () => {
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const retryHydration = (attempt: number): boolean => {
+      const delay = themeReadRetryDelay(attempt);
+      if (delay === null) return false;
+      retryTimer = setTimeout(() => void runHydration(attempt + 1), delay);
+      return true;
+    };
+
+    const runHydration = async (attempt = 0) => {
       const token = await getToken();
       if (cancelled) return;
       if (!token) {
-        setCloudHydrationStatus('failed');
+        if (!retryHydration(attempt)) setCloudHydrationStatus('failed');
         return;
       }
       try {
         const res = await fetch('/api/dashboard', { headers: { Authorization: `Bearer ${token}` } });
         if (cancelled) return;
         if (!res.ok) {
+          if (shouldRetryThemeRead(res.status) && retryHydration(attempt)) return;
           setCloudHydrationStatus('failed');
           return;
         }
@@ -549,10 +568,15 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
       } catch {
         // Never unlock writes after a failed read. That could replace the
         // only good cloud copy with stale browser data.
-        if (!cancelled) setCloudHydrationStatus('failed');
+        if (!cancelled && !retryHydration(attempt)) setCloudHydrationStatus('failed');
       }
-    })();
-    return () => { cancelled = true; };
+    };
+
+    void runHydration();
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [isAuthenticated, userId, getToken, persistPersonal]);
 
   // Debounced upload. PATCH semantics let us send only the theme fields

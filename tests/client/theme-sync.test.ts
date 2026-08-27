@@ -6,6 +6,8 @@ import {
   canAdoptLocalThemes,
   shouldKeepGuestThemeValue,
   saveCloudThemes,
+  shouldRetryThemeRead,
+  themeReadRetryDelay,
   themeWriteRetryDelay,
 } from '../../client/src/dashboard/use-theme';
 
@@ -33,6 +35,17 @@ test('failed theme writes get two retries and then stop', () => {
   assert.equal(themeWriteRetryDelay(0), 1000);
   assert.equal(themeWriteRetryDelay(1), 2000);
   assert.equal(themeWriteRetryDelay(2), null);
+});
+
+test('theme loading only retries temporary failures', () => {
+  assert.equal(themeReadRetryDelay(0), 500);
+  assert.equal(themeReadRetryDelay(1), 1500);
+  assert.equal(themeReadRetryDelay(2), null);
+  assert.equal(shouldRetryThemeRead(408), true);
+  assert.equal(shouldRetryThemeRead(429), true);
+  assert.equal(shouldRetryThemeRead(503), true);
+  assert.equal(shouldRetryThemeRead(401), false);
+  assert.equal(shouldRetryThemeRead(403), false);
 });
 
 test('theme cloud save uses PATCH and creates a missing dashboard row', async () => {
