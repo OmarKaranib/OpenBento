@@ -311,6 +311,39 @@ export function useAuth() {
   };
 
   /**
+   * Resend the signup confirmation without attempting to create the account
+   * again or changing the password the user originally chose.
+   */
+  const resendSignupConfirmation = async (email: string) => {
+    if (!supabase) return null;
+    const client = supabase;
+    setError(null);
+
+    try {
+      const result = await withRetry(
+        async () => {
+          const { data, error } = await client.auth.resend({
+            type: 'signup',
+            email,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback`,
+            },
+          });
+          if (error) throw error;
+          return data;
+        },
+        'resendSignupConfirmation'
+      );
+
+      return result;
+    } catch (err) {
+      console.error('[Auth] resend signup confirmation error:', err);
+      setError(err as Error);
+      throw err;
+    }
+  };
+
+  /**
    * Sign out current user
    */
   const logout = async () => {
@@ -412,6 +445,7 @@ export function useAuth() {
     signIn,
     signInWithOAuth,
     verifyOtp,
+    resendSignupConfirmation,
     logout,
     resetPassword,
     updatePassword,

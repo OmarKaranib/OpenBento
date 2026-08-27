@@ -10,7 +10,7 @@ interface LoginModalProps {
   onClose: () => void;
   auth: Pick<
     ReturnType<typeof useAuth>,
-    'signIn' | 'signUp' | 'signInWithOAuth' | 'resetPassword' | 'verifyOtp'
+    'signIn' | 'signUp' | 'signInWithOAuth' | 'resetPassword' | 'verifyOtp' | 'resendSignupConfirmation'
   >;
   onLoginSuccess?: () => void;
   triggerReason?: string;
@@ -18,7 +18,7 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ isOpen, onClose, auth, onLoginSuccess, triggerReason, defaultMode = 'login' }: LoginModalProps) {
-  const { signIn, signUp, signInWithOAuth, resetPassword, verifyOtp } = auth;
+  const { signIn, signUp, signInWithOAuth, resetPassword, verifyOtp, resendSignupConfirmation } = auth;
   const [mode, setMode] = useState<AuthMode>(defaultMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -112,7 +112,7 @@ export function LoginModal({ isOpen, onClose, auth, onLoginSuccess, triggerReaso
     setSuccess(null);
 
     try {
-      await signUp(email, password || 'temp-password');
+      await resendSignupConfirmation(email);
       setSuccess('Verification code resent! Check your email.');
     } catch (err: any) {
       setError(err?.message || 'Failed to resend code.');

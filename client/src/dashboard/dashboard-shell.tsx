@@ -96,6 +96,7 @@ const {
   signInWithOAuth,
   resetPassword,
   verifyOtp,
+  resendSignupConfirmation,
 } = useAuth();
 
 useEffect(() => {
@@ -865,7 +866,7 @@ return (
   <>
     <LoginModal
       isOpen={loginModalOpen}
-      auth={{ signIn, signUp, signInWithOAuth, resetPassword, verifyOtp }}
+      auth={{ signIn, signUp, signInWithOAuth, resetPassword, verifyOtp, resendSignupConfirmation }}
       onClose={() => {
         setLoginModalOpen(false);
         if (location === '/auth/reset-password') setLocation('/');
