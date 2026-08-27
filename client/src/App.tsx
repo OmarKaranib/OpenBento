@@ -60,6 +60,7 @@ function App() {
             {/* Dashboard routes share the full DashboardShell (sidebar,
                 login modal, DnD context, MasterControlDashboard). */}
             <Route path="/"                      component={DashboardShell} />
+            <Route path="/auth/callback"         component={DashboardShell} />
             <Route path="/auth/reset-password"   component={DashboardShell} />
             {/* Stateless / page-only routes mount their page directly,
                 without instantiating the dashboard tree. */}

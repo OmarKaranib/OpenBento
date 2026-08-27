@@ -106,6 +106,14 @@ useEffect(() => {
   }
 }, [location]);
 
+// Supabase returns email-confirmation links here. Wait until it has finished
+// reading the session from the URL, then move to the normal dashboard route.
+useEffect(() => {
+  if (location === '/auth/callback' && !authIsLoading) {
+    setLocation('/');
+  }
+}, [location, authIsLoading, setLocation]);
+
 const openLoginModal = useCallback((reason?: string) => {
   setLoginTriggerReason(reason);
   setLoginDefaultMode('login');
@@ -880,7 +888,7 @@ return (
       hasWidgets={widgets.length > 0}
       isAuthenticated={isAuthenticated}
       authIsLoading={authIsLoading}
-      isDashboardRoute={location === '/' || location === '/auth/reset-password'}
+      isDashboardRoute={location === '/' || location === '/auth/callback' || location === '/auth/reset-password'}
     />
 
     <DndContext
