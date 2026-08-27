@@ -4,11 +4,13 @@ import { buildApiHeaders, shouldAttachAdminToken } from "../../client/src/lib/ap
 
 test("admin API paths require a Supabase token", () => {
   assert.equal(shouldAttachAdminToken("/api/admin/channels"), true);
+  assert.equal(shouldAttachAdminToken("/api/admin/links/refresh"), true);
   assert.equal(shouldAttachAdminToken("/api/admin"), true);
 });
 
 test("tokens are not attached to public or lookalike URLs", () => {
   assert.equal(shouldAttachAdminToken("/api/links"), false);
+  assert.equal(shouldAttachAdminToken("/api/links/refresh"), false);
   assert.equal(shouldAttachAdminToken("/api/admin-evil/collect"), false);
   assert.equal(shouldAttachAdminToken("https://example.com/api/admin/users"), false);
 });

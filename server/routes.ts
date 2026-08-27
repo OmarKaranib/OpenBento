@@ -119,15 +119,6 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/links/refresh", async (req, res) => {
-    try {
-      const data = await refreshAllLinks();
-      res.json({ success: true, channelCount: data.channels.length, lastRefresh: data.lastRefresh });
-    } catch (error) {
-      res.status(500).json({ success: false, error: String(error) });
-    }
-  });
-
   app.get("/api/stream-status", (req, res) => {
     const globalStatus = getGlobalStreamStatus();
     res.json({
@@ -583,6 +574,18 @@ export async function registerRoutes(
   // The main app signs users in through Supabase. Verify that same Supabase
   // access token before any admin route checks the user's email.
   app.use("/api/admin", attachSupabaseUser);
+
+  app.post("/api/admin/links/refresh", async (req: Request, res: Response) => {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    try {
+      const data = await refreshAllLinks();
+      res.json({ success: true, channelCount: data.channels.length, lastRefresh: data.lastRefresh });
+    } catch (error) {
+      res.status(500).json({ success: false, error: String(error) });
+    }
+  });
 
   app.get("/api/admin/channels", async (req: Request, res: Response) => {
     if (!isAdmin(req)) {
