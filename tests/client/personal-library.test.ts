@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   libraryItemToSavedChannel,
+  isCloudLibraryId,
   mergeSavedChannels,
   reconcilePersonalLibrary,
   savedChannelIdentity,
@@ -28,6 +29,12 @@ test('saved channels use their strongest stable identity', () => {
     savedChannelIdentity(channel({ channelId: undefined, url: 'HTTPS://EXAMPLE.COM/live/' })),
     'youtube:url:https://example.com/live',
   );
+});
+
+test('only server UUIDs are treated as cloud library IDs', () => {
+  assert.equal(isCloudLibraryId('550e8400-e29b-41d4-a716-446655440000'), true);
+  assert.equal(isCloudLibraryId('saved-123-video'), false);
+  assert.equal(isCloudLibraryId('sky-news'), false);
 });
 
 test('cloud entries win when local and cloud libraries contain the same channel', () => {

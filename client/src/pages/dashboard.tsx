@@ -13,10 +13,13 @@ import { YouTubePlayer } from '@/components/youtube-player';
 import { TRENDING_CHANNELS } from '@/components/widget-sidebar';
 import {
   loadPersonalLibrary,
-  savePersonalLibrary,
   type SavedChannel,
 } from '@/lib/personal-library';
-import { syncPersonalLibraryWithCloud } from '@/lib/personal-library-sync';
+import {
+  addSavedChannelToPersonalLibrary,
+  removeSavedChannelFromPersonalLibrary,
+  syncPersonalLibraryWithCloud,
+} from '@/lib/personal-library-sync';
 import { useStreamHealing } from '@/hooks/use-stream-healing';
 import { useToast } from '@/hooks/use-toast';
 import { FloatingTutorial } from '@/components/floating-tutorial';
@@ -534,19 +537,7 @@ const MasterControlDashboard = ({
       savedAt: Date.now()
     };
 
-    setPersonalLibrary(prev => {
-      const exists = prev.some(c => 
-        (savedChannel.videoId && c.videoId === savedChannel.videoId) || 
-        (savedChannel.channelId && c.channelId === savedChannel.channelId)
-      );
-      if (exists) return prev;
-
-      const updated = [...prev, savedChannel];
-      savePersonalLibrary(updated);
-      // Dispatch event to sync sidebar
-      window.dispatchEvent(new CustomEvent('personalLibraryUpdated'));
-      return updated;
-    });
+    void addSavedChannelToPersonalLibrary(savedChannel);
   }, [isAuthenticated, openLoginModal]);
 
   // Check if widget is saved in Personal Library
@@ -561,20 +552,14 @@ const MasterControlDashboard = ({
 
   // Remove widget from Personal Library
   const removeWidgetFromLibrary = useCallback((widget: Widget) => {
-    setPersonalLibrary(prev => {
-      const updated = prev.filter(c => 
-        !(
-          (widget.videoId && c.videoId === widget.videoId) ||
-          (widget.youtubeChannelId && c.channelId === widget.youtubeChannelId) ||
-          (widget.twitchChannel && c.channelId === widget.twitchChannel) ||
-          (widget.kickChannel && c.channelId === widget.kickChannel)
-        )
-      );
-      savePersonalLibrary(updated);
-      window.dispatchEvent(new CustomEvent('personalLibraryUpdated'));
-      return updated;
-    });
-  }, []);
+    const savedChannel = personalLibrary.find(c =>
+      (widget.videoId && c.videoId === widget.videoId) ||
+      (widget.youtubeChannelId && c.channelId === widget.youtubeChannelId) ||
+      (widget.twitchChannel && c.channelId === widget.twitchChannel) ||
+      (widget.kickChannel && c.channelId === widget.kickChannel)
+    );
+    if (savedChannel) void removeSavedChannelFromPersonalLibrary(savedChannel);
+  }, [personalLibrary]);
 
   const handleVideoError = useCallback(async (widget: Widget, errorCode?: number) => {
     console.log(`[Self-Healing] Error detected for widget: ${widget.id}, errorCode: ${errorCode}`);

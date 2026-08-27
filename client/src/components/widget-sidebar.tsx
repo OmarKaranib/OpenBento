@@ -121,9 +121,13 @@
   import { useQuery } from '@tanstack/react-query';
   import {
     loadPersonalLibrary,
-    savePersonalLibrary,
+    savedChannelIdentity,
     type SavedChannel,
   } from '@/lib/personal-library';
+  import {
+    addSavedChannelToPersonalLibrary,
+    removeSavedChannelFromPersonalLibrary,
+  } from '@/lib/personal-library-sync';
 
   const BLOCKED_CHANNELS_KEY = 'openBentoBlockedChannels';
 
@@ -496,33 +500,23 @@
         openLoginModal?.('Sign in to save channels to your library and sync them across devices.');
         return;
       }
-      setPersonalLibrary(prev => {
-        if (prev.some(c => c.id === channel.id)) return prev;
-        const updated: SavedChannel[] = [
-          ...prev,
-          {
-            id: channel.id, name: channel.name, url: channel.url,
-            iconType: channel.iconType, category: channel.category,
-            platform: channel.platform, channelId: channel.channelId,
-            videoId: channel.videoId, savedAt: Date.now(),
-          },
-        ];
-        savePersonalLibrary(updated);
-        window.dispatchEvent(new CustomEvent('personalLibraryUpdated'));
-        return updated;
+      void addSavedChannelToPersonalLibrary({
+        id: channel.id, name: channel.name, url: channel.url,
+        iconType: channel.iconType, category: channel.category,
+        platform: channel.platform, channelId: channel.channelId,
+        videoId: channel.videoId, savedAt: Date.now(),
       });
     }, [isAuthenticated, openLoginModal]);
 
     const removeFromPersonalLibrary = useCallback((id: string) => {
-      setPersonalLibrary(prev => {
-        const u = prev.filter(c => c.id !== id);
-        savePersonalLibrary(u);
-        window.dispatchEvent(new CustomEvent('personalLibraryUpdated'));
-        return u;
-      });
-    }, []);
+      const channel = personalLibrary.find(item => item.id === id);
+      if (channel) void removeSavedChannelFromPersonalLibrary(channel);
+    }, [personalLibrary]);
 
-    const isInPersonalLibrary = useCallback((id: string) => personalLibrary.some(c => c.id === id), [personalLibrary]);
+    const isInPersonalLibrary = useCallback((channel: TrendingChannel) => {
+      const identity = savedChannelIdentity(channel);
+      return personalLibrary.some(item => savedChannelIdentity(item) === identity);
+    }, [personalLibrary]);
 
     const blockChannel = useCallback((channel: TrendingChannel) => {
       setBlockedChannels(prev => {
@@ -1409,7 +1403,7 @@
                           onClick={() => onChannelClick?.(ch)}
                           isLive={liveStatuses[ch.id]?.isLive}
                           showSaveButton
-                          isSaved={isInPersonalLibrary(ch.id)}
+                          isSaved={isInPersonalLibrary(ch)}
                           isBlocked={isChannelBlocked(ch.id)}
                           onSave={() => saveToPersonalLibrary(ch)}
                           onRemove={() => removeFromPersonalLibrary(ch.id)}

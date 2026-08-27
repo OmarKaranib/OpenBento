@@ -283,7 +283,9 @@ export async function removeFromLibrary(id: string): Promise<boolean> {
       credentials: 'include',
     });
     
-    return response.ok;
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data.success === true;
   } catch (error) {
     console.error('[StreamAPI] Remove from library failed:', error);
     return false;

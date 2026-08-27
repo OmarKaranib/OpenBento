@@ -39,7 +39,12 @@ function clean(value: string | null | undefined): string | undefined {
   return result || undefined;
 }
 
-export function savedChannelIdentity(channel: SavedChannel): string {
+type SavedChannelIdentity = Pick<
+  SavedChannel,
+  'id' | 'url' | 'platform' | 'channelId' | 'videoId'
+>;
+
+export function savedChannelIdentity(channel: SavedChannelIdentity): string {
   const platform = channel.platform.toLowerCase();
   const videoId = clean(channel.videoId);
   if (videoId) return `${platform}:video:${videoId}`;
@@ -51,6 +56,10 @@ export function savedChannelIdentity(channel: SavedChannel): string {
   if (url) return `${platform}:url:${url}`;
 
   return `${platform}:id:${channel.id}`;
+}
+
+export function isCloudLibraryId(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
 }
 
 export function mergeSavedChannels(
