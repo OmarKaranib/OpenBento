@@ -34,6 +34,7 @@ interface UseCloudSyncArgs {
 }
 
 export type CloudHydrationStatus = 'idle' | 'loading' | 'ready' | 'failed';
+export const DASHBOARD_OWNER_STORAGE_KEY = 'openBentoDashboardOwnerId';
 
 export function canWriteCloudDashboard(status: CloudHydrationStatus): boolean {
   return status === 'ready';
@@ -52,6 +53,29 @@ export function cloudReadRetryDelay(failedAttempt: number): number | null {
 
 export function shouldRetryCloudRead(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
+}
+
+export function canAdoptLocalDashboard(
+  localOwnerId: string | null,
+  currentUserId: string,
+): boolean {
+  return !localOwnerId || localOwnerId === currentUserId;
+}
+
+function getLocalDashboardOwner(): string | null {
+  try {
+    return localStorage.getItem(DASHBOARD_OWNER_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function rememberLocalDashboardOwner(userId: string): void {
+  try {
+    localStorage.setItem(DASHBOARD_OWNER_STORAGE_KEY, userId);
+  } catch {
+    // Private browsing can disable localStorage. Cloud sync still works.
+  }
 }
 
 export async function saveCloudDashboard(
@@ -156,6 +180,8 @@ export function useCloudSync({
         }
 
         const remote = body.dashboard;
+        const localOwnerId = getLocalDashboardOwner();
+        const mayAdoptLocal = canAdoptLocalDashboard(localOwnerId, userId);
         // Prefer the remote `pages` collection. Fall back to the legacy
         // single `widgets` array when the user has not synced post-migration.
         let resolved: DashboardPagesState | null = null;
@@ -194,12 +220,20 @@ export function useCloudSync({
           // when remote is genuinely empty (no widgets across pages).
           const remoteEmpty = resolved.pages.every(p => p.widgets.length === 0)
             && resolved.pages.length === 1;
-          if (!(remoteEmpty && localHasContent)) {
+          if (!(remoteEmpty && localHasContent && mayAdoptLocal)) {
             setPagesState(resolved);
             lastCloudPayloadRef.current = JSON.stringify(resolved);
           }
+        } else if (!remote && !mayAdoptLocal) {
+          // This browser still contains another account's dashboard and the
+          // current account has no cloud row. Start clean instead of copying
+          // the previous account's private layout into this one.
+          const empty = migrateLegacyWidgets([]);
+          setPagesState(empty);
+          lastCloudPayloadRef.current = JSON.stringify(empty);
         }
 
+        rememberLocalDashboardOwner(userId);
         setHydrationStatus('ready');
       } catch {
         // Network/API error — keep local state.

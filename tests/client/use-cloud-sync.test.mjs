@@ -33,6 +33,7 @@ import React from 'react';
 
 const {
   canWriteCloudDashboard,
+  canAdoptLocalDashboard,
   cloudReadRetryDelay,
   cloudWriteRetryDelay,
   saveCloudDashboard,
@@ -206,6 +207,12 @@ test('cloud loading only retries temporary failures', () => {
   assert.equal(shouldRetryCloudRead(401), false);
   assert.equal(shouldRetryCloudRead(403), false);
   assert.equal(shouldRetryCloudRead(404), false);
+});
+
+test('local dashboards can migrate from guests but never between accounts', () => {
+  assert.equal(canAdoptLocalDashboard(null, 'user-a'), true, 'guest dashboard may migrate');
+  assert.equal(canAdoptLocalDashboard('user-a', 'user-a'), true, 'same user may keep local data');
+  assert.equal(canAdoptLocalDashboard('user-a', 'user-b'), false, 'another user cannot adopt it');
 });
 
 test('saveCloudDashboard sends the active page and full pages collection', async () => {
