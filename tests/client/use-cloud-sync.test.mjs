@@ -33,8 +33,10 @@ import React from 'react';
 
 const {
   canWriteCloudDashboard,
+  cloudReadRetryDelay,
   cloudWriteRetryDelay,
   saveCloudDashboard,
+  shouldRetryCloudRead,
   useCloudSync,
 } = await import(
   '../../client/src/dashboard/use-cloud-sync.ts'
@@ -192,6 +194,18 @@ test('failed cloud writes get two retries and then stop', () => {
   assert.equal(cloudWriteRetryDelay(0), 1000);
   assert.equal(cloudWriteRetryDelay(1), 2000);
   assert.equal(cloudWriteRetryDelay(2), null);
+});
+
+test('cloud loading only retries temporary failures', () => {
+  assert.equal(cloudReadRetryDelay(0), 500);
+  assert.equal(cloudReadRetryDelay(1), 1500);
+  assert.equal(cloudReadRetryDelay(2), null);
+  assert.equal(shouldRetryCloudRead(408), true);
+  assert.equal(shouldRetryCloudRead(429), true);
+  assert.equal(shouldRetryCloudRead(503), true);
+  assert.equal(shouldRetryCloudRead(401), false);
+  assert.equal(shouldRetryCloudRead(403), false);
+  assert.equal(shouldRetryCloudRead(404), false);
 });
 
 test('saveCloudDashboard sends the active page and full pages collection', async () => {

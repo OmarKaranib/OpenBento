@@ -40,9 +40,18 @@ export function canWriteCloudDashboard(status: CloudHydrationStatus): boolean {
 }
 
 const CLOUD_WRITE_RETRY_DELAYS = [1000, 2000] as const;
+const CLOUD_READ_RETRY_DELAYS = [500, 1500] as const;
 
 export function cloudWriteRetryDelay(failedAttempt: number): number | null {
   return CLOUD_WRITE_RETRY_DELAYS[failedAttempt] ?? null;
+}
+
+export function cloudReadRetryDelay(failedAttempt: number): number | null {
+  return CLOUD_READ_RETRY_DELAYS[failedAttempt] ?? null;
+}
+
+export function shouldRetryCloudRead(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
 }
 
 export async function saveCloudDashboard(
@@ -111,6 +120,13 @@ export function useCloudSync({
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
+    const retryHydration = (attempt: number): boolean => {
+      const delay = cloudReadRetryDelay(attempt);
+      if (delay === null) return false;
+      retryTimer = setTimeout(() => void runHydration(attempt + 1), delay);
+      return true;
+    };
+
     const runHydration = async (attempt = 0) => {
       if (cancelled) return;
       const token = await getSupabaseAccessToken();
@@ -128,6 +144,7 @@ export function useCloudSync({
         });
         if (cancelled) return;
         if (!res.ok) {
+          if (shouldRetryCloudRead(res.status) && retryHydration(attempt)) return;
           setHydrationStatus('failed');
           return;
         }
@@ -186,7 +203,7 @@ export function useCloudSync({
         setHydrationStatus('ready');
       } catch {
         // Network/API error — keep local state.
-        if (!cancelled) setHydrationStatus('failed');
+        if (!cancelled && !retryHydration(attempt)) setHydrationStatus('failed');
       }
     };
 
