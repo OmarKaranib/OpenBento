@@ -194,7 +194,13 @@ export async function checkStreamHealth(
 export async function checkVideoLiveStatusById(
   videoId: string,
   apiKey: string
-): Promise<{ isLive: boolean; liveVideoId: string | null; title: string | null; apiError?: boolean }> {
+): Promise<{
+  isLive: boolean;
+  liveVideoId: string | null;
+  liveBroadcastContent: string | null;
+  title: string | null;
+  apiError?: boolean;
+}> {
   // Use YouTube Videos API (1 unit) instead of Search API (100 units)
   const url = `${YOUTUBE_API_BASE}/videos?part=snippet,status&id=${videoId}&key=${apiKey}`;
   
@@ -202,7 +208,7 @@ export async function checkVideoLiveStatusById(
     const response = await fetch(url);
     if (!response.ok) {
       console.error('[YouTube API] Video status check failed:', response.status);
-      return { isLive: false, liveVideoId: null, title: null, apiError: true };
+      return { isLive: false, liveVideoId: null, liveBroadcastContent: null, title: null, apiError: true };
     }
     
     const data = await response.json();
@@ -210,7 +216,7 @@ export async function checkVideoLiveStatusById(
     
     if (!video) {
       // Video not found - may have ended
-      return { isLive: false, liveVideoId: null, title: null, apiError: false };
+      return { isLive: false, liveVideoId: null, liveBroadcastContent: null, title: null, apiError: false };
     }
     
     // FALSE OFFLINE FIX: Stream is LIVE unless liveBroadcastContent is explicitly 'none'
@@ -220,12 +226,13 @@ export async function checkVideoLiveStatusById(
     return {
       isLive,
       liveVideoId: isLive ? videoId : null,
+      liveBroadcastContent: liveBroadcastContent ?? null,
       title: video.snippet?.title ?? null,
       apiError: false,
     };
   } catch (error) {
     console.error('[YouTube API] Video status check error:', error);
-    return { isLive: false, liveVideoId: null, title: null, apiError: true };
+    return { isLive: false, liveVideoId: null, liveBroadcastContent: null, title: null, apiError: true };
   }
 }
 

@@ -234,6 +234,7 @@ export async function registerRoutes(
         videoId,
         isLive: result.isLive,
         liveVideoId: result.liveVideoId,
+        liveBroadcastContent: result.liveBroadcastContent,
         title: result.title,
         apiError: result.apiError || false,
       });
