@@ -2,7 +2,13 @@ import { db } from '../db';
 import { streamStatusCache } from '@shared/schema';
 import { desc, eq } from 'drizzle-orm';
 import { checkStreamHealth, healStream } from './youtube-api';
-import { PULSE_INTERVAL_MS, TOP_CHANNELS_LIMIT } from './pulse-policy';
+import { FixedWindowRateLimiter } from './fixed-window-rate-limit';
+import {
+  BACKGROUND_REPAIR_LIMIT,
+  BACKGROUND_REPAIR_WINDOW_MS,
+  PULSE_INTERVAL_MS,
+  TOP_CHANNELS_LIMIT,
+} from './pulse-policy';
 
 interface GlobalStreamStatus {
   [channelId: string]: {
@@ -18,6 +24,11 @@ interface GlobalStreamStatus {
 
 let globalStreamStatus: GlobalStreamStatus = {};
 let pulseInterval: NodeJS.Timeout | null = null;
+const backgroundRepairBudget = new FixedWindowRateLimiter({
+  windowMs: BACKGROUND_REPAIR_WINDOW_MS,
+  maxAttempts: BACKGROUND_REPAIR_LIMIT,
+  maxEntries: 1,
+});
 
 export function getGlobalStreamStatus(): GlobalStreamStatus {
   return globalStreamStatus;
@@ -106,6 +117,16 @@ async function runPulseCheck(): Promise<void> {
     
     if (!health.isHealthy) {
       console.log(`[PulseCache] Unhealthy stream detected: ${status.channelName}`);
+
+      if (!backgroundRepairBudget.allow('youtube')) {
+        console.warn('[PulseCache] Daily background repair limit reached; skipping YouTube search');
+        await updateCacheEntry(channelId, {
+          isHealthy: false,
+          isLive: false,
+          errorCode: health.errorCode,
+        });
+        continue;
+      }
       
       const healResult = await healStream(status.channelName, channelId, apiKey);
       
