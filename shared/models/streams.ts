@@ -115,6 +115,11 @@ export const insertUserLibrarySchema = createInsertSchema(userLibrary).omit({
   updatedAt: true,
 });
 
+export const updateUserLibrarySchema = insertUserLibrarySchema
+  .omit({ userId: true })
+  .partial()
+  .strict();
+
 export const insertStreamStatusSchema = createInsertSchema(streamStatusCache).omit({
   id: true,
   lastChecked: true,

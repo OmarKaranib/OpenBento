@@ -6,7 +6,7 @@ import { loadLinks, refreshAllLinks, getChannelUrl, startLinkRefresher } from ".
 import { initializePulseCache, getGlobalStreamStatus, getStreamStatus, registerChannel } from "./services/pulse-cache";
 import { setupCastHub } from "./services/cast-hub";
 import { healStream, getVideoDetails, isMusicCategory, checkChannelLiveStatus, verifyVideoIsLive, searchChannelLiveStream, checkVideoLiveStatusById } from "./services/youtube-api";
-import { insertUserLibrarySchema, insertDashboardSchema, updateDashboardSchema, insertChannelSchema, insertFeedbackSchema } from "@shared/schema";
+import { insertUserLibrarySchema, updateUserLibrarySchema, insertDashboardSchema, updateDashboardSchema, insertChannelSchema, insertFeedbackSchema } from "@shared/schema";
 import { pickDailyWordleAnswer, wordleUtcDateKey } from "@shared/wordle-pool";
 import { getResendClient } from "./services/resend-client";
 import { createMarketsService, parseSymbols as parseMarketsSymbols } from "./markets";
@@ -490,7 +490,13 @@ export async function registerRoutes(
     }
 
     try {
-      const updated = await storage.updateLibraryItem(id, userId, req.body);
+      const validation = updateUserLibrarySchema.safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({ error: validation.error.message });
+      }
+
+      const updated = await storage.updateLibraryItem(id, userId, validation.data);
 
       if (!updated) {
         return res.status(404).json({ error: "Item not found" });

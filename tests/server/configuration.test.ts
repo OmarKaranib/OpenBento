@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { requireDatabaseUrl } from "../../server/config/database";
 import { getResendConfig } from "../../server/services/resend-client";
-import { updateDashboardSchema } from "../../shared/schema";
+import { updateDashboardSchema, updateUserLibrarySchema } from "../../shared/schema";
 
 test("production database configuration accepts Supabase hosts", () => {
   const direct = "postgresql://user:pass@db.example.supabase.co:5432/postgres";
@@ -51,4 +51,11 @@ test("dashboard patches cannot change ownership or internal columns", () => {
   assert.equal(updateDashboardSchema.safeParse({ userId: "another-user" }).success, false);
   assert.equal(updateDashboardSchema.safeParse({ id: "another-dashboard" }).success, false);
   assert.equal(updateDashboardSchema.safeParse({ createdAt: new Date() }).success, false);
+});
+
+test("personal library patches cannot change ownership or internal columns", () => {
+  assert.equal(updateUserLibrarySchema.safeParse({ name: "Updated" }).success, true);
+  assert.equal(updateUserLibrarySchema.safeParse({ userId: "another-user" }).success, false);
+  assert.equal(updateUserLibrarySchema.safeParse({ id: "another-item" }).success, false);
+  assert.equal(updateUserLibrarySchema.safeParse({ createdAt: new Date() }).success, false);
 });
