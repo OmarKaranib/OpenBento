@@ -24,6 +24,7 @@ import {
 import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { attachSupabaseUser, getUserId } from "./supabaseAuth";
+import { CastSocketTicketStore } from "./cast-socket-tickets";
 
 interface PendingCode {
   code: string;
@@ -41,6 +42,7 @@ const roomConns = new Map<string, Set<RoomConn>>();
 const pendingRoomIds = new Set<string>();
 const codeRateLimit = new Map<string, { count: number; resetAt: number }>();
 const tvLastSeen = new Map<string, number>();
+const laptopSocketTickets = new CastSocketTicketStore();
 
 const CODE_TTL_MS = 60_000;
 const SNAPSHOT_BYTES_LIMIT = 4 * 1024 * 1024;
@@ -563,6 +565,24 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
     });
   });
 
+  // Browsers cannot add an Authorization header to WebSocket connections.
+  // Give an owner a short-lived, one-use ticket instead of putting their
+  // Supabase access token in the socket URL.
+  app.post(
+    "/api/cast/rooms/:id/socket-ticket",
+    attachSupabaseUser,
+    async (req: Request, res: Response) => {
+      const roomId = String(req.params.id ?? "").trim();
+      if (!roomId) return res.status(400).json({ error: "Missing room id" });
+      const room = await loadRoom(roomId);
+      if (!room) return res.status(404).json({ error: "Room not found" });
+      if (!ensureCanWrite(room, getUserId(req))) {
+        return res.status(403).json({ error: "Not your room" });
+      }
+      res.json(laptopSocketTickets.issue(roomId));
+    },
+  );
+
   app.delete("/api/cast/rooms/:id", attachSupabaseUser, async (req: Request, res: Response) => {
     const roomId = String(req.params.id ?? "").trim();
     if (!roomId) return res.status(400).json({ error: "Missing room id" });
@@ -703,6 +723,9 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
     },
   );
 
+  // Laptop sockets also require a short-lived, one-use ticket. TV sockets use
+  // their unguessable room UUID as the device credential so existing paired
+  // TVs can reconnect without a signed-in browser being present.
   // ── WebSocket hub at /ws/cast?roomId=XXX&role=tv|laptop ─────────────────
   const wss = new WebSocketServer({ noServer: true });
 
@@ -717,6 +740,14 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
       socket.write("HTTP/1.1 400 Bad Request\r\n\r\n");
       socket.destroy();
       return;
+    }
+    if (role === "laptop") {
+      const ticket = url.searchParams.get("ticket") ?? "";
+      if (!ticket || !laptopSocketTickets.consume(ticket, roomId)) {
+        socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+        socket.destroy();
+        return;
+      }
     }
 
     wss.handleUpgrade(request, socket, head, (ws) => {

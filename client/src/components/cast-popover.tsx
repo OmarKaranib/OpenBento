@@ -127,7 +127,9 @@ export function CastPopover({
   const [pushingSelected, setPushingSelected] = useState(false);
   const popRef = useRef<HTMLDivElement | null>(null);
   const socketsRef = useRef<Map<string, WebSocket>>(new Map());
+  const connectingRoomsRef = useRef<Set<string>>(new Set());
   const reconnectTimersRef = useRef<Map<string, number>>(new Map());
+  const mountedRef = useRef(true);
   const { toast } = useToast();
 
   function clearReconnect(roomId: string): void {
@@ -136,6 +138,17 @@ export function CastPopover({
       window.clearTimeout(t);
       reconnectTimersRef.current.delete(roomId);
     }
+  }
+
+  function scheduleReconnect(roomId: string): void {
+    clearReconnect(roomId);
+    const timerId = window.setTimeout(() => {
+      reconnectTimersRef.current.delete(roomId);
+      if (loadPairedTVs().some((p) => p.roomId === roomId)) {
+        setTVs((prev) => [...prev]);
+      }
+    }, 3000);
+    reconnectTimersRef.current.set(roomId, timerId);
   }
 
   useEffect(() => {
@@ -230,53 +243,65 @@ export function CastPopover({
       }
     });
     tvs.forEach((tv) => {
-      if (sockets.has(tv.roomId)) return;
-      const proto = window.location.protocol === "https:" ? "wss" : "ws";
-      const url = `${proto}://${window.location.host}/ws/cast?roomId=${encodeURIComponent(
-        tv.roomId,
-      )}&role=laptop`;
-      const ws = new WebSocket(url);
-      sockets.set(tv.roomId, ws);
-      ws.onopen = () => clearReconnect(tv.roomId);
-      ws.onmessage = (ev) => {
+      if (sockets.has(tv.roomId) || connectingRoomsRef.current.has(tv.roomId)) return;
+      connectingRoomsRef.current.add(tv.roomId);
+      void (async () => {
         try {
-          const msg = JSON.parse(String(ev.data));
-          if (msg.type === "renamed" && typeof msg.label === "string") {
-            setTVs((prev) =>
-              prev.map((p) => (p.roomId === tv.roomId ? { ...p, label: msg.label } : p)),
-            );
-          } else if (msg.type === "presence") {
+          const ticketResponse = await authedFetch(
+            "POST",
+            `/api/cast/rooms/${tv.roomId}/socket-ticket`,
+          );
+          const ticketData = await ticketResponse.json();
+          if (typeof ticketData?.ticket !== "string" || !ticketData.ticket) {
+            throw new Error("Cast socket ticket missing");
+          }
+          if (!mountedRef.current || !loadPairedTVs().some((p) => p.roomId === tv.roomId)) return;
+
+          const proto = window.location.protocol === "https:" ? "wss" : "ws";
+          const url = `${proto}://${window.location.host}/ws/cast?roomId=${encodeURIComponent(
+            tv.roomId,
+          )}&role=laptop&ticket=${encodeURIComponent(ticketData.ticket)}`;
+          const ws = new WebSocket(url);
+          sockets.set(tv.roomId, ws);
+          ws.onopen = () => clearReconnect(tv.roomId);
+          ws.onmessage = (ev) => {
+            try {
+              const msg = JSON.parse(String(ev.data));
+              if (msg.type === "renamed" && typeof msg.label === "string") {
+                setTVs((prev) =>
+                  prev.map((p) => (p.roomId === tv.roomId ? { ...p, label: msg.label } : p)),
+                );
+              } else if (msg.type === "presence") {
+                setMeta((m) => ({
+                  ...m,
+                  [tv.roomId]: {
+                    ...(m[tv.roomId] ?? { online: false }),
+                    online: !!msg.tvOnline,
+                    lastSeenAt: typeof msg.lastSeenAt === "number"
+                      ? msg.lastSeenAt
+                      : m[tv.roomId]?.lastSeenAt,
+                  },
+                }));
+              } else if (msg.type === "closed") {
+                setTVs((prev) => prev.filter((p) => p.roomId !== tv.roomId));
+              }
+            } catch { /* ignore */ }
+          };
+          ws.onclose = () => {
             setMeta((m) => ({
               ...m,
-              [tv.roomId]: {
-                ...(m[tv.roomId] ?? { online: false }),
-                online: !!msg.tvOnline,
-                lastSeenAt: typeof msg.lastSeenAt === "number"
-                  ? msg.lastSeenAt
-                  : m[tv.roomId]?.lastSeenAt,
-              },
+              [tv.roomId]: { ...(m[tv.roomId] ?? {}), online: false },
             }));
-          } else if (msg.type === "closed") {
-            setTVs((prev) => prev.filter((p) => p.roomId !== tv.roomId));
-          }
-        } catch { /* ignore */ }
-      };
-      ws.onclose = () => {
-        setMeta((m) => ({
-          ...m,
-          [tv.roomId]: { ...(m[tv.roomId] ?? {}), online: false },
-        }));
-        sockets.delete(tv.roomId);
-        clearReconnect(tv.roomId);
-        const timerId = window.setTimeout(() => {
-          reconnectTimersRef.current.delete(tv.roomId);
-          if (loadPairedTVs().some((p) => p.roomId === tv.roomId)) {
-            setTVs((prev) => [...prev]);
-          }
-        }, 3000);
-        reconnectTimersRef.current.set(tv.roomId, timerId);
-      };
-      ws.onerror = () => { try { ws.close(); } catch { /* ignore */ } };
+            sockets.delete(tv.roomId);
+            scheduleReconnect(tv.roomId);
+          };
+          ws.onerror = () => { try { ws.close(); } catch { /* ignore */ } };
+        } catch {
+          scheduleReconnect(tv.roomId);
+        } finally {
+          connectingRoomsRef.current.delete(tv.roomId);
+        }
+      })();
     });
   }, [tvs]);
 
@@ -305,7 +330,9 @@ export function CastPopover({
   }, [widgets, masterMute]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       reconnectTimersRef.current.forEach((id) => window.clearTimeout(id));
       reconnectTimersRef.current.clear();
       socketsRef.current.forEach((ws) => {
