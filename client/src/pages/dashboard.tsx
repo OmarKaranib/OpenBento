@@ -29,7 +29,10 @@ import { CastPopover } from '@/components/cast-popover';
 import { PageTabsStrip } from '@/components/page-tabs-strip';
 import type { DashboardPage } from '@shared/dashboard-pages';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
-import { shouldCheckYouTubeWidget } from '@/lib/youtube-widget-check';
+import {
+  isTemporaryYouTubeStatusError,
+  shouldCheckYouTubeWidget,
+} from '@/lib/youtube-widget-check';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useTheme } from '@/dashboard/use-theme';
 import { BUILT_IN_THEMES } from '@shared/themes';
@@ -1147,6 +1150,14 @@ const MasterControlDashboard = ({
       
       try {
         const liveStatus = await checkVideoLiveStatus(widget.videoId);
+
+        if (isTemporaryYouTubeStatusError(liveStatus)) {
+          console.warn(`[CheckAgain] YouTube status is temporarily unavailable for ${widget.videoId}; keeping the last known state`);
+          setWidgets(prev => prev.map(w =>
+            w.id === widgetId ? { ...w, apiError: true } : w
+          ));
+          return;
+        }
         
         if (liveStatus.isLive) {
           console.log(`[CheckAgain] Video ${widget.videoId} is LIVE (videos.list 1 unit)`);
@@ -1181,12 +1192,9 @@ const MasterControlDashboard = ({
         }
       } catch (error) {
         console.error('[CheckAgain] Error checking video status:', error);
-        // ARCHITECTURE PIVOT: Don't set offline on error - badge update only
+        // Keep the last known playback state when the status check itself fails.
         setWidgets(prev => prev.map(w => 
-          w.id === widgetId ? { 
-            ...w, 
-            isLive: false, // Badge only
-          } : w
+          w.id === widgetId ? { ...w, apiError: true } : w
         ));
         return;
       }

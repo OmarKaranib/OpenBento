@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldCheckYouTubeWidget } from '../../client/src/lib/youtube-widget-check';
+import {
+  isTemporaryYouTubeStatusError,
+  shouldCheckYouTubeWidget,
+} from '../../client/src/lib/youtube-widget-check';
 
 const unchecked = new Set<string>();
 
@@ -27,4 +30,10 @@ test('checked videos wait, while offline YouTube videos follow revalidation timi
   const offline = { type: 'video', isYouTube: true, videoId: 'offline-video', isOffline: true };
   assert.equal(shouldCheckYouTubeWidget(offline, unchecked, false), false);
   assert.equal(shouldCheckYouTubeWidget(offline, unchecked, true), true);
+});
+
+test('temporary API failures are distinguished from confirmed offline answers', () => {
+  assert.equal(isTemporaryYouTubeStatusError({ apiError: true }), true);
+  assert.equal(isTemporaryYouTubeStatusError({ apiError: false }), false);
+  assert.equal(isTemporaryYouTubeStatusError({}), false);
 });

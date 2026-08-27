@@ -18,3 +18,7 @@ export function shouldCheckYouTubeWidget(
     ? shouldRevalidate
     : !checkedVideoIds.has(widget.videoId);
 }
+
+export function isTemporaryYouTubeStatusError(status: { apiError?: boolean }): boolean {
+  return status.apiError === true;
+}
