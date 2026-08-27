@@ -59,6 +59,20 @@ export interface UseThemeApi {
   renamePersonalTheme: (id: string, newName: string) => void;
 }
 
+export type ThemeHydrationStatus = 'idle' | 'loading' | 'ready' | 'failed';
+
+export function canWriteCloudThemes(status: ThemeHydrationStatus): boolean {
+  return status === 'ready';
+}
+
+export function canWriteCloudThemesForUser(
+  status: ThemeHydrationStatus,
+  hydratedUserId: string,
+  currentUserId: string,
+): boolean {
+  return canWriteCloudThemes(status) && hydratedUserId === currentUserId;
+}
+
 // ─── DOM writer (the only side-effecting code in this module) ───────────────
 
 // Exported so the integration test can drive it directly against a
@@ -168,7 +182,9 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
   // Cloud sync state. Mirrors the pattern in use-cloud-sync.
   const cloudUploadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastUploadedRef     = useRef<string>('');
-  const hydrationDoneRef    = useRef<boolean>(false);
+  const hydrationUserIdRef  = useRef<string>('');
+  const hydrationReadyUserIdRef = useRef<string>('');
+  const [cloudHydrationStatus, setCloudHydrationStatus] = useState<ThemeHydrationStatus>('idle');
   // Tracks the id of the theme currently written to the DOM so the
   // hydration effect can detect genuine activeThemeId changes (cross-
   // device cloud sync, late-arriving personal themes) without double-
@@ -342,7 +358,9 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
   // Reset hydration when the user signs out.
   useEffect(() => {
     if (!isAuthenticated || !userId) {
-      hydrationDoneRef.current = false;
+      hydrationUserIdRef.current = '';
+      hydrationReadyUserIdRef.current = '';
+      setCloudHydrationStatus('idle');
       lastUploadedRef.current  = '';
     }
   }, [isAuthenticated, userId]);
@@ -352,39 +370,55 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
   // extra round-trips for the common case.
   useEffect(() => {
     if (!isAuthenticated || !userId) return;
-    if (hydrationDoneRef.current) return;
+    if (hydrationUserIdRef.current === userId) return;
+    hydrationUserIdRef.current = userId;
+    hydrationReadyUserIdRef.current = '';
+    setCloudHydrationStatus('loading');
     let cancelled = false;
     (async () => {
       const token = await getToken();
-      if (!token || cancelled) { hydrationDoneRef.current = true; return; }
+      if (cancelled) return;
+      if (!token) {
+        setCloudHydrationStatus('failed');
+        return;
+      }
       try {
         const res = await fetch('/api/dashboard', { headers: { Authorization: `Bearer ${token}` } });
         if (cancelled) return;
-        if (res.ok) {
-          const body = await res.json();
-          const remote = body?.dashboard;
-          if (remote) {
-            // Cross-device deletion propagation: if the field is PRESENT
-            // (even as an empty array), trust the remote as source of
-            // truth so a user who cleared their themes on device A sees
-            // them disappear on device B. We previously gated this on
-            // `length > 0`, which left stale local themes intact and
-            // caused them to be re-uploaded on the next debounce.
-            if (Array.isArray(remote.personalThemes)) {
-              const remoteThemes = sanitizeThemes(remote.personalThemes);
-              setPersonalThemes(remoteThemes);
-              persistPersonal(remoteThemes);
-            }
-            if (typeof remote.activeThemeId === 'string' && remote.activeThemeId) {
-              setActiveThemeId(remote.activeThemeId);
-              try { localStorage.setItem(ACTIVE_THEME_ID_KEY, remote.activeThemeId); } catch {/* */}
-            }
+        if (!res.ok) {
+          setCloudHydrationStatus('failed');
+          return;
+        }
+        const body = await res.json();
+        if (!body || !Object.prototype.hasOwnProperty.call(body, 'dashboard')) {
+          setCloudHydrationStatus('failed');
+          return;
+        }
+        const remote = body.dashboard;
+        if (remote) {
+          // Cross-device deletion propagation: if the field is PRESENT
+          // (even as an empty array), trust the remote as source of
+          // truth so a user who cleared their themes on device A sees
+          // them disappear on device B. We previously gated this on
+          // `length > 0`, which left stale local themes intact and
+          // caused them to be re-uploaded on the next debounce.
+          if (Array.isArray(remote.personalThemes)) {
+            const remoteThemes = sanitizeThemes(remote.personalThemes);
+            setPersonalThemes(remoteThemes);
+            persistPersonal(remoteThemes);
+          }
+          if (typeof remote.activeThemeId === 'string' && remote.activeThemeId) {
+            setActiveThemeId(remote.activeThemeId);
+            try { localStorage.setItem(ACTIVE_THEME_ID_KEY, remote.activeThemeId); } catch {/* */}
           }
         }
+        hydrationReadyUserIdRef.current = userId;
+        setCloudHydrationStatus('ready');
       } catch {
-        // Network failure — keep localStorage values, retry on next sign-in.
+        // Never unlock writes after a failed read. That could replace the
+        // only good cloud copy with stale browser data.
+        if (!cancelled) setCloudHydrationStatus('failed');
       }
-      hydrationDoneRef.current = true;
     })();
     return () => { cancelled = true; };
   }, [isAuthenticated, userId, getToken, persistPersonal]);
@@ -393,7 +427,11 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
   // without overwriting the widget layout owned by use-cloud-sync.
   useEffect(() => {
     if (!isAuthenticated || !userId) return;
-    if (!hydrationDoneRef.current) return;
+    if (!canWriteCloudThemesForUser(
+      cloudHydrationStatus,
+      hydrationReadyUserIdRef.current,
+      userId,
+    )) return;
     const payload = JSON.stringify({ personalThemes, activeThemeId });
     if (payload === lastUploadedRef.current) return;
     if (cloudUploadTimerRef.current) clearTimeout(cloudUploadTimerRef.current);
@@ -434,7 +472,7 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
     return () => {
       if (cloudUploadTimerRef.current) clearTimeout(cloudUploadTimerRef.current);
     };
-  }, [personalThemes, activeThemeId, isAuthenticated, userId, getToken]);
+  }, [personalThemes, activeThemeId, isAuthenticated, userId, cloudHydrationStatus, getToken]);
 
   return {
     personalThemes,
