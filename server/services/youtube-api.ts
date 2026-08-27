@@ -15,6 +15,14 @@ type HandleLiveResult = ChannelLiveResult & {
   channelId: string | null;
 };
 
+type VideoLiveResult = {
+  isLive: boolean;
+  liveVideoId: string | null;
+  liveBroadcastContent: string | null;
+  title: string | null;
+  apiError?: boolean;
+};
+
 const channelLiveCache = new LruTtlCache<ChannelLiveResult>({
   max: 256,
   ttlMs: 5 * 60 * 1000,
@@ -22,6 +30,10 @@ const channelLiveCache = new LruTtlCache<ChannelLiveResult>({
 const handleLiveCache = new LruTtlCache<HandleLiveResult>({
   max: 256,
   ttlMs: 5 * 60 * 1000,
+});
+const videoLiveCache = new LruTtlCache<VideoLiveResult>({
+  max: 512,
+  ttlMs: 60 * 1000,
 });
 
 interface YouTubeSearchResult {
@@ -194,13 +206,11 @@ export async function checkStreamHealth(
 export async function checkVideoLiveStatusById(
   videoId: string,
   apiKey: string
-): Promise<{
-  isLive: boolean;
-  liveVideoId: string | null;
-  liveBroadcastContent: string | null;
-  title: string | null;
-  apiError?: boolean;
-}> {
+): Promise<VideoLiveResult> {
+  const cacheKey = videoId.trim();
+  const cached = videoLiveCache.get(cacheKey);
+  if (cached) return cached;
+
   // Use YouTube Videos API (1 unit) instead of Search API (100 units)
   const url = `${YOUTUBE_API_BASE}/videos?part=snippet,status&id=${videoId}&key=${apiKey}`;
   
@@ -216,20 +226,30 @@ export async function checkVideoLiveStatusById(
     
     if (!video) {
       // Video not found - may have ended
-      return { isLive: false, liveVideoId: null, liveBroadcastContent: null, title: null, apiError: false };
+      const result: VideoLiveResult = {
+        isLive: false,
+        liveVideoId: null,
+        liveBroadcastContent: null,
+        title: null,
+        apiError: false,
+      };
+      videoLiveCache.set(cacheKey, result);
+      return result;
     }
     
     // FALSE OFFLINE FIX: Stream is LIVE unless liveBroadcastContent is explicitly 'none'
     const liveBroadcastContent = video.snippet?.liveBroadcastContent;
     const isLive = liveBroadcastContent !== 'none';
     
-    return {
+    const result: VideoLiveResult = {
       isLive,
       liveVideoId: isLive ? videoId : null,
       liveBroadcastContent: liveBroadcastContent ?? null,
       title: video.snippet?.title ?? null,
       apiError: false,
     };
+    videoLiveCache.set(cacheKey, result);
+    return result;
   } catch (error) {
     console.error('[YouTube API] Video status check error:', error);
     return { isLive: false, liveVideoId: null, liveBroadcastContent: null, title: null, apiError: true };

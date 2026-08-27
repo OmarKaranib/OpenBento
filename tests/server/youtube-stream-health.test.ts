@@ -55,3 +55,29 @@ test('video live checks return the broadcast status expected by the browser', as
     globalThis.fetch = originalFetch;
   }
 });
+
+test('successful video live checks are shared for one minute', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    return {
+      ok: true,
+      json: async () => ({
+        items: [{
+          id: 'shared-video',
+          snippet: { title: 'Shared stream', liveBroadcastContent: 'live' },
+        }],
+      }),
+    } as Response;
+  }) as typeof fetch;
+
+  try {
+    const first = await checkVideoLiveStatusById('shared-video', 'test-key');
+    const second = await checkVideoLiveStatusById('shared-video', 'test-key');
+    assert.equal(calls, 1);
+    assert.deepEqual(second, first);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
