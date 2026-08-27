@@ -240,17 +240,6 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/stream/register", async (req, res) => {
-    const { channelId, channelName, platform, videoId } = req.body;
-
-    if (!channelId || !channelName || !platform) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    await registerChannel(channelId, channelName, platform, videoId);
-    res.json({ success: true });
-  });
-
   app.post("/api/stream/heal", async (req, res) => {
     const { channelId, channelName, currentVideoId } = req.body;
     const apiKey = process.env.YOUTUBE_API_KEY;

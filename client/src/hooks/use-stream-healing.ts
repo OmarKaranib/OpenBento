@@ -3,7 +3,6 @@ import {
   fetchGlobalStreamStatus, 
   requestStreamHeal, 
   getCachedStreamStatus,
-  registerStreamChannel 
 } from '@/lib/stream-api';
 
 interface HealingState {
@@ -117,15 +116,6 @@ export function useStreamHealing() {
     }
   }, [healingStates]);
 
-  const registerChannel = useCallback(async (
-    channelId: string,
-    channelName: string,
-    platform: string,
-    videoId?: string
-  ) => {
-    await registerStreamChannel(channelId, channelName, platform, videoId);
-  }, []);
-
   const resetHealAttempts = useCallback((widgetId: string) => {
     setHealingStates(prev => ({
       ...prev,
@@ -141,7 +131,6 @@ export function useStreamHealing() {
   return {
     getStreamHealth,
     triggerHeal,
-    registerChannel,
     resetHealAttempts,
     getHealingState,
   };

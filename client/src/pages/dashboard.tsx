@@ -244,7 +244,7 @@ const MasterControlDashboard = ({
     }
   }, [widgets.length, hasStartedBuilding]);
 
-  const { triggerHeal, getHealingState, registerChannel } = useStreamHealing();
+  const { triggerHeal, getHealingState } = useStreamHealing();
   const { toast } = useToast();
 
   // Theme Mode (dark/light) - User toggleable

@@ -196,26 +196,6 @@ export async function requestStreamHeal(
   }
 }
 
-export async function registerStreamChannel(
-  channelId: string,
-  channelName: string,
-  platform: string,
-  videoId?: string
-): Promise<boolean> {
-  try {
-    const response = await fetch(`${API_BASE}/api/stream/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channelId, channelName, platform, videoId }),
-    });
-    
-    return response.ok;
-  } catch (error) {
-    console.error('[StreamAPI] Register failed:', error);
-    return false;
-  }
-}
-
 export async function validateVideo(videoId: string): Promise<{
   valid: boolean;
   reason?: string;
