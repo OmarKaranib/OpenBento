@@ -13,6 +13,8 @@ import { createMarketsService, parseSymbols as parseMarketsSymbols } from "./mar
 import { createAirQualityService, geocodeCity as geocodeAirQualityCity } from "./air-quality";
 import { LruTtlCache } from "./services/lruCache";
 import { attachSupabaseUser as attachSupabaseUserShared } from "./services/supabaseAuth";
+import { FixedWindowRateLimiter } from "./services/fixed-window-rate-limit";
+import { streamHealRequestSchema } from "./services/stream-heal-guard";
 
 // Admin email list - used for admin access only
 const ADMIN_EMAILS = [
@@ -37,6 +39,19 @@ const isAdminEmail = (email: string): boolean => {
 // (and any other route module) can share the same LRU cache and verification
 // logic. Re-exported under the local name so existing references compile.
 const attachSupabaseUser = attachSupabaseUserShared;
+
+const streamHealRateLimit = new FixedWindowRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 12,
+});
+
+function requestIp(req: Request): string {
+  const forwarded = String(req.headers["x-forwarded-for"] ?? "")
+    .split(",")[0]
+    .trim()
+    .slice(0, 64);
+  return forwarded || req.socket.remoteAddress || "unknown";
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -241,7 +256,15 @@ export async function registerRoutes(
   });
 
   app.post("/api/stream/heal", async (req, res) => {
-    const { channelId, channelName, currentVideoId } = req.body;
+    if (!streamHealRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ success: false, error: "Too many repair requests, slow down" });
+    }
+
+    const validation = streamHealRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ success: false, error: "Invalid repair request" });
+    }
+    const { channelId, channelName, currentVideoId } = validation.data;
     const apiKey = process.env.YOUTUBE_API_KEY;
 
     if (!apiKey) {
@@ -249,10 +272,6 @@ export async function registerRoutes(
         success: false,
         error: "YouTube API key not configured"
       });
-    }
-
-    if (!channelId || !channelName) {
-      return res.status(400).json({ error: "Missing channelId or channelName" });
     }
 
     try {
