@@ -32,6 +32,7 @@ import {
 // its hardcoded background off so the theme's body background shows
 // through. Kept as a constant so the dashboard import stays in sync.
 export const THEMED_BODY_CLASS = 'ob-theme-active';
+export const THEME_OWNER_STORAGE_KEY = 'openBentoThemeOwnerId';
 
 type SupabaseLike = {
   auth: {
@@ -71,6 +72,37 @@ export function canWriteCloudThemesForUser(
   currentUserId: string,
 ): boolean {
   return canWriteCloudThemes(status) && hydratedUserId === currentUserId;
+}
+
+export function canAdoptLocalThemes(
+  localOwnerId: string | null,
+  currentUserId: string,
+): boolean {
+  return !localOwnerId || localOwnerId === currentUserId;
+}
+
+export function shouldKeepGuestThemeValue(
+  localOwnerId: string | null,
+  remoteHasValue: boolean,
+  localHasValue: boolean,
+): boolean {
+  return localOwnerId === null && !remoteHasValue && localHasValue;
+}
+
+function getLocalThemeOwner(): string | null {
+  try {
+    return localStorage.getItem(THEME_OWNER_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function rememberLocalThemeOwner(userId: string): void {
+  try {
+    localStorage.setItem(THEME_OWNER_STORAGE_KEY, userId);
+  } catch {
+    // Private browsing can disable localStorage. Cloud sync still works.
+  }
 }
 
 // ─── DOM writer (the only side-effecting code in this module) ───────────────
@@ -114,6 +146,23 @@ export function writeThemeToDom(theme: Theme, setIsDarkMode: (v: boolean) => voi
   //    already react to body.light-theme / .dark-theme, so this single
   //    call is enough to flip the rest of the UI's contrast palette.
   setIsDarkMode(!theme.lightMode);
+}
+
+export function clearThemeFromDom(): void {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  for (const key of Object.keys(themeToCssVars(BUILT_IN_THEMES[0]))) {
+    root.style.removeProperty(key);
+  }
+  if (document.body) {
+    document.body.style.fontFamily = '';
+    document.body.style.backgroundImage = 'none';
+    document.body.style.backgroundColor = '#F8F9FA';
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundAttachment = 'fixed';
+    document.body.classList.remove(THEMED_BODY_CLASS);
+  }
 }
 
 // Capture whatever theme-shaped state is currently on the DOM. Used so
@@ -395,6 +444,8 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
           return;
         }
         const remote = body.dashboard;
+        const localOwnerId = getLocalThemeOwner();
+        const mayAdoptLocal = canAdoptLocalThemes(localOwnerId, userId);
         if (remote) {
           // Cross-device deletion propagation: if the field is PRESENT
           // (even as an empty array), trust the remote as source of
@@ -402,16 +453,59 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
           // them disappear on device B. We previously gated this on
           // `length > 0`, which left stale local themes intact and
           // caused them to be re-uploaded on the next debounce.
+          if (Object.prototype.hasOwnProperty.call(remote, 'personalThemes') && !Array.isArray(remote.personalThemes)) {
+            setCloudHydrationStatus('failed');
+            return;
+          }
           if (Array.isArray(remote.personalThemes)) {
             const remoteThemes = sanitizeThemes(remote.personalThemes);
-            setPersonalThemes(remoteThemes);
-            persistPersonal(remoteThemes);
+            if (remoteThemes.length !== remote.personalThemes.length) {
+              setCloudHydrationStatus('failed');
+              return;
+            }
+            const keepGuestThemes = shouldKeepGuestThemeValue(
+              localOwnerId,
+              remoteThemes.length > 0,
+              personalThemes.length > 0,
+            );
+            if (!keepGuestThemes) {
+              setPersonalThemes(remoteThemes);
+              persistPersonal(remoteThemes);
+            }
+          } else if (!mayAdoptLocal) {
+            setPersonalThemes([]);
+            persistPersonal([]);
           }
-          if (typeof remote.activeThemeId === 'string' && remote.activeThemeId) {
-            setActiveThemeId(remote.activeThemeId);
-            try { localStorage.setItem(ACTIVE_THEME_ID_KEY, remote.activeThemeId); } catch {/* */}
+          if (Object.prototype.hasOwnProperty.call(remote, 'activeThemeId')) {
+            const remoteActiveId = typeof remote.activeThemeId === 'string' && remote.activeThemeId
+              ? remote.activeThemeId
+              : null;
+            const keepGuestActiveTheme = shouldKeepGuestThemeValue(
+              localOwnerId,
+              Boolean(remoteActiveId),
+              Boolean(activeThemeId),
+            );
+            if (!keepGuestActiveTheme) {
+              setActiveThemeId(remoteActiveId);
+              try {
+                if (remoteActiveId) localStorage.setItem(ACTIVE_THEME_ID_KEY, remoteActiveId);
+                else localStorage.removeItem(ACTIVE_THEME_ID_KEY);
+              } catch {/* */}
+              if (!remoteActiveId) clearThemeFromDom();
+            }
+          } else if (!mayAdoptLocal) {
+            setActiveThemeId(null);
+            try { localStorage.removeItem(ACTIVE_THEME_ID_KEY); } catch {/* */}
+            clearThemeFromDom();
           }
+        } else if (!mayAdoptLocal) {
+          setPersonalThemes([]);
+          persistPersonal([]);
+          setActiveThemeId(null);
+          try { localStorage.removeItem(ACTIVE_THEME_ID_KEY); } catch {/* */}
+          clearThemeFromDom();
         }
+        rememberLocalThemeOwner(userId);
         hydrationReadyUserIdRef.current = userId;
         setCloudHydrationStatus('ready');
       } catch {

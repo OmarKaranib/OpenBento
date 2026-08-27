@@ -183,6 +183,19 @@ test('writeThemeToDom: gradient theme writes raw gradient to backgroundImage', a
   assert.equal(document.body.style.backgroundColor, 'transparent');
 });
 
+test('clearThemeFromDom removes the previous account theme', async () => {
+  const { clearThemeFromDom, writeThemeToDom } = await import('../../client/src/dashboard/use-theme.ts');
+  const { BUILT_IN_THEMES_BY_ID } = await import('../../shared/themes.ts');
+  writeThemeToDom(BUILT_IN_THEMES_BY_ID['midnight-ocean'], () => {});
+
+  clearThemeFromDom();
+
+  assert.equal(document.body.classList.contains('ob-theme-active'), false);
+  assert.equal(document.body.style.backgroundImage, 'none');
+  assert.equal(document.body.style.backgroundColor, '#F8F9FA');
+  assert.equal(document.documentElement.style.getPropertyValue('--ob-accent'), '');
+});
+
 test('useTheme: cloud-sync handoff — activeThemeId switching A→B reapplies theme B to the DOM', async () => {
   // Regression test for the "cloud hydration handoff" bug: when device A
   // applies theme A locally and device B opens with a different cloud-
