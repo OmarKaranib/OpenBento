@@ -91,6 +91,11 @@ const {
   logout,
   isLoading: authIsLoading,
   supabase: supabaseClient,
+  signIn,
+  signUp,
+  signInWithOAuth,
+  resetPassword,
+  verifyOtp,
 } = useAuth();
 
 useEffect(() => {
@@ -860,6 +865,7 @@ return (
   <>
     <LoginModal
       isOpen={loginModalOpen}
+      auth={{ signIn, signUp, signInWithOAuth, resetPassword, verifyOtp }}
       onClose={() => {
         setLoginModalOpen(false);
         if (location === '/auth/reset-password') setLocation('/');

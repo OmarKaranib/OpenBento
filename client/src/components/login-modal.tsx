@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { useAuth } from '@/hooks/use-auth';
+import type { useAuth } from '@/hooks/use-auth';
 import { Loader2, Mail, Lock, Eye, EyeOff, X, KeyRound } from 'lucide-react';
 
 type AuthMode = 'login' | 'signup' | 'reset' | 'verify';
@@ -8,13 +8,17 @@ type AuthMode = 'login' | 'signup' | 'reset' | 'verify';
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
+  auth: Pick<
+    ReturnType<typeof useAuth>,
+    'signIn' | 'signUp' | 'signInWithOAuth' | 'resetPassword' | 'verifyOtp'
+  >;
   onLoginSuccess?: () => void;
   triggerReason?: string;
   defaultMode?: AuthMode;
 }
 
-export function LoginModal({ isOpen, onClose, onLoginSuccess, triggerReason, defaultMode = 'login' }: LoginModalProps) {
-  const { signIn, signUp, signInWithOAuth, resetPassword, verifyOtp } = useAuth();
+export function LoginModal({ isOpen, onClose, auth, onLoginSuccess, triggerReason, defaultMode = 'login' }: LoginModalProps) {
+  const { signIn, signUp, signInWithOAuth, resetPassword, verifyOtp } = auth;
   const [mode, setMode] = useState<AuthMode>(defaultMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
