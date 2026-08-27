@@ -21,7 +21,7 @@ import {
   type CastSnapshot,
   type CastRoom,
 } from "@shared/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { attachSupabaseUser, getUserId } from "./supabaseAuth";
 import { CastSocketTicketStore } from "./cast-socket-tickets";
@@ -55,6 +55,7 @@ const CODE_RATE_WINDOW_MS = 60_000;
 const CODE_RATE_MAX = 10;
 const HEARTBEAT_INTERVAL_MS = 5_000;
 const SCHEDULER_TICK_MS = 60_000;
+const SCHEDULE_REFIRE_GUARD_MS = 6 * 24 * 60 * 60 * 1_000;
 const codeCreationRateLimit = new FixedWindowRateLimiter({
   windowMs: CODE_RATE_WINDOW_MS,
   maxAttempts: CODE_RATE_MAX,
@@ -268,6 +269,22 @@ async function runSchedulerTick(now: Date = new Date()): Promise<number> {
   let fired = 0;
   for (const entry of due) {
     try {
+      // Claim this weekly occurrence before pushing it. The conditional update
+      // lets only one server instance win and also prevents a repeated clock
+      // hour from firing the same weekly entry twice.
+      const refireCutoff = new Date(now.getTime() - SCHEDULE_REFIRE_GUARD_MS);
+      const [claimed] = await db
+        .update(castSchedules)
+        .set({ lastFiredAt: now })
+        .where(
+          and(
+            eq(castSchedules.id, entry.id),
+            or(isNull(castSchedules.lastFiredAt), lt(castSchedules.lastFiredAt, refireCutoff)),
+          ),
+        )
+        .returning({ id: castSchedules.id });
+      if (!claimed) continue;
+
       const [layout] = await db
         .select()
         .from(castLayouts)
@@ -284,10 +301,6 @@ async function runSchedulerTick(now: Date = new Date()): Promise<number> {
       };
       const ok = await pushSnapshotToRoom(entry.roomId, stamped);
       if (!ok) continue;
-      await db
-        .update(castSchedules)
-        .set({ lastFiredAt: new Date() })
-        .where(eq(castSchedules.id, entry.id));
       // Refresh the TV overlay so "Next: …" reflects the new closest entry.
       await broadcastNextScheduled(entry.roomId);
       fired++;

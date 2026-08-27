@@ -92,6 +92,11 @@ databaseTest("scheduler tick fires entry matching current weekday + minute", asy
   const fired = await __castSchedulerForTests.run(fakeNow);
   assert.ok(fired >= 1, "Scheduler should report at least one fire");
 
+  // Simulate another server process checking the same weekly occurrence.
+  __castSchedulerForTests.resetMinute();
+  const repeated = await __castSchedulerForTests.run(fakeNow);
+  assert.equal(repeated, 0, "The same weekly occurrence must only fire once");
+
   const [room] = await db
     .select({ currentLayoutId: castRooms.currentLayoutId })
     .from(castRooms)
