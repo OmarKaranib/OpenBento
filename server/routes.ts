@@ -321,8 +321,12 @@ export async function registerRoutes(
     const { channelId } = req.query;
     const apiKey = process.env.YOUTUBE_API_KEY;
 
-    if (!channelId || typeof channelId !== 'string') {
-      return res.status(400).json({ error: "Missing channelId parameter" });
+    if (!youtubeSearchRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ error: "Too many YouTube searches, slow down", videoId: null });
+    }
+
+    if (!channelId || typeof channelId !== 'string' || channelId.length > 200) {
+      return res.status(400).json({ error: "Invalid channelId parameter", videoId: null });
     }
 
     if (!apiKey) {

@@ -12,9 +12,15 @@ test('public YouTube search routes share a request limit', () => {
     routes.indexOf('app.get("/api/youtube/search-live/:channelHandle"'),
     routes.indexOf('app.post("/api/stream/heal"'),
   );
+  const legacyLiveRoute = routes.slice(
+    routes.indexOf('app.get("/api/live-video"'),
+    routes.indexOf('// Kick API proxy'),
+  );
 
   assert.match(channelRoute, /youtubeSearchRateLimit\.allow\(requestIp\(req\)\)/);
   assert.match(handleRoute, /youtubeSearchRateLimit\.allow\(requestIp\(req\)\)/);
+  assert.match(legacyLiveRoute, /youtubeSearchRateLimit\.allow\(requestIp\(req\)\)/);
   assert.match(channelRoute, /channelId\.length > 200/);
   assert.match(handleRoute, /channelHandle\.length > 200/);
+  assert.match(legacyLiveRoute, /channelId\.length > 200/);
 });
