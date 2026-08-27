@@ -256,14 +256,16 @@ export async function resolveChannelHandle(
   handle: string,
   apiKey: string
 ): Promise<string | null> {
-  // Try with @ prefix first (handle format)
-  let searchHandle = handle.startsWith('@') ? handle : `@${handle}`;
-  const url = `${YOUTUBE_API_BASE}/search?part=snippet&q=${encodeURIComponent(searchHandle)}&type=channel&maxResults=1&key=${apiKey}`;
+  // Resolve a handle directly. channels.list costs one normal quota unit;
+  // using search.list here would waste a limited search call before the
+  // separate live-stream search even begins.
+  const normalizedHandle = handle.startsWith('@') ? handle : `@${handle}`;
+  const url = `${YOUTUBE_API_BASE}/channels?part=id&forHandle=${encodeURIComponent(normalizedHandle)}&key=${apiKey}`;
   
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      console.error('[YouTube API] Channel handle resolution failed:', response.status);
+      console.error('[YouTube API] Direct channel handle resolution failed:', response.status);
       return null;
     }
     
@@ -274,7 +276,7 @@ export async function resolveChannelHandle(
       return null;
     }
     
-    return items[0].snippet.channelId;
+    return typeof items[0]?.id === 'string' ? items[0].id : null;
   } catch (error) {
     console.error('[YouTube API] Channel handle resolution error:', error);
     return null;
