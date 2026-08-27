@@ -44,6 +44,10 @@ const streamHealRateLimit = new FixedWindowRateLimiter({
   windowMs: 10 * 60 * 1000,
   maxAttempts: 12,
 });
+const youtubeSearchRateLimit = new FixedWindowRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 12,
+});
 
 function requestIp(req: Request): string {
   const forwarded = String(req.headers["x-forwarded-for"] ?? "")
@@ -159,6 +163,13 @@ export async function registerRoutes(
     const { channelId } = req.params;
     const apiKey = process.env.YOUTUBE_API_KEY;
 
+    if (!youtubeSearchRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ isLive: null, apiError: true, error: "Too many YouTube searches, slow down" });
+    }
+    if (!channelId || channelId.length > 200) {
+      return res.status(400).json({ isLive: null, apiError: true, error: "Invalid channel ID" });
+    }
+
     if (!apiKey) {
       return res.status(503).json({
         isLive: null,
@@ -224,6 +235,13 @@ export async function registerRoutes(
   app.get("/api/youtube/search-live/:channelHandle", async (req, res) => {
     const { channelHandle } = req.params;
     const apiKey = process.env.YOUTUBE_API_KEY;
+
+    if (!youtubeSearchRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ isLive: false, apiError: true, error: "Too many YouTube searches, slow down" });
+    }
+    if (!channelHandle || channelHandle.length > 200) {
+      return res.status(400).json({ isLive: false, apiError: true, error: "Invalid channel handle" });
+    }
 
     if (!apiKey) {
       return res.status(503).json({
