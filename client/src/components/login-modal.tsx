@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import type { useAuth } from '@/hooks/use-auth';
+import { validateNewPassword } from '@/lib/auth-validation';
 import { Loader2, Mail, Lock, Eye, EyeOff, X, KeyRound } from 'lucide-react';
 
-type AuthMode = 'login' | 'signup' | 'reset' | 'verify';
+type AuthMode = 'login' | 'signup' | 'reset' | 'verify' | 'update';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   auth: Pick<
     ReturnType<typeof useAuth>,
-    'signIn' | 'signUp' | 'signInWithOAuth' | 'resetPassword' | 'verifyOtp' | 'resendSignupConfirmation'
+    'signIn' | 'signUp' | 'signInWithOAuth' | 'resetPassword' | 'updatePassword' | 'verifyOtp' | 'resendSignupConfirmation'
   >;
   onLoginSuccess?: () => void;
   triggerReason?: string;
@@ -18,10 +19,11 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ isOpen, onClose, auth, onLoginSuccess, triggerReason, defaultMode = 'login' }: LoginModalProps) {
-  const { signIn, signUp, signInWithOAuth, resetPassword, verifyOtp, resendSignupConfirmation } = auth;
+  const { signIn, signUp, signInWithOAuth, resetPassword, updatePassword, verifyOtp, resendSignupConfirmation } = auth;
   const [mode, setMode] = useState<AuthMode>(defaultMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,7 +50,18 @@ export function LoginModal({ isOpen, onClose, auth, onLoginSuccess, triggerReaso
     setSuccess(null);
 
     try {
-      if (mode === 'reset') {
+      if (mode === 'update') {
+        const passwordError = validateNewPassword(password, confirmPassword);
+        if (passwordError) {
+          setError(passwordError);
+          return;
+        }
+        await updatePassword(password);
+        setPassword('');
+        setConfirmPassword('');
+        setSuccess('Password updated successfully.');
+        setTimeout(onClose, 1000);
+      } else if (mode === 'reset') {
         await resetPassword(email);
         setSuccess('Check your email for a password reset link.');
         setMode('login');
@@ -144,6 +157,7 @@ export function LoginModal({ isOpen, onClose, auth, onLoginSuccess, triggerReaso
     switch (mode) {
       case 'signup': return 'Create Account';
       case 'reset': return 'Reset Password';
+      case 'update': return 'Choose New Password';
       case 'verify': return 'Verify Email';
       default: return 'Sign In';
     }
@@ -157,6 +171,7 @@ export function LoginModal({ isOpen, onClose, auth, onLoginSuccess, triggerReaso
     switch (mode) {
       case 'signup': return 'Sign up to sync your dashboard and channel library across devices';
       case 'reset': return 'Enter your email to reset password';
+      case 'update': return 'Enter and confirm your new password';
       default: return 'Sign in to sync your dashboard and channel library across devices';
     }
   };
@@ -304,6 +319,8 @@ export function LoginModal({ isOpen, onClose, auth, onLoginSuccess, triggerReaso
           ) : (
             // Login/Signup/Reset Screen
             <div className="space-y-[1.5rem]">
+              {(mode === 'login' || mode === 'signup') && (
+                <>
               <button
                 onClick={handleGoogleLogin}
                 disabled={isLoading || !configured}
@@ -325,22 +342,26 @@ export function LoginModal({ isOpen, onClose, auth, onLoginSuccess, triggerReaso
                 <span className="text-gray-400 text-[1.2rem]" style={{ fontFamily: 'Inter, sans-serif' }}>or</span>
                 <div className="flex-1 h-[0.1rem] bg-gray-200" />
               </div>
+                </>
+              )}
 
               <form onSubmit={handleEmailAuth} className="space-y-[1.2rem]">
-                <div className="relative">
-                  <Mail className="absolute left-[1.2rem] top-1/2 -translate-y-1/2 w-[1.6rem] h-[1.6rem] text-gray-400" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Email address"
-                    required
-                    disabled={!configured}
-                    className="w-full pl-[3.5rem] pr-[1.5rem] py-[1.1rem] bg-gray-50 border border-gray-200 rounded-[0.8rem] text-gray-800 placeholder-gray-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-[1.3rem] disabled:opacity-50"
-                    style={{ fontFamily: 'Inter, sans-serif' }}
-                    data-testid="input-email"
-                  />
-                </div>
+                {mode !== 'update' && (
+                  <div className="relative">
+                    <Mail className="absolute left-[1.2rem] top-1/2 -translate-y-1/2 w-[1.6rem] h-[1.6rem] text-gray-400" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Email address"
+                      required
+                      disabled={!configured}
+                      className="w-full pl-[3.5rem] pr-[1.5rem] py-[1.1rem] bg-gray-50 border border-gray-200 rounded-[0.8rem] text-gray-800 placeholder-gray-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-[1.3rem] disabled:opacity-50"
+                      style={{ fontFamily: 'Inter, sans-serif' }}
+                      data-testid="input-email"
+                    />
+                  </div>
+                )}
 
                 {mode !== 'reset' && (
                   <div className="relative">
@@ -349,7 +370,7 @@ export function LoginModal({ isOpen, onClose, auth, onLoginSuccess, triggerReaso
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Password"
+                      placeholder={mode === 'update' ? 'New password' : 'Password'}
                       required
                       minLength={6}
                       disabled={!configured}
@@ -371,6 +392,24 @@ export function LoginModal({ isOpen, onClose, auth, onLoginSuccess, triggerReaso
                   </div>
                 )}
 
+                {mode === 'update' && (
+                  <div className="relative">
+                    <Lock className="absolute left-[1.2rem] top-1/2 -translate-y-1/2 w-[1.6rem] h-[1.6rem] text-gray-400" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                      required
+                      minLength={6}
+                      disabled={!configured}
+                      className="w-full pl-[3.5rem] pr-[1.5rem] py-[1.1rem] bg-gray-50 border border-gray-200 rounded-[0.8rem] text-gray-800 placeholder-gray-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-[1.3rem] disabled:opacity-50"
+                      style={{ fontFamily: 'Inter, sans-serif' }}
+                      data-testid="input-confirm-password"
+                    />
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   disabled={isLoading || !configured}
@@ -382,7 +421,7 @@ export function LoginModal({ isOpen, onClose, auth, onLoginSuccess, triggerReaso
                     <Loader2 className="w-[1.8rem] h-[1.8rem] animate-spin" />
                   ) : (
                     <span className="text-[1.3rem]">
-                      {mode === 'signup' ? 'Create Account' : mode === 'reset' ? 'Send Reset Link' : 'Sign In with Email'}
+                      {mode === 'signup' ? 'Create Account' : mode === 'reset' ? 'Send Reset Link' : mode === 'update' ? 'Update Password' : 'Sign In with Email'}
                     </span>
                   )}
                 </button>

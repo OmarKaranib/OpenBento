@@ -82,7 +82,7 @@ const [isFullscreen, setIsFullscreen]     = useState(false);
 const [ghostPosition, setGhostPosition]   = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 const [loginModalOpen, setLoginModalOpen]         = useState(false);
 const [loginTriggerReason, setLoginTriggerReason] = useState<string | undefined>();
-const [loginDefaultMode, setLoginDefaultMode]     = useState<'login' | 'signup' | 'reset' | 'verify'>('login');
+const [loginDefaultMode, setLoginDefaultMode]     = useState<'login' | 'signup' | 'reset' | 'verify' | 'update'>('login');
 
 const [location, setLocation] = useLocation();
 const {
@@ -95,13 +95,14 @@ const {
   signUp,
   signInWithOAuth,
   resetPassword,
+  updatePassword,
   verifyOtp,
   resendSignupConfirmation,
 } = useAuth();
 
 useEffect(() => {
   if (location === '/auth/reset-password') {
-    setLoginDefaultMode('reset');
+    setLoginDefaultMode('update');
     setLoginModalOpen(true);
   }
 }, [location]);
@@ -874,7 +875,7 @@ return (
   <>
     <LoginModal
       isOpen={loginModalOpen}
-      auth={{ signIn, signUp, signInWithOAuth, resetPassword, verifyOtp, resendSignupConfirmation }}
+      auth={{ signIn, signUp, signInWithOAuth, resetPassword, updatePassword, verifyOtp, resendSignupConfirmation }}
       onClose={() => {
         setLoginModalOpen(false);
         if (location === '/auth/reset-password') setLocation('/');
