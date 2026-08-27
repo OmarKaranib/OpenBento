@@ -52,6 +52,10 @@ const youtubeVideoRateLimit = new FixedWindowRateLimiter({
   windowMs: 10 * 60 * 1000,
   maxAttempts: 120,
 });
+const publicPingRateLimit = new FixedWindowRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 300,
+});
 
 const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 
@@ -2005,6 +2009,10 @@ export async function registerRoutes(
   });
 
   app.get('/api/ping', async (req: Request, res: Response) => {
+    if (!publicPingRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ error: 'Too many network checks, slow down' });
+    }
+
     const raw = typeof req.query.url === 'string' ? req.query.url.trim() : '';
     if (!raw) {
       return res.status(400).json({ error: 'Missing url parameter' });
