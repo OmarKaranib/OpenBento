@@ -25,6 +25,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { attachSupabaseUser, getUserId } from "./supabaseAuth";
 import { CastSocketTicketStore } from "./cast-socket-tickets";
+import { FixedWindowRateLimiter } from "./fixed-window-rate-limit";
 
 interface PendingCode {
   code: string;
@@ -40,7 +41,6 @@ interface RoomConn {
 const pendingCodes = new Map<string, PendingCode>();
 const roomConns = new Map<string, Set<RoomConn>>();
 const pendingRoomIds = new Set<string>();
-const codeRateLimit = new Map<string, { count: number; resetAt: number }>();
 const tvLastSeen = new Map<string, number>();
 const laptopSocketTickets = new CastSocketTicketStore();
 
@@ -50,6 +50,14 @@ const CODE_RATE_WINDOW_MS = 60_000;
 const CODE_RATE_MAX = 10;
 const HEARTBEAT_INTERVAL_MS = 5_000;
 const SCHEDULER_TICK_MS = 60_000;
+const codeCreationRateLimit = new FixedWindowRateLimiter({
+  windowMs: CODE_RATE_WINDOW_MS,
+  maxAttempts: CODE_RATE_MAX,
+});
+const pairAttemptRateLimit = new FixedWindowRateLimiter({
+  windowMs: CODE_RATE_WINDOW_MS,
+  maxAttempts: CODE_RATE_MAX,
+});
 
 // BENTO-XXXX uses base32-ish (no 0/O/1/I) for human transcription.
 const STABLE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -105,15 +113,12 @@ async function purgeExpiredCodes(): Promise<void> {
   }
 }
 
-function checkCodeRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = codeRateLimit.get(ip);
-  if (!entry || entry.resetAt <= now) {
-    codeRateLimit.set(ip, { count: 1, resetAt: now + CODE_RATE_WINDOW_MS });
-    return true;
-  }
-  entry.count++;
-  return entry.count <= CODE_RATE_MAX;
+function requestIp(req: Request): string {
+  const forwarded = String(req.headers["x-forwarded-for"] ?? "")
+    .split(",")[0]
+    .trim()
+    .slice(0, 64);
+  return forwarded || req.socket.remoteAddress || "unknown";
 }
 
 function broadcast(roomId: string, payload: unknown, exclude?: WebSocket): void {
@@ -357,11 +362,7 @@ const layoutBody = z.object({
 export function setupCastHub(httpServer: HttpServer, app: Express): void {
   // ── Guest 6-digit pairing (unchanged behaviour) ──────────────────────────
   app.post("/api/cast/codes", async (req: Request, res: Response): Promise<void | Response> => {
-    const ip =
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-      req.socket.remoteAddress ||
-      "unknown";
-    if (!checkCodeRateLimit(ip)) {
+    if (!codeCreationRateLimit.allow(requestIp(req))) {
       return res.status(429).json({ error: "Too many pairing requests, slow down" });
     }
     await purgeExpiredCodes();
@@ -398,6 +399,9 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
     await purgeExpiredCodes();
     const raw = String(req.body?.code ?? "").trim().toUpperCase();
     if (/^\d{6}$/.test(raw)) {
+      if (!pairAttemptRateLimit.allow(requestIp(req))) {
+        return res.status(429).json({ error: "Too many pairing attempts, slow down" });
+      }
       const pending = pendingCodes.get(raw);
       if (!pending) return res.status(404).json({ error: "Code expired or invalid" });
       pendingCodes.delete(raw);
