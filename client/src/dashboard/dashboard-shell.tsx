@@ -85,7 +85,13 @@ const [loginTriggerReason, setLoginTriggerReason] = useState<string | undefined>
 const [loginDefaultMode, setLoginDefaultMode]     = useState<'login' | 'signup' | 'reset' | 'verify'>('login');
 
 const [location, setLocation] = useLocation();
-const { user, isAuthenticated, logout, isLoading: authIsLoading } = useAuth();
+const {
+  user,
+  isAuthenticated,
+  logout,
+  isLoading: authIsLoading,
+  supabase: supabaseClient,
+} = useAuth();
 
 useEffect(() => {
   if (location === '/auth/reset-password') {
@@ -275,7 +281,6 @@ useEffect(() => {
 
   // Cloud sync (logged-in users only). See client/src/dashboard/use-cloud-sync.ts
   // for the full hydrate-then-debounced-upload state machine.
-  const { supabase: supabaseClient } = useAuth();
   useCloudSync({
     isAuthenticated,
     userId: user?.id,
