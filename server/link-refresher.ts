@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { log } from './index';
+import { applyYouTubeRefresh, type YouTubeRefreshResult } from './services/stream-refresh';
 
 export interface LiveChannel {
   id: string;
@@ -23,12 +24,7 @@ export interface LinksData {
 const LINKS_FILE_PATH = path.join(process.cwd(), 'server', 'data', 'links.json');
 
 
-interface YouTubeFetchResult {
-  videoId: string | null;
-  isLive: boolean;
-}
-
-async function fetchYouTubeLiveVideoId(channelHandle: string): Promise<YouTubeFetchResult> {
+async function fetchYouTubeLiveVideoId(channelHandle: string): Promise<YouTubeRefreshResult> {
   try {
     const liveUrl = `https://www.youtube.com/@${channelHandle}/live`;
     log(`[LinkRefresher] Fetching live stream for @${channelHandle}...`);
@@ -44,7 +40,7 @@ async function fetchYouTubeLiveVideoId(channelHandle: string): Promise<YouTubeFe
 
     if (!response.ok) {
       log(`[LinkRefresher] Failed to fetch @${channelHandle}: ${response.status}`);
-      return { videoId: null, isLive: false };
+      return { videoId: null, isLive: false, apiError: true };
     }
 
     const html = await response.text();
@@ -57,20 +53,20 @@ async function fetchYouTubeLiveVideoId(channelHandle: string): Promise<YouTubeFe
     const videoIdMatch = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
     if (videoIdMatch && videoIdMatch[1]) {
       log(`[LinkRefresher] Found video ID for @${channelHandle}: ${videoIdMatch[1]} (isLive: ${isLiveBroadcast})`);
-      return { videoId: videoIdMatch[1], isLive: isLiveBroadcast };
+      return { videoId: videoIdMatch[1], isLive: isLiveBroadcast, apiError: false };
     }
 
     const canonicalMatch = html.match(/href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})"/);
     if (canonicalMatch && canonicalMatch[1]) {
       log(`[LinkRefresher] Found canonical video ID for @${channelHandle}: ${canonicalMatch[1]} (isLive: ${isLiveBroadcast})`);
-      return { videoId: canonicalMatch[1], isLive: isLiveBroadcast };
+      return { videoId: canonicalMatch[1], isLive: isLiveBroadcast, apiError: false };
     }
 
     log(`[LinkRefresher] No live stream found for @${channelHandle}`);
-    return { videoId: null, isLive: false };
+    return { videoId: null, isLive: false, apiError: false };
   } catch (error) {
     log(`[LinkRefresher] Error fetching @${channelHandle}: ${error}`);
-    return { videoId: null, isLive: false };
+    return { videoId: null, isLive: false, apiError: true };
   }
 }
 
@@ -124,12 +120,7 @@ export async function refreshAllLinks(): Promise<LinksData> {
     }
     if (channel.platform === 'youtube' && channel.isLive) {
       const result = await fetchYouTubeLiveVideoId(channel.channelHandle);
-      channels.push({
-        ...channel,
-        videoId: result.videoId || channel.videoId,
-        isLive: result.isLive,
-        lastUpdated: now,
-      });
+      channels.push(applyYouTubeRefresh(channel, result, now));
       await new Promise(resolve => setTimeout(resolve, 500));
     } else {
       channels.push({
