@@ -1,10 +1,8 @@
 import { db } from '../db';
 import { streamStatusCache } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { checkStreamHealth, healStream } from './youtube-api';
-
-const PULSE_INTERVAL_MS = 5 * 60 * 1000;
-const TOP_CHANNELS_LIMIT = 50;
+import { PULSE_INTERVAL_MS, TOP_CHANNELS_LIMIT } from './pulse-policy';
 
 interface GlobalStreamStatus {
   [channelId: string]: {
@@ -31,7 +29,10 @@ export function getStreamStatus(channelId: string) {
 
 async function loadCacheFromDatabase(): Promise<void> {
   try {
-    const cached = await db.select().from(streamStatusCache).limit(TOP_CHANNELS_LIMIT);
+    const cached = await db.select()
+      .from(streamStatusCache)
+      .orderBy(desc(streamStatusCache.lastChecked))
+      .limit(TOP_CHANNELS_LIMIT);
     
     for (const entry of cached) {
       globalStreamStatus[entry.channelId] = {
