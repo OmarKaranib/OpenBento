@@ -48,6 +48,12 @@ const youtubeSearchRateLimit = new FixedWindowRateLimiter({
   windowMs: 10 * 60 * 1000,
   maxAttempts: 12,
 });
+const youtubeVideoRateLimit = new FixedWindowRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 120,
+});
+
+const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 
 function requestIp(req: Request): string {
   const forwarded = String(req.headers["x-forwarded-for"] ?? "")
@@ -202,6 +208,13 @@ export async function registerRoutes(
   app.get("/api/youtube/video-live/:videoId", async (req, res) => {
     const { videoId } = req.params;
     const apiKey = process.env.YOUTUBE_API_KEY;
+
+    if (!YOUTUBE_VIDEO_ID_PATTERN.test(videoId)) {
+      return res.status(400).json({ isLive: null, apiError: true, error: "Invalid video ID" });
+    }
+    if (!youtubeVideoRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ isLive: null, apiError: true, error: "Too many YouTube checks, slow down" });
+    }
 
     if (!apiKey) {
       return res.status(503).json({
@@ -410,15 +423,18 @@ export async function registerRoutes(
   });
 
   app.post("/api/stream/validate", async (req, res) => {
-    const { videoId } = req.body;
+    const videoId = typeof req.body?.videoId === 'string' ? req.body.videoId.trim() : '';
     const apiKey = process.env.YOUTUBE_API_KEY;
+
+    if (!YOUTUBE_VIDEO_ID_PATTERN.test(videoId)) {
+      return res.status(400).json({ valid: false, reason: "Invalid video ID" });
+    }
+    if (!youtubeVideoRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ valid: false, reason: "Too many YouTube checks, slow down" });
+    }
 
     if (!apiKey) {
       return res.status(503).json({ valid: true, reason: "API key not configured - assuming valid" });
-    }
-
-    if (!videoId) {
-      return res.status(400).json({ error: "Missing videoId" });
     }
 
     try {

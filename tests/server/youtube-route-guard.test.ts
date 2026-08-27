@@ -24,3 +24,20 @@ test('public YouTube search routes share a request limit', () => {
   assert.match(handleRoute, /channelHandle\.length > 200/);
   assert.match(legacyLiveRoute, /channelId\.length > 200/);
 });
+
+test('public YouTube video lookups validate IDs and share a generous request limit', () => {
+  const routes = readFileSync('server/routes.ts', 'utf8');
+  const videoLiveRoute = routes.slice(
+    routes.indexOf('app.get("/api/youtube/video-live/:videoId"'),
+    routes.indexOf('app.get("/api/youtube/search-live/:channelHandle"'),
+  );
+  const validateRoute = routes.slice(
+    routes.indexOf('app.post("/api/stream/validate"'),
+    routes.indexOf('// Personal-library data'),
+  );
+
+  assert.match(videoLiveRoute, /YOUTUBE_VIDEO_ID_PATTERN\.test\(videoId\)/);
+  assert.match(validateRoute, /YOUTUBE_VIDEO_ID_PATTERN\.test\(videoId\)/);
+  assert.match(videoLiveRoute, /youtubeVideoRateLimit\.allow\(requestIp\(req\)\)/);
+  assert.match(validateRoute, /youtubeVideoRateLimit\.allow\(requestIp\(req\)\)/);
+});
