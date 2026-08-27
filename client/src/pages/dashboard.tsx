@@ -29,6 +29,7 @@ import { CastPopover } from '@/components/cast-popover';
 import { PageTabsStrip } from '@/components/page-tabs-strip';
 import type { DashboardPage } from '@shared/dashboard-pages';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
+import { shouldCheckYouTubeWidget } from '@/lib/youtube-widget-check';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useTheme } from '@/dashboard/use-theme';
 import { BUILT_IN_THEMES } from '@shared/themes';
@@ -692,12 +693,8 @@ const MasterControlDashboard = ({
       const shouldRevalidate = now - lastRevalidationRef.current > REVALIDATION_INTERVAL_MS;
       
       // Find new widgets to check AND offline widgets for periodic revalidation
-      const youtubeWidgets = widgets.filter(w => 
-        w.type === 'video' && 
-        w.isYouTube && 
-        w.videoId && 
-        (!w.isOffline && !checkedVideoIds.current.has(w.videoId!)) || 
-        (w.isOffline && shouldRevalidate)
+      const youtubeWidgets = widgets.filter(w =>
+        shouldCheckYouTubeWidget(w, checkedVideoIds.current, shouldRevalidate)
       );
       
       if (youtubeWidgets.length === 0) return;
