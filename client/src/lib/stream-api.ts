@@ -1,5 +1,6 @@
 import { buildApiHeaders } from './api-auth';
 import { supabase } from './supabase';
+import { cacheHandleLiveResult, restoreHandleLiveResult } from './youtube-handle-cache';
 
 const API_BASE = '';
 
@@ -50,7 +51,7 @@ const CACHE_TTL_MS = 30000;
 // Smart localStorage cache for YouTube live status with tiered TTLs
 const LIVE_STATUS_CACHE_KEY = 'openbento_live_status_cache';
 const CACHE_VERSION_KEY = 'openbento_cache_version';
-const CURRENT_CACHE_VERSION = '2.4.0'; // Increment to force cache flush - quota optimization (videos.list 1 unit)
+const CURRENT_CACHE_VERSION = '2.5.0'; // Flush entries that discarded handle fallback details.
 const ONLINE_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes for LIVE streams
 const OFFLINE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes for offline streams (faster re-check)
 const API_ERROR_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes for API errors (retry soon)
@@ -58,6 +59,8 @@ const API_ERROR_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes for API errors (retry
 interface CachedLiveStatus {
   isLive: boolean;
   liveVideoId: string | null;
+  latestVideoId?: string | null;
+  channelId?: string | null;
   title: string | null;
   timestamp: number;
   apiError?: boolean; // True if this was cached due to API error (403, etc.)
@@ -389,13 +392,8 @@ export async function searchChannelLiveStream(channelHandle: string, forceRefres
     if (cached) {
       console.log(`[StreamAPI] Cache HIT for handle ${channelHandle}: isLive=${cached.isLive}, apiError=${cached.apiError}`);
       return {
-        isLive: cached.isLive,
-        liveVideoId: cached.liveVideoId,
-        latestVideoId: null, // Cache doesn't store latestVideoId
-        channelId: null,
-        title: cached.title,
+        ...restoreHandleLiveResult(cached),
         fromCache: true,
-        apiError: cached.apiError,
       };
     }
   }
@@ -424,7 +422,7 @@ export async function searchChannelLiveStream(channelHandle: string, forceRefres
     };
     
     // Cache the result
-    setCachedLiveStatus(cacheKey, { isLive: result.isLive, liveVideoId: result.liveVideoId, title: result.title }, false);
+    setCachedLiveStatus(cacheKey, cacheHandleLiveResult(result), false);
     
     return { ...result, fromCache: false, apiError: false };
   } catch (error) {
