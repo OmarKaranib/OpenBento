@@ -124,10 +124,6 @@
     savedChannelIdentity,
     type SavedChannel,
   } from '@/lib/personal-library';
-  import {
-    addSavedChannelToPersonalLibrary,
-    removeSavedChannelFromPersonalLibrary,
-  } from '@/lib/personal-library-sync';
 
   const BLOCKED_CHANNELS_KEY = 'openBentoBlockedChannels';
 
@@ -500,17 +496,23 @@
         openLoginModal?.('Sign in to save channels to your library and sync them across devices.');
         return;
       }
-      void addSavedChannelToPersonalLibrary({
-        id: channel.id, name: channel.name, url: channel.url,
-        iconType: channel.iconType, category: channel.category,
-        platform: channel.platform, channelId: channel.channelId,
-        videoId: channel.videoId, savedAt: Date.now(),
+      void import('@/lib/personal-library-sync').then(({ addSavedChannelToPersonalLibrary }) => {
+        void addSavedChannelToPersonalLibrary({
+          id: channel.id, name: channel.name, url: channel.url,
+          iconType: channel.iconType, category: channel.category,
+          platform: channel.platform, channelId: channel.channelId,
+          videoId: channel.videoId, savedAt: Date.now(),
+        });
       });
     }, [isAuthenticated, openLoginModal]);
 
     const removeFromPersonalLibrary = useCallback((id: string) => {
       const channel = personalLibrary.find(item => item.id === id);
-      if (channel) void removeSavedChannelFromPersonalLibrary(channel);
+      if (channel) {
+        void import('@/lib/personal-library-sync').then(({ removeSavedChannelFromPersonalLibrary }) => {
+          void removeSavedChannelFromPersonalLibrary(channel);
+        });
+      }
     }, [personalLibrary]);
 
     const isInPersonalLibrary = useCallback((channel: TrendingChannel) => {
