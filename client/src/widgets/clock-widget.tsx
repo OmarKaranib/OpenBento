@@ -11,6 +11,10 @@ import { CLOCK_COLOR_PRESETS, ClockTab, MONO, WORLD_ZONES, Widget, isLightBg, pa
     onUpdate?: (widgetId: string, patch: Partial<Widget>) => void;
   }
 
+  export function normalizeClockWorldZone(value?: string): string {
+    return WORLD_ZONES.some(zone => zone.tz === value) ? value! : WORLD_ZONES[0].tz;
+  }
+
   export const ClockWidget: React.FC<ClockWidgetProps> = ({
   widget,
   onToggle24Hour,
@@ -42,7 +46,7 @@ import { CLOCK_COLOR_PRESETS, ClockTab, MONO, WORLD_ZONES, Widget, isLightBg, pa
   const use24       = widget.clockUse24Hour ?? false;
   const showAnalog  = widget.clockShowAnalog ?? false;
 
-  const [worldZone, setWorldZone] = useState(WORLD_ZONES[0].tz);
+  const [worldZone, setWorldZone] = useState(() => normalizeClockWorldZone(widget.clockWorldZone));
 
   const [timerTotal,   setTimerTotal]   = useState(300);
   const [timerLeft,    setTimerLeft]    = useState(300);
@@ -78,6 +82,10 @@ import { CLOCK_COLOR_PRESETS, ClockTab, MONO, WORLD_ZONES, Widget, isLightBg, pa
     setCh(el.offsetHeight);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    setWorldZone(normalizeClockWorldZone(widget.clockWorldZone));
+  }, [widget.clockWorldZone]);
 
   // ── Wall-clock tick ───────────────────────────────────────────────────────
   // The Clock tab always renders seconds (digital readout includes the
@@ -352,7 +360,12 @@ import { CLOCK_COLOR_PRESETS, ClockTab, MONO, WORLD_ZONES, Widget, isLightBg, pa
           <>
             <select
               value={worldZone}
-              onChange={(e) => { e.stopPropagation(); setWorldZone(e.target.value); }}
+              onChange={(e) => {
+                e.stopPropagation();
+                const next = normalizeClockWorldZone(e.target.value);
+                setWorldZone(next);
+                onUpdate?.(widget.id, { clockWorldZone: next });
+              }}
               onClick={(e) => e.stopPropagation()}
               style={{
                 padding: `${sz.selectPad}px ${sz.selectPad * 2}px`,

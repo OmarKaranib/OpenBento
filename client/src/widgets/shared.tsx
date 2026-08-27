@@ -103,6 +103,7 @@ export interface Widget {
   // Defaults to false (digital). When true, an SVG analog clock with
   // hour/minute/second hands renders in place of the digital readout.
   clockShowAnalog?: boolean;
+  clockWorldZone?: string;
   // World Clocks widget — list of IANA timezone identifiers to display.
   // Defaults to ['America/New_York','Europe/London','Asia/Tokyo','Australia/Sydney']
   // when undefined or empty.
