@@ -79,8 +79,8 @@ databaseTest("scheduler tick fires entry matching current weekday + minute", asy
 
   const fakeNow = new Date();
   fakeNow.setSeconds(0, 0);
-  const dayOfWeek = fakeNow.getDay();
-  const minuteOfDay = fakeNow.getHours() * 60 + fakeNow.getMinutes();
+  const dayOfWeek = fakeNow.getUTCDay();
+  const minuteOfDay = fakeNow.getUTCHours() * 60 + fakeNow.getUTCMinutes();
 
   const [scheduleRow] = await db
     .insert(castSchedules)
@@ -119,8 +119,8 @@ databaseTest("unpairing a room stops the scheduler from pushing to it", async ()
 
   const fakeNow = new Date();
   fakeNow.setSeconds(0, 0);
-  const dayOfWeek = fakeNow.getDay();
-  const minuteOfDay = fakeNow.getHours() * 60 + fakeNow.getMinutes();
+  const dayOfWeek = fakeNow.getUTCDay();
+  const minuteOfDay = fakeNow.getUTCHours() * 60 + fakeNow.getUTCMinutes();
 
   await db.insert(castSchedules).values({
     userId, roomId, layoutId, dayOfWeek, minuteOfDay,

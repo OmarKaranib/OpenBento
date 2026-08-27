@@ -26,6 +26,11 @@ import { z } from "zod";
 import { attachSupabaseUser, getUserId } from "./supabaseAuth";
 import { CastSocketTicketStore } from "./cast-socket-tickets";
 import { FixedWindowRateLimiter } from "./fixed-window-rate-limit";
+import {
+  isValidTimeZone,
+  minutesUntilSchedule,
+  scheduleMatches,
+} from "./cast-schedule-time";
 
 interface PendingCode {
   code: string;
@@ -247,24 +252,19 @@ async function pushSnapshotToRoom(roomId: string, snapshot: CastSnapshot): Promi
 }
 
 // ─── Scheduler ──────────────────────────────────────────────────────────────
-// Tick once a minute. Find every schedule whose (dayOfWeek, minuteOfDay)
-// matches "now" in server-local time and whose lastFiredAt is older than the
-// current minute window, then push the saved layout snapshot to its room.
+// Tick once a minute. Each entry is checked in the time zone where its owner
+// created it, so 09:00 stays 09:00 even when the server runs in UTC.
 let lastSchedulerTickMinute = -1;
 async function runSchedulerTick(now: Date = new Date()): Promise<number> {
-  const dayOfWeek = now.getDay();
-  const minuteOfDay = now.getHours() * 60 + now.getMinutes();
-  // Coalesce duplicate ticks within the same wall-clock minute.
-  const minuteKey = dayOfWeek * 1440 + minuteOfDay;
+  // Coalesce duplicate ticks within the same real minute.
+  const minuteKey = Math.floor(now.getTime() / 60_000);
   if (minuteKey === lastSchedulerTickMinute) return 0;
   lastSchedulerTickMinute = minuteKey;
 
-  const due = await db
-    .select()
-    .from(castSchedules)
-    .where(
-      and(eq(castSchedules.dayOfWeek, dayOfWeek), eq(castSchedules.minuteOfDay, minuteOfDay)),
-    );
+  const schedules = await db.select().from(castSchedules);
+  const due = schedules.filter((entry) =>
+    scheduleMatches(now, entry.dayOfWeek, entry.minuteOfDay, entry.timeZone),
+  );
   let fired = 0;
   for (const entry of due) {
     try {
@@ -316,18 +316,16 @@ async function computeNextScheduled(roomId: string, now: Date = new Date()): Pro
       id: castSchedules.id,
       dayOfWeek: castSchedules.dayOfWeek,
       minuteOfDay: castSchedules.minuteOfDay,
+      timeZone: castSchedules.timeZone,
       layoutId: castSchedules.layoutId,
     })
     .from(castSchedules)
     .where(eq(castSchedules.roomId, roomId));
   if (rows.length === 0) return null;
-  const nowDow = now.getDay();
-  const nowMin = now.getHours() * 60 + now.getMinutes();
   let bestDelta = Infinity;
   let bestLayoutId: string | null = null;
   for (const r of rows) {
-    let delta = (r.dayOfWeek - nowDow) * 1440 + (r.minuteOfDay - nowMin);
-    if (delta <= 0) delta += 7 * 1440;
+    const delta = minutesUntilSchedule(now, r.dayOfWeek, r.minuteOfDay, r.timeZone);
     if (delta < bestDelta) {
       bestDelta = delta;
       bestLayoutId = r.layoutId;
@@ -353,6 +351,7 @@ const scheduleBody = z.object({
   layoutId: z.string().min(1).max(64),
   dayOfWeek: z.number().int().min(0).max(6),
   minuteOfDay: z.number().int().min(0).max(1439),
+  timeZone: z.string().min(1).max(64).refine(isValidTimeZone).default("UTC"),
 });
 const layoutBody = z.object({
   name: z.string().min(1).max(80),
@@ -695,6 +694,7 @@ export function setupCastHub(httpServer: HttpServer, app: Express): void {
           layoutId: parsed.data.layoutId,
           dayOfWeek: parsed.data.dayOfWeek,
           minuteOfDay: parsed.data.minuteOfDay,
+          timeZone: parsed.data.timeZone,
         })
         .returning();
       await broadcastNextScheduled(roomId);

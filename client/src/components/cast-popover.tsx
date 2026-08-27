@@ -47,6 +47,7 @@ interface ScheduleEntry {
   layoutId: string;
   dayOfWeek: number;
   minuteOfDay: number;
+  timeZone: string;
 }
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -1017,10 +1018,11 @@ function ScheduleModal({
       return;
     }
     const minuteOfDay = hh * 60 + mm;
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     setAdding(true);
     try {
       const r = await authedFetch("POST", `/api/cast/rooms/${tv.roomId}/schedules`, {
-        layoutId, dayOfWeek: day, minuteOfDay,
+        layoutId, dayOfWeek: day, minuteOfDay, timeZone,
       });
       const data = await r.json();
       setEntries((prev) => [...prev, data.schedule]);

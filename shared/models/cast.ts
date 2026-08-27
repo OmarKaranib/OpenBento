@@ -58,6 +58,7 @@ export const castSchedules = pgTable(
     layoutId: varchar("layout_id").notNull(),
     dayOfWeek: integer("day_of_week").notNull(), // 0..6
     minuteOfDay: integer("minute_of_day").notNull(), // 0..1439
+    timeZone: varchar("time_zone").notNull().default("UTC"),
     lastFiredAt: timestamp("last_fired_at"),
     createdAt: timestamp("created_at").defaultNow(),
   },
