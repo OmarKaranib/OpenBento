@@ -6,7 +6,7 @@ interface NoteWidgetProps {
   noteContent: string;
   isDarkMode: boolean;
   isEditMode: boolean;
-  onChange: (widgetId: string, content: string) => void;
+  onChange: (content: string) => void;
 }
 
 type ViewMode = 'preview' | 'edit';
@@ -180,7 +180,7 @@ export function NoteWidget({
 
   const handleToggleTask = (lineIndex: number) => {
     if (isEditMode) return;
-    onChange(widgetId, toggleTaskAtLine(noteContent || '', lineIndex));
+    onChange(toggleTaskAtLine(noteContent || '', lineIndex));
   };
 
   const containerClass = `w-full h-full p-[1.2rem] flex flex-col rounded-[var(--outer-radius)] ${
@@ -250,7 +250,7 @@ export function NoteWidget({
       {effectiveMode === 'edit' ? (
         <textarea
           value={noteContent || ''}
-          onChange={(e) => onChange(widgetId, e.target.value)}
+          onChange={(e) => onChange(e.target.value)}
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           placeholder={'Type your note here…\n\nMarkdown supported: # headings, **bold**, *italic*, `code`, [links](https://), - bullets, - [ ] tasks'}
