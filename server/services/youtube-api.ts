@@ -1,5 +1,28 @@
+import { LruTtlCache } from './lruCache';
+
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 const MUSIC_CATEGORY_ID = '10';
+
+type ChannelLiveResult = {
+  isLive: boolean;
+  liveVideoId: string | null;
+  title: string | null;
+  apiError?: boolean;
+};
+
+type HandleLiveResult = ChannelLiveResult & {
+  latestVideoId: string | null;
+  channelId: string | null;
+};
+
+const channelLiveCache = new LruTtlCache<ChannelLiveResult>({
+  max: 256,
+  ttlMs: 5 * 60 * 1000,
+});
+const handleLiveCache = new LruTtlCache<HandleLiveResult>({
+  max: 256,
+  ttlMs: 5 * 60 * 1000,
+});
 
 interface YouTubeSearchResult {
   videoId: string;
@@ -186,13 +209,17 @@ export async function checkVideoLiveStatusById(
   }
 }
 
-// DEPRECATED: Search-based channel live check - costs 100 units per call
-// Only used as fallback when no videoId is available (should be rare)
+// Search-based channel live check. This uses the limited search.list bucket,
+// so it is cached and only used when no videoId is available.
 export async function checkChannelLiveStatus(
   channelId: string,
   apiKey: string
-): Promise<{ isLive: boolean; liveVideoId: string | null; title: string | null; apiError?: boolean }> {
-  console.warn('[YouTube API] Using expensive search.list (100 units) - should have videoId for videos.list (1 unit)');
+): Promise<ChannelLiveResult> {
+  const cacheKey = channelId.trim();
+  const cached = channelLiveCache.get(cacheKey);
+  if (cached) return cached;
+
+  console.warn('[YouTube API] Using limited search.list fallback; prefer videos.list when a videoId exists');
   // Use YouTube Search API with channelId and eventType=live
   const url = `${YOUTUBE_API_BASE}/search?part=snippet&channelId=${channelId}&type=video&eventType=live&maxResults=1&key=${apiKey}`;
   
@@ -209,17 +236,26 @@ export async function checkChannelLiveStatus(
     
     if (items.length === 0) {
       // No active live broadcasts for this channel - genuinely offline
-      return { isLive: false, liveVideoId: null, title: null, apiError: false };
+      const result: ChannelLiveResult = {
+        isLive: false,
+        liveVideoId: null,
+        title: null,
+        apiError: false,
+      };
+      channelLiveCache.set(cacheKey, result);
+      return result;
     }
     
     // eventType=live returns ONLY live streams - if we get a result, it's LIVE
     const liveItem = items[0];
-    return {
+    const result: ChannelLiveResult = {
       isLive: true,
       liveVideoId: liveItem.id.videoId,
       title: liveItem.snippet.title,
       apiError: false,
     };
+    channelLiveCache.set(cacheKey, result);
+    return result;
   } catch (error) {
     console.error('[YouTube API] Channel live check error:', error);
     return { isLive: false, liveVideoId: null, title: null, apiError: true };
@@ -328,7 +364,11 @@ export async function getLatestVideoId(
 export async function searchChannelLiveStream(
   channelHandle: string,
   apiKey: string
-): Promise<{ isLive: boolean; liveVideoId: string | null; latestVideoId: string | null; channelId: string | null; title: string | null; apiError?: boolean }> {
+): Promise<HandleLiveResult> {
+  const cacheKey = channelHandle.trim().toLowerCase().replace(/^@/, '');
+  const cached = handleLiveCache.get(cacheKey);
+  if (cached) return cached;
+
   console.log(`[YouTube API] Searching live stream for channel handle: ${channelHandle}`);
   
   // First resolve the channel handle to a channel ID
@@ -357,9 +397,11 @@ export async function searchChannelLiveStream(
     }
   }
   
-  return {
+  const result: HandleLiveResult = {
     ...liveResult,
     latestVideoId,
     channelId,
   };
+  if (!result.apiError) handleLiveCache.set(cacheKey, result);
+  return result;
 }
