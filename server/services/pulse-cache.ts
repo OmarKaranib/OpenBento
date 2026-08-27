@@ -95,6 +95,11 @@ async function runPulseCheck(): Promise<void> {
     }
     
     const health = await checkStreamHealth(status.currentVideoId, apiKey);
+
+    if (health.apiError) {
+      console.warn(`[PulseCache] YouTube check failed for ${status.channelName}; keeping the last known stream`);
+      continue;
+    }
     
     // True Live Filter: Check if video is actually live
     const isVideoLive = health.isLive ?? false;

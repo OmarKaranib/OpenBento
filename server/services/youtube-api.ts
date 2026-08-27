@@ -39,6 +39,11 @@ interface YouTubeVideoDetails {
   isEmbeddable: boolean;
 }
 
+interface VideoDetailsFetchResult {
+  details: YouTubeVideoDetails | null;
+  apiError: boolean;
+}
+
 export async function searchLiveStream(
   channelName: string,
   apiKey: string
@@ -69,30 +74,40 @@ export async function getVideoDetails(
   videoId: string,
   apiKey: string
 ): Promise<YouTubeVideoDetails | null> {
+  return (await fetchVideoDetails(videoId, apiKey)).details;
+}
+
+async function fetchVideoDetails(
+  videoId: string,
+  apiKey: string
+): Promise<VideoDetailsFetchResult> {
   const url = `${YOUTUBE_API_BASE}/videos?part=snippet,status,contentDetails&id=${videoId}&key=${apiKey}`;
   
   try {
     const response = await fetch(url);
     if (!response.ok) {
       console.error('[YouTube API] Video details failed:', response.status);
-      return null;
+      return { details: null, apiError: true };
     }
     
     const data = await response.json();
     const video = data.items?.[0];
     
-    if (!video) return null;
+    if (!video) return { details: null, apiError: false };
     
     return {
-      videoId: video.id,
-      channelId: video.snippet.channelId,
-      categoryId: video.snippet.categoryId,
-      liveBroadcastContent: video.snippet.liveBroadcastContent,
-      isEmbeddable: video.status?.embeddable ?? false,
+      details: {
+        videoId: video.id,
+        channelId: video.snippet.channelId,
+        categoryId: video.snippet.categoryId,
+        liveBroadcastContent: video.snippet.liveBroadcastContent,
+        isEmbeddable: video.status?.embeddable ?? false,
+      },
+      apiError: false,
     };
   } catch (error) {
     console.error('[YouTube API] Video details error:', error);
-    return null;
+    return { details: null, apiError: true };
   }
 }
 
@@ -151,9 +166,14 @@ export async function healStream(
 export async function checkStreamHealth(
   videoId: string,
   apiKey: string
-): Promise<{ isHealthy: boolean; errorCode?: string; isLive?: boolean }> {
-  const details = await getVideoDetails(videoId, apiKey);
+): Promise<{ isHealthy: boolean; errorCode?: string; isLive?: boolean; apiError?: boolean }> {
+  const result = await fetchVideoDetails(videoId, apiKey);
+  const details = result.details;
   
+  if (result.apiError) {
+    return { isHealthy: false, errorCode: 'apiError', apiError: true };
+  }
+
   if (!details) {
     return { isHealthy: false, errorCode: 'notFound' };
   }
