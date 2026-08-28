@@ -29,6 +29,7 @@ export type MarketEntry = {
 
 export const MARKETS_TTL_MS = 60 * 1000;
 export const STALE_TTL_MS = 5 * 60 * 1000;
+export const MARKETS_TIMEOUT_MS = 8_000;
 // Symbols are 1-8 chars: A-Z, 0-9, dot, dash. Matches both crypto tickers
 // (BTC, ETH) and US equities (SPY, BRK.B).
 export const SYMBOL_RE = /^[A-Z0-9.\-]{1,8}$/;
@@ -108,7 +109,10 @@ export function createMarketsService(opts: MarketsServiceOptions = {}): MarketsS
     }
     try {
       const url = `https://api.coingecko.com/api/v3/coins/${meta.id}/market_chart?vs_currency=usd&days=1`;
-      const resp = await fetchImpl(url, { headers: { Accept: 'application/json' } });
+      const resp = await fetchImpl(url, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(MARKETS_TIMEOUT_MS),
+      });
       if (!resp.ok) throw new Error(`CoinGecko ${resp.status}`);
       const data = await resp.json();
       const prices: [number, number][] = data?.prices || [];
@@ -135,8 +139,14 @@ export function createMarketsService(opts: MarketsServiceOptions = {}): MarketsS
     const quoteUrl = `https://api.twelvedata.com/quote?symbol=${symbolParam}&apikey=${encodeURIComponent(apiKey)}`;
     const seriesUrl = `https://api.twelvedata.com/time_series?symbol=${symbolParam}&interval=15min&outputsize=26&apikey=${encodeURIComponent(apiKey)}`;
     const [quoteResp, seriesResp] = await Promise.all([
-      fetchImpl(quoteUrl, { headers: { Accept: 'application/json' } }),
-      fetchImpl(seriesUrl, { headers: { Accept: 'application/json' } }),
+      fetchImpl(quoteUrl, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(MARKETS_TIMEOUT_MS),
+      }),
+      fetchImpl(seriesUrl, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(MARKETS_TIMEOUT_MS),
+      }),
     ]);
     if (!quoteResp.ok) throw new Error(`Twelve Data quote ${quoteResp.status}`);
     if (!seriesResp.ok) throw new Error(`Twelve Data time_series ${seriesResp.status}`);
@@ -192,6 +202,7 @@ export function createMarketsService(opts: MarketsServiceOptions = {}): MarketsS
     try {
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=15m&range=1d&includePrePost=false`;
       const resp = await fetchImpl(url, {
+        signal: AbortSignal.timeout(MARKETS_TIMEOUT_MS),
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           Accept: 'application/json',

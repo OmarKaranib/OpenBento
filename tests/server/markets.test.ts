@@ -16,6 +16,7 @@ import {
   parseSymbols,
   CRYPTO_MAP,
   MARKETS_TTL_MS,
+  MARKETS_TIMEOUT_MS,
   STALE_TTL_MS,
   type MarketEntry,
 } from '../../server/markets';
@@ -29,8 +30,10 @@ type Handler = (url: string) => FakeResponse;
 function makeFakeFetch() {
   const handlers: { match: (url: string) => boolean; handler: Handler }[] = [];
   const calls: string[] = [];
-  const fakeFetch = async (input: string) => {
+  const inits: any[] = [];
+  const fakeFetch = async (input: string, init?: any) => {
     calls.push(input);
+    inits.push(init);
     const found = handlers.find(h => h.match(input));
     if (!found) {
       throw new Error(`Unhandled fetch URL in test: ${input}`);
@@ -45,6 +48,7 @@ function makeFakeFetch() {
   return {
     fetch: fakeFetch,
     calls,
+    inits,
     on(matcher: string | RegExp, handler: Handler | FakeResponse) {
       const match = (url: string) =>
         matcher instanceof RegExp ? matcher.test(url) : url.includes(matcher);
@@ -53,6 +57,20 @@ function makeFakeFetch() {
     },
   };
 }
+
+test('market provider requests receive a hard timeout', async () => {
+  const fake = makeFakeFetch();
+  fake.on('coingecko', coingeckoPayload([100, 110]));
+
+  const service = createMarketsService({
+    fetchImpl: fake.fetch as any,
+    twelveDataApiKey: null,
+  });
+  await service.getMarketEntries(['BTC']);
+
+  assert.equal(MARKETS_TIMEOUT_MS, 8_000);
+  assert.ok(fake.inits[0]?.signal instanceof AbortSignal);
+});
 
 // CoinGecko market_chart payload — `prices` is `[[ts, price], ...]`.
 function coingeckoPayload(prices: number[]): FakeResponse {
