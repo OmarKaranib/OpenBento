@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { HelpCircle, RefreshCw, Settings as SettingsIcon, X as XIcon } from 'lucide-react';
 import { MONO, Widget, isLightBg, qrIconBtnStyle, qrLabelStyle } from './shared';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 interface Props { widget: Widget; onUpdate?: (id: string, patch: Partial<Widget>) => void; }
 
@@ -41,7 +42,9 @@ export const TriviaWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   const fetchOne = async () => {
     setLoading(true); setErr(null);
     try {
-      const r = await fetch(`/api/trivia?difficulty=${encodeURIComponent(difficulty)}`);
+      const r = await fetch(`/api/trivia?difficulty=${encodeURIComponent(difficulty)}`, {
+        signal: requestTimeoutSignal(),
+      });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json() as TriviaPayload;
       if (!j.question || !Array.isArray(j.choices)) throw new Error('Malformed payload');

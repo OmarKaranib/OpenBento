@@ -68,3 +68,9 @@ test('On This Day loads have a deadline', () => {
 
   assert.match(widget, /api\/onthisday[\s\S]*signal: requestTimeoutSignal\(\)/);
 });
+
+test('Trivia loads and refreshes have a deadline', () => {
+  const widget = readFileSync('client/src/widgets/trivia-widget.tsx', 'utf8');
+
+  assert.match(widget, /api\/trivia[\s\S]*signal: requestTimeoutSignal\(\)/);
+});
