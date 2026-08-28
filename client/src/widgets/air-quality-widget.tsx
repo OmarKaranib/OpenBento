@@ -16,6 +16,7 @@ import {
   type AirQualityPayload,
   type PollutantKey,
 } from '@shared/air-quality';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 const REFRESH_MS = 30 * 60_000; // 30 min
 
@@ -107,7 +108,9 @@ export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     const wantPollen = widget.airQualityShowPollen !== false;
     const qs = `lat=${target.lat}&lon=${target.lon}${wantPollen ? '&pollen=1' : ''}`;
     try {
-      const r = await fetch(`/api/air-quality?${qs}`, { signal });
+      const r = await fetch(`/api/air-quality?${qs}`, {
+        signal: requestTimeoutSignal(undefined, signal),
+      });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json() as AirQualityPayload;
       setData(j);
@@ -161,7 +164,9 @@ export const AirQualityWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     setLoading(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/air-quality?city=${encodeURIComponent(trimmed)}${widget.airQualityShowPollen !== false ? '&pollen=1' : ''}`);
+      const r = await fetch(`/api/air-quality?city=${encodeURIComponent(trimmed)}${widget.airQualityShowPollen !== false ? '&pollen=1' : ''}`, {
+        signal: requestTimeoutSignal(),
+      });
       if (r.status === 404) { setErr('City not found'); setTimeout(() => setErr(null), 2500); return; }
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const payload = await r.json() as AirQualityPayload & { cityLabel?: string };
