@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Send, Lightbulb, Bug, Loader2, ImagePlus, Trash2 } from 'lucide-react';
 import { Footer } from '@/components/footer';
 import { usePageMeta } from '@/hooks/use-page-meta';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -100,6 +101,7 @@ export default function Feedback() {
           email: email.trim() || undefined,
           screenshot: screenshot || undefined,
         }),
+        signal: requestTimeoutSignal(30_000),
       });
 
       const data = await response.json();

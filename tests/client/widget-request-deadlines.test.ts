@@ -98,3 +98,9 @@ test('Marketplace loading reaches its error state after a deadline', () => {
 
   assert.match(marketplace, /marketplace\/widgets\.json[\s\S]*signal: requestTimeoutSignal\(\)/);
 });
+
+test('Feedback submission has a longer upload deadline', () => {
+  const feedback = readFileSync('client/src/pages/feedback.tsx', 'utf8');
+
+  assert.match(feedback, /api\/feedback[\s\S]*signal: requestTimeoutSignal\(30_000\)/);
+});
