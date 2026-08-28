@@ -15,3 +15,10 @@ test('custom browser request deadlines abort', async () => {
   await new Promise((resolve) => setTimeout(resolve, 15));
   assert.equal(signal.aborted, true);
 });
+
+test('a parent cancellation still aborts a timed request', () => {
+  const parent = new AbortController();
+  const signal = requestTimeoutSignal(10_000, parent.signal);
+  parent.abort();
+  assert.equal(signal.aborted, true);
+});

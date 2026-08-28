@@ -8,6 +8,7 @@ import {
   qrIconBtnStyle, qrInputStyle, qrLabelStyle,
 } from './shared';
 import { haversineKm } from './sky-helpers';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 interface IssTrackerProps {
   widget: Widget;
@@ -51,7 +52,7 @@ export const IssTrackerWidget: React.FC<IssTrackerProps> = ({ widget, onUpdate }
     let cancelled = false;
     const load = async () => {
       try {
-        const r = await fetch('/api/iss');
+        const r = await fetch('/api/iss', { signal: requestTimeoutSignal() });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const j = await r.json();
         if (cancelled) return;
@@ -81,7 +82,9 @@ export const IssTrackerWidget: React.FC<IssTrackerProps> = ({ widget, onUpdate }
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch(`/api/weather?city=${encodeURIComponent(widget.issCity!)}`);
+        const r = await fetch(`/api/weather?city=${encodeURIComponent(widget.issCity!)}`, {
+          signal: requestTimeoutSignal(),
+        });
         if (!r.ok) return;
         const j = await r.json();
         if (cancelled) return;
@@ -110,7 +113,9 @@ export const IssTrackerWidget: React.FC<IssTrackerProps> = ({ widget, onUpdate }
     const ctrl = new AbortController();
     const fetchPass = async () => {
       try {
-        const r = await fetch(`/api/iss/pass?lat=${widget.issLat}&lon=${widget.issLon}`, { signal: ctrl.signal });
+        const r = await fetch(`/api/iss/pass?lat=${widget.issLat}&lon=${widget.issLon}`, {
+          signal: requestTimeoutSignal(undefined, ctrl.signal),
+        });
         if (!r.ok) return;
         const j = await r.json() as IssPass;
         if (cancelled) return;

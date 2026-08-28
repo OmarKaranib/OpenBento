@@ -36,3 +36,10 @@ test('the polling Network Light gives each request a deadline', () => {
   assert.match(widget, /requestTimeoutSignal/);
   assert.match(widget, /api\/ping[\s\S]*signal: requestTimeoutSignal\(\)/);
 });
+
+test('ISS position, city, and pass requests all have deadlines', () => {
+  const widget = readFileSync('client/src/widgets/iss-tracker-widget.tsx', 'utf8');
+
+  assert.equal(widget.match(/signal: requestTimeoutSignal\(/g)?.length, 3);
+  assert.match(widget, /requestTimeoutSignal\(undefined, ctrl\.signal\)/);
+});
