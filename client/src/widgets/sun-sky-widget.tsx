@@ -9,6 +9,7 @@ import {
 } from './shared';
 import { computeMoonPhase, computeSunTimes, sunArcPosition } from './sky-helpers';
 import { getLastResolvedLocation, subscribeLocation } from './weather-location';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 interface SunSkyProps {
   widget: Widget;
@@ -81,7 +82,9 @@ export const SunSkyWidget: React.FC<SunSkyProps> = ({ widget, onUpdate }) => {
       // 2) City name override → geocode via /api/weather.
       if (useCity) {
         try {
-          const r = await fetch(`/api/weather?city=${encodeURIComponent(widget.sunCity!)}`);
+          const r = await fetch(`/api/weather?city=${encodeURIComponent(widget.sunCity!)}`, {
+            signal: requestTimeoutSignal(),
+          });
           if (r.ok) {
             const j = await r.json();
             if (!cancelled && typeof j?.lat === 'number' && typeof j?.lon === 'number') {

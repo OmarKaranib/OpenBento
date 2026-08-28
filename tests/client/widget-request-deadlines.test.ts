@@ -104,3 +104,9 @@ test('Feedback submission has a longer upload deadline', () => {
 
   assert.match(feedback, /api\/feedback[\s\S]*signal: requestTimeoutSignal\(30_000\)/);
 });
+
+test('Sun and Sky city lookup has a deadline', () => {
+  const widget = readFileSync('client/src/widgets/sun-sky-widget.tsx', 'utf8');
+
+  assert.match(widget, /api\/weather[\s\S]*signal: requestTimeoutSignal\(\)/);
+});
