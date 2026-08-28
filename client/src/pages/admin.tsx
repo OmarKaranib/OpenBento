@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Shield, Users, Tv, BarChart3, Loader2, Edit2, Trash2, RefreshCw, Home, Plus, X, Save, AlertCircle, LogIn, Rocket, Link as LinkIcon, GripVertical, Eye, EyeOff, MessageSquare, Lightbulb, Bug, Search, CheckCircle2 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { searchChannelLiveStream } from '@/lib/stream-api';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -255,18 +256,24 @@ export default function Admin() {
       });
 
       try {
-        const response = await fetch(`/api/youtube/validate-video/${channel.videoId}`);
+        const response = await fetch(`/api/youtube/validate-video/${channel.videoId}`, {
+          signal: requestTimeoutSignal(),
+        });
         const result = await response.json();
 
         if (!result.valid) {
           console.log(`[PURGE] Broken stream detected: ${channel.name} - ${result.reason}`);
 
           if (channel.channelHandle) {
-            const searchResponse = await fetch(`/api/youtube/search-live/${channel.channelHandle}`);
+            const searchResponse = await fetch(`/api/youtube/search-live/${encodeURIComponent(channel.channelHandle)}`, {
+              signal: requestTimeoutSignal(),
+            });
             const searchResult = await searchResponse.json();
 
             if (searchResult.latestVideoId) {
-              const fallbackResponse = await fetch(`/api/youtube/validate-video/${searchResult.latestVideoId}`);
+              const fallbackResponse = await fetch(`/api/youtube/validate-video/${searchResult.latestVideoId}`, {
+                signal: requestTimeoutSignal(),
+              });
               const fallbackResult = await fallbackResponse.json();
 
               if (!fallbackResult.valid) {
