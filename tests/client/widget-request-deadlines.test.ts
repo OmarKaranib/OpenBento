@@ -8,3 +8,10 @@ test('the polling Markets widget gives each request a deadline', () => {
   assert.match(widget, /requestTimeoutSignal/);
   assert.match(widget, /api\/markets[\s\S]*signal: requestTimeoutSignal\(\)/);
 });
+
+test('the polling News widget gives each request a deadline', () => {
+  const widget = readFileSync('client/src/widgets/crisis-ticker-widget.tsx', 'utf8');
+
+  assert.match(widget, /requestTimeoutSignal/);
+  assert.match(widget, /api\/news[\s\S]*signal: requestTimeoutSignal\(\)/);
+});

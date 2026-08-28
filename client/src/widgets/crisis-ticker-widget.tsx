@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ExternalLink, Settings as SettingsIcon } from 'lucide-react';
 import { MONO, Widget } from './shared';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 const FALLBACK_HEADLINES: Headline[] = [
   { id: 1,  text: 'BREAKING: Major earthquake strikes Pacific Rim \u2014 tsunami Alert issued for coastal regions' },
@@ -107,7 +108,9 @@ export const CrisisTickerWidget: React.FC<CrisisTickerWidgetProps> = ({ widget, 
           if (q.category) params.set('category', q.category);
         }
         const qs = params.toString();
-        const resp = await fetch(qs ? `/api/news?${qs}` : '/api/news');
+        const resp = await fetch(qs ? `/api/news?${qs}` : '/api/news', {
+          signal: requestTimeoutSignal(),
+        });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         if (mounted && data.articles?.length > 0) {
