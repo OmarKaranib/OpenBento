@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Search, Star, Volume2, X } from 'lucide-react';
 import { MONO, Widget } from './shared';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 const POWER_WORDS = [
   'ephemeral', 'perspicacious', 'sanguine', 'mellifluous', 'obfuscate',
@@ -67,7 +68,9 @@ export const DictionaryWidget: React.FC<{
     setLoading(true); setError(false); setEntry(null);
     (async () => {
       try {
-        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(activeWord)}`);
+        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(activeWord)}`, {
+          signal: requestTimeoutSignal(),
+        });
         if (!res.ok) throw new Error('fetch failed');
         const data = await res.json();
         if (!mounted) return;

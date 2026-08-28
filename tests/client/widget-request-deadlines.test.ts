@@ -56,3 +56,9 @@ test('initial, hourly, and manual Quote requests have deadlines', () => {
 
   assert.equal(widget.match(/signal: requestTimeoutSignal\(\)/g)?.length, 3);
 });
+
+test('Dictionary searches have a deadline', () => {
+  const widget = readFileSync('client/src/widgets/dictionary-widget.tsx', 'utf8');
+
+  assert.match(widget, /api\.dictionaryapi\.dev[\s\S]*signal: requestTimeoutSignal\(\)/);
+});
