@@ -1,5 +1,6 @@
 import type { TrendingChannel } from '@/components/widget-sidebar';
 import type { Widget } from '@/App';
+import { initialWidgetLiveState } from '@/lib/stream-live-status';
 
 export type StarterTileType =
   | 'video'
@@ -184,7 +185,7 @@ export function buildWidgetsFromPack(
         twitchChannel: isTwitch ? handle : null,
         isKick,
         kickChannel: isKick ? handle : null,
-        isLive: ch.isLive === true,
+        isLive: initialWidgetLiveState(ch.platform, ch.isLive),
         lastRefresh: Date.now(),
       };
       widgets.push(widget);

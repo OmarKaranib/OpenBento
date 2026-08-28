@@ -10,6 +10,7 @@ import type { Widget, WidgetType } from '@/widgets/shared';
 import type { DashboardPage } from '@shared/dashboard-pages';
 import { WIDGET_TEMPLATES, type SavedChannel } from '@/components/widget-sidebar';
 import { SAMPLE_CUSTOM_WIDGETS } from '@shared/widget-sdk-protocol';
+import { initialWidgetLiveState } from '@/lib/stream-live-status';
 
 export type CommandSection = 'add' | 'pages' | 'actions';
 
@@ -224,7 +225,7 @@ export function buildCommands(host: CommandHostBag): Command[] {
           twitchChannel: ch.platform === 'twitch' ? (ch.channelId ?? ch.name) : null,
           isKick: ch.platform === 'kick',
           kickChannel: ch.platform === 'kick' ? (ch.channelId ?? ch.name) : null,
-          isLive: ch.platform === 'twitch' || ch.platform === 'kick',
+          isLive: initialWidgetLiveState(ch.platform, 'isLive' in ch ? ch.isLive : undefined),
           lastRefresh: Date.now(),
         } as Partial<Widget>);
       },

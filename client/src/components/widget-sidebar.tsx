@@ -15,6 +15,7 @@
     SAMPLE_CUSTOM_WIDGETS,
     isAllowedCustomWidgetUrl,
   } from '@shared/widget-sdk-protocol';
+  import { catalogStreamLiveStatus, liveStatusFromResponse } from '@/lib/stream-live-status';
 
   const failedLogoCache = new Set<string>();
 
@@ -162,7 +163,7 @@
 
   export interface LiveStatus {
     channelId: string;
-    isLive: boolean;
+    isLive: boolean | null;
     isOffline?: boolean;
     viewerCount?: number;
     lastChecked: number;
@@ -242,7 +243,7 @@
   interface DraggableChannelProps {
     channel: TrendingChannel | SavedChannel | BlockedChannel;
     onClick?: () => void;
-    isLive?: boolean;
+    isLive?: boolean | null;
     isSaved?: boolean;
     isBlocked?: boolean;
     onSave?: () => void;
@@ -557,12 +558,12 @@
 
     const channels: TrendingChannel[] = linksData?.channels?.length ? linksData.channels : FALLBACK_CHANNELS;
 
-    const checkKickLiveStatus = useCallback(async (channelId: string): Promise<boolean> => {
+    const checkKickLiveStatus = useCallback(async (channelId: string): Promise<boolean | null> => {
       try {
         const r = await fetch(`/api/kick/channel/${channelId}`);
-        if (r.ok) { const d = await r.json(); return d?.isLive === true; }
-        return false;
-      } catch { return true; }
+        if (!r.ok) return null;
+        return liveStatusFromResponse(await r.json());
+      } catch { return null; }
     }, []);
 
     useEffect(() => {
@@ -571,10 +572,8 @@
         const statuses: Record<string, LiveStatus> = {};
         for (const ch of channels) {
           if (!ch.channelId) continue;
-          let isLive = false;
-          if (ch.platform === 'youtube' || ch.platform === 'twitch') {
-            isLive = 'isLive' in ch ? (ch as any).isLive === true : false;
-          } else if (ch.platform === 'kick') {
+          let isLive = catalogStreamLiveStatus(ch.platform, ch.isLive);
+          if (ch.platform === 'kick') {
             isLive = await checkKickLiveStatus(ch.channelId);
           }
           statuses[ch.id] = { channelId: ch.channelId, isLive, lastChecked: now };

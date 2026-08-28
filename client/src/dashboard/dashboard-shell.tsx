@@ -22,6 +22,7 @@
   import type { Widget, WidgetType } from '@/widgets/shared';
   import { WidgetRenderer } from '@/widgets/widget-renderer';
   import { extractKickChannel, extractTwitchChannel } from '@/lib/stream-url';
+  import { initialWidgetLiveState } from '@/lib/stream-live-status';
   import { useCloudSync } from '@/dashboard/use-cloud-sync';
   import {
     type DashboardPagesState,
@@ -436,7 +437,7 @@ const addVideoWidget = useCallback((channel: TrendingChannel, w = 3, h = 2) => {
   const youtubeChannelId = channel.channelId || extractYouTubeChannelId(channel.url);
   const twitchChannel    = extractTwitchChannel(channel.url);
   const kickChannel      = extractKickChannel(channel.url);
-  const isLiveStream     = channel.platform === 'twitch' || channel.platform === 'kick' || channel.isLive === true;
+  const isLiveStream     = initialWidgetLiveState(channel.platform, channel.isLive);
   addWidget('video', w, h, {
     url: channel.url, isYouTube: channel.platform === 'youtube',
     videoId, youtubeChannelId,
