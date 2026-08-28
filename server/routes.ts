@@ -64,6 +64,22 @@ const kickStatusRateLimit = new FixedWindowRateLimiter({
 const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 const KICK_CHANNEL_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
 
+interface KickStatusPayload {
+  isLive: boolean | null;
+  viewerCount: number;
+  channelId: string;
+  status: 'ok' | 'unknown';
+}
+
+const kickStatusCache = new LruTtlCache<KickStatusPayload>({
+  max: 500,
+  ttlMs: 60 * 1000,
+});
+
+function unknownKickStatus(channelId: string): KickStatusPayload {
+  return { isLive: null, viewerCount: 0, channelId, status: 'unknown' };
+}
+
 function requestIp(req: Request): string {
   const forwarded = String(req.headers["x-forwarded-for"] ?? "")
     .split(",")[0]
@@ -394,45 +410,46 @@ export async function registerRoutes(
       return res.status(429).json({ isLive: null, error: "Too many Kick status checks, slow down" });
     }
 
+    const cached = kickStatusCache.get(channelId);
+    if (cached) return res.json(cached);
+
     try {
-      // Try v2 API with full browser headers
-      const response = await fetch(`https://kick.com/api/v2/channels/${channelId}`, {
-        signal: AbortSignal.timeout(5_000),
-        headers: {
-          'Accept': 'application/json, text/plain, */*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Referer': `https://kick.com/${channelId}`,
-          'Origin': 'https://kick.com',
-          'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
-          'sec-ch-ua-mobile': '?0',
-          'sec-ch-ua-platform': '"Windows"',
-          'sec-fetch-dest': 'empty',
-          'sec-fetch-mode': 'cors',
-          'sec-fetch-site': 'same-origin'
-        }
-      });
-
-      if (!response.ok) {
-        // Kick blocks server requests - return unknown status, player will show actual state
-        return res.json({
-          isLive: null,
-          viewerCount: 0,
-          channelId: channelId,
-          status: 'unknown'
+      const result = await kickStatusCache.dedupe(channelId, async () => {
+        // Try v2 API with full browser headers
+        const response = await fetch(`https://kick.com/api/v2/channels/${channelId}`, {
+          signal: AbortSignal.timeout(5_000),
+          headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Referer': `https://kick.com/${channelId}`,
+            'Origin': 'https://kick.com',
+            'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin'
+          }
         });
-      }
 
-      const data = await response.json();
-      res.json({
-        isLive: data?.livestream !== null && data?.livestream !== undefined,
-        viewerCount: data?.livestream?.viewer_count || 0,
-        channelId: data?.slug || channelId,
-        status: 'ok'
+        if (!response.ok) return unknownKickStatus(channelId);
+
+        const data = await response.json();
+        return {
+          isLive: data?.livestream !== null && data?.livestream !== undefined,
+          viewerCount: data?.livestream?.viewer_count || 0,
+          channelId: data?.slug || channelId,
+          status: 'ok' as const,
+        };
       });
+
+      res.json(result);
     } catch (error) {
-      // Return unknown rather than false - let the player show actual state
-      res.json({ isLive: null, viewerCount: 0, channelId, status: 'unknown' });
+      const unknown = unknownKickStatus(channelId);
+      // Briefly cache failures too, so an outage does not cause a retry storm.
+      kickStatusCache.set(channelId, unknown);
+      res.json(unknown);
     }
   });
 
