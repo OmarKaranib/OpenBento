@@ -16,6 +16,7 @@
     isAllowedCustomWidgetUrl,
   } from '@shared/widget-sdk-protocol';
   import { buildCatalogLiveStatuses, liveStatusFromResponse } from '@/lib/stream-live-status';
+  import { requestTimeoutSignal } from '@/lib/request-timeout';
 
   const failedLogoCache = new Set<string>();
 
@@ -563,7 +564,9 @@
       signal?: AbortSignal,
     ): Promise<boolean | null> => {
       try {
-        const r = await fetch(`/api/kick/channel/${channelId}`, { signal });
+        const r = await fetch(`/api/kick/channel/${channelId}`, {
+          signal: requestTimeoutSignal(undefined, signal),
+        });
         if (!r.ok) return null;
         return liveStatusFromResponse(await r.json());
       } catch { return null; }

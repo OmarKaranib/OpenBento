@@ -116,3 +116,9 @@ test('soundscape asset loading has a longer audio deadline', () => {
 
   assert.match(widget, /fetch\(opt\.asset, \{ signal: requestTimeoutSignal\(30_000\) \}\)/);
 });
+
+test('Kick catalog checks combine close-cancellation with a deadline', () => {
+  const sidebar = readFileSync('client/src/components/widget-sidebar.tsx', 'utf8');
+
+  assert.match(sidebar, /api\/kick[\s\S]*requestTimeoutSignal\(undefined, signal\)/);
+});
