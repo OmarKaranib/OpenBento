@@ -73,6 +73,10 @@ const rssLookupRateLimit = new FixedWindowRateLimiter({
   windowMs: 10 * 60 * 1000,
   maxAttempts: 60,
 });
+const issPassRateLimit = new FixedWindowRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 30,
+});
 
 const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 const KICK_CHANNEL_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
@@ -1847,6 +1851,9 @@ export async function registerRoutes(
     const cacheKey = `${lat.toFixed(2)}:${lon.toFixed(2)}`;
     const cached = ISS_PASS_CACHE.get(cacheKey);
     if (cached) return res.json(cached);
+    if (!issPassRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ error: 'Too many ISS pass lookups. Please try again later.' });
+    }
 
     // Sample every ~5 min over 95 min = 19 timestamps. Split into two
     // wheretheiss.at calls (10 ts max per request).
