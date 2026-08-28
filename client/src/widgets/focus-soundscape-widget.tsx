@@ -5,6 +5,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CloudRain, Flame, type LucideIcon, Pause, Play, Settings as SettingsIcon, TreePine, Volume2, Waves, Wind, X as XIcon } from 'lucide-react';
 import { MONO, Widget, isLightBg, qrIconBtnStyle } from './shared';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 interface FocusSoundscapeProps {
   widget: Widget;
@@ -40,7 +41,7 @@ async function loadBuffer(ctx: AudioContext, sound: SoundKey): Promise<AudioBuff
   const opt = SOUND_OPTIONS.find(o => o.key === sound) ?? SOUND_OPTIONS[0];
   const p = (async () => {
     try {
-      const res = await fetch(opt.asset);
+      const res = await fetch(opt.asset, { signal: requestTimeoutSignal(30_000) });
       if (!res.ok) throw new Error(`fetch ${opt.asset} → ${res.status}`);
       const arr = await res.arrayBuffer();
       const buf = await ctx.decodeAudioData(arr);

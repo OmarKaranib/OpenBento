@@ -110,3 +110,9 @@ test('Sun and Sky city lookup has a deadline', () => {
 
   assert.match(widget, /api\/weather[\s\S]*signal: requestTimeoutSignal\(\)/);
 });
+
+test('soundscape asset loading has a longer audio deadline', () => {
+  const widget = readFileSync('client/src/widgets/focus-soundscape-widget.tsx', 'utf8');
+
+  assert.match(widget, /fetch\(opt\.asset, \{ signal: requestTimeoutSignal\(30_000\) \}\)/);
+});
