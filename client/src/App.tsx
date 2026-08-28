@@ -8,11 +8,6 @@
 //   - Cloud-sync hook: client/src/dashboard/use-cloud-sync.ts
 //   - Auth/DnD shell + add/edit/move callbacks:
 //     client/src/dashboard/dashboard-shell.tsx
-//
-// Widget, WidgetType, and WidgetRenderer are re-exported below so existing
-// callers (pages/dashboard.tsx, pages/cast.tsx, data/starter-packs.ts,
-// components/widget-sidebar.tsx, components/onboarding-flow.tsx,
-// components/ad-block.tsx) keep working without import-path churn.
 
 import React, { useEffect, lazy, Suspense } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -21,17 +16,16 @@ import { queryClient } from './lib/queryClient';
 import { MobileGuard } from '@/components/mobile-guard';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { DashboardShell } from '@/dashboard/dashboard-shell';
-import NotFound from '@/pages/not-found';
-import Admin from '@/pages/admin';
-import Terms from '@/pages/terms';
-import Privacy from '@/pages/privacy';
-import Feedback from '@/pages/feedback';
-import DevWidgets from '@/pages/dev-widgets';
-import Marketplace from '@/pages/marketplace';
-import type { Widget, WidgetType } from '@/widgets/shared';
-import { WidgetRenderer } from '@/widgets/widget-renderer';
-
+const DashboardShell = lazy(() =>
+  import('@/dashboard/dashboard-shell').then(({ DashboardShell }) => ({ default: DashboardShell })),
+);
+const NotFound = lazy(() => import('@/pages/not-found'));
+const Admin = lazy(() => import('@/pages/admin'));
+const Terms = lazy(() => import('@/pages/terms'));
+const Privacy = lazy(() => import('@/pages/privacy'));
+const Feedback = lazy(() => import('@/pages/feedback'));
+const DevWidgets = lazy(() => import('@/pages/dev-widgets'));
+const Marketplace = lazy(() => import('@/pages/marketplace'));
 const CastPage = lazy(() => import('@/pages/cast'));
 
 // ─── Static background ────────────────────────────────────────────────────────
@@ -56,38 +50,30 @@ function App() {
       <MobileGuard>
         <StaticBackground />
         <TooltipProvider>
-          <Switch>
-            {/* Dashboard routes share the full DashboardShell (sidebar,
-                login modal, DnD context, MasterControlDashboard). */}
-            <Route path="/"                      component={DashboardShell} />
-            <Route path="/auth/callback"         component={DashboardShell} />
-            <Route path="/auth/reset-password"   component={DashboardShell} />
-            {/* Stateless / page-only routes mount their page directly,
-                without instantiating the dashboard tree. */}
-            <Route path="/admin"    component={Admin} />
-            <Route path="/terms"    component={Terms} />
-            <Route path="/privacy"  component={Privacy} />
-            <Route path="/feedback" component={Feedback} />
-            <Route path="/dev/widgets" component={DevWidgets} />
-            <Route path="/widgets" component={Marketplace} />
-            <Route path="/cast">
-              {() => (
-                <Suspense fallback={<div className="w-screen h-screen bg-slate-950" />}>
-                  <CastPage />
-                </Suspense>
-              )}
-            </Route>
-            <Route component={NotFound} />
-          </Switch>
+          <Suspense fallback={<div className="w-screen h-screen bg-slate-950" />}>
+            <Switch>
+              {/* Dashboard routes share the full DashboardShell (sidebar,
+                  login modal, DnD context, MasterControlDashboard). */}
+              <Route path="/"                      component={DashboardShell} />
+              <Route path="/auth/callback"         component={DashboardShell} />
+              <Route path="/auth/reset-password"   component={DashboardShell} />
+              {/* Stateless / page-only routes mount their page directly,
+                  without instantiating the dashboard tree. */}
+              <Route path="/admin"    component={Admin} />
+              <Route path="/terms"    component={Terms} />
+              <Route path="/privacy"  component={Privacy} />
+              <Route path="/feedback" component={Feedback} />
+              <Route path="/dev/widgets" component={DevWidgets} />
+              <Route path="/widgets" component={Marketplace} />
+              <Route path="/cast" component={CastPage} />
+              <Route component={NotFound} />
+            </Switch>
+          </Suspense>
           <Toaster />
         </TooltipProvider>
       </MobileGuard>
     </QueryClientProvider>
   );
 }
-
-// ── Backward-compatible re-exports ──────────────────────────────────────────
-export type { Widget, WidgetType };
-export { WidgetRenderer };
 
 export default App;

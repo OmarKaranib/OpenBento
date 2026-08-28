@@ -1,4 +1,4 @@
-import type { Widget } from "@/App";
+import type { Widget } from "@/widgets/shared";
 import type { CastSnapshot } from "@shared/schema";
 
 function stripWidgetForCast(w: Widget): Record<string, unknown> {

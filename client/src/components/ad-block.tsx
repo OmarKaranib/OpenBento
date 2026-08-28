@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Heart, Coffee } from 'lucide-react';
-import { Widget } from '@/App';
+import type { Widget } from '@/widgets/shared';
 
 const GRID_COLS = 12;
 const GRID_ROWS = 6;

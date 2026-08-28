@@ -119,7 +119,7 @@
 
   import { useDraggable } from '@dnd-kit/core';
   import { CSS } from '@dnd-kit/utilities';
-  import { WidgetType } from '@/App';
+  import type { WidgetType } from '@/widgets/shared';
   import { useQuery } from '@tanstack/react-query';
   import {
     loadPersonalLibrary,

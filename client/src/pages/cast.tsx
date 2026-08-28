@@ -2,7 +2,8 @@
 // itself to displaying snapshots pushed from a paired laptop.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Cast, Tv2, Wifi, WifiOff, Trash2 } from "lucide-react";
-import { WidgetRenderer, type Widget } from "@/App";
+import type { Widget } from "@/widgets/shared";
+import { WidgetRenderer } from "@/widgets/widget-renderer";
 import { buildKickEmbedUrl, buildTwitchEmbedUrl, currentEmbedOrigin } from "@/lib/stream-embed-url";
 import { requestTimeoutSignal } from "@/lib/request-timeout";
 import type { CastSnapshot } from "@shared/schema";

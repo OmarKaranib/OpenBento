@@ -11,7 +11,7 @@ import {
   savePairedTVs,
   type PairedTV,
 } from "@/lib/cast-snapshot";
-import type { Widget } from "@/App";
+import type { Widget } from "@/widgets/shared";
 import type { CastSnapshot } from "@shared/schema";
 import type { DashboardPage } from "@shared/dashboard-pages";
 import { requestTimeoutSignal } from "@/lib/request-timeout";

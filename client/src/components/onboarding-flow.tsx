@@ -6,7 +6,7 @@ import {
   type StarterPack,
 } from '@/data/starter-packs';
 import type { TrendingChannel } from '@/components/widget-sidebar';
-import type { Widget } from '@/App';
+import type { Widget } from '@/widgets/shared';
 import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 export const ONBOARDING_FLAG = 'openBentoOnboarded';

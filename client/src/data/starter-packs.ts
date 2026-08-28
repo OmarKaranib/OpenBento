@@ -1,5 +1,5 @@
 import type { TrendingChannel } from '@/components/widget-sidebar';
-import type { Widget } from '@/App';
+import type { Widget } from '@/widgets/shared';
 import { initialWidgetLiveState } from '@/lib/stream-live-status';
 
 export type StarterTileType =
