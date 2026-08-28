@@ -56,8 +56,13 @@ const publicPingRateLimit = new FixedWindowRateLimiter({
   windowMs: 10 * 60 * 1000,
   maxAttempts: 300,
 });
+const kickStatusRateLimit = new FixedWindowRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 60,
+});
 
 const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
+const KICK_CHANNEL_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
 
 function requestIp(req: Request): string {
   const forwarded = String(req.headers["x-forwarded-for"] ?? "")
@@ -380,15 +385,19 @@ export async function registerRoutes(
 
   // Kick API proxy (browser CORS blocked)
   app.get("/api/kick/channel/:channelId", async (req, res) => {
-    const { channelId } = req.params;
+    const channelId = req.params.channelId?.trim().toLowerCase();
 
-    if (!channelId) {
-      return res.status(400).json({ error: "Missing channelId" });
+    if (!channelId || !KICK_CHANNEL_PATTERN.test(channelId)) {
+      return res.status(400).json({ isLive: null, error: "Invalid Kick channel" });
+    }
+    if (!kickStatusRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ isLive: null, error: "Too many Kick status checks, slow down" });
     }
 
     try {
       // Try v2 API with full browser headers
       const response = await fetch(`https://kick.com/api/v2/channels/${channelId}`, {
+        signal: AbortSignal.timeout(5_000),
         headers: {
           'Accept': 'application/json, text/plain, */*',
           'Accept-Language': 'en-US,en;q=0.9',
