@@ -30,6 +30,7 @@ import { PageTabsStrip } from '@/components/page-tabs-strip';
 import type { DashboardPage } from '@shared/dashboard-pages';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
 import { isRefreshableVideoWidget, refreshVideoWidget } from '@/lib/video-refresh';
+import { buildKickEmbedUrl, buildTwitchEmbedUrl } from '@/lib/stream-embed-url';
 import {
   manualYouTubeCheckAction,
   shouldCheckYouTubeWidget,
@@ -990,12 +991,11 @@ const MasterControlDashboard = ({
   // CRITICAL FIX: Dynamic Twitch Parent Detection
   const getTwitchEmbedUrl = (channel: string): string => {
     // Use the current hostname so Twitch embeds work on every deployment.
-    return `https://player.twitch.tv/?channel=${channel}&parent=${window.location.hostname}&muted=true&autoplay=true`;
+    return buildTwitchEmbedUrl(channel, window.location.hostname);
   };
 
   const getKickEmbedUrl = (channel: string): string => {
-    const parentDomain = window.location.hostname;
-    return `https://player.kick.com/${channel}?muted=true&autoplay=true&parent=${parentDomain}`;
+    return buildKickEmbedUrl(channel, window.location.hostname);
   };
 
 

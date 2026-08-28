@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Cast, Tv2, Wifi, WifiOff, Trash2 } from "lucide-react";
 import { WidgetRenderer, type Widget } from "@/App";
+import { buildKickEmbedUrl, buildTwitchEmbedUrl } from "@/lib/stream-embed-url";
 import type { CastSnapshot } from "@shared/schema";
 
 const ROOM_KEY = "openBentoCastRoomId";
@@ -95,12 +96,12 @@ function buildEmbedUrl(widget: Widget, muted: boolean): string | null {
   if (widget.isTwitch || widget.twitchChannel) {
     const ch = widget.twitchChannel;
     if (!ch) return null;
-    return `https://player.twitch.tv/?channel=${encodeURIComponent(ch)}&parent=${parent}&muted=${muted ? "true" : "false"}&autoplay=true`;
+    return buildTwitchEmbedUrl(ch, parent, muted);
   }
   if (widget.isKick || widget.kickChannel) {
     const ch = widget.kickChannel;
     if (!ch) return null;
-    return `https://player.kick.com/${encodeURIComponent(ch)}?autoplay=true&muted=${muted ? "true" : "false"}`;
+    return buildKickEmbedUrl(ch, parent, muted);
   }
   return null;
 }
