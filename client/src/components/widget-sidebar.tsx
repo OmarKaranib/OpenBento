@@ -15,7 +15,7 @@
     SAMPLE_CUSTOM_WIDGETS,
     isAllowedCustomWidgetUrl,
   } from '@shared/widget-sdk-protocol';
-  import { catalogStreamLiveStatus, liveStatusFromResponse } from '@/lib/stream-live-status';
+  import { buildCatalogLiveStatuses, liveStatusFromResponse } from '@/lib/stream-live-status';
 
   const failedLogoCache = new Set<string>();
 
@@ -558,29 +558,28 @@
 
     const channels: TrendingChannel[] = linksData?.channels?.length ? linksData.channels : FALLBACK_CHANNELS;
 
-    const checkKickLiveStatus = useCallback(async (channelId: string): Promise<boolean | null> => {
+    const checkKickLiveStatus = useCallback(async (
+      channelId: string,
+      signal?: AbortSignal,
+    ): Promise<boolean | null> => {
       try {
-        const r = await fetch(`/api/kick/channel/${channelId}`);
+        const r = await fetch(`/api/kick/channel/${channelId}`, { signal });
         if (!r.ok) return null;
         return liveStatusFromResponse(await r.json());
       } catch { return null; }
     }, []);
 
     useEffect(() => {
-      const check = async () => {
-        const now = Date.now();
-        const statuses: Record<string, LiveStatus> = {};
-        for (const ch of channels) {
-          if (!ch.channelId) continue;
-          let isLive = catalogStreamLiveStatus(ch.platform, ch.isLive);
-          if (ch.platform === 'kick') {
-            isLive = await checkKickLiveStatus(ch.channelId);
-          }
-          statuses[ch.id] = { channelId: ch.channelId, isLive, lastChecked: now };
-        }
-        setLiveStatuses(statuses);
-      };
-      check();
+      const controller = new AbortController();
+      void buildCatalogLiveStatuses(
+        channels,
+        Date.now(),
+        (channelId) => checkKickLiveStatus(channelId, controller.signal),
+      ).then((statuses) => {
+        if (!controller.signal.aborted) setLiveStatuses(statuses);
+      });
+
+      return () => controller.abort();
     }, [checkKickLiveStatus, channels]);
 
     const liveStatusesRef = useRef<Record<string, LiveStatus>>({});

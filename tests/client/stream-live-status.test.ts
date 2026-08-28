@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildCatalogLiveStatuses,
   catalogStreamLiveStatus,
   initialWidgetLiveState,
   liveStatusFromResponse,
@@ -25,4 +26,42 @@ test('API status parser preserves true, false, and unknown', () => {
   assert.equal(liveStatusFromResponse({ isLive: null }), null);
   assert.equal(liveStatusFromResponse({ error: 'temporary failure' }), null);
   assert.equal(liveStatusFromResponse(null), null);
+});
+
+test('catalog checks all Kick channels together', async () => {
+  const requested: string[] = [];
+  const resolvers: Array<(value: boolean | null) => void> = [];
+  const resultPromise = buildCatalogLiveStatuses([
+    { id: 'kick-one', channelId: 'one', platform: 'kick' },
+    { id: 'kick-two', channelId: 'two', platform: 'kick' },
+  ], 123, (channelId) => new Promise((resolve) => {
+    requested.push(channelId);
+    resolvers.push(resolve);
+  }));
+
+  assert.deepEqual(requested, ['one', 'two']);
+  resolvers[0](true);
+  resolvers[1](null);
+
+  assert.deepEqual(await resultPromise, {
+    'kick-one': { channelId: 'one', isLive: true, lastChecked: 123 },
+    'kick-two': { channelId: 'two', isLive: null, lastChecked: 123 },
+  });
+});
+
+test('catalog skips missing handles and does not check Twitch', async () => {
+  let kickChecks = 0;
+  const statuses = await buildCatalogLiveStatuses([
+    { id: 'youtube', channelId: 'UC-one', platform: 'youtube', isLive: true },
+    { id: 'twitch', channelId: 'streamer', platform: 'twitch', isLive: true },
+    { id: 'missing', platform: 'kick' },
+  ], 456, async () => {
+    kickChecks++;
+    return true;
+  });
+
+  assert.equal(kickChecks, 0);
+  assert.equal(statuses.youtube.isLive, true);
+  assert.equal(statuses.twitch.isLive, null);
+  assert.equal(statuses.missing, undefined);
 });
