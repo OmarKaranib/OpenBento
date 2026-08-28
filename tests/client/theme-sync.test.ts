@@ -59,6 +59,8 @@ test('theme cloud save uses PATCH and creates a missing dashboard row', async ()
   assert.equal(calls.length, 2);
   assert.equal(calls[0].init?.method, 'PATCH');
   assert.equal(calls[1].init?.method, 'POST');
+  assert.ok(calls[0].init?.signal instanceof AbortSignal);
+  assert.ok(calls[1].init?.signal instanceof AbortSignal);
   assert.equal((calls[0].init?.headers as Record<string, string>).Authorization, 'Bearer theme-token');
 });
 

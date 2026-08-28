@@ -26,6 +26,7 @@ import {
   sanitizeThemes,
   isValidTheme,
 } from '@shared/themes';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 // Marker class added to <body> while a theme is active. The dashboard's
 // outer container reads it via [data-themed] / .ob-theme-active to switch
@@ -119,6 +120,7 @@ export async function saveCloudThemes(
       method: 'PATCH',
       headers,
       body: JSON.stringify({ personalThemes, activeThemeId }),
+      signal: requestTimeoutSignal(),
     });
     if (res.ok) return true;
     if (res.status !== 404) return false;
@@ -129,6 +131,7 @@ export async function saveCloudThemes(
       method: 'POST',
       headers,
       body: JSON.stringify({ widgets: [], personalThemes, activeThemeId }),
+      signal: requestTimeoutSignal(),
     });
     return created.ok;
   } catch {
@@ -488,7 +491,10 @@ export function useTheme(args: UseThemeArgs): UseThemeApi {
         return;
       }
       try {
-        const res = await fetch('/api/dashboard', { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch('/api/dashboard', {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: requestTimeoutSignal(),
+        });
         if (cancelled) return;
         if (!res.ok) {
           if (shouldRetryThemeRead(res.status) && retryHydration(attempt)) return;
