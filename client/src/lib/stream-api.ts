@@ -1,8 +1,16 @@
 import { buildApiHeaders } from './api-auth';
 import { supabase } from './supabase';
 import { cacheHandleLiveResult, restoreHandleLiveResult } from './youtube-handle-cache';
+import { requestTimeoutSignal } from './request-timeout';
 
 const API_BASE = '';
+
+function fetchStreamApi(input: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(input, {
+    ...init,
+    signal: requestTimeoutSignal(undefined, init.signal ?? undefined),
+  });
+}
 
 async function getLibraryHeaders(hasJsonBody = false): Promise<Record<string, string>> {
   const { data: { session } } = supabase
@@ -158,7 +166,7 @@ export async function fetchGlobalStreamStatus(): Promise<{ [channelId: string]: 
   }
   
   try {
-    const response = await fetch(`${API_BASE}/api/stream-status`);
+    const response = await fetchStreamApi(`${API_BASE}/api/stream-status`);
     if (!response.ok) throw new Error('Failed to fetch stream status');
     
     const data = await response.json();
@@ -181,7 +189,7 @@ export async function requestStreamHeal(
   currentVideoId?: string
 ): Promise<HealResult> {
   try {
-    const response = await fetch(`${API_BASE}/api/stream/heal`, {
+    const response = await fetchStreamApi(`${API_BASE}/api/stream/heal`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channelId, channelName, currentVideoId }),
@@ -206,7 +214,7 @@ export async function validateVideo(videoId: string): Promise<{
   isLive?: boolean;
 }> {
   try {
-    const response = await fetch(`${API_BASE}/api/stream/validate`, {
+    const response = await fetchStreamApi(`${API_BASE}/api/stream/validate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ videoId }),
@@ -221,7 +229,7 @@ export async function validateVideo(videoId: string): Promise<{
 
 export async function fetchUserLibrary(): Promise<LibraryItem[] | null> {
   try {
-    const response = await fetch(`${API_BASE}/api/library`, {
+    const response = await fetchStreamApi(`${API_BASE}/api/library`, {
       headers: await getLibraryHeaders(),
       credentials: 'include',
     });
@@ -241,7 +249,7 @@ export async function fetchUserLibrary(): Promise<LibraryItem[] | null> {
 
 export async function addToLibrary(item: Omit<LibraryItem, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<LibraryItem | null> {
   try {
-    const response = await fetch(`${API_BASE}/api/library`, {
+    const response = await fetchStreamApi(`${API_BASE}/api/library`, {
       method: 'POST',
       headers: await getLibraryHeaders(true),
       credentials: 'include',
@@ -260,7 +268,7 @@ export async function addToLibrary(item: Omit<LibraryItem, 'id' | 'userId' | 'cr
 
 export async function removeFromLibrary(id: string): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE}/api/library/${id}`, {
+    const response = await fetchStreamApi(`${API_BASE}/api/library/${id}`, {
       method: 'DELETE',
       headers: await getLibraryHeaders(),
       credentials: 'include',
@@ -277,7 +285,7 @@ export async function removeFromLibrary(id: string): Promise<boolean> {
 
 export async function updateLibraryItem(id: string, updates: Partial<LibraryItem>): Promise<LibraryItem | null> {
   try {
-    const response = await fetch(`${API_BASE}/api/library/${id}`, {
+    const response = await fetchStreamApi(`${API_BASE}/api/library/${id}`, {
       method: 'PATCH',
       headers: await getLibraryHeaders(true),
       credentials: 'include',
@@ -301,7 +309,7 @@ export async function checkVideoLiveStatus(videoId: string): Promise<{
   apiError?: boolean;
 }> {
   try {
-    const response = await fetch(`${API_BASE}/api/youtube/video-live/${videoId}`);
+    const response = await fetchStreamApi(`${API_BASE}/api/youtube/video-live/${videoId}`);
     if (!response.ok) {
       // API error - return apiError so client shows "System Maintenance" not "Offline"
       return { isLive: false, liveBroadcastContent: null, apiError: true };
@@ -344,7 +352,7 @@ export async function checkChannelLiveStatus(channelId: string, forceRefresh: bo
   console.log(`[StreamAPI] Cache MISS for ${channelId}, fetching from API...`);
   
   try {
-    const response = await fetch(`${API_BASE}/api/youtube/channel-live/${channelId}`);
+    const response = await fetchStreamApi(`${API_BASE}/api/youtube/channel-live/${channelId}`);
     if (!response.ok) {
       // On API error (403, etc.), mark as API error - NOT genuine offline
       console.warn(`[StreamAPI] API error for ${channelId}: ${response.status}`);
@@ -401,7 +409,7 @@ export async function searchChannelLiveStream(channelHandle: string, forceRefres
   console.log(`[StreamAPI] Cache MISS for handle ${channelHandle}, fetching from API...`);
   
   try {
-    const response = await fetch(`${API_BASE}/api/youtube/search-live/${encodeURIComponent(channelHandle)}`);
+    const response = await fetchStreamApi(`${API_BASE}/api/youtube/search-live/${encodeURIComponent(channelHandle)}`);
     if (!response.ok) {
       // On API error (403, etc.), mark as API error - NOT genuine offline
       console.warn(`[StreamAPI] API error for handle ${channelHandle}: ${response.status}`);
