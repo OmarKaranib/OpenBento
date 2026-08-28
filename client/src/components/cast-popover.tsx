@@ -14,6 +14,7 @@ import {
 import type { Widget } from "@/App";
 import type { CastSnapshot } from "@shared/schema";
 import type { DashboardPage } from "@shared/dashboard-pages";
+import { requestTimeoutSignal } from "@/lib/request-timeout";
 
 interface CastPopoverProps {
   widgets: Widget[];
@@ -66,6 +67,7 @@ async function authedFetch(method: string, url: string, body?: unknown): Promise
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
     credentials: "include",
+    signal: requestTimeoutSignal(),
   });
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
