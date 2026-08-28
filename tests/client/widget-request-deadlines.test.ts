@@ -15,3 +15,10 @@ test('the polling News widget gives each request a deadline', () => {
   assert.match(widget, /requestTimeoutSignal/);
   assert.match(widget, /api\/news[\s\S]*signal: requestTimeoutSignal\(\)/);
 });
+
+test('the polling GitHub widget gives each request a deadline', () => {
+  const widget = readFileSync('client/src/widgets/github-pulse-widget.tsx', 'utf8');
+
+  assert.match(widget, /requestTimeoutSignal/);
+  assert.match(widget, /fetch\(url, \{ signal: requestTimeoutSignal\(\) \}\)/);
+});

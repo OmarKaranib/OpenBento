@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GitCommit, GitPullRequest, Github, Settings as SettingsIcon, Star, Tag } from 'lucide-react';
 import { MONO, RefreshIndicator, Widget, qrIconBtnStyle, qrInputStyle, timeAgo } from './shared';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 interface GitHubPulseProps {
   widget: Widget;
@@ -81,7 +82,7 @@ export const GitHubPulseWidget: React.FC<GitHubPulseProps> = ({ widget, onUpdate
         const url = repo
           ? `/api/github/repo/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
           : `/api/github/user/${encodeURIComponent(owner)}`;
-        const r = await fetch(url);
+        const r = await fetch(url, { signal: requestTimeoutSignal() });
         const body = await r.json();
         if (cancelled) return;
         if (!r.ok) {
