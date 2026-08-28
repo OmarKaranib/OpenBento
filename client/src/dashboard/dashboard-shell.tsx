@@ -426,17 +426,6 @@ const addWidget = useCallback(
   [findSmartPosition]
 );
 
-// ── Nuclear Refresh Fix ───────────────────────────────────────────────────
-const handleRefreshWidget = useCallback((widgetId: string) => {
-  setWidgets(prev =>
-    prev.map(w =>
-      w.id === widgetId
-        ? { ...w, refreshCounter: (w.refreshCounter ?? 0) + 1, lastRefresh: Date.now(), error: null, embedBlocked: false, apiError: false, isPaused: false, usePureIframe: false }
-        : w
-    )
-  );
-}, []);
-
 // ── Clock 12h / 24h toggle ─────────────────────────────────────────────────
 const handleToggleClockFormat = useCallback((widgetId: string) => {
   setWidgets(prev =>
@@ -855,7 +844,6 @@ const dashboardProps = {
   // doesn't have to call useAuth() a second time just to get it. This
   // keeps a single auth-hook subscription per render tree.
   supabaseClient,
-  onRefreshWidget:     handleRefreshWidget,
   onToggleClockFormat: handleToggleClockFormat,
   onColorChange:       handleClockColorChange,
   // Multi-Page Dashboards — pages collection + management API
