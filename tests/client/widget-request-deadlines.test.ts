@@ -50,3 +50,9 @@ test('Air Quality refreshes and city searches have deadlines', () => {
   assert.equal(widget.match(/signal: requestTimeoutSignal\(/g)?.length, 2);
   assert.match(widget, /requestTimeoutSignal\(undefined, signal\)/);
 });
+
+test('initial, hourly, and manual Quote requests have deadlines', () => {
+  const widget = readFileSync('client/src/widgets/quote-widget.tsx', 'utf8');
+
+  assert.equal(widget.match(/signal: requestTimeoutSignal\(\)/g)?.length, 3);
+});

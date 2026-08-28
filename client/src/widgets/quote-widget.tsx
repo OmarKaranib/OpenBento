@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Heart, Quote as QuoteIcon, RefreshCw, Star } from 'lucide-react';
 import { MONO, Widget, isLightBg, qrIconBtnStyle } from './shared';
 import { FALLBACK_QUOTES, pickFallbackQuote, type QuoteEntry } from './play-helpers';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 interface Props { widget: Widget; onUpdate?: (id: string, patch: Partial<Widget>) => void; }
 
@@ -28,7 +29,7 @@ export const QuoteWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch('/api/quote');
+        const r = await fetch('/api/quote', { signal: requestTimeoutSignal() });
         if (!r.ok) return;
         const j = await r.json() as { text?: string; author?: string };
         if (cancelled || typeof j.text !== 'string' || j.text.trim().length === 0) return;
@@ -45,7 +46,7 @@ export const QuoteWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     const tick = async () => {
       if (!active) return;
       try {
-        const r = await fetch('/api/quote');
+        const r = await fetch('/api/quote', { signal: requestTimeoutSignal() });
         if (!r.ok) return;
         const j = await r.json() as { text?: string; author?: string };
         if (!active || typeof j.text !== 'string' || j.text.trim().length === 0) return;
@@ -77,7 +78,7 @@ export const QuoteWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   const refresh = async () => {
     setLoading(true); setErr(null);
     try {
-      const r = await fetch('/api/quote');
+      const r = await fetch('/api/quote', { signal: requestTimeoutSignal() });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json() as { text?: string; author?: string };
       if (typeof j.text !== 'string' || j.text.trim().length === 0) throw new Error('Empty quote');
