@@ -1338,10 +1338,10 @@ export async function registerRoutes(
         const now = Date.now();
       // PR count uses the search API to get a real total without paging.
       const [repoResp, commitsResp, prResp, releaseResp] = await Promise.all([
-        fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers }),
-        fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`, { headers }),
-        fetch(`https://api.github.com/search/issues?q=${encodeURIComponent(`repo:${owner}/${repo} is:pr is:open`)}&per_page=1`, { headers }),
-        fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, { headers }),
+        fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers, signal: AbortSignal.timeout(8_000) }),
+        fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`, { headers, signal: AbortSignal.timeout(8_000) }),
+        fetch(`https://api.github.com/search/issues?q=${encodeURIComponent(`repo:${owner}/${repo} is:pr is:open`)}&per_page=1`, { headers, signal: AbortSignal.timeout(8_000) }),
+        fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, { headers, signal: AbortSignal.timeout(8_000) }),
       ]);
 
       if (repoResp.status === 404) {
@@ -1466,8 +1466,8 @@ export async function registerRoutes(
       const pulse = await GITHUB_USER_CACHE.dedupe(cacheKey, async () => {
         const now = Date.now();
       const [userResp, reposResp] = await Promise.all([
-        fetch(`https://api.github.com/users/${owner}`, { headers }),
-        fetch(`https://api.github.com/users/${owner}/repos?type=owner&sort=updated&per_page=30`, { headers }),
+        fetch(`https://api.github.com/users/${owner}`, { headers, signal: AbortSignal.timeout(8_000) }),
+        fetch(`https://api.github.com/users/${owner}/repos?type=owner&sort=updated&per_page=30`, { headers, signal: AbortSignal.timeout(8_000) }),
       ]);
       if (userResp.status === 404) {
         throw new GhStatusError(404, 'User or organization not found');
