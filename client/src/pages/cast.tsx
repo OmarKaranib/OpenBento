@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Cast, Tv2, Wifi, WifiOff, Trash2 } from "lucide-react";
 import { WidgetRenderer, type Widget } from "@/App";
-import { buildKickEmbedUrl, buildTwitchEmbedUrl } from "@/lib/stream-embed-url";
+import { buildKickEmbedUrl, buildTwitchEmbedUrl, currentEmbedOrigin } from "@/lib/stream-embed-url";
 import type { CastSnapshot } from "@shared/schema";
 
 const ROOM_KEY = "openBentoCastRoomId";
@@ -91,7 +91,7 @@ function buildEmbedUrl(widget: Widget, muted: boolean): string | null {
     if (!id) return null;
     // enablejsapi=1 lets us postMessage mute/play/pause commands without
     // rebuilding the iframe (the cast-hub control channel relies on this).
-    return `https://www.youtube.com/embed/${id}?autoplay=1&mute=${muteFlag}&playsinline=1&rel=0&modestbranding=1&controls=0&enablejsapi=1`;
+    return `https://www.youtube.com/embed/${id}?autoplay=1&mute=${muteFlag}&playsinline=1&rel=0&modestbranding=1&controls=0&enablejsapi=1&origin=${encodeURIComponent(currentEmbedOrigin())}`;
   }
   if (widget.isTwitch || widget.twitchChannel) {
     const ch = widget.twitchChannel;

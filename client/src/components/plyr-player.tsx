@@ -1,4 +1,5 @@
 import { useEffect, useRef, useMemo, memo, useState } from 'react';
+import { currentEmbedOrigin } from '@/lib/stream-embed-url';
 
 declare global {
   interface Window {
@@ -76,8 +77,7 @@ function PlyrPlayerInner({
   useEffect(() => { onPausedChangeRef.current = onPausedChange; }, [onPausedChange]);
 
   const stableVideoId = useMemo(() => videoId || null, [videoId]);
-  // ORIGIN LOCKDOWN: Hardcoded production domain for YouTube postMessage handshake
-  const origin = 'https://openbento.tv';
+  const origin = useMemo(() => currentEmbedOrigin(), []);
 
   const setupMediaSession = (videoTitle: string) => {
     if ('mediaSession' in navigator) {

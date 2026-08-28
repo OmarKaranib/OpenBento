@@ -30,7 +30,7 @@ import { PageTabsStrip } from '@/components/page-tabs-strip';
 import type { DashboardPage } from '@shared/dashboard-pages';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
 import { isRefreshableVideoWidget, refreshVideoWidget } from '@/lib/video-refresh';
-import { buildKickEmbedUrl, buildTwitchEmbedUrl } from '@/lib/stream-embed-url';
+import { buildKickEmbedUrl, buildTwitchEmbedUrl, currentEmbedOrigin } from '@/lib/stream-embed-url';
 import {
   manualYouTubeCheckAction,
   shouldCheckYouTubeWidget,
@@ -979,10 +979,9 @@ const MasterControlDashboard = ({
     };
   }, [resizing, setWidgets, ad]);
 
-  // ORIGIN LOCKDOWN: Hardcoded production domain for YouTube postMessage handshake
-  // referrerPolicy="strict-origin-when-cross-origin" is set on iframes for valid Referer header
+  // The YouTube postMessage origin must match the page that owns the player.
   const getYouTubeEmbedUrl = (videoId: string): string => {
-    const origin = 'https://openbento.tv';
+    const origin = currentEmbedOrigin();
     return `https://www.youtube.com/embed/${videoId}?origin=${encodeURIComponent(origin)}&enablejsapi=1&autoplay=1&mute=1&modestbranding=1&rel=0&widget_referrer=${encodeURIComponent(origin)}`;
   };
 

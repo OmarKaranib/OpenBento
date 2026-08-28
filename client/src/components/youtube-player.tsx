@@ -1,6 +1,7 @@
 import { useEffect, useRef, useMemo, useCallback, memo, Component, ReactNode, useState } from 'react';
 import { Lock, ExternalLink } from 'lucide-react';
 import { isVideoBlacklisted } from '@/lib/channel-constants';
+import { currentEmbedOrigin } from '@/lib/stream-embed-url';
 
 // DOM EXCEPTION SHIELD: Error Boundary to catch YouTube player errors
 // Prevents removeChild errors from crashing the entire dashboard
@@ -215,6 +216,7 @@ function YouTubePlayerInner({
 
   // Memoize the stable channel ID for live streams - fallback when no videoId
   const stableChannelId = useMemo(() => channelId || null, [channelId]);
+  const embedOrigin = useMemo(() => currentEmbedOrigin(), []);
 
 
   // MediaSession API for background play support
@@ -259,8 +261,7 @@ function YouTubePlayerInner({
     safeCleanupPlayer(playerRef.current, playerId);
     playerRef.current = null;
 
-    // MULTI-VIEW PARITY: Hardcoded production domain for YouTube postMessage handshake
-    // Both origin AND widget_referrer must match to bypass domain blocks
+    // Both origin AND widget_referrer must match the page hosting the player.
     // rel: 0 = no related videos, iv_load_policy: 3 = hide video annotations
     const playerVars: Record<string, string | number> = {
       autoplay: 1,
@@ -269,8 +270,8 @@ function YouTubePlayerInner({
       rel: 0,
       iv_load_policy: 3,
       enablejsapi: 1,
-      origin: 'https://openbento.tv',
-      widget_referrer: 'https://openbento.tv',
+      origin: embedOrigin,
+      widget_referrer: embedOrigin,
       playsinline: 1,
     };
 
@@ -405,7 +406,7 @@ function YouTubePlayerInner({
       console.error('[YouTube] Failed to initialize player:', e);
       onErrorRef.current?.();
     }
-  }, [playerId, stableVideoId, stableChannelId, widgetId, setupMediaSession, isManualOverride]); // Only re-init when video/widget/channel changes
+  }, [playerId, stableVideoId, stableChannelId, widgetId, setupMediaSession, isManualOverride, embedOrigin]); // Only re-init when video/widget/channel changes
 
   // Initialize player only when videoId changes
   useEffect(() => {
@@ -527,7 +528,7 @@ function YouTubePlayerInner({
         style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
       >
         <iframe
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${isMuted ? 1 : 0}&origin=https://openbento.tv&playsinline=1&rel=0&modestbranding=1`}
+          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${isMuted ? 1 : 0}&origin=${encodeURIComponent(embedOrigin)}&playsinline=1&rel=0&modestbranding=1`}
           className="w-full h-full border-0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           referrerPolicy="strict-origin-when-cross-origin"
@@ -547,7 +548,7 @@ function YouTubePlayerInner({
         className="w-full h-full"
       >
         <iframe
-          src={`https://www.youtube.com/embed/${stableVideoId}?autoplay=1&mute=${isMuted ? 1 : 0}&origin=https://openbento.tv&playsinline=1&rel=0&modestbranding=1`}
+          src={`https://www.youtube.com/embed/${stableVideoId}?autoplay=1&mute=${isMuted ? 1 : 0}&origin=${encodeURIComponent(embedOrigin)}&playsinline=1&rel=0&modestbranding=1`}
           className="w-full h-full border-0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           referrerPolicy="strict-origin-when-cross-origin"
