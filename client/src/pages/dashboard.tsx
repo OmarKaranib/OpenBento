@@ -29,6 +29,7 @@ import { CastPopover } from '@/components/cast-popover';
 import { PageTabsStrip } from '@/components/page-tabs-strip';
 import type { DashboardPage } from '@shared/dashboard-pages';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
+import { isRefreshableVideoWidget } from '@/lib/video-refresh';
 import {
   manualYouTubeCheckAction,
   shouldCheckYouTubeWidget,
@@ -1317,28 +1318,21 @@ const MasterControlDashboard = ({
   };
 
   const handleRefreshAllWidgets = () => {
-    const videoWidgets = widgets.filter(w => w.type === 'video' && w.url);
+    const videoWidgets = widgets.filter(isRefreshableVideoWidget);
     if (videoWidgets.length === 0) return;
 
     setWidgets(prev => prev.map(w => {
-      if (w.type === 'video' && w.url) {
-        return { ...w, url: '', lastRefresh: Date.now(), isOffline: false };
+      if (isRefreshableVideoWidget(w)) {
+        return {
+          ...w,
+          lastRefresh: Date.now(),
+          isOffline: false,
+          error: null,
+          embedBlocked: false,
+        };
       }
       return w;
     }));
-
-    setTimeout(() => {
-      setWidgets(prev => prev.map(w => {
-        if (w.type === 'video') {
-          if (w.isYouTube && w.videoId) {
-            return { ...w, url: `https://www.youtube.com/watch?v=${w.videoId}` };
-          } else if (w.isTwitch && w.twitchChannel) {
-            return { ...w, url: `https://www.twitch.tv/${w.twitchChannel}` };
-          }
-        }
-        return w;
-      }));
-    }, 100);
   };
 
   const handleMasterMute = () => {

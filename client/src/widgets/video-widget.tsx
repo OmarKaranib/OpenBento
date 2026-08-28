@@ -145,6 +145,7 @@ export function VideoWidget({
   } else if (widget.url) {
     return (
       <iframe
+        key={`${widget.id}-${widget.lastRefresh || 0}`}
         src={widget.url}
         className="w-full h-full"
         style={{ pointerEvents: isSeekMode ? 'auto' : 'none' }}
