@@ -18,17 +18,13 @@ test('weather and news requests cannot wait forever', () => {
 
 test('weather and news routes share an abuse limit', () => {
   const routes = readFileSync('server/routes.ts', 'utf8');
-  const publicDataRoutes = routes.slice(
-    routes.indexOf('// ─── Weather API'),
-    routes.indexOf('// ─── Markets API'),
-  );
 
-  const guardedRoutes = publicDataRoutes.match(
+  const guardedRoutes = routes.match(
     /publicDataRateLimit\.allow\(requestIp\(req\)\)/g,
   );
 
-  assert.equal(guardedRoutes?.length, 3);
-  assert.match(publicDataRoutes, /status\(429\)/);
+  assert.equal(guardedRoutes?.length, 5);
+  assert.match(routes, /Too many public data requests/);
 });
 
 test('successful weather and news responses are cached', () => {

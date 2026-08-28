@@ -1258,6 +1258,10 @@ export async function registerRoutes(
   void MARKETS_CACHE;
 
   app.get('/api/markets', async (req: Request, res: Response) => {
+    if (!publicDataRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ error: 'Too many public data requests. Please try again later.' });
+    }
+
     const raw = typeof req.query.symbols === 'string' ? req.query.symbols : '';
     const symbols = parseMarketsSymbols(raw);
     if (symbols.length === 0) {
@@ -1791,6 +1795,10 @@ export async function registerRoutes(
   // elsewhere and the widget hides the row).
   const airQualityService = createAirQualityService();
   app.get('/api/air-quality', async (req: Request, res: Response) => {
+    if (!publicDataRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ error: 'Too many public data requests. Please try again later.' });
+    }
+
     const pollen = req.query.pollen === '1' || req.query.pollen === 'true';
     let lat = Number(req.query.lat);
     let lon = Number(req.query.lon);
