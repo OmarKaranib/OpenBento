@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseWeatherLookup } from '../../server/services/weather-query';
+import { parseWeatherLookup, weatherLookupCacheKey } from '../../server/services/weather-query';
 
 test('weather lookup accepts valid coordinates', () => {
   assert.deepEqual(parseWeatherLookup({ lat: '25.2048', lon: '55.2708' }), {
@@ -44,4 +44,15 @@ test('weather lookup rejects malformed and oversized cities', () => {
     ok: false,
     error: 'City name is too long',
   });
+});
+
+test('nearby coordinates and equivalent cities share cache keys', () => {
+  assert.equal(
+    weatherLookupCacheKey({ kind: 'coordinates', lat: 25.20481, lon: 55.27081 }),
+    weatherLookupCacheKey({ kind: 'coordinates', lat: 25.20482, lon: 55.27082 }),
+  );
+  assert.equal(
+    weatherLookupCacheKey({ kind: 'city', city: 'Dubai' }),
+    weatherLookupCacheKey({ kind: 'city', city: 'DUBAI' }),
+  );
 });

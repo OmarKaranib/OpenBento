@@ -30,3 +30,16 @@ test('weather and news routes share an abuse limit', () => {
   assert.equal(guardedRoutes?.length, 3);
   assert.match(publicDataRoutes, /status\(429\)/);
 });
+
+test('successful weather and news responses are cached', () => {
+  const routes = readFileSync('server/routes.ts', 'utf8');
+  const publicDataRoutes = routes.slice(
+    routes.indexOf('// ─── Weather API'),
+    routes.indexOf('// ─── Markets API'),
+  );
+
+  assert.equal(publicDataRoutes.match(/weatherCache\.get\(cacheKey\)/g)?.length, 2);
+  assert.equal(publicDataRoutes.match(/weatherCache\.set\(cacheKey, mapped\)/g)?.length, 2);
+  assert.match(publicDataRoutes, /newsCache\.get\(cacheKey\)/);
+  assert.match(publicDataRoutes, /newsCache\.set\(cacheKey, mapped\)/);
+});

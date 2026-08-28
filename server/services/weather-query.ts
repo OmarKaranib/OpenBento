@@ -6,6 +6,12 @@ export type WeatherLookupResult =
   | { ok: true; lookup: WeatherLookup }
   | { ok: false; error: string };
 
+export function weatherLookupCacheKey(lookup: WeatherLookup): string {
+  return lookup.kind === 'coordinates'
+    ? `coordinates:${lookup.lat.toFixed(2)},${lookup.lon.toFixed(2)}`
+    : `city:${lookup.city.toLocaleLowerCase('en-US')}`;
+}
+
 export function parseWeatherLookup(query: Record<string, unknown>): WeatherLookupResult {
   const hasLat = query.lat !== undefined;
   const hasLon = query.lon !== undefined;

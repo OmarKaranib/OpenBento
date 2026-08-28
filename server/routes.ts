@@ -15,7 +15,7 @@ import { LruTtlCache } from "./services/lruCache";
 import { attachSupabaseUser as attachSupabaseUserShared } from "./services/supabaseAuth";
 import { FixedWindowRateLimiter } from "./services/fixed-window-rate-limit";
 import { streamHealRequestSchema } from "./services/stream-heal-guard";
-import { parseWeatherLookup } from "./services/weather-query";
+import { parseWeatherLookup, weatherLookupCacheKey } from "./services/weather-query";
 
 // Admin email list - used for admin access only
 const ADMIN_EMAILS = [
@@ -79,6 +79,14 @@ interface KickStatusPayload {
 const kickStatusCache = new LruTtlCache<KickStatusPayload>({
   max: 500,
   ttlMs: 60 * 1000,
+});
+const weatherCache = new LruTtlCache<Record<string, unknown>>({
+  max: 500,
+  ttlMs: 5 * 60 * 1000,
+});
+const newsCache = new LruTtlCache<Record<string, unknown>>({
+  max: 100,
+  ttlMs: 10 * 60 * 1000,
 });
 
 function unknownKickStatus(channelId: string): KickStatusPayload {
@@ -1006,6 +1014,9 @@ export async function registerRoutes(
     const lookupResult = parseWeatherLookup(req.query);
     if (!lookupResult.ok) return res.status(400).json({ error: lookupResult.error });
     const lookup = lookupResult.lookup;
+    const cacheKey = `current:${weatherLookupCacheKey(lookup)}`;
+    const cached = weatherCache.get(cacheKey);
+    if (cached) return res.json(cached);
 
     let url: string;
     if (lookup.kind === 'coordinates') {
@@ -1034,6 +1045,7 @@ export async function registerRoutes(
         humidity: data.main.humidity,
         windKph: Math.round((data.wind?.speed || 0) * 3.6),
       };
+      weatherCache.set(cacheKey, mapped);
       res.json(mapped);
     } catch (err) {
       console.error('[Weather] Fetch error:', err);
@@ -1057,6 +1069,9 @@ export async function registerRoutes(
     const lookupResult = parseWeatherLookup(req.query);
     if (!lookupResult.ok) return res.status(400).json({ error: lookupResult.error });
     const lookup = lookupResult.lookup;
+    const cacheKey = `forecast:${weatherLookupCacheKey(lookup)}`;
+    const cached = weatherCache.get(cacheKey);
+    if (cached) return res.json(cached);
 
     let url: string;
     if (lookup.kind === 'coordinates') {
@@ -1121,12 +1136,14 @@ export async function registerRoutes(
         };
       });
 
-      res.json({
+      const mapped = {
         city: data.city?.name ?? null,
         lat: data.city?.coord?.lat ?? (lookup.kind === 'coordinates' ? lookup.lat : null),
         lon: data.city?.coord?.lon ?? (lookup.kind === 'coordinates' ? lookup.lon : null),
         days,
-      });
+      };
+      weatherCache.set(cacheKey, mapped);
+      res.json(mapped);
     } catch (err) {
       console.error('[Weather Forecast] Fetch error:', err);
       res.status(503).json({ error: 'Service temporarily unavailable' });
@@ -1177,6 +1194,9 @@ export async function registerRoutes(
       .join(',');
 
     const category = NEWS_VALID_CATEGORIES.has(rawCategory) ? rawCategory : '';
+    const cacheKey = sources ? `sources:${sources}` : `category:${category || 'general'}`;
+    const cached = newsCache.get(cacheKey);
+    if (cached) return res.json(cached);
 
     try {
       const params = new URLSearchParams();
@@ -1204,7 +1224,9 @@ export async function registerRoutes(
           source: a.source?.name || '',
           url: a.url || '',
         }));
-      res.json({ articles });
+      const mapped = { articles };
+      newsCache.set(cacheKey, mapped);
+      res.json(mapped);
     } catch (err) {
       console.error('[News] Fetch error:', err);
       res.status(503).json({ error: 'Service temporarily unavailable' });
