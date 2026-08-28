@@ -1,7 +1,12 @@
 import { LruTtlCache } from './lruCache';
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
+const YOUTUBE_REQUEST_TIMEOUT_MS = 8_000;
 const MUSIC_CATEGORY_ID = '10';
+
+function fetchYouTubeApi(url: string): Promise<Response> {
+  return fetch(url, { signal: AbortSignal.timeout(YOUTUBE_REQUEST_TIMEOUT_MS) });
+}
 
 type ChannelLiveResult = {
   isLive: boolean;
@@ -64,7 +69,7 @@ export async function searchLiveStream(
   const url = `${YOUTUBE_API_BASE}/search?part=snippet&q=${searchQuery}&type=video&eventType=live&maxResults=10&key=${apiKey}`;
   
   try {
-    const response = await fetch(url);
+    const response = await fetchYouTubeApi(url);
     if (!response.ok) {
       console.error('[YouTube API] Search failed:', response.status);
       return [];
@@ -96,7 +101,7 @@ async function fetchVideoDetails(
   const url = `${YOUTUBE_API_BASE}/videos?part=snippet,status,contentDetails&id=${videoId}&key=${apiKey}`;
   
   try {
-    const response = await fetch(url);
+    const response = await fetchYouTubeApi(url);
     if (!response.ok) {
       console.error('[YouTube API] Video details failed:', response.status);
       return { details: null, apiError: true };
@@ -215,7 +220,7 @@ export async function checkVideoLiveStatusById(
   const url = `${YOUTUBE_API_BASE}/videos?part=snippet,status&id=${videoId}&key=${apiKey}`;
   
   try {
-    const response = await fetch(url);
+    const response = await fetchYouTubeApi(url);
     if (!response.ok) {
       console.error('[YouTube API] Video status check failed:', response.status);
       return { isLive: false, liveVideoId: null, liveBroadcastContent: null, title: null, apiError: true };
@@ -271,7 +276,7 @@ export async function checkChannelLiveStatus(
   const url = `${YOUTUBE_API_BASE}/search?part=snippet&channelId=${channelId}&type=video&eventType=live&maxResults=1&key=${apiKey}`;
   
   try {
-    const response = await fetch(url);
+    const response = await fetchYouTubeApi(url);
     if (!response.ok) {
       console.error('[YouTube API] Channel live check failed:', response.status);
       // Return apiError=true so client knows this was an API failure, not genuinely offline
@@ -346,7 +351,7 @@ export async function resolveChannelHandle(
   const url = `${YOUTUBE_API_BASE}/channels?part=id&forHandle=${encodeURIComponent(normalizedHandle)}&key=${apiKey}`;
   
   try {
-    const response = await fetch(url);
+    const response = await fetchYouTubeApi(url);
     if (!response.ok) {
       console.error('[YouTube API] Direct channel handle resolution failed:', response.status);
       return null;
@@ -380,7 +385,7 @@ export async function getLatestVideoId(
   const url = `${YOUTUBE_API_BASE}/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=1&key=${apiKey}`;
   
   try {
-    const response = await fetch(url);
+    const response = await fetchYouTubeApi(url);
     if (!response.ok) {
       console.error('[YouTube API] Uploads playlist fetch failed:', response.status);
       return { videoId: null, title: null, apiError: true };

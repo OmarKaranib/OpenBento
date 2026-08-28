@@ -5,8 +5,10 @@ import { resolveChannelHandle } from '../../server/services/youtube-api';
 test('YouTube handles use the direct low-cost channel lookup', async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl = '';
-  globalThis.fetch = (async (input: string | URL | Request) => {
+  let requestedSignal: AbortSignal | null | undefined;
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     requestedUrl = String(input);
+    requestedSignal = init?.signal;
     return {
       ok: true,
       json: async () => ({ items: [{ id: 'UC-direct-id' }] }),
@@ -22,6 +24,7 @@ test('YouTube handles use the direct low-cost channel lookup', async () => {
     assert.equal(url.searchParams.get('part'), 'id');
     assert.equal(url.searchParams.get('forHandle'), '@OpenBento');
     assert.equal(url.searchParams.get('q'), null);
+    assert.ok(requestedSignal instanceof AbortSignal);
   } finally {
     globalThis.fetch = originalFetch;
   }
