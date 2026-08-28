@@ -18,6 +18,7 @@ import {
   type MarketplaceCategory,
   type MarketplaceWidget,
 } from '@shared/marketplace-manifest';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 type Filter = 'all' | MarketplaceCategory;
 
@@ -62,7 +63,10 @@ export default function MarketplacePage() {
   // ── Load manifest ─────────────────────────────────────────────────────
   useEffect(() => {
     cancelledRef.current = false;
-    fetch('/marketplace/widgets.json', { cache: 'no-store' })
+    fetch('/marketplace/widgets.json', {
+      cache: 'no-store',
+      signal: requestTimeoutSignal(),
+    })
       .then((r) => {
         if (!r.ok) throw new Error('http ' + r.status);
         return r.json();

@@ -92,3 +92,9 @@ test('onboarding channel preload has a deadline', () => {
 
   assert.match(onboarding, /fetch\('\/api\/links', \{ signal: requestTimeoutSignal\(\) \}\)/);
 });
+
+test('Marketplace loading reaches its error state after a deadline', () => {
+  const marketplace = readFileSync('client/src/pages/marketplace.tsx', 'utf8');
+
+  assert.match(marketplace, /marketplace\/widgets\.json[\s\S]*signal: requestTimeoutSignal\(\)/);
+});
