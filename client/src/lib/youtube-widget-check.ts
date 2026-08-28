@@ -19,6 +19,17 @@ export function shouldCheckYouTubeWidget(
     : !checkedVideoIds.has(widget.videoId);
 }
 
-export function isTemporaryYouTubeStatusError(status: { apiError?: boolean }): boolean {
-  return status.apiError === true;
+export type ManualYouTubeCheckAction =
+  | 'preserve'
+  | 'accept-live'
+  | 'search-replacement'
+  | 'accept-offline';
+
+export function manualYouTubeCheckAction(
+  status: { isLive: boolean; apiError?: boolean },
+  hasChannelHandle: boolean,
+): ManualYouTubeCheckAction {
+  if (status.apiError) return 'preserve';
+  if (status.isLive) return 'accept-live';
+  return hasChannelHandle ? 'search-replacement' : 'accept-offline';
 }

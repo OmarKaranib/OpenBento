@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  isTemporaryYouTubeStatusError,
+  manualYouTubeCheckAction,
   shouldCheckYouTubeWidget,
 } from '../../client/src/lib/youtube-widget-check';
 
@@ -32,8 +32,9 @@ test('checked videos wait, while offline YouTube videos follow revalidation timi
   assert.equal(shouldCheckYouTubeWidget(offline, unchecked, true), true);
 });
 
-test('temporary API failures are distinguished from confirmed offline answers', () => {
-  assert.equal(isTemporaryYouTubeStatusError({ apiError: true }), true);
-  assert.equal(isTemporaryYouTubeStatusError({ apiError: false }), false);
-  assert.equal(isTemporaryYouTubeStatusError({}), false);
+test('manual checks search for a replacement only after a confirmed ended video', () => {
+  assert.equal(manualYouTubeCheckAction({ isLive: false, apiError: true }, true), 'preserve');
+  assert.equal(manualYouTubeCheckAction({ isLive: true, apiError: false }, true), 'accept-live');
+  assert.equal(manualYouTubeCheckAction({ isLive: false, apiError: false }, true), 'search-replacement');
+  assert.equal(manualYouTubeCheckAction({ isLive: false, apiError: false }, false), 'accept-offline');
 });

@@ -30,7 +30,7 @@ import { PageTabsStrip } from '@/components/page-tabs-strip';
 import type { DashboardPage } from '@shared/dashboard-pages';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
 import {
-  isTemporaryYouTubeStatusError,
+  manualYouTubeCheckAction,
   shouldCheckYouTubeWidget,
 } from '@/lib/youtube-widget-check';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -1142,6 +1142,7 @@ const MasterControlDashboard = ({
   const handleRefreshWidget = async (widgetId: string) => {
     const widget = widgets.find(w => w.id === widgetId);
     if (!widget) return;
+    let shouldSearchReplacement = widget.isYouTube === true && !widget.videoId;
 
     // QUOTA OPTIMIZATION: Prefer videos.list (1 unit) over search.list (100 units)
     // If widget has a videoId, check if it's still live using videos.list first
@@ -1150,8 +1151,9 @@ const MasterControlDashboard = ({
       
       try {
         const liveStatus = await checkVideoLiveStatus(widget.videoId);
+        const action = manualYouTubeCheckAction(liveStatus, Boolean(widget.channelHandle));
 
-        if (isTemporaryYouTubeStatusError(liveStatus)) {
+        if (action === 'preserve') {
           console.warn(`[CheckAgain] YouTube status is temporarily unavailable for ${widget.videoId}; keeping the last known state`);
           setWidgets(prev => prev.map(w =>
             w.id === widgetId ? { ...w, apiError: true } : w
@@ -1159,7 +1161,7 @@ const MasterControlDashboard = ({
           return;
         }
         
-        if (liveStatus.isLive) {
+        if (action === 'accept-live') {
           console.log(`[CheckAgain] Video ${widget.videoId} is LIVE (videos.list 1 unit)`);
           setWidgets(prev => prev.map(w => 
             w.id === widgetId 
@@ -1176,20 +1178,21 @@ const MasterControlDashboard = ({
               : w
           ));
           return;
-        } else {
-          // Video is no longer live - ONLY update badge, keep embed rendering
-          // ARCHITECTURE PIVOT: Never set isOffline=true if videoId exists
-          console.log(`[CheckAgain] Video ${widget.videoId} is not live (badge update only)`);
-          setWidgets(prev => prev.map(w => 
-            w.id === widgetId ? { 
-              ...w, 
-              isLive: false, // Badge only - embed keeps rendering
-              error: null,
-              embedBlocked: false,
-            } : w
-          ));
-          return;
         }
+
+        console.log(`[CheckAgain] Video ${widget.videoId} is not live`);
+        setWidgets(prev => prev.map(w =>
+          w.id === widgetId ? {
+            ...w,
+            isLive: false,
+            apiError: false,
+            error: null,
+            embedBlocked: false,
+          } : w
+        ));
+
+        if (action === 'accept-offline') return;
+        shouldSearchReplacement = true;
       } catch (error) {
         console.error('[CheckAgain] Error checking video status:', error);
         // Keep the last known playback state when the status check itself fails.
@@ -1200,14 +1203,22 @@ const MasterControlDashboard = ({
       }
     }
     
-    // FALLBACK: Only use search.list (100 units) if no videoId exists
-    // This path should be rare - only for widgets without a stored videoId
-    if (widget.isYouTube && widget.channelHandle && !widget.videoId) {
-      console.warn(`[CheckAgain] EXPENSIVE: Using search.list (100 units) for @${widget.channelHandle} - no videoId stored`);
+    // A search is only used after a manual click when no video is stored or
+    // the stored video was confirmed to have ended.
+    if (widget.isYouTube && widget.channelHandle && shouldSearchReplacement) {
+      console.warn(`[CheckAgain] Searching for replacement content from @${widget.channelHandle}`);
       
       try {
         const result = await searchChannelLiveStream(widget.channelHandle, true);
         
+        if (result.apiError) {
+          console.warn(`[CheckAgain] Replacement search failed for @${widget.channelHandle}; keeping the current player`);
+          setWidgets(prev => prev.map(w =>
+            w.id === widgetId ? { ...w, apiError: true } : w
+          ));
+          return;
+        }
+
         if (result.isLive && result.liveVideoId) {
           console.log(`[CheckAgain] Found live stream: ${result.liveVideoId} for @${widget.channelHandle}`);
           setWidgets(prev => prev.map(w => 
@@ -1253,15 +1264,14 @@ const MasterControlDashboard = ({
           return;
         } else {
           // No liveVideoId and no latestVideoId - channel has no playable content
-          const hasApiError = result.apiError === true;
-          console.log(`[CheckAgain] Channel @${widget.channelHandle} has no playable content (apiError: ${hasApiError})`);
+          console.log(`[CheckAgain] Channel @${widget.channelHandle} has no replacement content`);
           setWidgets(prev => prev.map(w => 
             w.id === widgetId ? { 
               ...w, 
-              isOffline: true, // No content available - show offline state
+              isOffline: !widget.videoId,
               isLive: false,
               isPlayingLatestVideo: false,
-              apiError: hasApiError,
+              apiError: false,
               error: null,
               embedBlocked: false,
             } : w
@@ -1271,48 +1281,13 @@ const MasterControlDashboard = ({
       } catch (error) {
         console.error('[CheckAgain] Error searching for live stream:', error);
         setWidgets(prev => prev.map(w => 
-          w.id === widgetId ? { 
-            ...w, 
-            isOffline: true, 
-            isLive: false,
-            apiError: true,
-            error: null,
-          } : w
+          w.id === widgetId ? { ...w, apiError: true } : w
         ));
         return;
       }
     }
 
-    // For YouTube widgets without channelHandle or videoId, just refresh
-    if (widget.isYouTube && widget.videoId && !widget.channelHandle) {
-      setWidgets(prev => prev.map(w => 
-        w.id === widgetId && w.type === 'video' 
-          ? { ...w, url: '', lastRefresh: Date.now(), isOffline: false, error: null, embedBlocked: false } 
-          : w
-      ));
-
-      try {
-        const liveStatus = await checkVideoLiveStatus(widget.videoId);
-        if (liveStatus.isLive) {
-          // Video is live - ensure consistent state
-          console.log(`[TrueLiveFilter] Video ${widget.videoId} is LIVE`);
-          setWidgets(prev => prev.map(w => 
-            w.id === widgetId ? { ...w, isOffline: false, isLive: true, error: null, embedBlocked: false } : w
-          ));
-        } else {
-          console.log(`[TrueLiveFilter] Video ${widget.videoId} is not live (${liveStatus.liveBroadcastContent})`);
-          setWidgets(prev => prev.map(w => 
-            w.id === widgetId ? { ...w, isOffline: true, isLive: false, error: null, embedBlocked: false } : w
-          ));
-        }
-        return;
-      } catch (error) {
-        console.error('[TrueLiveFilter] Error checking live status:', error);
-      }
-      return;
-    }
-
-    // For non-YouTube widgets (Twitch/Kick), just refresh
+    // Widgets that do not need a YouTube search can be remounted directly.
     setWidgets(prev => prev.map(w => 
       w.id === widgetId && w.type === 'video' 
         ? { ...w, url: '', lastRefresh: Date.now(), isOffline: false, error: null, embedBlocked: false } 
