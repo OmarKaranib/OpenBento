@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Cast, Tv2, Wifi, WifiOff, Trash2 } from "lucide-react";
 import { WidgetRenderer, type Widget } from "@/App";
 import { buildKickEmbedUrl, buildTwitchEmbedUrl, currentEmbedOrigin } from "@/lib/stream-embed-url";
+import { requestTimeoutSignal } from "@/lib/request-timeout";
 import type { CastSnapshot } from "@shared/schema";
 
 const ROOM_KEY = "openBentoCastRoomId";
@@ -268,7 +269,10 @@ export default function CastPage() {
       codeRetryRef.current = null;
     }
     try {
-      const res = await fetch("/api/cast/codes", { method: "POST" });
+      const res = await fetch("/api/cast/codes", {
+        method: "POST",
+        signal: requestTimeoutSignal(),
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setPairing({
@@ -491,7 +495,10 @@ export default function CastPage() {
     endForget();
     const rid = getRoomId();
     if (rid) {
-      fetch(`/api/cast/rooms/${encodeURIComponent(rid)}`, { method: "DELETE" }).catch(
+      fetch(`/api/cast/rooms/${encodeURIComponent(rid)}`, {
+        method: "DELETE",
+        signal: requestTimeoutSignal(),
+      }).catch(
         () => {},
       );
     }
