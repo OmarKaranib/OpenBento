@@ -29,7 +29,7 @@ import { CastPopover } from '@/components/cast-popover';
 import { PageTabsStrip } from '@/components/page-tabs-strip';
 import type { DashboardPage } from '@shared/dashboard-pages';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
-import { isRefreshableVideoWidget } from '@/lib/video-refresh';
+import { isRefreshableVideoWidget, refreshVideoWidget } from '@/lib/video-refresh';
 import {
   manualYouTubeCheckAction,
   shouldCheckYouTubeWidget,
@@ -1288,51 +1288,19 @@ const MasterControlDashboard = ({
       }
     }
 
-    // Widgets that do not need a YouTube search can be remounted directly.
-    setWidgets(prev => prev.map(w => 
-      w.id === widgetId && w.type === 'video' 
-        ? { ...w, url: '', lastRefresh: Date.now(), isOffline: false, error: null, embedBlocked: false } 
-        : w
+    // Remount the player without briefly deleting its source.
+    const refreshedAt = Date.now();
+    setWidgets(prev => prev.map(w =>
+      w.id === widgetId ? refreshVideoWidget(w, refreshedAt) : w
     ));
-
-    setTimeout(() => {
-      setWidgets(prev => {
-        const widget = prev.find(w => w.id === widgetId);
-        if (widget) {
-          const videoId = widget.videoId;
-          const twitchChannel = widget.twitchChannel;
-          return prev.map(w => {
-            if (w.id === widgetId) {
-              if (w.isYouTube && videoId) {
-                return { ...w, url: `https://www.youtube.com/watch?v=${videoId}` };
-              } else if (w.isTwitch && twitchChannel) {
-                return { ...w, url: `https://www.twitch.tv/${twitchChannel}` };
-              }
-            }
-            return w;
-          });
-        }
-        return prev;
-      });
-    }, 100);
   };
 
   const handleRefreshAllWidgets = () => {
     const videoWidgets = widgets.filter(isRefreshableVideoWidget);
     if (videoWidgets.length === 0) return;
 
-    setWidgets(prev => prev.map(w => {
-      if (isRefreshableVideoWidget(w)) {
-        return {
-          ...w,
-          lastRefresh: Date.now(),
-          isOffline: false,
-          error: null,
-          embedBlocked: false,
-        };
-      }
-      return w;
-    }));
+    const refreshedAt = Date.now();
+    setWidgets(prev => prev.map(w => refreshVideoWidget(w, refreshedAt)));
   };
 
   const handleMasterMute = () => {
