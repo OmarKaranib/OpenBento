@@ -227,6 +227,7 @@ test('saveCloudDashboard sends the active page and full pages collection', async
   assert.equal(calls.length, 1);
   assert.equal(calls[0].init.method, 'POST');
   assert.equal(calls[0].init.headers.Authorization, 'Bearer token-save');
+  assert.ok(calls[0].init.signal instanceof AbortSignal);
   const body = JSON.parse(calls[0].init.body);
   assert.equal(body.activePageId, 'page-home');
   assert.deepEqual(body.widgets, pagesState.pages[0].widgets);
@@ -282,6 +283,7 @@ test('Scenario 1: happy-path hydrate populates widgets from cloud row', async ()
   assert.ok(calls.length >= 1, 'hydrate GET fires');
   assert.match(calls[0].url, /\/api\/dashboard/);
   assert.equal((calls[0].init && calls[0].init.method) || 'GET', 'GET');
+  assert.ok(calls[0].init.signal instanceof AbortSignal);
   assert.ok(received, 'setPagesState was called');
   assert.equal(received.pages.length, 1, 'legacy row maps to a single Home page');
   assert.deepEqual(

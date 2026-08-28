@@ -17,6 +17,7 @@ import {
   sanitizePages,
   getActivePage,
 } from '@shared/dashboard-pages';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 type SupabaseLike = {
   auth: {
@@ -97,6 +98,7 @@ export async function saveCloudDashboard(
         pages: pagesState.pages,
         activePageId: pagesState.activePageId,
       }),
+      signal: requestTimeoutSignal(),
     });
     return res.ok;
   } catch {
@@ -165,6 +167,7 @@ export function useCloudSync({
       try {
         const res = await fetch('/api/dashboard', {
           headers: { Authorization: `Bearer ${token}` },
+          signal: requestTimeoutSignal(),
         });
         if (cancelled) return;
         if (!res.ok) {
