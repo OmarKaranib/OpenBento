@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Cloud, CloudDrizzle, CloudLightning, CloudRain, CloudSnow, Cloudy, Search, Sun, Wind } from 'lucide-react';
 import { MONO, Widget } from './shared';
 import { setLastResolvedLocation } from './weather-location';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 type WeatherIconType = 'sun' | 'cloud' | 'cloud-rain' | 'cloud-snow' | 'cloud-lightning' | 'wind' | 'cloud-drizzle' | 'cloudy';
 
@@ -147,7 +148,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget, onUpdate }
       ? `lat=${query.lat}&lon=${query.lon}`
       : `city=${encodeURIComponent(query.city)}`;
     try {
-      const resp = await fetch(`/api/weather?${qs}`);
+      const resp = await fetch(`/api/weather?${qs}`, { signal: requestTimeoutSignal() });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const w = await resp.json() as WeatherEntry;
       if (!mountedRef.current) return null;
@@ -163,7 +164,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget, onUpdate }
         ? `lat=${w.lat}&lon=${w.lon}`
         : qs;
       try {
-        const fcResp = await fetch(`/api/weather/forecast?${fcQs}`);
+        const fcResp = await fetch(`/api/weather/forecast?${fcQs}`, { signal: requestTimeoutSignal() });
         if (fcResp.ok) {
           const fc = await fcResp.json() as { days: ForecastDay[] };
           if (mountedRef.current) setForecast(Array.isArray(fc.days) ? fc.days : []);
