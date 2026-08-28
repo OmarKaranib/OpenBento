@@ -52,8 +52,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps = {}) {
     setError(null);
 
     try {
-      // Preserve the previous redirect target to avoid an OAuth flow regression.
-      await signInWithOAuth('google', { redirectTo: 'https://openbento.tv/' });
+      await signInWithOAuth('google');
     } catch (err: any) {
       setError(err?.message || 'An error occurred during Google login.');
     } finally {

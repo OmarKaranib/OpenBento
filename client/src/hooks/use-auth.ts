@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase as sharedSupabase } from '@/lib/supabase';
+import { currentAuthRedirectUrl } from '@/lib/auth-redirect';
 
 // Retry configuration
 const MAX_RETRIES = 3;
@@ -181,7 +182,7 @@ export function useAuth() {
             email,
             password,
             options: {
-              emailRedirectTo: `${window.location.origin}/auth/callback`,
+              emailRedirectTo: currentAuthRedirectUrl('/auth/callback'),
               data: {
                 email_confirmed: false, // Require email confirmation
               },
@@ -256,7 +257,7 @@ export function useAuth() {
           const { data, error } = await client.auth.signInWithOAuth({
             provider,
             options: {
-              redirectTo: options?.redirectTo ?? `${window.location.origin}/auth/callback`,
+              redirectTo: options?.redirectTo ?? currentAuthRedirectUrl('/auth/callback'),
               ...(options?.queryParams ? { queryParams: options.queryParams } : {}),
             },
           });
@@ -326,7 +327,7 @@ export function useAuth() {
             type: 'signup',
             email,
             options: {
-              emailRedirectTo: `${window.location.origin}/auth/callback`,
+              emailRedirectTo: currentAuthRedirectUrl('/auth/callback'),
             },
           });
           if (error) throw error;
@@ -390,7 +391,7 @@ export function useAuth() {
       const result = await withRetry(
         async () => {
           const { data, error } = await client.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/auth/reset-password`,
+            redirectTo: currentAuthRedirectUrl('/auth/reset-password'),
           });
           if (error) throw error;
           return data;

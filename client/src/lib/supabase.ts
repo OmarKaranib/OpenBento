@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient, User, Session, AuthError } from '@supabase/supabase-js';
+import { currentAuthRedirectUrl } from '@/lib/auth-redirect';
 
 const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const rawKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -56,7 +57,7 @@ export async function signInWithGoogle(): Promise<{ error: AuthError | null }> {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: 'https://openbento.tv/',
+      redirectTo: currentAuthRedirectUrl('/auth/callback'),
     },
   });
   return { error };
@@ -90,7 +91,7 @@ export async function resetPassword(email: string): Promise<{ error: AuthError |
     return { error: { name: 'ConfigError', message: 'Supabase not configured' } as AuthError };
   }
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/auth/reset-password`,
+    redirectTo: currentAuthRedirectUrl('/auth/reset-password'),
   });
   return { error };
 }
