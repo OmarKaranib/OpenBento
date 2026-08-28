@@ -1,3 +1,5 @@
+import { requestTimeoutSignal } from './request-timeout';
+
 const CACHE_KEY = 'openBentoVideoIdCache';
 const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -68,7 +70,9 @@ export function clearAllCache(): void {
 
 export async function fetchFreshVideoId(channelId: string): Promise<string | null> {
   try {
-    const response = await fetch(`/api/live-video?channelId=${encodeURIComponent(channelId)}`);
+    const response = await fetch(`/api/live-video?channelId=${encodeURIComponent(channelId)}`, {
+      signal: requestTimeoutSignal(),
+    });
     
     if (!response.ok) {
       return null;

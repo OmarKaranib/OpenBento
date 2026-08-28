@@ -10,3 +10,9 @@ test('all stream and library requests use the timed request helper', () => {
   assert.equal(source.match(/await fetchStreamApi\(/g)?.length, 10);
   assert.equal(source.match(/await fetch\(/g)?.length ?? 0, 0);
 });
+
+test('the legacy video refresh reaches its cache fallback after a deadline', () => {
+  const source = readFileSync('client/src/lib/video-cache.ts', 'utf8');
+
+  assert.match(source, /api\/live-video[\s\S]*signal: requestTimeoutSignal\(\)/);
+});
