@@ -29,3 +29,10 @@ test('the polling RSS widget gives each request a deadline', () => {
   assert.match(widget, /requestTimeoutSignal/);
   assert.match(widget, /api\/rss[\s\S]*signal: requestTimeoutSignal\(\)/);
 });
+
+test('the polling Network Light gives each request a deadline', () => {
+  const widget = readFileSync('client/src/widgets/network-light-widget.tsx', 'utf8');
+
+  assert.match(widget, /requestTimeoutSignal/);
+  assert.match(widget, /api\/ping[\s\S]*signal: requestTimeoutSignal\(\)/);
+});

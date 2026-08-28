@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Activity, Settings as SettingsIcon, X as XIcon } from 'lucide-react';
 import { MONO, Widget, isLightBg, normalizeUrl, qrIconBtnStyle, qrInputStyle } from './shared';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 interface NetworkLightProps {
   widget: Widget;
@@ -43,7 +44,9 @@ export const NetworkLightWidget: React.FC<NetworkLightProps> = ({ widget, onUpda
     const ping = async () => {
       setPinging(true);
       try {
-        const r = await fetch(`/api/ping?url=${encodeURIComponent(url)}`);
+        const r = await fetch(`/api/ping?url=${encodeURIComponent(url)}`, {
+          signal: requestTimeoutSignal(),
+        });
         const body: PingResult = await r.json();
         if (!cancelled) setResult(body);
       } catch (err: unknown) {
