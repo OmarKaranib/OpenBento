@@ -23,6 +23,7 @@
   import { WidgetRenderer } from '@/widgets/widget-renderer';
   import { extractKickChannel, extractTwitchChannel } from '@/lib/stream-url';
   import { initialWidgetLiveState } from '@/lib/stream-live-status';
+  import { requestTimeoutSignal } from '@/lib/request-timeout';
   import { useCloudSync } from '@/dashboard/use-cloud-sync';
   import {
     type DashboardPagesState,
@@ -54,7 +55,9 @@
 
   async function fetchYouTubeTitle(videoId: string): Promise<string> {
   try {
-    const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
+    const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`, {
+      signal: requestTimeoutSignal(),
+    });
     if (!res.ok) throw new Error(`noembed ${res.status}`);
     const data = await res.json();
     if (data?.title && typeof data.title === 'string' && data.title.trim()) return data.title.trim();

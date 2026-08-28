@@ -80,3 +80,9 @@ test('Wordle reaches its offline fallback after a request deadline', () => {
 
   assert.match(widget, /api\/wordle\/today[\s\S]*signal: requestTimeoutSignal\(\)/);
 });
+
+test('YouTube title lookup reaches its video-ID fallback after a deadline', () => {
+  const shell = readFileSync('client/src/dashboard/dashboard-shell.tsx', 'utf8');
+
+  assert.match(shell, /noembed\.com[\s\S]*signal: requestTimeoutSignal\(\)/);
+});
