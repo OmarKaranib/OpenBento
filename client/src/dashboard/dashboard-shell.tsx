@@ -21,6 +21,7 @@
   import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
   import type { Widget, WidgetType } from '@/widgets/shared';
   import { WidgetRenderer } from '@/widgets/widget-renderer';
+  import { extractKickChannel, extractTwitchChannel } from '@/lib/stream-url';
   import { useCloudSync } from '@/dashboard/use-cloud-sync';
   import {
     type DashboardPagesState,
@@ -332,17 +333,6 @@ const extractYouTubeChannelId = (url: string): string | null => {
   const m = url.match(/youtube\.com\/@([a-zA-Z0-9_-]+)/) ||
             url.match(/youtube\.com\/channel\/([a-zA-Z0-9_-]+)/) ||
             url.match(/youtube\.com\/c\/([a-zA-Z0-9_-]+)/);
-  return m ? m[1] : null;
-};
-
-const extractTwitchChannel = (url: string): string | null => {
-  const m = url.match(/(?:twitch\.tv\/)([a-zA-Z0-9_]+)/) ||
-            url.match(/player\.twitch\.tv\/.*[?&]channel=([a-zA-Z0-9_]+)/);
-  return m ? m[1] : null;
-};
-
-const extractKickChannel = (url: string): string | null => {
-  const m = url.match(/(?:kick\.com\/)([a-zA-Z0-9_-]+)/);
   return m ? m[1] : null;
 };
 
