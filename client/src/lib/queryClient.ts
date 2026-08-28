@@ -1,6 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { buildApiHeaders, shouldAttachAdminToken } from "@/lib/api-auth";
+import { requestTimeoutSignal } from "@/lib/request-timeout";
 
 async function getRequestHeaders(url: string, hasJsonBody: boolean): Promise<Record<string, string>> {
   // Admin routes are protected by Supabase. Send the current user's access
@@ -34,6 +35,7 @@ export async function apiRequest(
     headers: await getRequestHeaders(url, data !== undefined),
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
+    signal: requestTimeoutSignal(),
   });
 
   await throwIfResNotOk(res);
@@ -45,11 +47,12 @@ export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
+  async ({ queryKey, signal }) => {
     const url = queryKey.join("/") as string;
     const res = await fetch(url, {
       headers: await getRequestHeaders(url, false),
       credentials: "include",
+      signal: requestTimeoutSignal(undefined, signal),
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
