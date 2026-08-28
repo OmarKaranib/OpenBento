@@ -7,6 +7,7 @@ import {
   moveSymbol as moveSymbolHelper,
   removeSymbol as removeSymbolHelper,
 } from '@/lib/markets-symbols';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 interface MarketEntry {
   symbol: string;
@@ -105,7 +106,9 @@ export const MarketsTickerWidget: React.FC<MarketsTickerWidgetProps> = ({ widget
     let mounted = true;
     const fetchMarkets = async () => {
       try {
-        const resp = await fetch(`/api/markets?symbols=${encodeURIComponent(symbolsKey)}`);
+        const resp = await fetch(`/api/markets?symbols=${encodeURIComponent(symbolsKey)}`, {
+          signal: requestTimeoutSignal(),
+        });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         if (mounted) {
