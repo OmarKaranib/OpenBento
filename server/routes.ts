@@ -15,6 +15,7 @@ import { LruTtlCache } from "./services/lruCache";
 import { attachSupabaseUser as attachSupabaseUserShared } from "./services/supabaseAuth";
 import { FixedWindowRateLimiter } from "./services/fixed-window-rate-limit";
 import { streamHealRequestSchema } from "./services/stream-heal-guard";
+import { parseWeatherLookup } from "./services/weather-query";
 
 // Admin email list - used for admin access only
 const ADMIN_EMAILS = [
@@ -1002,19 +1003,15 @@ export async function registerRoutes(
       return res.status(503).json({ error: 'Weather API key not configured' });
     }
 
-    const latParam = req.query.lat as string | undefined;
-    const lonParam = req.query.lon as string | undefined;
-    const cityParam = req.query.city as string | undefined;
-    const lat = latParam !== undefined ? Number(latParam) : NaN;
-    const lon = lonParam !== undefined ? Number(lonParam) : NaN;
-    const useCoords = Number.isFinite(lat) && Number.isFinite(lon);
+    const lookupResult = parseWeatherLookup(req.query);
+    if (!lookupResult.ok) return res.status(400).json({ error: lookupResult.error });
+    const lookup = lookupResult.lookup;
 
     let url: string;
-    if (useCoords) {
-      url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+    if (lookup.kind === 'coordinates') {
+      url = `https://api.openweathermap.org/data/2.5/weather?lat=${lookup.lat}&lon=${lookup.lon}&appid=${apiKey}&units=metric`;
     } else {
-      const city = cityParam || 'London';
-      url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`;
+      url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(lookup.city)}&appid=${apiKey}&units=metric`;
     }
 
     try {
@@ -1027,8 +1024,8 @@ export async function registerRoutes(
       const data = await resp.json();
       const mapped = {
         city: data.name,
-        lat: data.coord?.lat ?? (useCoords ? lat : null),
-        lon: data.coord?.lon ?? (useCoords ? lon : null),
+        lat: data.coord?.lat ?? (lookup.kind === 'coordinates' ? lookup.lat : null),
+        lon: data.coord?.lon ?? (lookup.kind === 'coordinates' ? lookup.lon : null),
         tempC: Math.round(data.main.temp),
         tempF: Math.round(data.main.temp * 9 / 5 + 32),
         condition: data.weather?.[0]?.main || 'Unknown',
@@ -1057,19 +1054,15 @@ export async function registerRoutes(
       return res.status(503).json({ error: 'Weather API key not configured' });
     }
 
-    const latParam = req.query.lat as string | undefined;
-    const lonParam = req.query.lon as string | undefined;
-    const cityParam = req.query.city as string | undefined;
-    const lat = latParam !== undefined ? Number(latParam) : NaN;
-    const lon = lonParam !== undefined ? Number(lonParam) : NaN;
-    const useCoords = Number.isFinite(lat) && Number.isFinite(lon);
+    const lookupResult = parseWeatherLookup(req.query);
+    if (!lookupResult.ok) return res.status(400).json({ error: lookupResult.error });
+    const lookup = lookupResult.lookup;
 
     let url: string;
-    if (useCoords) {
-      url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+    if (lookup.kind === 'coordinates') {
+      url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lookup.lat}&lon=${lookup.lon}&appid=${apiKey}&units=metric`;
     } else {
-      const city = cityParam || 'London';
-      url = `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`;
+      url = `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(lookup.city)}&appid=${apiKey}&units=metric`;
     }
 
     try {
@@ -1130,8 +1123,8 @@ export async function registerRoutes(
 
       res.json({
         city: data.city?.name ?? null,
-        lat: data.city?.coord?.lat ?? (useCoords ? lat : null),
-        lon: data.city?.coord?.lon ?? (useCoords ? lon : null),
+        lat: data.city?.coord?.lat ?? (lookup.kind === 'coordinates' ? lookup.lat : null),
+        lon: data.city?.coord?.lon ?? (lookup.kind === 'coordinates' ? lookup.lon : null),
         days,
       });
     } catch (err) {
