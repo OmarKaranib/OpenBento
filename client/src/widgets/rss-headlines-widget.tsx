@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Rss, Settings as SettingsIcon } from 'lucide-react';
 import { MONO, RefreshIndicator, Widget, qrIconBtnStyle, qrInputStyle, timeAgo } from './shared';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 
   interface RSSHeadlinesProps {
@@ -33,7 +34,9 @@ import { MONO, RefreshIndicator, Widget, qrIconBtnStyle, qrInputStyle, timeAgo }
     const run = async () => {
       setLoading(true);
       try {
-        const r = await fetch(`/api/rss?url=${encodeURIComponent(url)}`);
+        const r = await fetch(`/api/rss?url=${encodeURIComponent(url)}`, {
+          signal: requestTimeoutSignal(),
+        });
         const body = await r.json();
         if (cancelled) return;
         if (!r.ok) {
