@@ -7,6 +7,7 @@ import {
 } from '@/data/starter-packs';
 import type { TrendingChannel } from '@/components/widget-sidebar';
 import type { Widget } from '@/App';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 export const ONBOARDING_FLAG = 'openBentoOnboarded';
 export const REPLAY_EVENT = 'openbento:replay-onboarding';
@@ -46,7 +47,7 @@ export function OnboardingFlow({
   // Pre-fetch live channel data so video starter packs get fresh videoIds
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/links')
+    fetch('/api/links', { signal: requestTimeoutSignal() })
       .then(r => (r.ok ? r.json() : null))
       .then(data => {
         if (cancelled) return;

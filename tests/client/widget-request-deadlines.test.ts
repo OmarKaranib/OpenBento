@@ -86,3 +86,9 @@ test('YouTube title lookup reaches its video-ID fallback after a deadline', () =
 
   assert.match(shell, /noembed\.com[\s\S]*signal: requestTimeoutSignal\(\)/);
 });
+
+test('onboarding channel preload has a deadline', () => {
+  const onboarding = readFileSync('client/src/components/onboarding-flow.tsx', 'utf8');
+
+  assert.match(onboarding, /fetch\('\/api\/links', \{ signal: requestTimeoutSignal\(\) \}\)/);
+});
