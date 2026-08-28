@@ -60,6 +60,10 @@ const kickStatusRateLimit = new FixedWindowRateLimiter({
   windowMs: 10 * 60 * 1000,
   maxAttempts: 60,
 });
+const publicDataRateLimit = new FixedWindowRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 120,
+});
 
 const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 const KICK_CHANNEL_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
@@ -989,6 +993,10 @@ export async function registerRoutes(
   // response always includes lat/lon so the client can request the matching
   // forecast without a second geocoding round-trip.
   app.get('/api/weather', async (req: Request, res: Response) => {
+    if (!publicDataRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ error: 'Too many public data requests. Please try again later.' });
+    }
+
     const apiKey = process.env.WEATHER_API_KEY;
     if (!apiKey) {
       return res.status(503).json({ error: 'Weather API key not configured' });
@@ -1040,6 +1048,10 @@ export async function registerRoutes(
   // Returns the next 3 days (excluding today) with min/max temps and the
   // representative icon. Accepts ?lat=&lon= or ?city=.
   app.get('/api/weather/forecast', async (req: Request, res: Response) => {
+    if (!publicDataRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ error: 'Too many public data requests. Please try again later.' });
+    }
+
     const apiKey = process.env.WEATHER_API_KEY;
     if (!apiKey) {
       return res.status(503).json({ error: 'Weather API key not configured' });
@@ -1151,6 +1163,10 @@ export async function registerRoutes(
   ]);
 
   app.get('/api/news', async (req: Request, res: Response) => {
+    if (!publicDataRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ error: 'Too many public data requests. Please try again later.' });
+    }
+
     const apiKey = process.env.NEWS_API_KEY;
     if (!apiKey) {
       return res.status(503).json({ error: 'News API key not configured' });
