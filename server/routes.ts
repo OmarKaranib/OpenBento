@@ -1010,7 +1010,7 @@ export async function registerRoutes(
     }
 
     try {
-      const resp = await fetch(url);
+      const resp = await fetch(url, { signal: AbortSignal.timeout(8_000) });
       if (!resp.ok) {
         const body = await resp.text();
         console.error(`[Weather] OpenWeatherMap error ${resp.status}: ${body}`);
@@ -1061,7 +1061,7 @@ export async function registerRoutes(
     }
 
     try {
-      const resp = await fetch(url);
+      const resp = await fetch(url, { signal: AbortSignal.timeout(8_000) });
       if (!resp.ok) {
         const body = await resp.text();
         console.error(`[Weather Forecast] OpenWeatherMap error ${resp.status}: ${body}`);
@@ -1179,7 +1179,7 @@ export async function registerRoutes(
       }
       params.set('apiKey', apiKey);
       const url = `https://newsapi.org/v2/top-headlines?${params.toString()}`;
-      const resp = await fetch(url);
+      const resp = await fetch(url, { signal: AbortSignal.timeout(8_000) });
       if (!resp.ok) {
         const body = await resp.text();
         console.error(`[News] NewsAPI error ${resp.status}: ${body}`);
