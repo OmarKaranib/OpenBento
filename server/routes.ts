@@ -69,6 +69,10 @@ const githubLookupRateLimit = new FixedWindowRateLimiter({
   windowMs: 10 * 60 * 1000,
   maxAttempts: 60,
 });
+const rssLookupRateLimit = new FixedWindowRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 60,
+});
 
 const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 const KICK_CHANNEL_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
@@ -1635,6 +1639,14 @@ export async function registerRoutes(
     if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
       return res.status(400).json({ error: 'Only http(s) URLs are allowed' });
     }
+    const cacheKey = normalizeFeedUrl(parsedUrl);
+    const fresh = RSS_CACHE.get(cacheKey);
+    if (fresh) {
+      return res.json(fresh);
+    }
+    if (!rssLookupRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ error: 'Too many feed lookups. Please try again later.' });
+    }
     // SSRF guard helper: resolve hostname and verify EVERY A/AAAA record is
     // a public address. Hostnames that are themselves IP literals skip DNS.
     // Throws on failure with a stable message we surface to the caller.
@@ -1661,11 +1673,6 @@ export async function registerRoutes(
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Validation failed';
       return res.status(400).json({ error: msg });
-    }
-    const cacheKey = normalizeFeedUrl(parsedUrl);
-    const fresh = RSS_CACHE.get(cacheKey);
-    if (fresh) {
-      return res.json(fresh);
     }
     const stale = RSS_CACHE.get(cacheKey, true);
 
