@@ -62,3 +62,9 @@ test('Dictionary searches have a deadline', () => {
 
   assert.match(widget, /api\.dictionaryapi\.dev[\s\S]*signal: requestTimeoutSignal\(\)/);
 });
+
+test('On This Day loads have a deadline', () => {
+  const widget = readFileSync('client/src/widgets/on-this-day-widget.tsx', 'utf8');
+
+  assert.match(widget, /api\/onthisday[\s\S]*signal: requestTimeoutSignal\(\)/);
+});

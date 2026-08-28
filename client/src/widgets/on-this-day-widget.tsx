@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, RefreshCw, Settings as SettingsIcon, X as XIcon } from 'lucide-react';
 import { MONO, Widget, isLightBg, qrIconBtnStyle, qrInputStyle, qrLabelStyle } from './shared';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 interface Props { widget: Widget; onUpdate?: (id: string, patch: Partial<Widget>) => void; }
 
@@ -29,7 +30,7 @@ export const OnThisDayWidget: React.FC<Props> = ({ widget, onUpdate }) => {
   const load = async () => {
     setLoading(true); setErr(null);
     try {
-      const r = await fetch('/api/onthisday');
+      const r = await fetch('/api/onthisday', { signal: requestTimeoutSignal() });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = (await r.json()) as Payload;
       setPayload(j);
