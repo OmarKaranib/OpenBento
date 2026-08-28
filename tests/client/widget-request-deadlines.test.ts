@@ -74,3 +74,9 @@ test('Trivia loads and refreshes have a deadline', () => {
 
   assert.match(widget, /api\/trivia[\s\S]*signal: requestTimeoutSignal\(\)/);
 });
+
+test('Wordle reaches its offline fallback after a request deadline', () => {
+  const widget = readFileSync('client/src/widgets/wordle-widget.tsx', 'utf8');
+
+  assert.match(widget, /api\/wordle\/today[\s\S]*signal: requestTimeoutSignal\(\)/);
+});

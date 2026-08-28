@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Delete, Puzzle } from 'lucide-react';
 import { MONO, Widget, isLightBg } from './shared';
 import { evaluateWordleGuess, pickDailyWord, utcDateKey, WORDLE_ANSWERS } from './play-helpers';
+import { requestTimeoutSignal } from '@/lib/request-timeout';
 
 interface WordleTodayResp { date: string; answer: string; }
 
@@ -60,7 +61,7 @@ export const WordleWidget: React.FC<Props> = ({ widget, onUpdate }) => {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch('/api/wordle/today');
+        const r = await fetch('/api/wordle/today', { signal: requestTimeoutSignal() });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const j = await r.json() as WordleTodayResp;
         if (cancelled) return;
