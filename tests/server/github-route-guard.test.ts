@@ -14,3 +14,20 @@ test('GitHub widget requests validate names, cache results, and time out', () =>
   assert.match(githubRoutes, /GITHUB_USER_CACHE\.dedupe\(cacheKey/);
   assert.equal(githubRoutes.match(/AbortSignal\.timeout\(8_000\)/g)?.length, 6);
 });
+
+test('uncached GitHub widget lookups share an abuse limit', () => {
+  const routes = readFileSync('server/routes.ts', 'utf8');
+  const githubRoutes = routes.slice(
+    routes.indexOf('// ─── GitHub Pulse API'),
+    routes.indexOf('// ─── RSS / Atom Feed API'),
+  );
+
+  assert.equal(
+    githubRoutes.match(/githubLookupRateLimit\.allow\(requestIp\(req\)\)/g)?.length,
+    2,
+  );
+  assert.equal(
+    githubRoutes.match(/Too many GitHub lookups\. Please try again later\./g)?.length,
+    2,
+  );
+});

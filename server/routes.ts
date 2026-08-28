@@ -65,6 +65,10 @@ const publicDataRateLimit = new FixedWindowRateLimiter({
   windowMs: 10 * 60 * 1000,
   maxAttempts: 120,
 });
+const githubLookupRateLimit = new FixedWindowRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 60,
+});
 
 const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 const KICK_CHANNEL_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
@@ -1321,6 +1325,9 @@ export async function registerRoutes(
     if (fresh) {
       return res.json(fresh);
     }
+    if (!githubLookupRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ error: 'Too many GitHub lookups. Please try again later.' });
+    }
     // Stale entry kept around for fallback if upstream fails or rate-limits.
     const stale = GITHUB_CACHE.get(cacheKey, true);
 
@@ -1451,6 +1458,9 @@ export async function registerRoutes(
     const cacheKey = owner.toLowerCase();
     const fresh = GITHUB_USER_CACHE.get(cacheKey);
     if (fresh) return res.json(fresh);
+    if (!githubLookupRateLimit.allow(requestIp(req))) {
+      return res.status(429).json({ error: 'Too many GitHub lookups. Please try again later.' });
+    }
     const stale = GITHUB_USER_CACHE.get(cacheKey, true);
 
     const headers: Record<string, string> = {
