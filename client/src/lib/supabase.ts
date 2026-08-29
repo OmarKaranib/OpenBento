@@ -11,7 +11,7 @@ const isConfigured = supabaseUrl &&
   supabaseUrl.startsWith('https://') && 
   !supabaseUrl.includes('${');
 
-if (!isConfigured) {
+if (!isConfigured && typeof window !== 'undefined') {
   console.warn('Supabase credentials not configured. Auth features will be disabled. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
 }
 
