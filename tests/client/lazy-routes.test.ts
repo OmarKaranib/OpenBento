@@ -42,3 +42,8 @@ test("feature modules do not import through App and pull the route tree into the
     assert.doesNotMatch(source, /from\s+['\"]@\/App['\"]/);
   }
 });
+
+test("the dashboard does not pretend its already-loaded channel constants are a separate chunk", async () => {
+  const source = await readFile("client/src/pages/dashboard.tsx", "utf8");
+  assert.doesNotMatch(source, /import\(['\"]@\/lib\/channel-constants['\"]\)/);
+});

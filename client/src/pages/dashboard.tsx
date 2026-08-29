@@ -31,6 +31,7 @@ import { PageTabsStrip } from '@/components/page-tabs-strip';
 import type { DashboardPage } from '@shared/dashboard-pages';
 import { checkVideoLiveStatus, searchChannelLiveStream } from '@/lib/stream-api';
 import { isRefreshableVideoWidget, refreshVideoWidget } from '@/lib/video-refresh';
+import { getFallbackVideoId } from '@/lib/channel-constants';
 import { buildKickEmbedUrl, buildTwitchEmbedUrl, currentEmbedOrigin } from '@/lib/stream-embed-url';
 import {
   manualYouTubeCheckAction,
@@ -570,9 +571,6 @@ const MasterControlDashboard = ({
 
   const handleVideoError = useCallback(async (widget: Widget, errorCode?: number) => {
     console.log(`[Self-Healing] Error detected for widget: ${widget.id}, errorCode: ${errorCode}`);
-
-    // Import hardcoded fallback helper from shared constants (avoids circular import)
-    const { getFallbackVideoId } = await import('@/lib/channel-constants');
 
     // THE 150/101 OVERRIDE: Force latestVideoId fallback on restriction errors
     // Both errors swap to latestVideoId without showing "Unavailable" screen
