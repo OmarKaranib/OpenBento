@@ -47,3 +47,8 @@ test("the dashboard does not pretend its already-loaded channel constants are a 
   const source = await readFile("client/src/pages/dashboard.tsx", "utf8");
   assert.doesNotMatch(source, /import\(['\"]@\/lib\/channel-constants['\"]\)/);
 });
+
+test("the sidebar does not pretend its already-loaded library sync is a separate chunk", async () => {
+  const source = await readFile("client/src/components/widget-sidebar.tsx", "utf8");
+  assert.doesNotMatch(source, /import\(['\"]@\/lib\/personal-library-sync['\"]\)/);
+});
