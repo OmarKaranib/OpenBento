@@ -1005,7 +1005,7 @@ const MasterControlDashboard = ({
         func: command,
         args: value !== undefined ? [value] : []
       };
-      iframe.contentWindow.postMessage(JSON.stringify(message), '*');
+      iframe.contentWindow.postMessage(JSON.stringify(message), 'https://www.youtube.com');
     }
   }, []);
 
