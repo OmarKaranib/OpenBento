@@ -3,7 +3,7 @@ import { Volume2, VolumeX, Volume1, Plus, Save, Power, X, ChevronDown, Edit3, Re
 import { Link, useLocation } from 'wouter';
 import { CommandPalette } from '@/components/command-palette';
 import type { CommandHostBag } from '@/lib/command-palette-helpers';
-import { ADMIN_EMAIL } from '@/pages/admin';
+import { isAdminEmail } from '@shared/admin-access';
 import { UniqueIdentifier } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -1866,7 +1866,7 @@ const MasterControlDashboard = ({
                   <ChevronDown className="w-[1.2rem] h-[1.2rem]" />
                 </button>
                 <div className="absolute right-0 top-full mt-[0.4rem] w-[16rem] bg-slate-800 border border-slate-600 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                  {user.email === ADMIN_EMAIL && (
+                  {isAdminEmail(user.email) && (
                     <Link href="/admin">
                       <a
                         className="flex items-center gap-[0.8rem] px-[1.2rem] py-[1rem] text-[1.2rem] text-cyan-400 hover:bg-slate-700 transition-colors rounded-t-lg"

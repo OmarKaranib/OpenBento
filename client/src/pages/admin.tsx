@@ -11,13 +11,7 @@ import { requestTimeoutSignal } from '@/lib/request-timeout';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-
-export const ADMIN_EMAILS = [
-  'legionofoogabooga@gmail.com',
-  'omar.karanib@anculabs.com',
-];
-
-export const ADMIN_EMAIL = ADMIN_EMAILS[0]; // For backwards compatibility
+import { isAdminEmail } from '@shared/admin-access';
 
 interface Channel {
   id: string;
@@ -318,7 +312,7 @@ export default function Admin() {
     alert(`Purge complete! Soft-deleted ${deletedCount} broken channels (they can be restored).`);
   };
 
-  const isAdmin = isAuthenticated && ADMIN_EMAILS.includes(user?.email?.toLowerCase() || '');
+  const isAdmin = isAuthenticated && isAdminEmail(user?.email);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && !isAdmin) {
@@ -642,9 +636,9 @@ export default function Admin() {
                   {filteredUsers.map((u) => (
                     <div key={u.id} className="flex items-center gap-3 p-3 bg-slate-800 rounded-lg">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        ADMIN_EMAILS.includes(u.email?.toLowerCase() || '') ? 'bg-cyan-500/20' : 'bg-slate-700'
+                        isAdminEmail(u.email) ? 'bg-cyan-500/20' : 'bg-slate-700'
                       }`}>
-                        <Users className={`w-5 h-5 ${ADMIN_EMAILS.includes(u.email?.toLowerCase() || '') ? 'text-cyan-400' : 'text-slate-400'}`} />
+                        <Users className={`w-5 h-5 ${isAdminEmail(u.email) ? 'text-cyan-400' : 'text-slate-400'}`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-medium truncate">{u.email}</p>
@@ -654,7 +648,7 @@ export default function Admin() {
                           }`}>
                             {u.provider}
                           </span>
-                          {ADMIN_EMAILS.includes(u.email?.toLowerCase() || '') && (
+                          {isAdminEmail(u.email) && (
                             <span className="px-2 py-0.5 rounded text-xs bg-cyan-500/20 text-cyan-400">Admin</span>
                           )}
                           {u.emailConfirmed && (

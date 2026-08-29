@@ -16,16 +16,7 @@ import { attachSupabaseUser as attachSupabaseUserShared } from "./services/supab
 import { FixedWindowRateLimiter } from "./services/fixed-window-rate-limit";
 import { streamHealRequestSchema } from "./services/stream-heal-guard";
 import { parseWeatherLookup, weatherLookupCacheKey } from "./services/weather-query";
-
-// Admin email list - used for admin access only
-const ADMIN_EMAILS = [
-  'legionofoogabooga@gmail.com',
-  'omar.karanib@anculabs.com',
-];
-
-const isAdminEmail = (email: string): boolean => {
-  return ADMIN_EMAILS.includes(email?.toLowerCase() || '');
-};
+import { isAdminEmail } from "@shared/admin-access";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Supabase Bearer-token middleware.
