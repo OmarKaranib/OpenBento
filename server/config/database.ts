@@ -14,9 +14,9 @@ export function requireDatabaseUrl(
   env: NodeJS.ProcessEnv = process.env,
   options: DatabaseUrlOptions = {},
 ): string {
-  const raw = env.DATABASE_URL?.trim();
+  const raw = env.SUPABASE_DATABASE_URL?.trim() || env.DATABASE_URL?.trim();
   if (!raw) {
-    throw new Error("DATABASE_URL is required. Use the PostgreSQL connection string from Supabase.");
+    throw new Error("SUPABASE_DATABASE_URL or DATABASE_URL is required. Use the PostgreSQL connection string from Supabase.");
   }
 
   let parsed: URL;

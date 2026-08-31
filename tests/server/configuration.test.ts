@@ -12,6 +12,17 @@ test("production database configuration accepts Supabase hosts", () => {
   assert.equal(requireDatabaseUrl({ DATABASE_URL: pooler, NODE_ENV: "production" }), pooler);
 });
 
+test("Supabase database setting overrides Replit's managed database setting", () => {
+  const supabase = "postgresql://user:pass@aws-0-region.pooler.supabase.com:6543/postgres";
+  const replit = "postgresql://user:pass@replit-database.example.com:5432/app";
+
+  assert.equal(requireDatabaseUrl({
+    SUPABASE_DATABASE_URL: supabase,
+    DATABASE_URL: replit,
+    NODE_ENV: "production",
+  }), supabase);
+});
+
 test("production database configuration rejects non-Supabase hosts", () => {
   assert.throws(
     () => requireDatabaseUrl({

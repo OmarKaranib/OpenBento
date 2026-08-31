@@ -126,7 +126,7 @@ development. Keep all real values out of git.
 Server-side variables:
 
 ```bash
-DATABASE_URL=
+SUPABASE_DATABASE_URL=
 YOUTUBE_API_KEY=
 OPENWEATHER_API_KEY=
 NEWS_API_KEY=
@@ -146,7 +146,7 @@ VITE_SUPABASE_ANON_KEY=
 
 Notes:
 
-- In production, `DATABASE_URL` must be a Supabase PostgreSQL connection string.
+- In production, `SUPABASE_DATABASE_URL` must be a Supabase PostgreSQL connection string. `DATABASE_URL` remains available as a fallback outside Replit.
 - `RESEND_FROM_EMAIL` must use a sender/domain verified in your Resend account.
 - `VITE_*` variables are exposed to browser code. Only put public client values
   there.
