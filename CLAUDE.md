@@ -75,7 +75,7 @@ Uses **Wouter** (not React Router). Routes defined in `client/src/App.tsx`:
 Required at runtime:
 - `DATABASE_URL` — Supabase PostgreSQL connection string in production
 - `YOUTUBE_API_KEY`
-- `OPENWEATHER_API_KEY`, `NEWS_API_KEY`
+- `WEATHER_API_KEY`, `NEWS_API_KEY`
 - `RESEND_API_KEY`
 - `RESEND_FROM_EMAIL`
 - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (client-side)
